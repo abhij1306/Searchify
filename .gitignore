@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+*.env
+!.env.example
+infra/docker/.env
+
+# Node / frontend (F1+)
+node_modules/
+.next/
+
+# OS
+.DS_Store
