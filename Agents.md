@@ -30,15 +30,30 @@ for the per-surface MVP/roadmap marker.
 
 - **All ids are string UUIDs.** Workspace-scoped. **No `user_id` scoping. No integer PKs.**
 - **API prefix `/api/v1`** (the reference `/api/ai-visibility` prefix is dropped).
-- **Logical engines**: `chatgpt | gemini | claude`. **MVP transports**: `anthropic | google
-  | openrouter`. `openai` (direct) is **reserved — fast-follow, disabled at MVP**; `chatgpt`
-  reaches MVP via `openrouter`.
+- **Logical engines**: `chatgpt | gemini | claude` (what the user asked for). **Active
+  transports** (how we physically reach an engine) are **exactly** `openai | anthropic |
+  google`, one approved route per engine: `chatgpt → openai → gpt-5.4`, `claude → anthropic
+  → claude-sonnet-4-6`, `gemini → google → gemini-flash-latest`. `openrouter` is **retired
+  as an active transport** — it survives ONLY as a HISTORICAL token so old rows read safely
+  (never an active/approved/write route). ChatGPT runs through the **direct OpenAI Responses
+  API** (`backend/app/connectors/answer_engines/openai.py`); the OpenRouter adapter/parser
+  were deleted. See `backend/app/core/config/provider_catalog.py`
+  (`ACTIVE_TRANSPORTS` / `HISTORICAL_TRANSPORTS` / `APPROVED_ROUTES`) and migration
+  `migrations/versions/0008_direct_openai_retirement.py` (marker `openrouter_retired_v2`).
 - `benchmark_mode`: `consumer_like | controlled_localized | forced_grounded`.
 - Prompt `intent`: `discovery | comparison | purchase | service | local`.
 - Browser → backend is **same-origin** via Next.js `rewrites()` (`/api/:path*` → server-only
   `BACKEND_ORIGIN`); the browser never sees a cross-origin backend URL.
-- MVP dashboard is a **single-run / selected-run projection** — no cross-run trend at MVP
-  (trend is roadmap). **Sentiment + avg-position are NOT computed** at MVP (nullable/roadmap).
+- `/visibility` is a **four-tab workspace** with a shared filter bar: **Overview** (default;
+  selected-run score / share-of-voice / provider comparison / rankings), **Trends** (cross-run
+  metrics + charts from persisted `MetricSnapshot` rows), **Mentions & Citations** and **Query
+  Fanout** (both read the shared persisted evidence dataset `GET
+  /api/v1/projects/{project_id}/visibility/evidence` →
+  `VisibilityEvidenceResponse{items, truncated}`). Only ONE panel renders at a time; the active
+  tab is mirrored in `?tab=`; the tablist is WAI-ARIA compliant. There are NO Sources / Topics /
+  Sentiment tabs and no disabled / "coming soon" tabs. **Sentiment + avg-position are still NOT
+  computed** and render as an em-dash (`—`). Query Fanout has three states:
+  `queries_available | count_only | no_search`.
 
 ## Read-on-demand doc guide
 

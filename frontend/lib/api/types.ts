@@ -19,6 +19,7 @@ import type {
   executionEvidenceSchema,
   executionSchema,
   executionStatusSchema,
+  historicalTransportProviderSchema,
   logicalEngineSchema,
   projectSchema,
   promptIntentSchema,
@@ -30,9 +31,16 @@ import type {
   rankingRowSchema,
   sessionUserSchema,
   transportProviderSchema,
-  uiTransportProviderSchema,
   visibilityEngineSchema,
+  visibilityEvidenceResponseSchema,
+  visibilityEvidenceSearchEventSchema,
+  visibilityExecutionEvidenceSchema,
+  visibilityFanoutStateSchema,
+  visibilityMentionEvidenceSchema,
   visibilitySchema,
+  visibilityTrendPointSchema,
+  visibilityTrendRankingRowSchema,
+  visibilityTrendSovSchema,
   workspaceSchema,
 } from './schemas';
 
@@ -46,8 +54,8 @@ export type PromptSet = z.infer<typeof promptSetSchema>;
 export type BenchmarkMode = z.infer<typeof benchmarkModeSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type TransportProvider = z.infer<typeof transportProviderSchema>;
-/** Wider UI-only transport space including the reserved/disabled `openai`. */
-export type UiTransportProvider = z.infer<typeof uiTransportProviderSchema>;
+/** Historical transport space including the retired `openrouter` (read DTOs). */
+export type HistoricalTransportProvider = z.infer<typeof historicalTransportProviderSchema>;
 export type LogicalEngine = z.infer<typeof logicalEngineSchema>;
 export type ProviderConnection = z.infer<typeof providerConnectionSchema>;
 export type ProviderRoute = z.infer<typeof providerRouteSchema>;
@@ -63,3 +71,11 @@ export type ExecutionEvidence = z.infer<typeof executionEvidenceSchema>;
 export type VisibilityEngine = z.infer<typeof visibilityEngineSchema>;
 export type RankingRow = z.infer<typeof rankingRowSchema>;
 export type Visibility = z.infer<typeof visibilitySchema>;
+export type VisibilityTrendSov = z.infer<typeof visibilityTrendSovSchema>;
+export type VisibilityTrendRankingRow = z.infer<typeof visibilityTrendRankingRowSchema>;
+export type VisibilityTrendPoint = z.infer<typeof visibilityTrendPointSchema>;
+export type VisibilityFanoutState = z.infer<typeof visibilityFanoutStateSchema>;
+export type VisibilityEvidenceSearchEvent = z.infer<typeof visibilityEvidenceSearchEventSchema>;
+export type VisibilityMentionEvidence = z.infer<typeof visibilityMentionEvidenceSchema>;
+export type VisibilityExecutionEvidence = z.infer<typeof visibilityExecutionEvidenceSchema>;
+export type VisibilityEvidenceResponse = z.infer<typeof visibilityEvidenceResponseSchema>;

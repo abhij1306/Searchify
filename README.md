@@ -45,8 +45,8 @@ Browser ──/api/:path*── Next.js (rewrites, same-origin proxy) ──> Fa
                                                         Postgres task queue (SKIP LOCKED)
                                                                         │
                                                                   Audit worker ──> Answer engines
-                                                                                   (BYOK: Anthropic,
-                                                                                    Google, OpenRouter)
+                                                                                   (BYOK: OpenAI,
+                                                                                    Anthropic, Google)
 ```
 
 - **Same-origin proxying.** The browser only ever calls relative `/api/*`; Next.js
@@ -212,10 +212,13 @@ pnpm test:e2e         # Playwright (requires a browser + running stack)
 
 - **Unified contract.** All ids are string UUIDs, workspace-scoped (no `user_id` scoping, no
   integer PKs). API prefix is `/api/v1`.
-- **Engines vs transports.** Logical engines are `chatgpt | gemini | claude`; MVP transports
-  are `anthropic | google | openrouter`. Direct `openai` is reserved (disabled at MVP);
-  `chatgpt` reaches MVP via OpenRouter. Every route/attempt records all three identities:
-  logical engine + transport provider + exact transport model.
+- **Engines vs transports.** Logical engines are `chatgpt | gemini | claude`; active
+  transports are exactly `openai | anthropic | google`, with one approved route per engine
+  (`chatgpt → openai → gpt-5.4`, `claude → anthropic → claude-sonnet-4-6`, `gemini → google
+  → gemini-flash-latest`). ChatGPT runs through the **direct OpenAI Responses API**.
+  `openrouter` is retired as an active transport and kept only as a read-only historical token
+  so legacy rows still render (never an active/approved route). Every route/attempt records all
+  three identities: logical engine + transport provider + exact transport model.
 - **Benchmark modes.** `consumer_like | controlled_localized | forced_grounded`.
 - **Prompt intents.** `discovery | comparison | purchase | service | local`.
 - **BYOK security.** Provider API keys are Fernet-encrypted at rest, resolved only at

@@ -1,7 +1,7 @@
 /**
  * UI primitives barrel (F3). Token-driven, bridged-token-only components.
- * Note: `trend-chart` is exported but intentionally UNUSED in the MVP UI
- * (roadmap trend view) — do not wire it into any MVP screen.
+ * Note: `trend-chart` is the single cross-run chart owner, now wired into the
+ * `/visibility` Trend view — do not add a second chart component.
  */
 export { Button, type ButtonProps } from './button';
 export { buttonVariants } from './button-variants';

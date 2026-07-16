@@ -123,13 +123,15 @@ Each logical engine can use:
 - its direct provider API; or
 - an OpenRouter transport route.
 
-**MVP route matrix (target-state direct support vs what ships in MVP).** The direct-vs-OpenRouter
-choice above is the *target-state* contract. In the MVP the supported routes are narrower:
+**Shipped route matrix (v2 direct-provider retirement).** The direct-vs-OpenRouter choice
+above is the *target-state* contract. As shipped, every engine runs through its **direct**
+transport and there is exactly one approved route per engine:
 
-- **Gemini / Google** — direct (`google`) **or** OpenRouter.
-- **Claude / Anthropic** — direct (`anthropic`) **or** OpenRouter.
-- **ChatGPT / OpenAI** — **OpenRouter only** in MVP. A direct OpenAI adapter is a reserved
-  fast-follow (see the roadmap `docs/roadmap/openai-adapter.md`), **not** in MVP scope.
+- **Gemini / Google** — direct (`google`), model `gemini-flash-latest`.
+- **Claude / Anthropic** — direct (`anthropic`), model `claude-sonnet-4-6`.
+- **ChatGPT / OpenAI** — direct (`openai`) via the **OpenAI Responses API**, model `gpt-5.4`.
+  The direct OpenAI adapter (`backend/app/connectors/answer_engines/openai.py`) is **shipped**;
+  `openrouter` is retired as an active transport (see `docs/roadmap/openai-adapter.md`).
 
 #### Discovery and analysis model
 
@@ -144,12 +146,14 @@ A separately configured model used for brand understanding, prompt suggestion, c
 - Groq;
 - other explicitly approved OpenAI-compatible endpoints.
 
-A result must always preserve both identities:
+A result must always preserve both identities. Active measurement rows now carry a direct
+transport (`openai | anthropic | google`); `openrouter` appears only on **historical** rows
+retired by migration `0008`, which must still read safely:
 
 ```text
 logical_engine = gemini
-transport_provider = openrouter
-transport_model = google/<exact-model-id>
+transport_provider = google           # active; a legacy row may read `openrouter`
+transport_model = gemini-flash-latest
 ```
 
 ---
@@ -169,7 +173,7 @@ transport_model = google/<exact-model-id>
 - CSV prompt import and export;
 - prompt review, editing, grouping, filtering, enable/disable, and deletion;
 - centralized BYOK provider settings;
-- direct and OpenRouter routes for ChatGPT, Gemini, and Claude;
+- direct measurement routes for ChatGPT (`openai`), Gemini (`google`), and Claude (`anthropic`);
 - separate discovery/analysis-model configuration;
 - one-time audit execution;
 - enabled-engine selection per audit;
@@ -877,7 +881,7 @@ Before upgrading:
 ## 18. MVP acceptance criteria
 
 1. All provider secrets are configured only in Providers & Settings.
-2. The supported MVP routes work: direct or OpenRouter for Gemini and Claude, and OpenRouter for ChatGPT/OpenAI (direct OpenAI is a post-MVP fast-follow).
+2. The supported measurement routes work: direct `google` for Gemini, direct `anthropic` for Claude, and direct `openai` (OpenAI Responses API) for ChatGPT. `openrouter` is retired as an active transport and kept read-only for historical rows.
 3. Discovery/analysis model configuration is separate.
 4. AI discovery can be skipped.
 5. Manual and CSV prompt paths work.

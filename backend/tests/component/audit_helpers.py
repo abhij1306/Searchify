@@ -13,8 +13,12 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.provider_catalog import (
+    ENGINE_CHATGPT,
+    ENGINE_CLAUDE,
     ENGINE_GEMINI,
+    TRANSPORT_ANTHROPIC,
     TRANSPORT_GOOGLE,
+    TRANSPORT_OPENAI,
     default_model,
 )
 from app.core.security import encrypt_secret
@@ -106,11 +110,7 @@ async def seed_audit_fixtures(
     # One approved connection + default route per requested engine. Gemini via
     # google is the simplest approved route; others resolve their catalog model.
     for engine in engines:
-        transport = (
-            TRANSPORT_GOOGLE
-            if engine == ENGINE_GEMINI
-            else _transport_for(engine)
-        )
+        transport = _transport_for(engine)
         connection = ProviderConnection(
             workspace_id=workspace.id,
             label=f"{engine} key",
@@ -142,15 +142,12 @@ async def seed_audit_fixtures(
 
 
 def _transport_for(engine: str) -> str:
-    from app.core.config.provider_catalog import (
-        ENGINE_CHATGPT,
-        ENGINE_CLAUDE,
-        TRANSPORT_ANTHROPIC,
-        TRANSPORT_OPENROUTER,
-    )
-
-    if engine == ENGINE_CLAUDE:
-        return TRANSPORT_ANTHROPIC
-    if engine == ENGINE_CHATGPT:
-        return TRANSPORT_OPENROUTER
-    return TRANSPORT_OPENROUTER
+    transports = {
+        ENGINE_CLAUDE: TRANSPORT_ANTHROPIC,
+        ENGINE_CHATGPT: TRANSPORT_OPENAI,
+        ENGINE_GEMINI: TRANSPORT_GOOGLE,
+    }
+    try:
+        return transports[engine]
+    except KeyError:
+        raise ValueError(f"Unsupported engine: {engine!r}") from None

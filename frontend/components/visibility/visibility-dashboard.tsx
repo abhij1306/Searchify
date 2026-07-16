@@ -1,38 +1,90 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EngineComparison } from '@/components/visibility/engine-comparison';
-import { RankingsTable } from '@/components/visibility/rankings-table';
 import { VisibilityEmptyState } from '@/components/visibility/empty-state';
-import { VisibilityScoreCard } from '@/components/visibility/score-card';
-import { VisibilityToolbar } from '@/components/visibility/visibility-toolbar';
+import { FanoutEvidence } from '@/components/visibility/fanout-evidence';
+import { MentionsCitations } from '@/components/visibility/mentions-citations';
+import { VisibilityOverview } from '@/components/visibility/visibility-overview';
+import { VisibilityTabs } from '@/components/visibility/visibility-tabs';
+import { VisibilityToolbar, type EngineFilter } from '@/components/visibility/visibility-toolbar';
+import { VisibilityTrends } from '@/components/visibility/visibility-trends';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
 import { visibilityApi } from '@/lib/api/visibility';
 import { useProjectContext } from '@/lib/project/project-context';
-import { DEFAULT_FILTERS, toRunOptions, type VisibilityFilters } from '@/lib/visibility/dashboard';
+import {
+  isEvidenceTab,
+  normalizeTab,
+  toPromptOptions,
+  toRunOptions,
+  type VisibilityTab,
+} from '@/lib/visibility/dashboard';
+import {
+  rangeToFrom,
+  type TrendGranularity,
+  type TrendRange,
+} from '@/lib/visibility/trends';
+
+/** Newest-window size for the shared execution-evidence request (backend max 500). */
+const EVIDENCE_LIMIT = 100;
 
 /**
- * Visibility dashboard container (F9).
+ * Visibility workspace container (F9, four-tab IA).
  *
  * Resolves the active project (F5 context), lists its audits to build the run
- * selector, and fetches the selected-run projection from B6's
- * `/projects/{id}/visibility?audit_id=` via `visibility.ts`. The selected run
- * defaults to the latest dashboard-ready audit; engine / prompt-type filters
- * are folded into the query key so switching them re-derives the view. Renders
- * the empty state when the project has no completed runs.
+ * selector, and orchestrates one workspace shell: a shared filter bar
+ * (`visibility-toolbar.tsx`) above an accessible tablist (`visibility-tabs.tsx`)
+ * with exactly four panels — Overview, Trends, Mentions & Citations, and Query
+ * Fanout.
+ *
+ * Shared filter STATE lives here and persists across tab switches; hidden
+ * controls keep their state. Ownership (plan §IA): selected run → Overview +
+ * both evidence tabs; logical engine → all four; prompt → both evidence tabs;
+ * date range → Trends + both evidence tabs; granularity → Trends only. When an
+ * evidence request has both `audit_id` and a date bound, the backend intersects
+ * them.
+ *
+ * The active tab is mirrored in `?tab=` (invalid values fall back to Overview)
+ * so refresh / back / forward preserve it. Only the relevant query runs per tab:
+ * the selected-run projection for Overview, the trend series for Trends, and the
+ * shared execution-evidence query (one identical cache key) for either evidence
+ * tab — so switching between the two evidence tabs reuses the cache.
  */
 export function VisibilityDashboard() {
   const { activeProject, isLoading: isProjectLoading } = useProjectContext();
   const projectId = activeProject?.id ?? null;
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlTab = normalizeTab(searchParams?.get('tab'));
+
+  // The active tab is mirrored in the URL; local state keeps it responsive and
+  // re-syncs from the URL on back/forward navigation.
+  const [activeTab, setActiveTab] = useState<VisibilityTab>(urlTab);
+  useEffect(() => {
+    setActiveTab(urlTab);
+  }, [urlTab]);
+
+  // Shared filter state (persists across tab switches).
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<VisibilityFilters>(DEFAULT_FILTERS);
+  const [engine, setEngine] = useState<EngineFilter>('all');
+  const [promptId, setPromptId] = useState<string | null>(null);
+  const [range, setRange] = useState<TrendRange>('90d');
+  const [granularity, setGranularity] = useState<TrendGranularity>('run');
+
+  function selectTab(tab: VisibilityTab) {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    params.set('tab', tab);
+    router.replace(`${pathname}?${params.toString()}`);
+  }
 
   const auditsQuery = useQuery({
     queryKey: queryKeys.runs.list({ project_id: projectId ?? '' }),
@@ -52,19 +104,100 @@ export function VisibilityDashboard() {
   }, [runOptions, selectedRunId]);
 
   const hasRuns = runOptions.length > 0;
+  const evidenceTab = isEvidenceTab(activeTab);
+  const engineParam = engine === 'all' ? undefined : engine;
+  // Resolve the range preset to a `from` bound once per range change. Computing
+  // it inline would call `new Date()` on every render and churn the query key.
+  const fromParam = useMemo(() => rangeToFrom(range), [range]);
 
+  // Overview: the selected-run projection. Enabled only on the Overview tab.
   const visibilityQuery = useQuery({
-    queryKey: queryKeys.visibility.project(projectId ?? '', activeRunId ?? undefined, {
-      engine: filters.engine,
-    }),
+    queryKey: queryKeys.visibility.project(projectId ?? '', activeRunId ?? undefined, { engine }),
     queryFn: ({ signal }) =>
       visibilityApi.getProjectVisibility(
         projectId!,
         activeRunId ? { audit_id: activeRunId } : undefined,
         { signal },
       ),
-    enabled: Boolean(projectId) && hasRuns,
+    enabled: Boolean(projectId) && hasRuns && activeTab === 'overview',
   });
+
+  // Trends: the cross-run series. Enabled only on the Trends tab. Engine, date
+  // range, and granularity fold into the query key.
+  const trendQuery = useQuery({
+    queryKey: queryKeys.visibility.trends(projectId ?? '', {
+      engine: engineParam ?? null,
+      from: fromParam ?? null,
+      granularity,
+    }),
+    queryFn: ({ signal }) =>
+      visibilityApi.getVisibilityTrends(
+        projectId!,
+        { engine: engineParam, from: fromParam, granularity },
+        { signal },
+      ),
+    enabled: Boolean(projectId) && hasRuns && activeTab === 'trends',
+  });
+
+  // Shared execution-evidence: ONE identical cache key drives both evidence
+  // tabs, so switching between Mentions & Citations and Query Fanout reuses the
+  // cache instead of refetching. `audit_id` + date bound intersect server-side.
+  const evidenceParams = {
+    audit_id: activeRunId ?? undefined,
+    prompt_id: promptId ?? undefined,
+    engine: engineParam,
+    from: fromParam,
+    limit: EVIDENCE_LIMIT,
+  };
+  const evidenceQuery = useQuery({
+    queryKey: queryKeys.visibility.evidence(projectId ?? '', {
+      audit_id: activeRunId ?? null,
+      prompt_id: promptId ?? null,
+      engine: engineParam ?? null,
+      from: fromParam ?? null,
+      limit: EVIDENCE_LIMIT,
+    }),
+    queryFn: ({ signal }) => visibilityApi.getVisibilityEvidence(projectId!, evidenceParams, { signal }),
+    enabled: Boolean(projectId) && hasRuns && evidenceTab,
+  });
+
+  // Prompt options for the evidence prompt selector must NOT collapse when a
+  // prompt is selected, so they are derived from a parallel evidence query that
+  // keeps the run/engine/date scope but omits `prompt_id`. When no prompt is
+  // selected this key is identical to the main evidence query above, so it
+  // reuses the cache and issues no extra request; only a selected prompt filter
+  // triggers a second (unfiltered-by-prompt) fetch to keep the list stable.
+  const promptOptionsQuery = useQuery({
+    queryKey: queryKeys.visibility.evidence(projectId ?? '', {
+      audit_id: activeRunId ?? null,
+      prompt_id: null,
+      engine: engineParam ?? null,
+      from: fromParam ?? null,
+      limit: EVIDENCE_LIMIT,
+    }),
+    queryFn: ({ signal }) =>
+      visibilityApi.getVisibilityEvidence(
+        projectId!,
+        { ...evidenceParams, prompt_id: undefined },
+        { signal },
+      ),
+    enabled: Boolean(projectId) && hasRuns && evidenceTab,
+  });
+  const promptOptions = useMemo(
+    () => toPromptOptions(promptOptionsQuery.data?.items ?? []),
+    [promptOptionsQuery.data],
+  );
+
+  // A narrowing filter (engine, bounded range, or a specific prompt) is active —
+  // used to explain a filtered-empty result vs a genuinely empty history.
+  const isFiltered = engine !== 'all' || range !== 'all' || promptId !== null;
+  const isTrendFiltered = engine !== 'all' || range !== 'all';
+
+  function clearEvidenceFilters() {
+    setEngine('all');
+    setRange('all');
+    setPromptId(null);
+  }
 
   const isBootstrapping = isProjectLoading || (Boolean(projectId) && auditsQuery.isLoading);
 
@@ -88,40 +221,55 @@ export function VisibilityDashboard() {
     );
   }
 
+  // Preserve the launch-your-first-audit empty state: a project with no
+  // completed runs has nothing to show in any tab.
   if (!hasRuns) {
     return <VisibilityEmptyState />;
   }
 
-  const visibility = visibilityQuery.data;
+  let panel: ReactNode;
+  if (activeTab === 'trends') {
+    panel = <VisibilityTrends query={trendQuery} hasRuns={hasRuns} isFiltered={isTrendFiltered} />;
+  } else if (activeTab === 'mentions-citations') {
+    panel = (
+      <MentionsCitations
+        query={evidenceQuery}
+        isFiltered={isFiltered}
+        onClearFilters={clearEvidenceFilters}
+        limit={EVIDENCE_LIMIT}
+      />
+    );
+  } else if (activeTab === 'query-fanout') {
+    panel = (
+      <FanoutEvidence
+        query={evidenceQuery}
+        isFiltered={isFiltered}
+        onClearFilters={clearEvidenceFilters}
+        limit={EVIDENCE_LIMIT}
+      />
+    );
+  } else {
+    panel = <VisibilityOverview query={visibilityQuery} engineFilter={engine} />;
+  }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <VisibilityToolbar
+        activeTab={activeTab}
         runs={runOptions}
         activeRunId={activeRunId}
         onSelectRun={setSelectedRunId}
-        filters={filters}
-        onChangeFilters={setFilters}
-        visibility={visibility}
+        engine={engine}
+        onChangeEngine={setEngine}
+        promptOptions={promptOptions}
+        promptId={promptId}
+        onChangePrompt={setPromptId}
+        range={range}
+        onChangeRange={setRange}
+        granularity={granularity}
+        onChangeGranularity={setGranularity}
       />
-
-      {visibilityQuery.isError ? (
-        <Alert tone="danger">
-          Could not load visibility metrics for this run. Try another run or refresh.
-        </Alert>
-      ) : null}
-
-      {visibilityQuery.isLoading || !visibility ? (
-        <DashboardSkeleton />
-      ) : (
-        <>
-          <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
-            <VisibilityScoreCard visibility={visibility} />
-            <RankingsTable visibility={visibility} />
-          </div>
-          <EngineComparison visibility={visibility} filter={filters.engine} />
-        </>
-      )}
+      <VisibilityTabs activeTab={activeTab} onSelectTab={selectTab} panel={panel} />
     </div>
   );
 }

@@ -11,12 +11,49 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Loopback hosts allowed over plain http (local self-hosted proxy in dev). Every
+# other host must use https so a stored base_url cannot downgrade a
+# bearer-authenticated provider call to cleartext or a non-web scheme.
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _validate_base_url(value: str | None) -> str | None:
+    """Reject base_url values with an unsafe scheme (SSRF/downgrade guard).
+
+    Empty / ``None`` means "use the provider default" and is always allowed.
+    Otherwise only ``https`` is accepted, except plain ``http`` to a loopback
+    host for local self-hosted proxies. A missing scheme or host is rejected so
+    the adapter never posts a bearer-authenticated request to an ambiguous URL.
+    """
+    if value is None or value == "":
+        return value
+    parts = urlsplit(value)
+    scheme = parts.scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError("base_url must use http or https")
+    if not parts.hostname:
+        raise ValueError("base_url must include a host")
+    if scheme == "http" and parts.hostname.lower() not in _LOOPBACK_HOSTS:
+        raise ValueError("base_url must use https (http allowed only for localhost)")
+    return value
 
 # Enumerations mirror provider_catalog (kept as Literals so FastAPI validates
 # the request body; the service re-validates against the catalog for routes).
-TransportProvider = Literal["anthropic", "google", "openrouter"]
+#
+# v2 direct-provider retirement: ``ActiveTransportProvider`` is the write/create
+# surface and accepts ONLY the three direct transports — the retired
+# ``openrouter`` token is rejected at request validation, so a new OpenRouter
+# connection cannot be created. Response provenance stays a tolerant ``str``
+# (see ``ProviderConnectionResponse.transport_provider`` /
+# ``ProviderRouteResponse.transport_provider``) so historical OpenRouter rows
+# still read (invariant 10).
+ActiveTransportProvider = Literal["openai", "anthropic", "google"]
+# Backwards-compatible alias used by the create/write path.
+TransportProvider = ActiveTransportProvider
 LogicalEngine = Literal["chatgpt", "gemini", "claude"]
 
 
@@ -34,6 +71,10 @@ class ProviderRouteResponse(BaseModel):
     transport_provider: str
     transport_model: str
     is_default: bool
+    # Whether this route is still executable. Legacy openrouter routes are
+    # returned with active=false so read clients can identify (and skip) retired
+    # rows without seeing the internal deactivation marker.
+    active: bool = True
 
 
 class ProviderConnectionCreate(BaseModel):
@@ -45,6 +86,8 @@ class ProviderConnectionCreate(BaseModel):
     active: bool = True
     routes: list[ProviderRouteInput] = Field(default_factory=list)
 
+    _check_base_url = field_validator("base_url")(_validate_base_url)
+
 
 class ProviderConnectionUpdate(BaseModel):
     label: str | None = Field(default=None, max_length=255)
@@ -53,6 +96,8 @@ class ProviderConnectionUpdate(BaseModel):
     base_url: str | None = Field(default=None, max_length=1024)
     active: bool | None = None
     routes: list[ProviderRouteInput] | None = None
+
+    _check_base_url = field_validator("base_url")(_validate_base_url)
 
 
 class ProviderConnectionResponse(BaseModel):

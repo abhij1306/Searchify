@@ -348,22 +348,34 @@ that parses in-browser, previews rows, then persists via `/prompt-sets/{id}/impo
 state: centered prompt-to-add card.
 
 ### 9.5 Provider Settings (`/providers`)
-Grid of three per-engine `card`s. **Gemini** and **Claude** cards: a direct/OpenRouter route
-segmented toggle, an API-key `input` (masked, write-only — never shows a stored secret), a
-"Test connection" `button` surfacing success/error inline, and a `configured` status badge.
-**ChatGPT** card: **OpenRouter route only** at MVP, with a disabled "Direct OpenAI — coming
-soon" option. Below the engine cards, a separate **Discovery / analysis model** selection card
-(plumbing-only; stored, not invoked). Unconfigured engines show a muted "Not configured" state.
+Grid of three per-engine `card`s, one **direct** transport each (ChatGPT/OpenAI,
+Gemini/Google, Claude/Anthropic). Each card shows its fixed route + default model, an API-key
+`input` (masked, write-only — never shows a stored secret), a "Test connection" `button`
+surfacing success/error inline, and a `configured` status badge. After the v2 direct-provider
+retirement each engine has exactly ONE route, so the **route segmented toggle and the reserved
+"Direct OpenAI — coming soon" option are removed**; `openrouter` labels appear only on read-only
+historical provenance. Below the engine cards, a separate **Discovery / analysis model**
+selection card (plumbing-only; stored, not invoked). Unconfigured engines show a muted "Not
+configured" state.
 
-### 9.6 Visibility dashboard (`/visibility`)
-Header row: page title + a **run selector** (defaults to latest completed audit) + filters
-(engine, prompt-type). No date/run-range trend control (roadmap). Below, a two-column grid.
-**Left card — Visibility**: large mono **Visibility Score** (`--text-2xl`) with a `score-ring`,
-subtitle "Your brand's visibility across LLMs for this run". **Right card — Rankings**: dense
-`table` of brand + competitors — columns `#`, Brand (avatar + name, "You" pill on own brand),
-Visibility% (mono + score-band), SOV% (mono), Sentiment (mono `—` placeholder), Avg Position
-(mono `—` placeholder). Below: a **per-engine comparison** card (donut or grouped bars per
-logical engine for the selected run) and a **Share of Voice** card (brand-vs-competitor donut).
+### 9.6 Visibility workspace (`/visibility`)
+ONE workspace shell: a **shared filter bar** (run selector defaulting to the latest completed
+audit, logical engine, prompt, date range, granularity) above an accessible **four-tab**
+tablist — **Overview** (default), **Trends**, **Mentions & Citations**, **Query Fanout**. Only
+one panel renders at a time; the active tab is mirrored in `?tab=`. There are **no Sources /
+Topics / Sentiment tabs** and no disabled / "coming soon" tabs.
+- **Overview**: two-column grid. **Left card — Visibility**: large mono **Visibility Score**
+  (`--text-2xl`) with a `score-ring`, subtitle "Your brand's visibility across LLMs for this
+  run". **Right card — Rankings**: dense `table` of brand + competitors — columns `#`, Brand
+  (avatar + name, "You" pill on own brand), Visibility% (mono + score-band), SOV% (mono),
+  Sentiment (mono `—` placeholder), Avg Position (mono `—` placeholder). Below: a **per-engine
+  comparison** card and a **Share of Voice** card (brand-vs-competitor donut).
+- **Trends**: cross-run metrics + charts (`trend-chart`) over the selected date range /
+  granularity.
+- **Mentions & Citations** and **Query Fanout**: the shared persisted execution-evidence
+  dataset — brand/competitor mention chips, classified citations, and frozen prompts + generated
+  queries with `queries_available | count_only | no_search` states.
+
 Empty state (no completed runs): a "Launch your first audit" card linking to `/runs`.
 
 ### 9.7 Run/Executions explorer (`/runs`, `/runs/[runId]`, `.../executions/[executionId]`)
