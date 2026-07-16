@@ -182,11 +182,14 @@ async def analyze_task(
 
 async def _execution_dicts(
     session: AsyncSession, *, audit_id: uuid.UUID, config: ScoringConfig
-) -> tuple[list[dict], dict[str, list[dict]]]:
+) -> tuple[list[dict], dict[str, list[dict]], list[ResponseAnalysis]]:
     """Build the aggregate input from persisted analyses (invariant 7).
 
-    Reads only persisted ``ResponseAnalysis`` + ``Citation`` rows — never a
-    provider. Returns ``(all_execution_dicts, per_engine_execution_dicts)``.
+    Reads only persisted ``ResponseAnalysis`` + ``Citation`` + ``AuditTask``
+    rows — never a provider. Re-attaches each execution's persisted provider
+    usage (from ``AuditTask.provider_metadata``) so token/cost aggregation is
+    not lost. Returns
+    ``(all_execution_dicts, per_engine_execution_dicts, analyses)``.
     """
     analyses = list(
         (
@@ -229,6 +232,17 @@ async def _execution_dicts(
                 "matched_competitor": row.matched_competitor,
             }
         )
+    # task_id -> persisted provider_metadata (carries the usage block used by
+    # cost/token aggregation). Reading it back here is projection-only.
+    provider_metadata_by_task: dict[uuid.UUID, dict] = {}
+    for task_id, provider_metadata in (
+        await session.execute(
+            select(AuditTask.id, AuditTask.provider_metadata).where(
+                AuditTask.audit_id == audit_id
+            )
+        )
+    ).all():
+        provider_metadata_by_task[task_id] = provider_metadata or {}
 
     all_dicts: list[dict] = []
     per_engine: dict[str, list[dict]] = {}
@@ -241,11 +255,13 @@ async def _execution_dicts(
             "prompt_theme_snapshot": theme,
             "citations": citations_by_analysis.get(analysis.id, []),
             "score": analysis.score or {},
-            "provider_metadata": {},
+            "provider_metadata": provider_metadata_by_task.get(
+                analysis.task_id, {}
+            ),
         }
         all_dicts.append(execution)
         per_engine.setdefault(analysis.logical_engine, []).append(execution)
-    return all_dicts, per_engine
+    return all_dicts, per_engine, analyses
 
 
 async def finalize_audit_analysis(
@@ -278,7 +294,7 @@ async def finalize_audit_analysis(
         await analyze_task(session, task=task, config=config)
     await session.flush()
 
-    all_dicts, per_engine = await _execution_dicts(
+    all_dicts, per_engine, analyses = await _execution_dicts(
         session, audit_id=audit.id, config=config
     )
     metrics = aggregate_run(all_dicts, config)
@@ -308,6 +324,12 @@ async def finalize_audit_analysis(
     snapshot.total_failed = failed
     snapshot.visibility_score = visibility_score
     snapshot.metrics = metrics
+    # Invariant 4: trace the snapshot back to the exact evidence set it
+    # aggregated — the ResponseAnalysis rows and their raw response artifacts.
+    snapshot.source_analysis_ids = [str(a.id) for a in analyses]
+    snapshot.source_artifact_ids = [
+        str(a.artifact_id) for a in analyses if a.artifact_id is not None
+    ]
 
     audit.summary = metrics
     audit.analyzer_version = ANALYZER_VERSION

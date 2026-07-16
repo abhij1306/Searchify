@@ -94,11 +94,17 @@ class CitationEvidence(BaseModel):
 
 
 class ExecutionEvidenceResponse(BaseModel):
-    """One execution's persisted analysis + evidence (``GET /executions/{id}``)."""
+    """One execution's persisted analysis + evidence (``GET /executions/{id}``).
+
+    ``id``/``task_id`` are the *execution* (``AuditTask``) id — the id clients
+    receive from ``GET /audits/{id}/executions`` and pass here. ``analysis_id``
+    is the internal ``ResponseAnalysis`` id (exposed for traceability).
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    analysis_id: uuid.UUID
     audit_id: uuid.UUID
     task_id: uuid.UUID
     artifact_id: uuid.UUID | None = None

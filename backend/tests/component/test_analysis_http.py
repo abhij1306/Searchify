@@ -25,7 +25,6 @@ from app.connectors.answer_engines.contracts import (
 from app.core.config.audits import audit_settings
 from app.core.config.provider_catalog import ENGINE_GEMINI, TRANSPORT_GOOGLE
 from app.domain.audits.planner import create_audit
-from app.models.analysis import ResponseAnalysis
 from app.models.workspace import WorkspaceMember
 from app.workers import audit_worker
 from app.workers.audit_worker import AuditWorker
@@ -130,18 +129,28 @@ async def test_endpoints_serve_projections_over_http(
     assert body["sentiment"] is None
     assert any(r["is_brand"] for r in body["rankings"])
 
-    # Execution evidence.
-    async with session_factory() as session:
-        analysis = await session.scalar(
-            select(ResponseAnalysis).where(
-                ResponseAnalysis.audit_id == audit.id
-            )
-        )
+    # Execution evidence. The executions list and the single-execution route
+    # must share one id space: the id from GET /audits/{id}/executions must
+    # resolve at GET /executions/{id} (regression: it used to 404 because the
+    # single-execution route keyed on the internal analysis id).
+    execs = await client.get(
+        f"/api/v1/audits/{audit.id}/executions", headers=headers
+    )
+    assert execs.status_code == 200
+    exec_rows = execs.json()
+    assert exec_rows
+    execution_id = exec_rows[0]["id"]
     e = await client.get(
-        f"/api/v1/executions/{analysis.id}", headers=headers
+        f"/api/v1/executions/{execution_id}", headers=headers
     )
     assert e.status_code == 200
-    assert e.json()["brand_mentioned"] is True
+    ebody = e.json()
+    assert ebody["brand_mentioned"] is True
+    # The returned id echoes the execution id the client passed in, and the
+    # internal analysis id is surfaced separately for traceability.
+    assert ebody["id"] == execution_id
+    assert ebody["task_id"] == execution_id
+    assert ebody["analysis_id"] != execution_id
 
     # Exports with correct media types.
     csv_resp = await client.get(

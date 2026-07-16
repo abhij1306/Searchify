@@ -312,6 +312,16 @@ class MetricSnapshot(Base):
     # Full aggregate metrics dict (headline rates, SOV, per-prompt stability,
     # citation shares, per-engine, cost). The source of truth for projections.
     metrics: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Provenance (invariant 4): the exact evidence set this aggregate was
+    # computed from — the ``ResponseAnalysis`` ids and their source raw
+    # ``artifact_id``s. Every derived row, including this aggregate, must be
+    # traceable to the raw evidence + analyzer/rule versions.
+    source_analysis_ids: Mapped[list | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    source_artifact_ids: Mapped[list | None] = mapped_column(
+        JSONB, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

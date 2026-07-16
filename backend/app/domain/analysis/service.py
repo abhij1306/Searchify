@@ -101,12 +101,17 @@ async def get_execution_evidence(
     session: AsyncSession,
     *,
     workspace_id: uuid.UUID,
-    analysis_id: uuid.UUID,
+    task_id: uuid.UUID,
 ) -> ExecutionEvidenceResponse:
-    """Serve one execution's persisted analysis + citation evidence."""
+    """Serve one execution's persisted analysis + citation evidence.
+
+    Keyed on the *execution* (``AuditTask``) id — the id clients receive from
+    ``GET /audits/{id}/executions`` — not the internal ``ResponseAnalysis`` id.
+    The analysis' own id is still surfaced as ``analysis_id``.
+    """
     analysis = await session.scalar(
         select(ResponseAnalysis).where(
-            ResponseAnalysis.id == analysis_id,
+            ResponseAnalysis.task_id == task_id,
             ResponseAnalysis.workspace_id == workspace_id,
         )
     )
@@ -116,14 +121,15 @@ async def get_execution_evidence(
         (
             await session.scalars(
                 select(Citation)
-                .where(Citation.analysis_id == analysis_id)
+                .where(Citation.analysis_id == analysis.id)
                 .order_by(Citation.ordinal.asc())
             )
         ).all()
     )
     score = analysis.score or {}
     return ExecutionEvidenceResponse(
-        id=analysis.id,
+        id=analysis.task_id,
+        analysis_id=analysis.id,
         audit_id=analysis.audit_id,
         task_id=analysis.task_id,
         artifact_id=analysis.artifact_id,

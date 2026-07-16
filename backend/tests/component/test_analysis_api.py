@@ -244,15 +244,21 @@ async def test_execution_evidence_projection(
                 ResponseAnalysis.audit_id == audit.id
             )
         )
+        # Keyed on the execution (AuditTask) id, matching the id clients get
+        # from GET /audits/{id}/executions — not the internal analysis id.
         evidence = await get_execution_evidence(
             session,
             workspace_id=seed.workspace_id,
-            analysis_id=analysis.id,
+            task_id=analysis.task_id,
         )
         assert evidence.brand_mentioned is True
         assert evidence.citation_count == 2
         assert len(evidence.citations) == 2
         assert "Globex" in evidence.competitors_mentioned
+        # id/task_id are the execution id; analysis_id is the internal id.
+        assert evidence.id == analysis.task_id
+        assert evidence.task_id == analysis.task_id
+        assert evidence.analysis_id == analysis.id
         # Roadmap fields present but null.
         assert evidence.sentiment is None
         assert evidence.avg_position is None
@@ -264,7 +270,7 @@ async def test_execution_evidence_projection(
             await get_execution_evidence(
                 session,
                 workspace_id=uuid.uuid4(),
-                analysis_id=analysis.id,
+                task_id=analysis.task_id,
             )
 
 
@@ -326,3 +332,103 @@ async def test_metrics_not_found_for_unanalyzed_audit(
                 workspace_id=seed.workspace_id,
                 project_id=seed.project_id,
             )
+
+
+@pytest.mark.asyncio
+async def test_snapshot_records_source_provenance(
+    session_factory: async_sessionmaker[AsyncSession],
+    _stub_adapter,
+) -> None:
+    """The MetricSnapshot traces back to the exact evidence set (invariant 4).
+
+    ``source_analysis_ids`` must equal the succeeded tasks' analysis ids and
+    ``source_artifact_ids`` their raw response artifacts.
+    """
+    seed, audit = await _run_completed_audit(session_factory)
+
+    async with session_factory() as session:
+        analyses = list(
+            (
+                await session.scalars(
+                    select(ResponseAnalysis).where(
+                        ResponseAnalysis.audit_id == audit.id
+                    )
+                )
+            ).all()
+        )
+        snapshot = await session.scalar(
+            select(MetricSnapshot).where(MetricSnapshot.audit_id == audit.id)
+        )
+        assert snapshot is not None
+        expected_analysis_ids = {str(a.id) for a in analyses}
+        expected_artifact_ids = {
+            str(a.artifact_id) for a in analyses if a.artifact_id is not None
+        }
+        assert set(snapshot.source_analysis_ids) == expected_analysis_ids
+        assert set(snapshot.source_artifact_ids) == expected_artifact_ids
+        # Every succeeded analysis has an artifact in this fixture.
+        assert len(snapshot.source_artifact_ids) == len(analyses)
+
+
+class _UsageStubAdapter(_StubAdapter):
+    """Like the base stub but reports a per-request token/cost usage block
+    nested under ``provider_metadata`` (as the real parsers do), so cost/token
+    aggregation has non-zero data to sum."""
+
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
+        response = await super().execute(request)
+        usage = {
+            "total_input_tokens": 100,
+            "total_output_tokens": 50,
+            "total_tokens": 150,
+            "provider_cost_usd": 0.25,
+        }
+        return AnswerEngineResponse(
+            logical_engine=response.logical_engine,
+            transport_provider=response.transport_provider,
+            transport_model=response.transport_model,
+            answer_text=response.answer_text,
+            search_used=response.search_used,
+            search_events=response.search_events,
+            citations=response.citations,
+            provider_metadata={
+                **dict(response.provider_metadata),
+                "usage": usage,
+            },
+            usage=usage,
+            latency_ms=response.latency_ms,
+        )
+
+
+@pytest.mark.asyncio
+async def test_aggregation_preserves_provider_usage(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persisted provider usage flows into the aggregate (not dropped as zero).
+
+    Regression: the aggregate input was rebuilt with an empty
+    ``provider_metadata``, so token/cost metrics were always zero.
+    """
+    monkeypatch.setattr(
+        audit_worker, "build_adapter", lambda **_: _UsageStubAdapter()
+    )
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+
+    seed, audit = await _run_completed_audit(session_factory)
+
+    async with session_factory() as session:
+        metrics = await get_metrics(
+            session, workspace_id=seed.workspace_id, audit_id=audit.id
+        )
+        token_usage = metrics.metrics["token_usage"]
+        # 4 executions * 100/50 tokens each.
+        assert token_usage["input_tokens"] == 400
+        assert token_usage["output_tokens"] == 200
+        assert token_usage["total_tokens"] == 600
+
+        cost = metrics.metrics["cost"]
+        # 4 executions * $0.25 provider-reported each — previously always zero
+        # because provider_metadata was dropped when rebuilding the aggregate.
+        assert cost["provider_reported_cost_usd"] == 1.0

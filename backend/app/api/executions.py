@@ -1,9 +1,10 @@
 # Executions router: single-execution evidence (B6, invariants 5/7).
 #
-# ``GET /executions/{id}`` serves one execution's persisted ``ResponseAnalysis``
-# + its classified citation evidence. It is a top-level route (the plan lists it
-# as ``executions/{id}``); the ``{id}`` is the analysis id. Workspace-scoped and
-# projection-only — it reads persisted rows and never calls a provider.
+# ``GET /executions/{execution_id}`` serves one execution's persisted
+# ``ResponseAnalysis`` + its classified citation evidence. ``execution_id`` is
+# the *execution* (``AuditTask``) id — the id clients receive from
+# ``GET /audits/{id}/executions`` — so the two endpoints share one id space.
+# Workspace-scoped and projection-only — reads persisted rows, never a provider.
 from __future__ import annotations
 
 import uuid
@@ -29,10 +30,13 @@ _SessionDep = Annotated[AsyncSession, Depends(get_db)]
 async def get_execution_endpoint(
     execution_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> ExecutionEvidenceResponse:
-    """Serve one execution's persisted analysis + citation evidence."""
+    """Serve one execution's persisted analysis + citation evidence.
+
+    ``execution_id`` is the ``AuditTask`` id from the executions list.
+    """
     try:
         return await get_execution_evidence(
-            session, workspace_id=ctx.workspace_id, analysis_id=execution_id
+            session, workspace_id=ctx.workspace_id, task_id=execution_id
         )
     except AnalysisNotFoundError as exc:
         raise HTTPException(
