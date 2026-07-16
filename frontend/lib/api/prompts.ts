@@ -1,7 +1,7 @@
 /**
- * Prompts domain endpoints (F2): prompt-set CRUD, individual prompt edits, CSV
- * import, and the AI-suggest `/generate` stub (coming-soon UI). Every response
- * passes through `strictValidate`.
+ * Prompts domain endpoints (F2/F7): prompt-set CRUD, individual prompt edits,
+ * CSV import (raw file or browser-parsed rows), and the AI-suggest `/generate`
+ * stub (coming-soon UI). Every response passes through `strictValidate`.
  */
 import { z } from 'zod';
 
@@ -21,12 +21,22 @@ export type PromptInput = {
 
 export const promptsApi = {
   listPromptSets: async (projectId: string, options?: ApiRequestOptions) => {
-    const res = await apiClient.get<PromptSet[]>(`/projects/${projectId}/prompt-sets`, options);
+    const res = await apiClient.get<PromptSet[]>(
+      `/prompt-sets?project_id=${encodeURIComponent(projectId)}`,
+      options,
+    );
     return strictValidate(promptSetListSchema, res, 'prompts.listPromptSets');
   },
   getPromptSet: async (promptSetId: string, options?: ApiRequestOptions) => {
     const res = await apiClient.get<PromptSet>(`/prompt-sets/${promptSetId}`, options);
     return strictValidate(promptSetSchema, res, 'prompts.getPromptSet');
+  },
+  createPromptSet: async (
+    input: { project_id: string; name?: string; description?: string },
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.post<PromptSet>('/prompt-sets', input, options);
+    return strictValidate(promptSetSchema, res, 'prompts.createPromptSet');
   },
   createPrompt: async (promptSetId: string, input: PromptInput, options?: ApiRequestOptions) => {
     const res = await apiClient.post<Prompt>(`/prompt-sets/${promptSetId}/prompts`, input, options);
@@ -52,13 +62,28 @@ export const promptsApi = {
     );
     return strictValidate(promptSetSchema, res, 'prompts.importCsv');
   },
-  generate: async (promptSetId: string, options?: ApiRequestOptions) => {
-    // AI-suggest stub → coming-soon UI. Returns the (unchanged) prompt set.
+  /**
+   * Persist browser-parsed rows through the same `/import` endpoint. The B3
+   * backend accepts a JSON body of `{ prompts: [...] }` (rows already parsed +
+   * previewed in the browser) and bulk-creates them with `origin='imported'`.
+   */
+  importRows: async (
+    promptSetId: string,
+    rows: PromptInput[],
+    options?: ApiRequestOptions,
+  ) => {
     const res = await apiClient.post<PromptSet>(
-      `/prompt-sets/${promptSetId}/generate`,
-      undefined,
+      `/prompt-sets/${promptSetId}/import`,
+      { prompts: rows },
       options,
     );
-    return strictValidate(promptSetSchema, res, 'prompts.generate');
+    return strictValidate(promptSetSchema, res, 'prompts.importRows');
   },
+  /**
+   * AI-suggest stub (B-4). The backend returns 501 `not_implemented`, so this
+   * call is expected to throw an `ApiError`; the coming-soon UI does not invoke
+   * it eagerly. Kept here so the panel can wire a probe when the roadmap lands.
+   */
+  generate: (promptSetId: string, options?: ApiRequestOptions) =>
+    apiClient.post<void>(`/prompt-sets/${promptSetId}/generate`, undefined, options),
 };

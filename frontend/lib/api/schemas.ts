@@ -47,7 +47,11 @@ export const competitorSchema = z.object({
   domains: z.array(z.string()),
 });
 
+// Intent enum. The B3 backend `normalize_intent` casefolds a free-text intent
+// and normalizes any empty/unknown value to `''` ("unspecified"), so `''` is a
+// valid on-the-wire value and must be accepted here (contract, not UI sugar).
 export const promptIntentSchema = z.enum([
+  '',
   'discovery',
   'comparison',
   'purchase',
@@ -55,6 +59,8 @@ export const promptIntentSchema = z.enum([
   'local',
 ]);
 
+// Backend `theme` is a non-null string (empty when unset); keep it nullable so
+// an explicit null never fails, but `''` is the common case.
 export const promptSchema = z.object({
   id: uuid(),
   prompt_set_id: uuid(),
@@ -64,12 +70,19 @@ export const promptSchema = z.object({
   branded: z.boolean(),
   enabled: z.boolean(),
   origin: z.enum(['manual', 'imported', 'generated']),
+  // Evidence for a future AI-generated prompt (B-4 roadmap); null at MVP.
+  generation_evidence: z.record(z.string(), z.unknown()).nullable().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
 });
 
 export const promptSetSchema = z.object({
   id: uuid(),
   project_id: uuid(),
   name: z.string(),
+  // B3 PromptSetResponse carries a description and a denormalized prompt_count.
+  description: z.string().optional(),
+  prompt_count: z.number().int().optional(),
   prompts: z.array(promptSchema),
   created_at: z.string(),
   updated_at: z.string(),
