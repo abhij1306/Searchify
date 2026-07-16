@@ -232,6 +232,7 @@ npm run test:e2e       # Playwright (requires a browser + running stack)
 | [`docs/invariants.md`](docs/invariants.md) | The 12 hard rules (review-blocking) |
 | [`docs/design.md`](docs/design.md) | Design tokens, theme, per-screen layout |
 | [`docs/plans/`](docs/plans/) | Approved implementation plan + task graph |
+| [`docs/roadmap/`](docs/roadmap/) | Design specs for roadmap surfaces (e.g. the [Technical Audit crawler](docs/roadmap/technical-audit.md)) |
 
 ## Known gotchas
 
