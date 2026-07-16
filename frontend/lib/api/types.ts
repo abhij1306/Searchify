@@ -8,12 +8,14 @@
 import type { z } from 'zod';
 
 import type {
+  auditEngineSnapshotSchema,
   auditSchema,
   auditStatusSchema,
   benchmarkModeSchema,
   citationClassificationSchema,
   citationSchema,
   competitorSchema,
+  executionEvidenceSchema,
   executionSchema,
   executionStatusSchema,
   logicalEngineSchema,
@@ -25,7 +27,6 @@ import type {
   providerConnectionSchema,
   providerRouteSchema,
   rankingRowSchema,
-  searchEventSchema,
   sessionUserSchema,
   transportProviderSchema,
   visibilityEngineSchema,
@@ -47,12 +48,13 @@ export type ProviderConnection = z.infer<typeof providerConnectionSchema>;
 export type ProviderRoute = z.infer<typeof providerRouteSchema>;
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;
 export type AuditStatus = z.infer<typeof auditStatusSchema>;
+export type AuditEngineSnapshot = z.infer<typeof auditEngineSnapshotSchema>;
 export type Audit = z.infer<typeof auditSchema>;
 export type ExecutionStatus = z.infer<typeof executionStatusSchema>;
-export type SearchEvent = z.infer<typeof searchEventSchema>;
 export type CitationClassification = z.infer<typeof citationClassificationSchema>;
 export type Citation = z.infer<typeof citationSchema>;
 export type Execution = z.infer<typeof executionSchema>;
+export type ExecutionEvidence = z.infer<typeof executionEvidenceSchema>;
 export type VisibilityEngine = z.infer<typeof visibilityEngineSchema>;
 export type RankingRow = z.infer<typeof rankingRowSchema>;
 export type Visibility = z.infer<typeof visibilitySchema>;

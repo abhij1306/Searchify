@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   auditSchema,
   citationSchema,
+  executionEvidenceSchema,
   executionSchema,
   projectSchema,
   providerConnectionSchema,
@@ -80,54 +81,117 @@ describe('contract schemas', () => {
       url: 'https://acme.example/a',
       title: 'A',
       domain: 'acme.example',
-      cited_text: null,
       classification: 'owned',
+      is_owned: true,
+      is_unintended: false,
+      matched_competitor: null,
     };
     expect(strictValidate(citationSchema, citation, 'c').classification).toBe('owned');
+    // The 'unintended' (owned-but-unwanted) class is a valid backend value.
+    expect(
+      strictValidate(citationSchema, { ...citation, classification: 'unintended' }, 'c')
+        .classification,
+    ).toBe('unintended');
     expect(() =>
       strictValidate(citationSchema, { ...citation, classification: 'internal' }, 'c'),
     ).toThrow();
   });
 
-  it('validates an audit with uuid ids', () => {
+  it('validates an audit (string seed + engine snapshots, no null error)', () => {
     const audit = {
       id: UUID,
       workspace_id: UUID2,
       project_id: UUID,
       status: 'completed',
-      random_seed: 42,
-      configuration: {},
-      summary: null,
+      benchmark_mode: 'consumer_like',
+      repetitions: 3,
+      random_seed: '42',
       requested_count: 10,
       completed_count: 10,
       failed_count: 0,
-      error_message: null,
+      error_message: '',
+      engine_snapshots: [
+        { logical_engine: 'gemini', transport_provider: 'google', transport_model: 'gemini-flash-latest' },
+      ],
       created_at: '2026-07-15T00:00:00Z',
       updated_at: '2026-07-15T00:00:00Z',
+      started_at: '2026-07-15T00:00:05Z',
       completed_at: '2026-07-15T00:10:00Z',
     };
     expect(strictValidate(auditSchema, audit, 'audit').status).toBe('completed');
+    // The 64-bit seed is a decimal STRING on the wire, never a number.
+    expect(() => strictValidate(auditSchema, { ...audit, random_seed: 42 }, 'audit')).toThrow();
   });
 
-  it('validates an execution with citations', () => {
+  it('validates an execution/queue row (AuditTaskResponse shape)', () => {
     const execution = {
       id: UUID,
       audit_id: UUID2,
       prompt_index: 0,
       repetition: 1,
       randomized_position: 2,
+      logical_engine: 'gemini',
+      transport_provider: 'google',
+      transport_model: 'gemini-flash-latest',
       status: 'succeeded',
+      attempt_count: 1,
+      max_attempts: 5,
       answer_text: 'Answer',
       search_used: true,
-      search_events: [{ query: 'best crm' }],
-      citations: [],
-      score: { visibility: 0.5 },
-      provider_metadata: {},
-      error_code: null,
-      error_message: null,
+      error_code: '',
+      error_detail: '',
       latency_ms: 1200,
+      created_at: '2026-07-15T00:00:00Z',
+      completed_at: '2026-07-15T00:00:03Z',
     };
     expect(strictValidate(executionSchema, execution, 'exec').status).toBe('succeeded');
+  });
+
+  it('validates execution evidence keyed by the execution id', () => {
+    const evidence = {
+      id: UUID,
+      analysis_id: UUID2,
+      audit_id: UUID2,
+      task_id: UUID,
+      artifact_id: null,
+      analyzer_version: 'v1',
+      scoring_rule_version: 'v1',
+      logical_engine: 'gemini',
+      transport_provider: 'google',
+      transport_model: 'gemini-flash-latest',
+      prompt_index: 0,
+      repetition: 1,
+      prompt_class: 'unbranded',
+      brand_mentioned: true,
+      brand_first_offset: 12,
+      owned_domain_cited: true,
+      owned_citation_count: 1,
+      unintended_domain_cited: false,
+      citation_count: 2,
+      search_used: true,
+      search_query_count: 1,
+      sentiment: null,
+      avg_position: null,
+      score: { visibility: 1 },
+      citations: [
+        {
+          ordinal: 1,
+          url: 'https://acme.example/a',
+          title: 'A',
+          domain: 'acme.example',
+          classification: 'owned',
+          is_owned: true,
+          is_unintended: false,
+          matched_competitor: null,
+        },
+      ],
+      competitors_mentioned: ['Beta'],
+      created_at: '2026-07-15T00:00:00Z',
+    };
+    const parsed = strictValidate(executionEvidenceSchema, evidence, 'evidence');
+    expect(parsed.brand_mentioned).toBe(true);
+    expect(parsed.sentiment).toBeNull();
+    expect(parsed.citations[0]?.classification).toBe('owned');
   });
 
   it('validates a visibility projection with nullable sentiment/avg_position', () => {

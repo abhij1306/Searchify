@@ -187,39 +187,57 @@ export const auditStatusSchema = z.enum([
   'cancelled',
 ]);
 
+// The engine provenance a run froze at launch (B5 `AuditEngineSnapshotResponse`).
+export const auditEngineSnapshotSchema = z.object({
+  logical_engine: z.string(),
+  transport_provider: z.string(),
+  transport_model: z.string(),
+});
+
+// A run/audit projection (B5 `AuditResponse`). `random_seed` is a decimal
+// STRING (64-bit seed), `error_message` a non-null string ('' when unset), and
+// the engine provenance is carried but the provider key never is (invariant 6).
 export const auditSchema = z.object({
   id: uuid(),
   workspace_id: uuid(),
   project_id: uuid(),
   status: auditStatusSchema,
-  random_seed: z.number(),
-  configuration: z.record(z.string(), z.unknown()),
-  summary: z.record(z.string(), z.unknown()).nullable(),
+  benchmark_mode: z.string(),
+  repetitions: z.number().int(),
+  random_seed: z.string(),
   requested_count: z.number().int(),
   completed_count: z.number().int(),
   failed_count: z.number().int(),
-  error_message: z.string().nullable(),
+  error_message: z.string(),
+  engine_snapshots: z.array(auditEngineSnapshotSchema),
   created_at: z.string(),
   updated_at: z.string(),
+  started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
 });
 
-export const citationClassificationSchema = z.enum(['owned', 'competitor', 'third_party']);
+// Deterministic citation classification (B6 `_classification`, invariant 4):
+// owned / unintended (owned-but-unwanted) / competitor / third-party.
+export const citationClassificationSchema = z.enum([
+  'owned',
+  'unintended',
+  'competitor',
+  'third_party',
+]);
 
+// One classified source citation on the evidence card (B6 `CitationEvidence`).
 export const citationSchema = z.object({
   ordinal: z.number().int(),
   url: z.string(),
-  title: z.string().nullable(),
+  title: z.string(),
   domain: z.string(),
-  cited_text: z.string().nullable(),
   classification: citationClassificationSchema,
+  is_owned: z.boolean(),
+  is_unintended: z.boolean(),
+  matched_competitor: z.string().nullable(),
 });
 
-export const searchEventSchema = z.object({
-  query: z.string(),
-  results: z.array(z.record(z.string(), z.unknown())).optional(),
-});
-
+// Queue/execution row status (B5 task statuses).
 export const executionStatusSchema = z.enum([
   'queued',
   'leased',
@@ -230,22 +248,63 @@ export const executionStatusSchema = z.enum([
   'cancelled',
 ]);
 
+// One execution/queue row in the run's executions table (B5 `AuditTaskResponse`).
+// `answer_text` / `error_detail` default to '' (never null); the classified
+// citation evidence lives on the single-execution evidence endpoint below.
 export const executionSchema = z.object({
   id: uuid(),
   audit_id: uuid(),
   prompt_index: z.number().int(),
   repetition: z.number().int(),
   randomized_position: z.number().int(),
+  logical_engine: z.string(),
+  transport_provider: z.string(),
+  transport_model: z.string(),
   status: executionStatusSchema,
-  answer_text: z.string().nullable(),
+  attempt_count: z.number().int(),
+  max_attempts: z.number().int(),
+  answer_text: z.string(),
   search_used: z.boolean(),
-  search_events: z.array(searchEventSchema),
-  citations: z.array(citationSchema),
-  score: z.record(z.string(), z.unknown()).nullable(),
-  provider_metadata: z.record(z.string(), z.unknown()).nullable(),
-  error_code: z.string().nullable(),
-  error_message: z.string().nullable(),
+  error_code: z.string(),
+  error_detail: z.string(),
   latency_ms: z.number().nullable(),
+  created_at: z.string(),
+  completed_at: z.string().nullable(),
+});
+
+// One execution's persisted analysis + evidence (B6 `ExecutionEvidenceResponse`,
+// `GET /executions/{id}`). `id`/`task_id` are the EXECUTION (AuditTask) id — the
+// same id space as the executions list — so the evidence page keys off the row
+// id. `analysis_id` is the internal ResponseAnalysis id (traceability only).
+// `sentiment` / `avg_position` are present but null until the roadmap (B-2).
+export const executionEvidenceSchema = z.object({
+  id: uuid(),
+  analysis_id: uuid(),
+  audit_id: uuid(),
+  task_id: uuid(),
+  artifact_id: uuid().nullable(),
+  analyzer_version: z.string(),
+  scoring_rule_version: z.string(),
+  logical_engine: z.string(),
+  transport_provider: z.string(),
+  transport_model: z.string(),
+  prompt_index: z.number().int(),
+  repetition: z.number().int(),
+  prompt_class: z.string(),
+  brand_mentioned: z.boolean(),
+  brand_first_offset: z.number().int().nullable(),
+  owned_domain_cited: z.boolean(),
+  owned_citation_count: z.number().int(),
+  unintended_domain_cited: z.boolean(),
+  citation_count: z.number().int(),
+  search_used: z.boolean(),
+  search_query_count: z.number().int(),
+  sentiment: z.string().nullable(),
+  avg_position: z.number().nullable(),
+  score: z.record(z.string(), z.unknown()).nullable(),
+  citations: z.array(citationSchema),
+  competitors_mentioned: z.array(z.string()),
+  created_at: z.string(),
 });
 
 // ---------------------------------------------------------------------------
