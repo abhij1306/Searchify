@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.site_health import (
     DEFAULT_SITE_HEALTH_CAPABILITY,
+    SELECTION_SOURCE_FREE_SAMPLE,
+    SELECTION_SOURCE_USER,
     capability_profile,
     normalize_capability,
 )
@@ -100,3 +102,55 @@ async def set_entitlement(
         row.capability_revision = row.capability_revision + 1
     await session.flush()
     return row
+
+
+async def lock_entitlement(
+    session: AsyncSession,
+    workspace_id: uuid.UUID,
+    *,
+    default_capability: str = DEFAULT_SITE_HEALTH_CAPABILITY,
+) -> WorkspaceSiteHealthEntitlement:
+    """Resolve then lock the workspace entitlement row ``FOR UPDATE``.
+
+    This is THE quota serialization point (subplan Persistence contract): every
+    monitored-set replacement across every project in the workspace must lock
+    this single row before counting active rows, so two concurrent updates are
+    ordered and neither can push the workspace above its ``monitored_url_limit``
+    (subplan Acceptance criteria 2). Seeds a Free row first if the workspace has
+    none, then re-selects it ``with_for_update`` so the lock is held for the
+    caller's transaction.
+    """
+    await resolve_entitlement(
+        session, workspace_id, default_capability=default_capability
+    )
+    result = await session.execute(
+        select(WorkspaceSiteHealthEntitlement)
+        .where(WorkspaceSiteHealthEntitlement.workspace_id == workspace_id)
+        .with_for_update()
+    )
+    return result.scalar_one()
+
+
+def entitlement_allows_monitored_analysis(
+    entitlement: WorkspaceSiteHealthEntitlement | None,
+    *,
+    selection_source: str = SELECTION_SOURCE_USER,
+) -> bool:
+    """Pure guard: may this entitlement analyze a row of ``selection_source``?
+
+    Used both by the selection mutation (block Free from user selection) and by
+    the worker guard before I/O / before evidence persistence (a downgrade must
+    block NEW user-managed analysis work while preserving existing evidence).
+
+    - A capability that allows user selection (Starter) may analyze any row.
+    - A capability that does not (Free) may still analyze its own system-managed
+      ``free_sample`` rows, but never a ``user`` row — so a Starter->Free
+      downgrade stops new user-source work without deleting anything.
+    - A missing entitlement fails closed (no analysis).
+    """
+    if entitlement is None:
+        return False
+    profile = capability_profile(entitlement.plan_key)
+    if profile.allows_user_selection:
+        return True
+    return selection_source == SELECTION_SOURCE_FREE_SAMPLE
