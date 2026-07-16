@@ -109,23 +109,8 @@ export const projectSchema = z.object({
 export const transportProviderSchema = z.enum(['anthropic', 'google', 'openrouter', 'openai']);
 export const logicalEngineSchema = z.enum(['chatgpt', 'gemini', 'claude']);
 
-export const providerConnectionSchema = z
-  .object({
-    id: uuid(),
-    workspace_id: uuid(),
-    transport_provider: transportProviderSchema,
-    base_url: z.string().nullable(),
-    active: z.boolean(),
-    label: z.string().nullable().optional(),
-    last_tested_at: z.string().nullable().optional(),
-    last_test_status: z.enum(['ok', 'failed', 'untested']).optional(),
-    created_at: z.string(),
-    updated_at: z.string(),
-  })
-  // Strict: an unexpected key (e.g. a leaked `api_key`/`secret`) is a contract
-  // violation and must fail loud — the secret is never present on the wire.
-  .strict();
-
+// A configured route on a connection: which logical engine this transport
+// serves and the concrete transport model to call.
 export const providerRouteSchema = z.object({
   id: uuid(),
   logical_engine: logicalEngineSchema,
@@ -134,16 +119,42 @@ export const providerRouteSchema = z.object({
   is_default: z.boolean(),
 });
 
+export const providerConnectionSchema = z
+  .object({
+    id: uuid(),
+    workspace_id: uuid(),
+    // Optional so the pre-B4 minimal shape (used in the schema test) still
+    // validates; the live B4 DTO always sends these.
+    label: z.string().nullable().optional(),
+    transport_provider: transportProviderSchema,
+    base_url: z.string().nullable(),
+    active: z.boolean(),
+    // Presence flag only — the key value itself is NEVER on the wire.
+    api_key_set: z.boolean().optional(),
+    last_tested_at: z.string().nullable().optional(),
+    // Backend defaults to '' (untested); accept any short status string.
+    last_test_status: z.string().optional(),
+    routes: z.array(providerRouteSchema).optional(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  // Strict: an unexpected key (e.g. a leaked `api_key`/`secret`) is a contract
+  // violation and must fail loud — the secret is never present on the wire.
+  .strict();
+
+export const providerCatalogRouteSchema = z.object({
+  transport_provider: transportProviderSchema,
+  default_model: z.string(),
+});
+
 export const providerCatalogEngineSchema = z.object({
   logical_engine: logicalEngineSchema,
-  transport_provider: transportProviderSchema,
-  transport_models: z.array(z.string()),
-  reserved: z.boolean(),
+  routes: z.array(providerCatalogRouteSchema),
 });
 
 export const providerCatalogSchema = z.object({
+  transports: z.array(transportProviderSchema),
   engines: z.array(providerCatalogEngineSchema),
-  guardrails: z.record(z.string(), z.unknown()),
 });
 
 // ---------------------------------------------------------------------------

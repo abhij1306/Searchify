@@ -8,25 +8,49 @@ import { z } from 'zod';
 
 import { apiClient, type ApiRequestOptions } from './client';
 import {
+  logicalEngineSchema,
   providerCatalogSchema,
   providerConnectionSchema,
   strictValidate,
 } from './schemas';
-import type { ProviderCatalog, ProviderConnection, TransportProvider } from './types';
+import type {
+  LogicalEngine,
+  ProviderCatalog,
+  ProviderConnection,
+  TransportProvider,
+} from './types';
 
 const connectionListSchema = z.array(providerConnectionSchema);
 
+// Mirrors B4's `ProviderConnectionTestResponse`. `status` is a free string on
+// the wire ('ok' | 'failed'); the extra provenance fields are surfaced inline.
 const connectionTestResultSchema = z.object({
-  status: z.enum(['ok', 'failed']),
-  message: z.string().nullable(),
+  connection_id: z.string().uuid(),
+  status: z.string(),
+  error_code: z.string().optional().default(''),
+  detail: z.string().optional().default(''),
+  latency_ms: z.number().nullable().optional(),
+  logical_engine: z.string().optional().default(''),
+  transport_provider: z.string().optional().default(''),
+  transport_model: z.string().optional().default(''),
+  tested_at: z.string(),
 });
 export type ConnectionTestResult = z.infer<typeof connectionTestResultSchema>;
+
+/** A route entry sent on create/update (B4 `ProviderRouteInput`). */
+export type ProviderRouteInput = {
+  logical_engine: LogicalEngine;
+  transport_model?: string;
+  is_default?: boolean;
+};
 
 export type ProviderConnectionInput = {
   transport_provider: TransportProvider;
   api_key: string;
-  base_url?: string | null;
-  label?: string | null;
+  base_url?: string;
+  label?: string;
+  active?: boolean;
+  routes?: ProviderRouteInput[];
 };
 
 export const providersApi = {
@@ -65,3 +89,13 @@ export const providersApi = {
     return strictValidate(providerCatalogSchema, res, 'providers.getCatalog');
   },
 };
+
+/** True when a test result represents a successful probe. */
+export function isTestOk(result: ConnectionTestResult): boolean {
+  return result.status === 'ok';
+}
+
+// Re-export so the logical-engine literal union is importable from the API
+// barrel without reaching into `schemas`.
+export type { LogicalEngine };
+export const logicalEngines = logicalEngineSchema.options;
