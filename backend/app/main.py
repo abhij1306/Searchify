@@ -12,6 +12,9 @@ from app.api.audits import router as audits_router
 from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.prompts import router as prompts_router
+from app.api.provider_connections import (
+    catalog_router as provider_catalog_router,
+)
 from app.api.provider_connections import router as provider_connections_router
 from app.api.workspaces import router as workspaces_router
 from app.core.config import get_frontend_origins, settings
@@ -37,6 +40,7 @@ _ROUTERS = (
     projects_router,
     prompts_router,
     provider_connections_router,
+    provider_catalog_router,
     audits_router,
 )
 

@@ -31,10 +31,11 @@ async def test_health_echoes_request_id_header() -> None:
 
 
 def test_health_route_and_router_stubs_registered() -> None:
-    # /health is registered, and all six stub routers are included so B2-B6
-    # fill them in place (they carry no endpoints yet).
+    # /health is registered, and all mounted routers are included so B2-B6
+    # fill them in place. B4 adds the provider-catalog router alongside the six
+    # original stubs (7 total).
     from app.main import _ROUTERS
 
     paths = {getattr(route, "path", None) for route in app.routes}
     assert "/health" in paths
-    assert len(_ROUTERS) == 6
+    assert len(_ROUTERS) == 7

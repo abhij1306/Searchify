@@ -16,6 +16,12 @@ from app.models.brand import (
 )
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet
+from app.models.provider import (
+    DiscoveryModelConfig,
+    ProviderConnection,
+    ProviderConnectionTest,
+    ProviderRoute,
+)
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
@@ -24,10 +30,14 @@ __all__ = [
     "Brand",
     "BrandAlias",
     "Competitor",
+    "DiscoveryModelConfig",
     "OwnedDomain",
     "Project",
     "Prompt",
     "PromptSet",
+    "ProviderConnection",
+    "ProviderConnectionTest",
+    "ProviderRoute",
     "UnintendedDomain",
     "User",
     "Workspace",
