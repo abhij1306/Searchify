@@ -1,5 +1,5 @@
-# Password hashing, JWT handling, and BYOK secret encryption helpers.
-# Ported from CrawlerAI backend/app/core/security.py (argon2 / joserfc / Fernet).
+# Password hashing, JWT handling, and BYOK secret encryption helpers
+# (argon2 / joserfc / Fernet).
 from __future__ import annotations
 
 import base64

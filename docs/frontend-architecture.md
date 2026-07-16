@@ -12,10 +12,10 @@
 - **TanStack Query v5** for server state; **react-hook-form** + **zod** for forms/validation.
 - **Tailwind v4** semantic tokens (light/dark) — single `app/globals.css` token source authored
   from [`design.md`](design.md). **Radix** primitives + **lucide** icons; **CVA** for variants.
-- Conventions lifted from the CrawlerAI frontend (typed API client with `ApiError` +
-  request-id + abort, per-domain endpoint modules with zod `strictValidate`, `queryKeys`
-  module, React Query retry policy, CVA primitives, single-`globals.css` token bridge,
-  `data-theme` toggle) — but on **App Router, not Vite**.
+- Frontend conventions: typed API client with `ApiError` + request-id + abort, per-domain
+  endpoint modules with zod `strictValidate`, a `queryKeys` module, a React Query retry policy,
+  CVA primitives, a single-`globals.css` token bridge, and a `data-theme` toggle — on
+  **App Router**.
 - **Role**: render the seven MVP screens and orchestrate calls to the FastAPI backend. It owns
   no business logic and no source of truth — **the backend is the source of truth** (§7).
 

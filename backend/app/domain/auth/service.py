@@ -1,7 +1,6 @@
 # Authentication + registration service.
 #
-# Adapts CrawlerAI's user-scoped auth_service to Searchify's WORKSPACE-scoped
-# model: registration and first login both ensure the account has a personal
+# WORKSPACE-scoped auth model: registration and first login both ensure the account has a personal
 # workspace and a membership row (invariant 5 — access is via membership, not
 # a user-id shortcut).
 from __future__ import annotations

@@ -23,8 +23,8 @@ from app.models.brand import (
 from app.models.project import Project
 
 
-# A faithful re-implementation of the reference ``ScoringConfig.from_project``
-# contract (crawlerai ai_visibility/scoring.py). If the shim's dict shape drifts
+# A faithful re-implementation of the ``ScoringConfig.from_project``
+# contract (``ai_visibility/scoring.py``). If the shim's dict shape drifts
 # from what the scorer reads, this consumer breaks — which is the point.
 @dataclass(frozen=True)
 class _CompetitorConfig:

@@ -14,8 +14,8 @@ Claude). A workspace defines a **brand + competitors + prompts**, runs a one-tim
 
 **The full product** (documented, mostly roadmap) is a broader AEO suite: LLM Analytics,
 Traffic, Content, Opportunities, Site Health + Issues, Brand/Competitors/E-E-A-T, Topics,
-integrations (GSC/GA4/Bing), Agent, and MCP. The screenshots in `Images/` show that full
-surface.
+integrations (GSC/GA4/Bing), Agent, and MCP. See [`docs/architecture.md`](docs/architecture.md)
+for that full surface.
 
 **The MVP boundary** (what we actually code) is the **visibility slice** only — seven
 frontend screens (Auth, App Shell, Brand/Project setup, Prompt library, Provider Settings,
@@ -50,7 +50,7 @@ for the per-surface MVP/roadmap marker.
 | any frontend route, API contract layer, data flow | `docs/frontend-architecture.md` |
 | tokens, theme, per-screen layout, component primitives | `docs/design.md` |
 | the approved plan / task graph | `docs/plans/v1-searchify-visibility-mvp.md` |
-| whole-product architecture rationale | `cube27-aeo-visibility-mvp-architecture-plan-v2.md` |
+| whole-product architecture rationale | `docs/architecture.md` |
 
 ## Default startup flow (every task)
 

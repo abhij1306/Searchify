@@ -1,9 +1,10 @@
 # Searchify — AI-Visibility MVP + Product Documentation (Implementation Plan)
 
-> One merged plan across backend + frontend. Sources: reference implementation on branch
-> `feature/extraction-v3-phase0-eval` at `/tmp/crawlerai-aiv`; conventions from CrawlerAI main at
-> `/code/abhij1306/CrawlerAI`. Target repo: `/code/abhij1306/Searchify` (empty but for the v2 doc +
-> `Images/`). All prior "blocking questions" are decided in the summary and reflected here.
+> One merged plan across backend + frontend for Searchify's own AI-visibility subsystem, built on the
+> target architecture. The full-product surface (auth, workspaces, brand/project setup, prompts,
+> provider settings, visibility dashboard, run/executions explorer, and the documented roadmap
+> surfaces) is described in prose in `../architecture.md` and the `docs/` files this plan writes. All
+> prior "blocking questions" are decided in the summary and reflected here.
 >
 > **Task numbering:** `D1` = the documentation task (written **first**, before all implementation);
 > `B#` = backend/repo tasks; `F#` = frontend tasks; `V1` = final full-stack verification. `[after ...]`
@@ -46,7 +47,7 @@ MVP/roadmap marker per surface, both operational gotchas in `invariants.md` + a 
   identify owning subsystem); always-on rules (config not in service code; workspace auth on every
   query; secrets never returned; provenance on derived rows); verify commands (focused pytest, ruff,
   alembic upgrade, docker compose up with the shell-env workaround).
-- **`docs/backend-architecture.md`** — scope + MVP/roadmap table (every screenshot surface marked
+- **`docs/backend-architecture.md`** — scope + MVP/roadmap table (every product surface marked
   coded/roadmap); runtime stack; registered API surface (`File | Purpose` router table); audit request +
   settings contract; high-level flow (prompt → slot → task → adapter → raw artifact → analysis → metrics
   projection); subsystem ownership; persistence model (`File | Purpose` per model + provenance/version
@@ -71,7 +72,7 @@ MVP/roadmap marker per surface, both operational gotchas in `invariants.md` + a 
   progress — the backend SSE `/events` endpoint is MVP but the UI uses polling first and consumes SSE
   optionally); drift policy (`strictValidate` fails loud; backend is source of truth); zod
   data contracts; testing surface; architectural notes; companion-docs links.
-- **`docs/design.md`** — a written design system **with concrete values so no screenshot is needed**:
+- **`docs/design.md`** — a written design system **with concrete values so no visual reference is needed**:
   overview (globals.css is the single source of truth; dense clean B2B analytics aesthetic, original
   palette); theme model (explicit light + dark surface hierarchies); **actual token values** — light +
   dark hex palettes for surfaces/borders/text/accent, the **px type scale** (display/heading/body/label
@@ -86,7 +87,7 @@ MVP/roadmap marker per surface, both operational gotchas in `invariants.md` + a 
   themes always defined).
 - **Test:** all five files exist; markdown lints; cross-references resolve; a reviewer can trace
   subsystem ownership and confirm every MVP screen has concrete tokens + layout prose so the MVP can be
-  rebuilt from docs alone (no screenshot dependency).
+  rebuilt from docs alone (no visual-reference dependency).
 
 ---
 
@@ -95,8 +96,8 @@ MVP/roadmap marker per surface, both operational gotchas in `invariants.md` + a 
 ## B1 — Repo skeleton + Docker Compose + Postgres + Alembic + core scaffolding [after D1]
 - Monorepo dirs (above). `app/core/database.py` (`Base`, async engine, `async_sessionmaker`,
   `get_session()`), `app/core/config/__init__.py` (`Settings(BaseSettings)` singleton),
-  `app/core/security.py` (argon2 / joserfc JWT / Fernet `encrypt_secret`/`decrypt_secret`, ported from
-  CrawlerAI `security.py` L92/L96), `app/core/telemetry.py` (structlog + correlation ids + optional
+  `app/core/security.py` (argon2 / joserfc JWT / Fernet `encrypt_secret`/`decrypt_secret`),
+  `app/core/telemetry.py` (structlog + correlation ids + optional
   Logfire), `app/main.py` (app factory, CORS, lifespan, explicit router stubs, `/health`).
 - `migrations/env.py` bound to `Base.metadata`; `infra/docker/docker-compose.yml` (postgres + backend +
   worker) with the **shell-env override note baked in as a comment**; deps via uv (fastapi,
@@ -214,9 +215,9 @@ audits/{id}/metrics, executions/{id}, audits/{id}/export.{csv,md}
 # Frontend (Next.js App Router, TypeScript, Vercel)
 
 Stack: Next.js App Router + TS; TanStack Query v5; Tailwind v4 semantic tokens (light/dark); zod;
-react-hook-form; Radix + lucide. Conventions lifted from the CrawlerAI frontend (typed API client with
+react-hook-form; Radix + lucide. Frontend conventions (typed API client with
 `ApiError`+request-id+abort, per-domain endpoint modules with zod `strictValidate`, `queryKeys` module,
-React Query retry policy, CVA primitives, single-`globals.css` token bridge, `data-theme` toggle) but on
+React Query retry policy, CVA primitives, single-`globals.css` token bridge, `data-theme` toggle) built on
 App Router, not Vite. **All zod `id` fields are string UUIDs; the client consumes the workspace-scoped
 `/api/v1` contract from B2–B6 — no int-id / `user_id` / msw-only fallback.**
 
@@ -344,7 +345,7 @@ validated via `strictValidate`.
 ### Frontend integration verification
 Per-task tests above cover each screen; `next build` + lint + architecture-guard scripts + full Vitest
 suite + Playwright smoke run in task **V1** (below), which also verifies the same-origin proxy and both
-themes against `design.md` (no screenshot reference needed).
+themes against `design.md` (no visual reference needed).
 
 ---
 

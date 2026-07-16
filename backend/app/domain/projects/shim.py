@@ -2,8 +2,8 @@
 #
 # Decision B-1 stores brand identity as normalized rows (``Brand`` /
 # ``BrandAlias`` / ``Competitor`` / ``OwnedDomain`` / ``UnintendedDomain``),
-# but the deterministic scorer (ported in B5/B6 from crawlerai
-# ``ai_visibility/scoring.py``) consumes a **plain dict** via
+# but the deterministic scorer (B5/B6, ``ai_visibility/scoring.py``)
+# consumes a **plain dict** via
 # ``ScoringConfig.from_project(config)``. Rather than rewrite the scorer to
 # understand ORM rows, this shim rebuilds exactly the dict shape the scorer
 # expects, so downstream scoring works unchanged.

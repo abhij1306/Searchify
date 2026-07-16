@@ -4,14 +4,14 @@
 > an engineer (or agent) can start building without re-deriving the architecture. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
-> [`../Agents.md`](../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule
+> [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule
 > there applies here too.
 
 ## 1. Goal & positioning
 
 A **fast, HTTP-first, Screaming-Frog-style site crawler** that audits a website's technical
 SEO / AEO health and emits a de-duplicated **Issues catalog**. It is deliberately **not** a
-browser-rendering crawler and **not** CrawlerAI's commerce/acquisition engine — those are
+browser-rendering crawler and **not** a commerce/acquisition engine — those are
 heavyweight and out of scope. The design target is **throughput**: crawl tens of thousands of
 URLs in minutes by doing concurrent async HTTP fetches + streaming HTML parsing, with browser
 rendering as an optional, opt-in, per-URL fallback only.
@@ -175,6 +175,6 @@ Nothing tunable is hard-coded in service/worker code (invariant 1).
 
 - No full browser rendering on the fast path (opt-in fallback only).
 - No true field Core Web Vitals without a RUM/CrUX/PageSpeed integration (roadmap+).
-- No reuse of CrawlerAI's commerce/acquisition/selector/domain-memory engine.
+- No commerce/acquisition/selector/domain-memory crawling engine.
 - No LLM in issue detection (deterministic rules only — invariant 9); LLM-written remediation
   copy, if ever added, is a projection layer over deterministic findings, never the detector.
