@@ -52,8 +52,12 @@ describe('SessionGuard', () => {
   });
 
   it('redirects unauthenticated visitors to /login', async () => {
+    let requestCount = 0;
     mswServer.use(
-      http.get('/api/v1/auth/me', () => HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })),
+      http.get('/api/v1/auth/me', () => {
+        requestCount += 1;
+        return HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 });
+      }),
     );
 
     renderWithProviders(
@@ -63,6 +67,8 @@ describe('SessionGuard', () => {
     );
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(requestCount).toBe(1);
     expect(screen.queryByText(/signed in as/i)).not.toBeInTheDocument();
   });
 

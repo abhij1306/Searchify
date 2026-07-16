@@ -70,7 +70,7 @@ Browser ──/api/:path*── Next.js (rewrites, same-origin proxy) ──> Fa
 | Backend   | Python 3.12, FastAPI, SQLAlchemy (async) + asyncpg, Pydantic v2 / pydantic-settings, Alembic, httpx, argon2-cffi, joserfc (JWT), cryptography (Fernet), structlog |
 | Frontend  | Next.js (App Router) + TypeScript, Tailwind CSS v4, TanStack Query, react-hook-form + zod, Radix UI |
 | Database  | PostgreSQL |
-| Tooling   | `uv` (backend deps), `npm` (frontend), Docker Compose, Ruff, pytest / pytest-asyncio, Vitest + Testing Library + MSW, Playwright |
+| Tooling   | `uv` (backend deps), `pnpm` (frontend), Docker Compose, Ruff, pytest / pytest-asyncio, Vitest + Testing Library + MSW, Playwright |
 
 ## Repository layout
 
@@ -109,7 +109,7 @@ Searchify/
 
 - **Docker + Docker Compose** (for the quick start), or for bare-metal dev:
 - **Python 3.12** and [`uv`](https://docs.astral.sh/uv/)
-- **Node.js 22+** and **npm**
+- **Node.js 22+** and **pnpm 11+**
 - **PostgreSQL 15+** (only if running the backend outside Docker)
 
 ## Quick start (Docker Compose)
@@ -133,8 +133,8 @@ cd backend && uv run alembic upgrade head
 # 4. Start the frontend (from frontend/)
 cd ../frontend
 echo "BACKEND_ORIGIN=http://localhost:8000" > .env.local
-npm install
-npm run dev        # http://localhost:3000
+pnpm install
+pnpm dev            # http://localhost:3000
 ```
 
 Open <http://localhost:3000>, register a user (a workspace is created automatically), then
@@ -155,8 +155,8 @@ uv run python -m app.workers.audit_worker            # audit worker (separate sh
 # Frontend
 cd frontend
 echo "BACKEND_ORIGIN=http://localhost:8000" > .env.local
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ## Configuration
@@ -201,11 +201,11 @@ uv run ruff check .
 
 # Frontend (from frontend/)
 cd frontend
-npm run test           # Vitest unit/component tests (MSW-mocked network)
-npm run check:policy   # architecture / token guards
-npm run build          # next build
-npx tsc --noEmit       # type check
-npm run test:e2e       # Playwright (requires a browser + running stack)
+pnpm test             # Vitest unit/component tests (MSW-mocked network)
+pnpm check:policy     # architecture / token guards
+pnpm build            # next build
+pnpm exec tsc --noEmit # type check
+pnpm test:e2e         # Playwright (requires a browser + running stack)
 ```
 
 ## Key concepts

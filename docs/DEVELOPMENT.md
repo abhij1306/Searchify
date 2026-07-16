@@ -12,7 +12,7 @@ environment gotchas that will otherwise cost you an afternoon. Pair this with
 | Python | 3.12+ | Backend |
 | [`uv`](https://docs.astral.sh/uv/) | latest | Backend dependency + venv manager |
 | Node.js | 22+ | Frontend |
-| npm | bundled with Node | Frontend package manager |
+| pnpm | 11.9+ | Frontend package manager; pinned in `frontend/package.json` |
 | PostgreSQL | 15+ | Via Docker or local |
 | Docker + Compose | latest | Local stack |
 
@@ -41,8 +41,8 @@ executes provider calls; it only enqueues tasks (invariant 8).
 ```bash
 cd frontend
 echo "BACKEND_ORIGIN=http://localhost:8000" > .env.local
-npm install
-npm run dev                 # http://localhost:3000
+pnpm install
+pnpm dev                    # http://localhost:3000
 ```
 
 `BACKEND_ORIGIN` is **server-only**. The browser calls relative `/api/*`; Next.js
@@ -91,11 +91,11 @@ export TEST_DATABASE_URL="postgresql+asyncpg://postgres:searchify_dev_password@l
 
 ```bash
 cd frontend
-npm run test           # Vitest (network mocked with MSW)
-npm run check:policy   # architecture + design-token guards
-npx tsc --noEmit       # type check
-npm run build          # next build
-npm run test:e2e       # Playwright (needs a browser + a running stack)
+pnpm test             # Vitest (network mocked with MSW)
+pnpm check:policy     # architecture + design-token guards
+pnpm exec tsc --noEmit # type check
+pnpm build            # next build
+pnpm test:e2e         # Playwright (needs a browser + a running stack)
 ```
 
 ## Migrations (hand-written)

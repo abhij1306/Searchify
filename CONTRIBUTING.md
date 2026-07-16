@@ -70,10 +70,10 @@ uv run ruff check .
 uv run alembic upgrade head
 
 # Frontend (from frontend/)
-npm run test           # Vitest
-npm run check:policy   # architecture + token guards
-npx tsc --noEmit       # type check
-npm run build          # next build
+pnpm test              # Vitest
+pnpm check:policy      # architecture + token guards
+pnpm exec tsc --noEmit # type check
+pnpm build             # next build
 ```
 
 ## Frontend/backend contract discipline

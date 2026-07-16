@@ -8,6 +8,8 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
+  useState,
   type ReactNode,
 } from 'react';
 
@@ -44,6 +46,8 @@ export function SessionGuard({
 }: Readonly<{ children: ReactNode; fallback?: ReactNode }>) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const redirectingRef = useRef(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const {
     data: user,
@@ -53,9 +57,16 @@ export function SessionGuard({
   } = useQuery({
     queryKey: queryKeys.auth.me(),
     queryFn: ({ signal }) => authApi.me({ signal }),
+    enabled: !isRedirecting,
   });
 
   const clearSession = useCallback(() => {
+    // Clearing the cache removes the active `me` query. Without this latch,
+    // the still-mounted guard immediately recreates it and can hammer the
+    // backend with 401s until the router finishes navigating.
+    if (redirectingRef.current) return;
+    redirectingRef.current = true;
+    setIsRedirecting(true);
     queryClient.clear();
     router.replace('/login');
   }, [queryClient, router]);
@@ -87,7 +98,7 @@ export function SessionGuard({
     [user, clearSession],
   );
 
-  if (isLoading || !value) {
+  if (isLoading || isRedirecting || !value) {
     // Loading, or unauthenticated and mid-redirect: never render protected UI.
     // Surface the underlying error only for debugging (kept out of the DOM).
     void error;

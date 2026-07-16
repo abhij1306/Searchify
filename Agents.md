@@ -64,6 +64,13 @@ for the per-surface MVP/roadmap marker.
 4. Make the **minimal scoped change**. Add/adjust tests in the project's existing framework.
 5. Run the focused verify commands below before reporting done.
 
+## Frontend package manager
+
+The frontend uses **pnpm only**, pinned to `pnpm@11.9.0` in
+`frontend/package.json`. Use `pnpm install`, `pnpm <script>`, and the checked-in
+`frontend/pnpm-lock.yaml`. Do not use npm or yarn, do not run `npm install`, and do not
+create or regenerate a `package-lock.json`.
+
 ## Always-on rules (full list in `docs/invariants.md`)
 
 - **Config never lives in service code.** Tokens, thresholds, model ids, transport catalogs,
@@ -93,9 +100,9 @@ uv run ruff check .
 uv run alembic upgrade head
 
 # Frontend — focused (from frontend/)
-npm run test -- <file>        # Vitest
-npm run build                 # next build
-npm run lint
+pnpm test -- <file>          # Vitest
+pnpm build                   # next build
+pnpm lint
 
 # Docker compose — boots ONLY via the shell-env workaround (see invariant 11).
 # This machine exports POSTGRES_* + DATABASE_URL into every shell and Compose
