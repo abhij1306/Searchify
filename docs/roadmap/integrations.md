@@ -270,7 +270,8 @@ No endpoint ever returns a token (invariant 6).
 - `GET /integrations/oauth/{provider}/callback` — exchange code, persist encrypted tokens on the
   `IntegrationOAuthGrant` (find-or-create for the transport) and attach the connection(s), 302
   back to Settings.
-- `POST /integrations/{id}/test` — validate the stored token against the provider (a cheap
+- `POST /integrations/{id}/test` — validate the connection's grant token (resolved from the
+  connection's `IntegrationOAuthGrant`, not a connection column) against the provider (a cheap
   authenticated probe, analogous to `POST /provider-connections/{id}/test`); returns a status +
   `error_code`, never the token. Appends an `IntegrationEvent`.
 - `POST /integrations/{id}/sync` — enqueue an on-demand `IntegrationSyncRun` (body: optional
