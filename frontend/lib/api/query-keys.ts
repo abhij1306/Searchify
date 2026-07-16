@@ -45,4 +45,27 @@ export const queryKeys = {
     project: (projectId: string, auditId?: string, filters: ListFilters = {}) =>
       ['visibility', 'project', projectId, auditId ?? 'latest', filters] as const,
   },
+  // Site Health — isolated by project / crawl / filter so an inventory query
+  // for one crawl (or one filter combination) never collides with another.
+  siteHealth: {
+    all: ['site-health'] as const,
+    entitlements: () => ['site-health', 'entitlements'] as const,
+    dashboard: (projectId: string, crawlId?: string) =>
+      ['site-health', 'dashboard', projectId, crawlId ?? 'latest'] as const,
+    crawls: (projectId: string, filters: ListFilters = {}) =>
+      ['site-health', 'crawls', projectId, filters] as const,
+    crawl: (crawlId: string) => ['site-health', 'crawl', crawlId] as const,
+    inventory: (crawlId: string, filters: ListFilters = {}) =>
+      ['site-health', 'inventory', crawlId, filters] as const,
+    monitored: (projectId: string) => ['site-health', 'monitored', projectId] as const,
+    pages: (crawlId: string, filters: ListFilters = {}) =>
+      ['site-health', 'pages', crawlId, filters] as const,
+    page: (crawlId: string, siteUrlId: string) =>
+      ['site-health', 'page', crawlId, siteUrlId] as const,
+    issues: (crawlId: string, filters: ListFilters = {}) =>
+      ['site-health', 'issues', crawlId, filters] as const,
+    issue: (crawlId: string, issueId: string) =>
+      ['site-health', 'issue', crawlId, issueId] as const,
+    events: (crawlId: string) => ['site-health', 'events', crawlId] as const,
+  },
 } as const;
