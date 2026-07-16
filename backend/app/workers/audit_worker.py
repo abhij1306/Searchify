@@ -1,25 +1,763 @@
-# Audit worker entrypoint (placeholder).
+# Audit worker: the Postgres-queue claim/lease execution loop (invariant 8).
 #
-# The real Postgres-queue worker lands in B5: it claims AuditTask rows via
-# FOR UPDATE SKIP LOCKED, runs the answer-engine adapter, persists artifacts,
-# heartbeats its lease, and drives audit state transitions (invariant 8).
-# This placeholder keeps the `worker` compose service wired without a
-# crash-loop until B5 replaces `main()` with the real claim/lease loop.
+# A separate process (the ``worker`` compose service). It claims ``AuditTask``
+# rows via ``PostgresTaskQueue`` (``FOR UPDATE SKIP LOCKED``, lease committed
+# BEFORE any network I/O), resolves the decrypted BYOK key from the task's
+# ``ProviderConnection`` at execution time (never env, never logged — invariant
+# 6), builds the answer-engine adapter, and calls it with request pacing, a hard
+# per-call ceiling, and a bounded retry budget. Each attempt appends an
+# immutable ``ProviderAttempt``; a successful call persists an immutable
+# ``RawResponseArtifact`` plus the task's execution fields (single writer = the
+# claiming worker — invariant 3). It heartbeats the lease while a call runs,
+# drives the audit lifecycle (QUEUED -> RUNNING, then RUNNING -> ANALYZING /
+# FAILED at the execution boundary), and honors cooperative cancel + the per-run
+# wall-clock deadline at each task boundary (invariant 9).
+#
+# Scoring/analysis is B6's job: this worker persists the raw answer + citations
+# and hands a finished-execution audit off at ``analyzing``.
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import time
+import uuid
+from datetime import UTC, datetime
 
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.connectors.answer_engines.contracts import (
+    AnswerEngineRequest,
+    AnswerEngineResponse,
+)
+from app.connectors.answer_engines.errors import ProviderError
+from app.connectors.answer_engines.factory import build_adapter
+from app.core.config.audits import (
+    ATTEMPT_STATUS_FAILED,
+    ATTEMPT_STATUS_SUCCEEDED,
+    AUDIT_STATUS_ANALYZING,
+    AUDIT_STATUS_CANCELLED,
+    AUDIT_STATUS_FAILED,
+    AUDIT_STATUS_QUEUED,
+    AUDIT_STATUS_RUNNING,
+    AUDIT_TERMINAL_STATUSES,
+    ERROR_NO_CONNECTION,
+    ERROR_RUN_DEADLINE,
+    EVENT_AUDIT_RUNNING,
+    EVENT_TASK_FAILED,
+    EVENT_TASK_RETRY,
+    EVENT_TASK_SUCCEEDED,
+    TASK_STATUS_SUCCEEDED,
+    TASK_TERMINAL_STATUSES,
+    audit_settings,
+)
+from app.core.config.provider_catalog import (
+    ERROR_PARSE,
+    ERROR_TIMEOUT,
+    RETRYABLE_ERRORS,
+)
+from app.core.database import SessionLocal
+from app.core.security import decrypt_secret
 from app.core.telemetry import configure_logging
+from app.domain.audits.state_events import apply_transition, record_event
+from app.models.audit import (
+    Audit,
+    AuditEngineSnapshot,
+    AuditTask,
+    ProviderAttempt,
+    RawResponseArtifact,
+)
+from app.models.provider import ProviderConnection
+from app.orchestration.postgres_task_queue import PostgresTaskQueue
 
 logger = logging.getLogger("app.workers.audit_worker")
 
 
-def main() -> None:
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+# --- Request pacing (per transport, across concurrent tasks in this process) --
+_provider_pacing_locks: dict[str, asyncio.Lock] = {}
+_provider_last_request_started: dict[str, float] = {}
+
+
+async def pace_provider_request(transport_provider: str) -> None:
+    """Space provider request starts per transport to respect rate limits.
+
+    Mainly protects Gemini's low per-minute quota. A no-op when
+    ``min_request_interval_seconds`` is 0 (the default).
+    """
+    interval = max(0.0, audit_settings.min_request_interval_seconds)
+    if interval <= 0:
+        return
+    lock = _provider_pacing_locks.setdefault(transport_provider, asyncio.Lock())
+    async with lock:
+        last_started = _provider_last_request_started.get(transport_provider)
+        if last_started is not None:
+            remaining = interval - (time.monotonic() - last_started)
+            if remaining > 0:
+                await asyncio.sleep(remaining)
+        _provider_last_request_started[transport_provider] = time.monotonic()
+
+
+async def _call_with_retries(
+    adapter, request: AnswerEngineRequest
+) -> tuple[AnswerEngineResponse | None, ProviderError | None, int]:
+    """Call the provider with pacing, a hard per-call ceiling, and retries.
+
+    Returns ``(response, None, attempts)`` on success or
+    ``(None, last_error, attempts)`` once the budget is spent. A single call can
+    never run past ``max_call_seconds`` (``asyncio.wait_for`` guards the HTTP
+    client); the loop is bounded by ``max_attempts``.
+    """
+    attempts = max(1, audit_settings.max_attempts)
+    last_error: ProviderError | None = None
+    made = 0
+    for attempt in range(attempts):
+        made = attempt + 1
+        try:
+            await pace_provider_request(adapter.transport_provider)
+            # Hard per-call ceiling independent of the HTTP client timeout: a
+            # stalled call (hung socket, redirect loop) can never run past this.
+            response = await asyncio.wait_for(
+                adapter.execute(request),
+                timeout=audit_settings.max_call_seconds,
+            )
+            return response, None, made
+        except TimeoutError:
+            last_error = ProviderError(
+                "provider call exceeded max_call_seconds "
+                f"({audit_settings.max_call_seconds}s)",
+                error_code=ERROR_TIMEOUT,
+                retryable=True,
+            )
+        except ProviderError as exc:
+            last_error = exc
+            if not (exc.retryable and exc.error_code in RETRYABLE_ERRORS):
+                break
+        if attempt == attempts - 1:
+            break
+        retry_after = getattr(last_error, "retry_after_seconds", None)
+        await asyncio.sleep(
+            audit_settings.retry_delay(attempt, retry_after)
+        )
+    return None, last_error, made
+
+
+def _build_request_snapshot(
+    *, task: AuditTask, request: AnswerEngineRequest, configuration: dict
+) -> dict:
+    """What determined the request. Proves statelessness; never the key/brand.
+
+    Records the visible prompt, the resolved model + provenance triple, the
+    neutral system instruction, and locale — enough to reproduce the call. The
+    brand/competitor list and the API key are intentionally excluded
+    (invariant 6).
+    """
+    return {
+        "logical_engine": task.logical_engine,
+        "transport_provider": task.transport_provider,
+        "transport_model": task.transport_model,
+        "model": request.model,
+        "prompt": request.prompt,
+        "system_instruction": request.system_instruction,
+        "stateless": True,
+        "benchmark_mode": configuration.get("benchmark_mode", ""),
+        "country_code": configuration.get("country_code", ""),
+        "language_code": configuration.get("language_code", ""),
+    }
+
+
+def _serialize_search_events(response: AnswerEngineResponse) -> list[dict]:
+    return [
+        {
+            "sequence": event.sequence,
+            "query": event.query,
+            "call_id": event.call_id,
+            "call_sequence": event.call_sequence,
+            "query_sequence": event.query_sequence,
+        }
+        for event in response.search_events
+    ]
+
+
+def _serialize_citations(response: AnswerEngineResponse) -> list[dict]:
+    """One row per distinct source URL (collapse per-span duplicates).
+
+    Grounded providers cite the same source once per supported text span; the
+    UI and later scoring want one row per distinct source. Keeps the first
+    occurrence and re-numbers ``ordinal`` densely. Scoring/classification is
+    deferred to B6.
+    """
+    seen: set = set()
+    deduped: list[dict] = []
+    for citation in response.citations:
+        url = str(citation.url or "").strip()
+        key = url or (citation.domain, citation.title)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(
+            {
+                "ordinal": len(deduped),
+                "url": citation.url,
+                "domain": citation.domain,
+                "title": citation.title,
+                "start_index": citation.start_index,
+                "end_index": citation.end_index,
+                "cited_text": citation.cited_text,
+            }
+        )
+    return deduped
+
+
+class AuditWorker:
+    """Owns a claim/lease loop against ``PostgresTaskQueue``.
+
+    A single worker claims up to ``worker_concurrency`` tasks per poll and runs
+    them serially inside its loop (each in its own short-lived session). Sharing
+    an async session across concurrent tasks corrupts session state, so a worker
+    never holds one open across a provider call.
+    """
+
+    def __init__(
+        self,
+        *,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+        owner: str | None = None,
+    ) -> None:
+        self._session_factory = session_factory or SessionLocal
+        self._queue = PostgresTaskQueue(self._session_factory)
+        self.owner = owner or f"worker-{uuid.uuid4().hex[:12]}"
+
+    async def run_once(self) -> int:
+        """Sweep expired leases, claim a batch, execute it. Returns count run."""
+        await self._queue.release_expired()
+        tasks = await self._queue.claim(
+            owner=self.owner,
+            limit=max(1, audit_settings.worker_concurrency),
+        )
+        for task in tasks:
+            await self._execute_task(task)
+        return len(tasks)
+
+    async def run_until_idle(self, *, max_batches: int = 1000) -> int:
+        """Drain the queue until a claim returns nothing (test/one-shot mode)."""
+        total = 0
+        for _ in range(max_batches):
+            ran = await self.run_once()
+            if ran == 0:
+                break
+            total += ran
+        return total
+
+    async def run_forever(self) -> None:  # pragma: no cover - long-running loop
+        logger.info("audit worker started", extra={"owner": self.owner})
+        while True:
+            try:
+                ran = await self.run_once()
+            except Exception:  # defensive: a bad task must not kill the loop
+                logger.exception("audit worker loop iteration failed")
+                ran = 0
+            if ran == 0:
+                await asyncio.sleep(
+                    max(0.05, audit_settings.poll_interval_seconds)
+                )
+
+    # --- per-task execution ------------------------------------------------
+
+    async def _execute_task(self, claimed: AuditTask) -> None:
+        """Run one claimed task end to end inside its own session.
+
+        Honors cooperative cancel + the per-run wall-clock deadline at the
+        boundary (before touching the provider). Persists the immutable artifact
+        + attempt and finalizes the task through the queue so the lease is always
+        released. Never raises — a crash is caught and recorded as a failure.
+        """
+        task_id = claimed.id
+        audit_id = claimed.audit_id
+        try:
+            async with self._session_factory() as session:
+                task = await session.get(AuditTask, task_id)
+                if task is None:
+                    return
+                audit = await session.get(Audit, audit_id)
+                if audit is None:
+                    return
+
+                # Cooperative cancel: stop at this boundary if the audit was
+                # killed since the claim, rather than hitting the provider.
+                if audit.status == AUDIT_STATUS_CANCELLED:
+                    await session.rollback()
+                    await self._queue.cancel(task_id=task_id)
+                    return
+
+                # Per-run wall-clock deadline: once the audit has been running
+                # longer than max_run_seconds, terminalize remaining tasks
+                # instead of starting another provider call.
+                if self._deadline_passed(audit):
+                    await session.rollback()
+                    await self._queue.fail(
+                        task_id=task_id,
+                        owner=self.owner,
+                        error_code=ERROR_RUN_DEADLINE,
+                        error_detail=(
+                            "audit exceeded max_run_seconds "
+                            f"({audit_settings.max_run_seconds}s)"
+                        ),
+                    )
+                    await self._finalize_audit(audit_id)
+                    return
+
+                # First task moves the audit QUEUED -> RUNNING.
+                self._ensure_running(session, audit)
+                await session.commit()
+
+            # Mark the queue row running (still owned) before the network call.
+            if not await self._queue.mark_running(
+                task_id=task_id, owner=self.owner
+            ):
+                # Lease lost (sweeper reclaimed it); another worker will retry.
+                return
+
+            await self._run_provider_call(task_id, audit_id)
+        except Exception as exc:  # defensive: never let one task kill the loop
+            logger.exception("audit task crashed", extra={"task_id": str(task_id)})
+            await self._record_crash(task_id, audit_id, exc)
+        finally:
+            await self._finalize_audit(audit_id)
+
+    def _deadline_passed(self, audit: Audit) -> bool:
+        started = audit.started_at
+        if started is None:
+            return False
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        elapsed = (_utcnow() - started).total_seconds()
+        return elapsed >= audit_settings.max_run_seconds
+
+    def _ensure_running(self, session: AsyncSession, audit: Audit) -> None:
+        if audit.status == AUDIT_STATUS_QUEUED:
+            audit.started_at = _utcnow()
+            apply_transition(
+                session,
+                audit=audit,
+                target=AUDIT_STATUS_RUNNING,
+                message="audit running",
+            )
+            record_event(
+                session,
+                audit_id=audit.id,
+                event_type=EVENT_AUDIT_RUNNING,
+                message="audit running",
+            )
+
+    async def _run_provider_call(
+        self, task_id: uuid.UUID, audit_id: uuid.UUID
+    ) -> None:
+        # Load everything the call needs in one short session, then close it
+        # before the (long) network call so no txn is held across provider I/O.
+        async with self._session_factory() as session:
+            task = await session.get(AuditTask, task_id)
+            audit = await session.get(Audit, audit_id)
+            if task is None or audit is None:
+                return
+            snapshot = await session.get(
+                AuditEngineSnapshot, task.engine_snapshot_id
+            )
+            connection: ProviderConnection | None = None
+            if snapshot is not None and snapshot.connection_id is not None:
+                connection = await session.get(
+                    ProviderConnection, snapshot.connection_id
+                )
+            configuration = dict(audit.configuration or {})
+            system_instruction = audit.system_instruction or ""
+            attempt_number = task.attempt_count + 1
+            logical_engine = task.logical_engine
+            transport_provider = task.transport_provider
+            transport_model = task.transport_model
+            prompt_text = task.prompt_text or ""
+            base_url = snapshot.base_url if snapshot is not None else ""
+
+        # A missing/inactive connection is a terminal misconfiguration.
+        if connection is None or not connection.active:
+            await self._fail_terminal(
+                task_id=task_id,
+                audit_id=audit_id,
+                attempt_number=attempt_number,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                error_code=ERROR_NO_CONNECTION,
+                error_detail="provider connection missing or inactive",
+            )
+            return
+
+        # Resolve the BYOK key at execution time. Never logged/persisted.
+        api_key = decrypt_secret(connection.api_key_encrypted)
+        request = AnswerEngineRequest(
+            prompt=prompt_text,
+            system_instruction=system_instruction,
+            model=transport_model,
+            timeout_seconds=audit_settings.request_timeout_seconds,
+        )
+        request_snapshot = _build_request_snapshot(
+            task=SimpleTask(
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+            ),
+            request=request,
+            configuration=configuration,
+        )
+
+        try:
+            adapter = build_adapter(
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                api_key=api_key,
+                country_code=str(configuration.get("country_code", "")),
+                base_url=base_url,
+            )
+        except ProviderError as exc:
+            await self._fail_terminal(
+                task_id=task_id,
+                audit_id=audit_id,
+                attempt_number=attempt_number,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                error_code=exc.error_code,
+                error_detail=str(exc),
+                request_snapshot=request_snapshot,
+            )
+            return
+
+        # Heartbeat the lease while the (possibly slow) call runs.
+        heartbeat = asyncio.create_task(self._heartbeat_loop(task_id))
+        try:
+            response, error, attempts_made = await _call_with_retries(
+                adapter, request
+            )
+        finally:
+            heartbeat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat
+
+        if response is None:
+            await self._handle_failure(
+                task_id=task_id,
+                audit_id=audit_id,
+                attempts_made=attempts_made,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                error=error,
+                request_snapshot=request_snapshot,
+            )
+            return
+
+        await self._persist_success(
+            task_id=task_id,
+            audit_id=audit_id,
+            attempts_made=attempts_made,
+            response=response,
+            request_snapshot=request_snapshot,
+        )
+
+    async def _heartbeat_loop(
+        self, task_id: uuid.UUID
+    ) -> None:  # pragma: no cover - timing loop
+        interval = max(1.0, audit_settings.heartbeat_interval_seconds)
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                await self._queue.heartbeat(task_id=task_id, owner=self.owner)
+        except asyncio.CancelledError:
+            raise
+
+    async def _persist_success(
+        self,
+        *,
+        task_id: uuid.UUID,
+        audit_id: uuid.UUID,
+        attempts_made: int,
+        response: AnswerEngineResponse,
+        request_snapshot: dict,
+    ) -> None:
+        search_events = _serialize_search_events(response)
+        citations = _serialize_citations(response)
+        artifact_id: uuid.UUID | None = None
+        async with self._session_factory() as session:
+            task = await session.get(AuditTask, task_id)
+            if task is None:
+                return
+            # Immutable raw artifact (invariant 3): written once, never mutated.
+            artifact = RawResponseArtifact(
+                audit_id=audit_id,
+                task_id=task_id,
+                logical_engine=response.logical_engine,
+                transport_provider=response.transport_provider,
+                transport_model=response.transport_model,
+                answer_text=response.answer_text,
+                search_used=response.search_used,
+                search_events=search_events,
+                citations=citations,
+                provider_metadata=dict(response.provider_metadata),
+                usage=dict(response.usage),
+                latency_ms=response.latency_ms,
+            )
+            session.add(artifact)
+            await session.flush()
+            artifact_id = artifact.id
+
+            task.attempt_count += attempts_made
+            task.answer_text = response.answer_text
+            task.search_used = response.search_used
+            task.search_events = search_events
+            task.citations = citations
+            task.request_snapshot = request_snapshot
+            task.provider_metadata = dict(response.provider_metadata)
+            task.latency_ms = response.latency_ms
+            task.error_code = ""
+            task.error_detail = ""
+
+            session.add(
+                ProviderAttempt(
+                    task_id=task_id,
+                    audit_id=audit_id,
+                    attempt_number=task.attempt_count,
+                    logical_engine=response.logical_engine,
+                    transport_provider=response.transport_provider,
+                    transport_model=response.transport_model,
+                    status=ATTEMPT_STATUS_SUCCEEDED,
+                    latency_ms=response.latency_ms,
+                    artifact_id=artifact_id,
+                )
+            )
+            record_event(
+                session,
+                audit_id=audit_id,
+                event_type=EVENT_TASK_SUCCEEDED,
+                message="task succeeded",
+                payload={"task_id": str(task_id)},
+            )
+            await session.commit()
+
+        await self._queue.succeed(
+            task_id=task_id, owner=self.owner, result_artifact_id=artifact_id
+        )
+
+    async def _handle_failure(
+        self,
+        *,
+        task_id: uuid.UUID,
+        audit_id: uuid.UUID,
+        attempts_made: int,
+        logical_engine: str,
+        transport_provider: str,
+        transport_model: str,
+        error: ProviderError | None,
+        request_snapshot: dict,
+    ) -> None:
+        error_code = error.error_code if error else ERROR_PARSE
+        error_detail = str(error) if error else "unknown provider error"
+        retryable = bool(error and error.retryable and error_code in RETRYABLE_ERRORS)
+        retry_after = getattr(error, "retry_after_seconds", None)
+
+        async with self._session_factory() as session:
+            task = await session.get(AuditTask, task_id)
+            if task is None:
+                return
+            task.attempt_count += attempts_made
+            task.request_snapshot = request_snapshot
+            attempt_number = task.attempt_count
+            exhausted = task.attempt_count >= task.max_attempts
+            session.add(
+                ProviderAttempt(
+                    task_id=task_id,
+                    audit_id=audit_id,
+                    attempt_number=attempt_number,
+                    logical_engine=logical_engine,
+                    transport_provider=transport_provider,
+                    transport_model=transport_model,
+                    status=ATTEMPT_STATUS_FAILED,
+                    error_code=error_code,
+                    error_detail=error_detail[:2000],
+                )
+            )
+            will_retry = retryable and not exhausted
+            record_event(
+                session,
+                audit_id=audit_id,
+                event_type=EVENT_TASK_RETRY if will_retry else EVENT_TASK_FAILED,
+                message="task retry" if will_retry else "task failed",
+                payload={"task_id": str(task_id), "error_code": error_code},
+            )
+            await session.commit()
+
+        if will_retry:
+            await self._queue.retry(
+                task_id=task_id,
+                owner=self.owner,
+                delay_seconds=audit_settings.retry_delay(
+                    attempt_number, retry_after
+                ),
+                error_code=error_code,
+                error_detail=error_detail,
+            )
+        else:
+            await self._queue.fail(
+                task_id=task_id,
+                owner=self.owner,
+                error_code=error_code,
+                error_detail=error_detail,
+            )
+
+    async def _fail_terminal(
+        self,
+        *,
+        task_id: uuid.UUID,
+        audit_id: uuid.UUID,
+        attempt_number: int,
+        logical_engine: str,
+        transport_provider: str,
+        transport_model: str,
+        error_code: str,
+        error_detail: str,
+        request_snapshot: dict | None = None,
+    ) -> None:
+        """Terminally fail a task (non-retryable misconfiguration)."""
+        async with self._session_factory() as session:
+            task = await session.get(AuditTask, task_id)
+            if task is None:
+                return
+            task.attempt_count += 1
+            if request_snapshot is not None:
+                task.request_snapshot = request_snapshot
+            session.add(
+                ProviderAttempt(
+                    task_id=task_id,
+                    audit_id=audit_id,
+                    attempt_number=task.attempt_count,
+                    logical_engine=logical_engine,
+                    transport_provider=transport_provider,
+                    transport_model=transport_model,
+                    status=ATTEMPT_STATUS_FAILED,
+                    error_code=error_code,
+                    error_detail=error_detail[:2000],
+                )
+            )
+            record_event(
+                session,
+                audit_id=audit_id,
+                event_type=EVENT_TASK_FAILED,
+                message="task failed",
+                payload={"task_id": str(task_id), "error_code": error_code},
+            )
+            await session.commit()
+        await self._queue.fail(
+            task_id=task_id,
+            owner=self.owner,
+            error_code=error_code,
+            error_detail=error_detail,
+        )
+
+    async def _record_crash(
+        self, task_id: uuid.UUID, audit_id: uuid.UUID, exc: Exception
+    ) -> None:
+        detail = f"{type(exc).__name__}: {exc}"
+        await self._queue.fail(
+            task_id=task_id,
+            owner=self.owner,
+            error_code=ERROR_PARSE,
+            error_detail=detail,
+        )
+
+    async def _finalize_audit(self, audit_id: uuid.UUID) -> None:
+        """Move a finished-execution audit off ``running`` at the boundary.
+
+        Runs after each task terminalizes. When no non-terminal task remains,
+        counts outcomes and transitions RUNNING -> ANALYZING (>=1 success, B6
+        picks it up) or RUNNING -> FAILED (0 successes). A cancelled audit keeps
+        its status. Guarded with ``FOR UPDATE`` so concurrent workers don't
+        double-finalize.
+        """
+        async with self._session_factory() as session:
+            audit = await session.get(Audit, audit_id, with_for_update=True)
+            if audit is None or audit.status in AUDIT_TERMINAL_STATUSES:
+                if audit is not None:
+                    await session.rollback()
+                return
+            remaining = await session.scalar(
+                select(func.count())
+                .select_from(AuditTask)
+                .where(AuditTask.audit_id == audit_id)
+                .where(AuditTask.status.not_in(list(TASK_TERMINAL_STATUSES)))
+            )
+            if remaining and remaining > 0:
+                await session.rollback()
+                return
+            succeeded = await session.scalar(
+                select(func.count())
+                .select_from(AuditTask)
+                .where(AuditTask.audit_id == audit_id)
+                .where(AuditTask.status == TASK_STATUS_SUCCEEDED)
+            )
+            total = await session.scalar(
+                select(func.count())
+                .select_from(AuditTask)
+                .where(AuditTask.audit_id == audit_id)
+            )
+            succeeded = int(succeeded or 0)
+            total = int(total or 0)
+            audit.completed_count = succeeded
+            audit.failed_count = total - succeeded
+            if audit.status == AUDIT_STATUS_RUNNING:
+                if succeeded == 0:
+                    audit.completed_at = _utcnow()
+                    apply_transition(
+                        session,
+                        audit=audit,
+                        target=AUDIT_STATUS_FAILED,
+                        message="audit failed: no successful executions",
+                    )
+                    audit.error_message = "no successful executions"
+                else:
+                    # Execution done; analysis (B6) takes over from analyzing.
+                    apply_transition(
+                        session,
+                        audit=audit,
+                        target=AUDIT_STATUS_ANALYZING,
+                        message="execution complete; ready for analysis",
+                        payload={"completed": succeeded, "failed": total - succeeded},
+                    )
+            await session.commit()
+
+
+class SimpleTask:
+    """Lightweight provenance-triple carrier for the request snapshot builder."""
+
+    __slots__ = ("logical_engine", "transport_provider", "transport_model")
+
+    def __init__(
+        self,
+        *,
+        logical_engine: str,
+        transport_provider: str,
+        transport_model: str,
+    ) -> None:
+        self.logical_engine = logical_engine
+        self.transport_provider = transport_provider
+        self.transport_model = transport_model
+
+
+def main() -> None:  # pragma: no cover - process entrypoint
     configure_logging()
-    logger.info("audit worker placeholder started; awaiting B5 implementation")
-    while True:  # pragma: no cover - long-running process loop
-        time.sleep(60)
+    worker = AuditWorker()
+    asyncio.run(worker.run_forever())
 
 
 if __name__ == "__main__":  # pragma: no cover

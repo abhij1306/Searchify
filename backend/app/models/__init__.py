@@ -7,6 +7,15 @@
 from __future__ import annotations
 
 from app.core.database import Base
+from app.models.audit import (
+    Audit,
+    AuditEngineSnapshot,
+    AuditEvent,
+    AuditPromptSnapshot,
+    AuditTask,
+    ProviderAttempt,
+    RawResponseArtifact,
+)
 from app.models.brand import (
     Brand,
     BrandAlias,
@@ -26,6 +35,11 @@ from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
 __all__ = [
+    "Audit",
+    "AuditEngineSnapshot",
+    "AuditEvent",
+    "AuditPromptSnapshot",
+    "AuditTask",
     "Base",
     "Brand",
     "BrandAlias",
@@ -35,9 +49,11 @@ __all__ = [
     "Project",
     "Prompt",
     "PromptSet",
+    "ProviderAttempt",
     "ProviderConnection",
     "ProviderConnectionTest",
     "ProviderRoute",
+    "RawResponseArtifact",
     "UnintendedDomain",
     "User",
     "Workspace",
