@@ -83,9 +83,22 @@ Hard rules:
   tool call: `id`, `message_id`, `tool_name`, `arguments_snapshot` (JSONB, credential-free),
   `result_ref`, `status`, `latency_ms`, `created_at`. Lets a write-capable tool (e.g. "launch
   audit") be audited independently.
+- **`McpAccessToken`** — the persistence model backing the MCP tokens minted in Settings (§6);
+  without it a minted token has nowhere to resolve from. `id`, `workspace_id` (the workspace the
+  token is scoped to, invariant 5), `name`/`label`, and the credential material stored as
+  **either a Fernet-encrypted secret (`encrypted_secret`, `encrypt_secret` — invariant 6) or a
+  one-way lookup hash (`token_hash`)** — never the plaintext token, which is returned once at
+  creation and never again (invariant 6). Plus `capability_scope` (JSONB — the granted tool
+  capabilities; read-only unless a write capability is explicitly granted, §6), `expires_at`
+  (TTL, from the config'd MCP token TTL, §8), `revoked_at` / `status` (`active | revoked |
+  expired` revocation state), `last_used_at`, and creation/update/audit metadata (`created_at`,
+  `updated_at`, `created_by` workspace member). A tool call resolves the presented secret to this
+  row, checks it is active + unexpired, and scopes every downstream read by its `workspace_id`
+  (invariant 5). Workspace-scoped; no `user_id` scoping.
 
 No message row is ever mutated after write; conversation history is an immutable log, exactly
-like `AuditEvent` (invariant 3).
+like `AuditEvent` (invariant 3). `McpAccessToken` is the one exception that carries mutable
+lifecycle fields (`last_used_at`, revocation state) — the tokens themselves, not the log.
 
 ## 5. Agent execution (queue for long turns, cooperative cancel)
 
@@ -111,12 +124,14 @@ transport — e.g. an authenticated MCP-over-HTTP/SSE endpoint) that exposes:
 
 Auth + secrets:
 - **No unauthenticated MCP access** (non-goal §8). An MCP client authenticates with a
-  workspace-scoped **MCP access token** minted in Settings; the token is a BYOK-style secret —
-  **Fernet-encrypted at rest** (`encrypt_secret`, reuse — invariant 2/6) and **never returned
-  after creation** or logged. It resolves to a `workspace_id` + a capability scope; every tool
-  call is then scoped by that `workspace_id` (invariant 5).
+  workspace-scoped **MCP access token** minted in Settings and persisted as an `McpAccessToken`
+  row (§4); the token is a BYOK-style secret — stored **Fernet-encrypted at rest**
+  (`encrypt_secret`, reuse — invariant 2/6) or as a one-way lookup hash, and **never returned
+  after creation** or logged. It resolves via the `McpAccessToken` row to a `workspace_id` + a
+  capability scope; the row is checked for revocation + TTL expiry, and every tool call is then
+  scoped by that `workspace_id` (invariant 5).
 - Read tools are enabled by default; **write/destructive tools require explicit per-token
-  scoping** and are off unless granted (non-goal §8).
+  scoping** (the token's `capability_scope`, §4) and are off unless granted (non-goal §8).
 
 ## 7. API + frontend
 
@@ -145,14 +160,17 @@ tool/resource allow-list. The discovery-model transport catalog stays in
 ## 9. Suggested build order
 
 1. Config: `agent.py` (system prompt, tool catalog, limits) + migration for `AgentSession` /
-   `AgentMessage` (+ `AgentToolInvocation`).
+   `AgentMessage` (+ `AgentToolInvocation`, + `McpAccessToken`). The `McpAccessToken` table
+   ships in this migration **before** the MCP transport is implemented (step 6), so token
+   minting has its persistence model in place.
 2. Read-only tool layer wrapping the existing projection services (workspace-scoped), with the
    `evidence_refs` provenance recorded per turn (invariant 4).
 3. Discovery-model call path reusing `DiscoveryModelConfig` + BYOK resolution + the
    logical/transport/model triple (invariant 10); inline turns first.
 4. Agent REST + `/agent` chat UI (flip the nav item live).
 5. Queued long turns on the existing `PostgresTaskQueue` (invariant 8) + cooperative cancel.
-6. MCP server: token minting (Fernet, never returned), read resources/tools, then the scoped
+6. MCP server: token minting into the `McpAccessToken` table (Fernet-encrypted or hashed, never
+   returned after creation) with TTL + revocation, read resources/tools, then the scoped
    `launch_audit` write tool last.
 
 ## 10. Explicit non-goals (MVP of this surface)

@@ -37,7 +37,14 @@ invariant 1):
 
 - **Deterministic (default):** embedding or keyword/theme clustering with a stored
   `random_seed` for reproducible cluster ordering (mirrors the audit seed pattern, invariant 9),
-  or a rules-over-`theme`/`intent` grouping. Fully reproducible.
+  or a rules-over-`theme`/`intent` grouping. Keyword/theme and rules-over-`theme`/`intent`
+  clustering are **fully reproducible** from the stored `random_seed` alone. Embedding-based
+  clustering is reproducible only when the **embedding provenance is also pinned**: because
+  `random_seed` does not capture a provider/model change, the embedding **model identity +
+  transport + version** must be persisted on the clustering run and on the `Topic`/`PromptTopic`
+  rows (the identity triple `logical_engine` + `transport_provider` + `transport_model` plus an
+  `embedding_version`, invariants 4 + 10). A clustering run whose embedding provenance is not
+  recorded is **not** claimed as fully reproducible.
 - **Discovery-model assisted (roadmap):** the discovery/analysis model proposes topic labels and
   groupings. This is an **analysis aid** whose output is treated like any derived row: persisted
   with provenance to the clustering run **and** the model-identity triple `logical_engine` +
@@ -60,14 +67,16 @@ Workspace-scoped through `project_id` (invariant 5); UUID PKs, no `user_id`. Mir
   `clustering_run_id` (the run that produced it), `clustering_method`
   (`deterministic|discovery_model`), `random_seed` (for the deterministic method),
   `analyzer_version` + `clustering_version` (provenance + version, invariant 4), and — when
-  discovery-model-assisted — the identity triple `logical_engine` + `transport_provider` +
-  `transport_model` + `discovery_config_id` (invariant 10). Timestamps.
+  discovery-model-assisted **or embedding-based** — the identity triple `logical_engine` +
+  `transport_provider` + `transport_model` + `discovery_config_id` (invariant 10) plus an
+  `embedding_version` for the embedding case, so an embedding provider/model change is captured
+  rather than hidden behind `random_seed`. Timestamps.
 - **`PromptTopic`** — the **assignment** of a prompt to a topic (the join, but a derived row in
   its own right). `id`, `workspace_id`, `project_id`, `prompt_id` (FK → `prompts.id`),
   `topic_id` (FK → `topics.id`), `confidence` (nullable float; only meaningful for
   model-assisted clustering), `clustering_run_id`, **provenance**: `analyzer_version` +
-  `clustering_version` (+ the model-identity triple when model-assisted, invariants 4 + 10),
-  `assigned_at`. Unique `(clustering_run_id, prompt_id)` so a prompt has exactly one topic per
+  `clustering_version` (+ the model-identity triple + `embedding_version` when model-assisted or
+  embedding-based, invariants 4 + 10), `assigned_at`. Unique `(clustering_run_id, prompt_id)` so a prompt has exactly one topic per
   run. A prompt may be assigned to different topics across different runs (immutable per run,
   invariant 3).
 - **`TopicVisibilitySnapshot`** *(optional projection)* — per-topic aggregate metrics for a

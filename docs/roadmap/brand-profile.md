@@ -89,8 +89,10 @@ provenance discipline as `ResponseAnalysis` (invariant 4). Columns:
 - `present` (Boolean) + `value` (JSONB — the exact evidence: the rating count, the entity id,
   the `sameAs` URL list, the schema `@type`).
 - **Provenance (invariant 4):** `source_artifact_id` (FK → the immutable web-evidence artifact,
-  §5, `ondelete=SET NULL`), `collector_version` (String — the deterministic collector rule set),
-  `analyzer_version`. A signal with no traceable source + version is invalid.
+  §5, **`ondelete=RESTRICT`** — a signal can never lose its source; the source artifact is
+  retained while any signal cites it, or the FK cascade-deletes dependent signals with it, but
+  it is **never** nulled out), `collector_version` (String — the deterministic collector rule
+  set), `analyzer_version`. A signal with no traceable source + version is invalid.
 - `collected_at` timestamp.
 
 **These are deterministic collection results, not scores.** `present`/`value` record what the
@@ -139,12 +141,19 @@ Reuse the audit pattern (`app/orchestration/*`, `PostgresTaskQueue`). Profile en
 1. **Web-evidence fetch** — enqueue one task per candidate URL (brand site + declared `sameAs`
    links, respecting robots), claimed with `FOR UPDATE SKIP LOCKED` (invariant 8), producing
    immutable `BrandEvidence` artifacts. Commit the claim before network I/O; heartbeat; sweeper
-   reclaims expired leases (invariant 8).
+   reclaims expired leases (invariant 8). Because the brand site + `sameAs` URLs are
+   user-controlled, every fetch **must go through the shared SSRF-guarded fetcher** (arch doc
+   §Security SSRF stance) — respecting robots.txt alone does not stop requests to internal
+   addresses. The fetcher is **HTTP(S)-only**, **revalidates every redirect hop** (no blind
+   redirect following), and enforces **approved-host + resolved-address checks** that block
+   loopback, private, link-local, and cloud-metadata ranges; it re-resolves and re-checks the
+   address it actually connects to, defending against **DNS rebinding**.
 2. **Deterministic E-E-A-T collection** — parse the immutable evidence and emit `EEATSignal`
    rows (present/value + provenance + `collector_version`). No LLM (invariant 9).
-3. **Optional AI-assisted analysis** — only if a `DiscoveryModelConfig` is active *and* the user
-   opted in. Calls the discovery/analysis model, writes one immutable `BrandAnalysisArtifact`
-   with full model identity + provenance. Advisory only.
+3. **Optional AI-assisted analysis** — only if `BRAND_ANALYSIS_ENABLED` is true, a
+   `DiscoveryModelConfig` is active, *and* the user opted in. Calls the discovery/analysis model,
+   writes one immutable `BrandAnalysisArtifact` with full model identity + provenance. Advisory
+   only.
 
 Cancellation is cooperative — workers stop at the URL/analysis boundary (invariant 9). Re-running
 enrichment produces **new** artifact identities, never an in-place overwrite (invariant 3).
@@ -164,8 +173,10 @@ All workspace-scoped via `require_workspace_member` (invariant 5). Extend the ex
 - `GET /projects/{id}/competitors/{cid}/profile` / `PUT` — competitor rich profile.
 - `GET /projects/{id}/competitors/visibility` — per-competitor tracked-visibility projection over
   existing `CompetitorMention`/`MetricSnapshot` rows (no recompute, invariant 7).
-- `POST /projects/{id}/brand-analysis` — enqueue optional AI-assisted analysis (**501 / disabled**
-  until a `DiscoveryModelConfig` is active, mirroring the `/prompt-sets/{id}/generate` stub).
+- `POST /projects/{id}/brand-analysis` — enqueue optional AI-assisted analysis. Enabled **only
+  when `BRAND_ANALYSIS_ENABLED` is true *and* an active `DiscoveryModelConfig` exists**; if
+  either condition is unmet it keeps the existing **501 / disabled** behavior, mirroring the
+  `/prompt-sets/{id}/generate` stub.
 - `GET /projects/{id}/brand-analysis/{artifactId}` — advisory analysis artifact (with model
   identity + confidence/reason), clearly flagged as AI-suggested.
 
@@ -199,7 +210,9 @@ config module:
 - `COLLECTOR_VERSION` (bumped when the deterministic E-E-A-T collection rules change — the
   provenance stamp on `EEATSignal`, mirroring `ANALYZER_VERSION` in `config/analysis.py`).
 - `BRAND_PROFILE_SOURCE_TOKENS` (`manual` | `web_evidence` | `ai_suggested`).
-- `BRAND_ANALYSIS_PROMPT_TEMPLATE_VERSION` + `BRAND_ANALYSIS_ENABLED` flag (default false).
+- `BRAND_ANALYSIS_PROMPT_TEMPLATE_VERSION` + `BRAND_ANALYSIS_ENABLED` flag (default false — the
+  `POST /projects/{id}/brand-analysis` endpoint is enabled only when this is true *and* an active
+  `DiscoveryModelConfig` exists; otherwise it stays 501/disabled, §5).
 - Web-evidence fetch knobs (max URLs per brand, per-host delay, request timeout, respect-robots)
   — reuse the site-audit fetch knobs where they already exist (invariant 2).
 - The discovery/analysis model itself is chosen from `DiscoveryModelConfig` (workspace data),

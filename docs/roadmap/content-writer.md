@@ -69,7 +69,8 @@ defaults, `JSONB` for structured provenance).
   prose** — it is a projection (invariant 7).
 - **`ContentDraft`** — an **immutable, written-once** generated draft (invariant 3). `id`,
   `workspace_id`, `project_id`, `brief_id` (FK), `version` (monotonic per brief; a re-generation
-  creates a **new** row, never an overwrite), `body` (the generated markdown/HTML), `outline`
+  creates a **new** row, never an overwrite), `generation_id` (the stable generation/task
+  identity — see the idempotency note below), `body` (the generated markdown/HTML), `outline`
   (JSONB), `citations_suggested` (JSONB: owned URLs/sources the draft was told to reference),
   **the discovery-model identity triple** `logical_engine` + `transport_provider` +
   `transport_model` (invariant 10 — recorded exactly as `ProviderRoute` / `DiscoveryModelConfig`
@@ -78,6 +79,20 @@ defaults, `JSONB` for structured provenance).
   `generation_metadata` (JSONB: token usage, latency), `analyzer_version` (the brief formula +
   generator version), `created_at`. Exactly one writer (the worker that claimed the generation
   task) — no later stage edits it.
+
+  **Idempotent, single-writer inserts under concurrency/retries (invariants 3 + 8).** Monotonic
+  `version` alone is **not** enough: two concurrent requests, or a reclaimed worker after a lease
+  expiry, could each compute "next version = N" and insert duplicate drafts. Two constraints
+  close the race on the immutable insert:
+  - a **unique `(brief_id, version)`** constraint, so two writers racing for the same next
+    version conflict on insert instead of both succeeding; and
+  - a **stable `generation_id`** — the generation/task identity (the `ContentGenerationTask`
+    `idempotency_key`) carried onto the draft, with a **unique `generation_id`** constraint, so a
+    retry or reclaim of the *same* generation conflicts on that identity rather than minting a
+    duplicate draft/version.
+
+  A conflicting insert is caught and treated as "already generated" (the winning row is
+  returned), never an overwrite — preserving monotonic versioning + written-once semantics.
 - **`ContentRevision`** — the **mutable** human review/edit layer, kept separate so drafts stay
   immutable. `id`, `workspace_id`, `project_id`, `draft_id` (FK to the draft the human started
   from), `edited_body`, `review_state` (state machine below), `reviewer_user_id` *(the one
@@ -119,6 +134,10 @@ Rules that carry over verbatim:
   (invariant 6); the brief passes only the neutral gap description + owned-source URLs.
 - The generation is **not deterministic** and is explicitly excluded from any headline metric —
   drafts are actions, not measurements (invariant 9).
+- The immutable `ContentDraft` insert carries the task's `idempotency_key` as its
+  `generation_id` and relies on the unique `(brief_id, version)` + unique `generation_id`
+  constraints (see §3), so a reclaimed worker or concurrent request conflicts on that identity
+  instead of duplicating a draft/version (invariants 3 + 8).
 
 **Review state machine** (`ContentRevision.review_state`), following the `audit_state.py`
 `_ALLOWED_TRANSITIONS` pattern:

@@ -46,6 +46,11 @@ Like the technical-audit **rule catalog**, opportunity rules live in config
 (`app/core/config/opportunities.py`), never inline in service code (invariant 1). Each rule:
 `rule_id`, `opportunity_type`, source subsystem(s), a deterministic predicate over persisted
 rows, default `severity`/weight, thresholds, and human-readable title + remediation text.
+Because the catalog is **config, not a table**, a persisted row cannot FK to it: an
+`Opportunity.rule_id` is a **validated, versioned string** — the write path validates it against
+the config catalog (an unknown `rule_id` is rejected) and stamps the catalog's `rule_version`
+onto the row for provenance (invariants 1 + 4). This keeps rules config-zero-tolerance while
+every derived row stays traceable to the exact rule + version that produced it.
 Illustrative rules:
 
 | `rule_id` | Type | Source rows (persisted) | Fires when |
@@ -83,7 +88,10 @@ Workspace-scoped through `project_id` (invariant 5); UUID PKs, no `user_id` scop
 `SiteIssue` derived-row shape from [`technical-audit.md`](technical-audit.md).
 
 - **`Opportunity`** — a derived opportunity **instance**. `id`, `workspace_id`, `project_id`,
-  `rule_id` (FK to the config rule catalog), `opportunity_type`
+  `rule_id` (a **validated, versioned string**, not a DB FK — the config catalog is code, not a
+  table; the write path validates `rule_id` against `config/opportunities.py` and rejects an
+  unknown value, and records the catalog's `rule_version` below for provenance — invariants 1 +
+  4), `opportunity_type`
   (`visibility|site|traffic|topic`), `severity`, `priority_score` (the computed float),
   `title` (from the rule), `target_prompt_id` / `target_url` / `target_theme` (whichever the
   rule targets, nullable), **`evidence`** (JSONB: the concrete offending values + the source row

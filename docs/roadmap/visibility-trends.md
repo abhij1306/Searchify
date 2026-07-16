@@ -46,12 +46,22 @@ together things that are already built:
 already-persisted per-run `MetricSnapshot` rows. This keeps the change minimal and honors
 "reports/metrics are projections, not recomputation".
 
-A `VisibilityTrendPoint` DTO (response-only, not persisted) per completed audit:
-`audit_id`, `completed_at`, `logical_engine` (nullable — present when the point is an
+A `VisibilityTrendPoint` DTO (response-only, not persisted). For a raw per-run point it
+projects a single audit; for a week/month **bucket** it folds every contributing
+`MetricSnapshot`, so provenance is a **list**, not a single id:
+`audit_id` (nullable — set for a raw per-run point, null for a multi-run bucket),
+`completed_at`, `logical_engine` (nullable — present when the point is an
 engine-filtered slice), `visibility_score`, `sov` (response-level + mention-level),
 `brand_mention_rate`, `owned_citation_rate`, `sentiment` (**null**), `avg_position`
-(**null**), `analyzer_version`, `scoring_rule_version`, `source_snapshot_id`
-(the `MetricSnapshot.id` this point projects — provenance, invariant 4).
+(**null**), `source_snapshot_ids` (JSONB list — the `MetricSnapshot.id`s this point folds;
+one for a raw point, many for a bucket — provenance, invariant 4), and **version metadata**
+`analyzer_versions` + `scoring_rule_versions` (the distinct versions across the folded
+snapshots) plus a `spans_version_boundary` flag. When a bucket would fold snapshots produced
+under **different** `analyzer_version` / `scoring_rule_version` values, the point is either
+labelled as version-mixed (all contributing versions listed, `spans_version_boundary=true`) so
+the UI never attributes a version step to a real visibility shift, **or** — under the strict
+config option (§4) — such a bucket is **not emitted at all** and the range is returned as
+raw per-run points instead. Provenance is therefore never ambiguous across a version change.
 
 **Optional future optimization (roadmap+, not required):** a `VisibilityTrendSnapshot`
 projection-cache table (UUID PK, workspace-scoped, `metrics` JSONB, `source_snapshot_ids`
@@ -70,11 +80,15 @@ every point is a projection of a persisted, versioned snapshot, the trend is ful
 reproducible from the same audits.
 
 **Version continuity:** points may span different `analyzer_version` / `scoring_rule_version`
-values if audits ran across a scoring change. The endpoint returns the version on every point
-and the UI surfaces a marker where the version changes, so a step in the line is never silently
-attributed to a real visibility shift. Never re-run old audits under the new version to
-"normalize" the series — that would be recomputation (invariant 7) and would mint new artifacts
-(invariant 3).
+values if audits ran across a scoring change. The endpoint returns the version(s) on every
+point and the UI surfaces a marker where the version changes, so a step in the line is never
+silently attributed to a real visibility shift. For **bucketed** points that fold many
+snapshots this means listing every contributing version (`analyzer_versions` /
+`scoring_rule_versions`) with `spans_version_boundary`; a config knob
+(`TRENDS_STRICT_VERSION_BUCKETS`) makes version-crossing buckets **prohibited** instead —
+the range then falls back to raw per-run points so no bucket ever mixes versions. Never re-run
+old audits under the new version to "normalize" the series — that would be recomputation
+(invariant 7) and would mint new artifacts (invariant 3).
 
 ## 5. API surface (roadmap; `/api/v1`, projection only — invariant 7)
 
@@ -82,7 +96,12 @@ attributed to a real visibility shift. Never re-run old audits under the new ver
   `VisibilityTrendPoint`s for the project's completed audits, optionally filtered by
   `logical_engine` (invariant 10) and time window. `granularity` controls whether raw per-run
   points or bucketed (week/month) aggregates are returned; bucketing is a deterministic
-  aggregate over the persisted snapshots, still no recomputation.
+  aggregate over the persisted snapshots, still no recomputation. A bucket may fold **multiple**
+  `MetricSnapshot` rows, so each bucketed point carries `source_snapshot_ids` (the full list it
+  folds) and lists every contributing `analyzer_version` / `scoring_rule_version` with a
+  `spans_version_boundary` flag (invariants 4 + 7). Buckets that would cross a version boundary
+  are either version-labelled or — under the strict config option (§4) — **not emitted**, with
+  the range returned as raw per-run points instead; provenance is never ambiguous.
 - Reuses the existing `/projects/{id}/visibility` router file (`app/api/projects.py`) — add the
   sub-route there rather than a new module (invariant 2).
 

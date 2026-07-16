@@ -41,16 +41,23 @@ discovery model is a *separately configured* model for brand understanding + pro
   `ProviderConnection` BYOK key at call time (invariant 6, never from env), and record the
   **logical/transport/model triple** on the output (invariant 10) exactly as an audit attempt
   does.
-- **Brand/competitor boundary.** Invariant 6 says the brand/competitor list is *never sent to a
-  measurement provider*. Generation is different: the discovery model is a **separate configured
-  model** whose entire job is to reason over brand context, so the brand evidence *is* its
-  input. The boundary to hold: brand/competitor context flows to the **discovery model only**,
-  and **never leaks into a measurement route** — the generated prompt *text* that later feeds an
-  audit must still be brand-context-free at measurement time (measurement neutrality is
-  preserved because audits send only the prompt text, scored against the brand list afterward).
+- **Brand/competitor boundary.** Invariant 6's rule is precise: the brand/competitor **list** is
+  *never sent to a provider as part of a prompt*. The boundary that generation must hold is about
+  the **list as context**, not about brand *words* appearing in prompt text:
+  - The **discovery/analysis model is the only model that receives the brand/competitor list** as
+    context. Its entire job is to reason over brand evidence, so the brand/competitor list *is*
+    its input (by design, invariant 6 permits this for the discovery model specifically).
+  - **Measurement-engine routes must never be sent the brand/competitor list** as context — not
+    in a system prompt, not in a `request_snapshot`, not appended to prompt text. Audits send only
+    the prompt text; scoring matches it against the brand list *afterward* (invariant 9).
+  - A **generated prompt's text MAY legitimately mention a brand or competitor name** (e.g.
+    "How does Acme compare to Rivalco for X?"). That text is a normal prompt and is later sent to
+    measurement engines as-is — which is fine, because it is prompt *text*, not the brand/competitor
+    *list* injected as context. Such prompts are flagged via the existing `Prompt.branded` semantics
+    (see §4) so they are visible and filterable, exactly like a manually-authored branded prompt.
   Sending brand evidence to the discovery provider is the master-plan §15 action that "requires
   explicit confirmation before sending brand evidence to a selected discovery provider" — the UI
-  must confirm before the first generation.
+  must confirm before the first generation, and the backend enforces the confirmation (§6).
 
 ## 3. Inputs & flow
 
@@ -61,14 +68,21 @@ POST /prompt-sets/{id}/generate  { count, intents?, include_web_evidence?, seed?
   → resolve DiscoveryModelConfig + decrypt BYOK key
   → call discovery model with a neutral system prompt + brand context, request `count` prompts
   → parse suggestions → dedupe against existing prompts (invariant 2 no-dup)
-  → persist each as Prompt(origin='generated', generation_evidence={...})
-  → return the created prompts for user review/edit
+  → persist each as a PENDING suggestion (Prompt(origin='generated', enabled=false,
+    review_status='pending', generation_evidence={...})) — NOT an active prompt
+  → return the pending suggestions for user review/edit/accept/reject
 ```
 
 - **User-controlled count** (`count`, bounded by config §7). The plan's §4.2 is explicit:
   *"suggest requested number of prompts."*
-- **Dedupe**: generated text is normalized + compared against existing prompts in the set before
-  insert — one concept, one row (invariant 2). Duplicates are dropped, not re-added.
+- **Dedupe**: one concept, one row (invariant 2). A naïve normalize-then-compare-then-insert
+  **races** between concurrent generation requests (two requests can both pass the compare, then
+  both insert the same concept). Instead, persist a **canonical normalized-text hash** on each
+  prompt (normalization rules from config §7) and enforce a **uniqueness constraint scoped per
+  prompt set** (`unique(prompt_set_id, normalized_text_hash)`). Inserts use an **atomic,
+  conflict-safe upsert** (`INSERT ... ON CONFLICT DO NOTHING`) so a duplicate is dropped by the
+  database, not by an application-level check — concurrent requests can never both win. Dropped
+  duplicates are not re-added.
 - **Determinism note**: an optional `seed` may be recorded for reproducibility, but generation
   is inherently a model call, so it is **not** a headline metric and does **not** touch
   deterministic scoring (invariant 9) — see §6.
@@ -77,6 +91,24 @@ POST /prompt-sets/{id}/generate  { count, intents?, include_web_evidence?, seed?
 
 Generated prompts reuse the **existing** `Prompt` table — no new prompt table (invariant 2):
 - `origin = 'generated'` (`config/projects.py` `PROMPT_ORIGIN_GENERATED`).
+- **Suggestions are persisted as pending, never as active prompts.** A fresh suggestion is
+  written **disabled** (`enabled = false`) with a `review_status = 'pending'` staging marker, so
+  it does **not** enter the active prompt set and can **never** be consumed by an audit before a
+  human has seen it (this is what enforces the §9 non-goal "no auto-run" and the frontend
+  accept/edit/reject requirement).
+  - **Acceptance transition.** A pending suggestion becomes an **active** `Prompt` only after
+    user review: on **accept** (optionally after **edit**) the row transitions to
+    `review_status = 'accepted'`, `enabled = true` — at which point it is an ordinary prompt and
+    eligible for audits. Editing before accept updates the text (and `branded` flag) but keeps it
+    pending until accepted.
+  - **Rejection + auditability.** On **reject** the row transitions to
+    `review_status = 'rejected'` and stays disabled; it is retained (not hard-deleted) so the
+    generation run remains auditable — the full set of AI output, and which suggestions a human
+    accepted vs rejected, is traceable via `generation_evidence`. Because an audit only ever reads
+    active (`enabled`, `accepted`) prompts, an audit can **never** consume unreviewed AI output.
+- **`branded` flag.** When a suggestion's text mentions a brand/competitor name (see §2), the
+  service sets `branded = true` on the pending row so it surfaces correctly in the branded/
+  non-branded filters; the user can override this during review/edit.
 - `generation_evidence` (JSONB) is the **provenance** (invariant 4). Minimum contents:
   - `model_identity`: the logical/transport/model triple (invariant 10);
   - `discovery_config_id`: the `DiscoveryModelConfig` used;
@@ -105,11 +137,17 @@ polls for completion, then the reviewed prompts appear in the set.
 
 - **Backend — flip the existing stub.** In `backend/app/api/prompts.py`, replace the
   `501 not_implemented` raise in `generate_prompts_endpoint` with a call into a new
-  `domain/prompts/generation.py` service. Keep the existing workspace-scope check first (foreign
-  set → 404 before anything runs, invariant 5). Request body: `{ count, intents?,
-  include_web_evidence?, confirm_send_evidence, seed? }`. Response: the created `Prompt` rows
-  (inline) or `202` + task id (queued). Reuse the existing `PromptResponse` DTO — it already
-  exposes `origin` + `generation_evidence` (`domain/prompts/schemas.py`).
+  `domain/prompts/generation.py` service. Guard order matters:
+  1. **Workspace-scope check first** (foreign set → 404 before anything runs, invariant 5).
+  2. **Then the backend — not just the UI — must validate `confirm_send_evidence == true`**
+     before *any* discovery-provider I/O (brand evidence, web fetches, or the model call).
+     A missing or `false` `confirm_send_evidence` is rejected with the standard structured
+     `{code, message}` validation error (422) — the UI confirmation is a convenience, never the
+     only gate, so a direct API caller cannot skip the master-plan §15 confirmation.
+  Request body: `{ count, intents?, include_web_evidence?, confirm_send_evidence, seed? }`.
+  Response: the created pending `Prompt` suggestions (inline) or `202` + task id (queued). Reuse
+  the existing `PromptResponse` DTO — it already exposes `origin` + `generation_evidence`
+  (`domain/prompts/schemas.py`).
 - **Frontend — replace coming-soon.** `/prompts` currently shows AI-suggest as *coming soon*
   ([`../frontend-architecture.md`](../frontend-architecture.md) §3). Add a "Suggest prompts"
   action → a count/intents form + the master-plan §15 **confirmation** before brand evidence is
@@ -137,8 +175,10 @@ Nothing tunable is hard-coded (invariant 1):
 2. `domain/prompts/generation.py`: resolve `DiscoveryModelConfig` + BYOK, build the neutral
    request, call the discovery model, parse + dedupe suggestions. Unit-test the parser/dedupe
    deterministically against fixture model output (no live provider in tests).
-3. Persist as `Prompt(origin='generated', generation_evidence=...)` with full provenance
-   (invariant 4); assert the brand list never appears in a measurement path.
+3. Persist as **pending** `Prompt(origin='generated', enabled=false, review_status='pending',
+   generation_evidence=...)` with full provenance (invariant 4) via a conflict-safe upsert on the
+   per-set `normalized_text_hash` uniqueness constraint (§3); assert the brand/competitor *list*
+   never appears in a measurement path (branded prompt *text* is fine, §2).
 4. Flip the `501` stub to call the service (inline path first); keep the workspace-scope 404.
 5. Queued path on the existing `PostgresTaskQueue` for large `count` / web evidence (invariant 8).
 6. `/prompts` UI: suggest form + evidence-send confirmation + review/accept table.

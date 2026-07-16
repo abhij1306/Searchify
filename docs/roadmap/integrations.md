@@ -38,7 +38,7 @@ the analog of an `AuditTask`; an import artifact is the analog of a `RawResponse
 Google (GSC + GA4 share Google OAuth) and Microsoft (Bing) both use the authorization-code
 flow with refresh tokens. The flow is entirely **server-side**; the browser never sees a token.
 
-```
+```text
 user clicks "Connect Google" in Settings → Integrations
   → backend builds the provider authorize URL (scopes from config) + a signed state nonce
   → GET /integrations/oauth/{provider}/start  → 302 to provider consent screen
@@ -63,9 +63,18 @@ Rules:
   URLs, the OAuth client id, and the minimal scope set per provider come from
   `app/core/config/integrations.py`; the OAuth **client secret** is an env-injected secret (a
   deployment credential, resolved via `Settings`, never checked in), not hard-coded.
-- **State nonce** is signed + short-lived to prevent CSRF on the callback; it encodes the
-  target `workspace_id` + `provider` so the callback lands the token on the right connection
-  without trusting a client-supplied id (invariant 5).
+- **State nonce** is signed + short-lived to prevent CSRF on the callback and to prevent
+  account-linking (a token being planted on a workspace/session the initiator does not
+  control). It encodes the target `workspace_id` + `provider` (so the callback lands the token
+  on the right connection without trusting a client-supplied id, invariant 5) **and** binds to
+  the **initiating user/session** — the id of the member who started the flow plus a
+  server-issued session/CSRF token. On the callback the backend, **before persisting any
+  token**, (a) verifies the state signature and that it has not expired, (b) verifies the
+  callback is being made under the **same authenticated session** the state was minted for
+  (matching user + session/CSRF token), and (c) enforces **one-time consumption** — the state
+  is marked consumed atomically and a replayed or already-consumed state is rejected. Only
+  after all three checks pass does the code exchange run and the encrypted tokens land on the
+  workspace's `IntegrationConnection` (invariant 5, invariant 6).
 
 ## 3. Data model (new tables — UUID PKs, workspace-scoped)
 
@@ -78,7 +87,9 @@ each producing immutable **import artifacts**, from which the consumer surfaces 
   Google grant), `label`, `access_token_encrypted` (Fernet), `refresh_token_encrypted`
   (Fernet), `token_expires_at`, `granted_scopes` (JSONB), `account_ref` (the provider-side
   property/site id, e.g. GA4 property id or GSC site URL), `status`
-  (`connected | needs_reauth | revoked | error`), `last_synced_at`, `created_at`, `updated_at`.
+  (`connected | needs_reauth | pending_revocation | revoked | error` — `pending_revocation`
+  is the disconnect-requested-but-remote-revoke-not-yet-confirmed state from §5, in which the
+  encrypted tokens are deliberately retained), `last_synced_at`, `created_at`, `updated_at`.
   The two `*_encrypted` columns are **never** serialized into any DTO (invariant 6), exactly
   like `ProviderConnection.api_key_encrypted`.
 - **`IntegrationSyncRun`** — one sync execution. Reuse the queue-row contract from
@@ -87,9 +98,18 @@ each producing immutable **import artifacts**, from which the consumer surfaces 
   `window_end` (the date range requested), `status`
   (`queued | leased | running | succeeded | retry_wait | failed | cancelled`), `lease_owner`,
   `lease_expires_at`, `heartbeat_at`, `attempt_count`, `max_attempts`, `idempotency_key`
-  (unique), unique `(connection_id, sync_kind, window_start, window_end)`,
+  (unique), `resync_seq` (a monotonic per-window attempt/version counter — see below),
   `available_at`, `error_code`, `error_detail`, timestamps. Claimed with `FOR UPDATE SKIP
   LOCKED` (invariant 8). No double-claim.
+  **Window uniqueness is scoped so re-syncing a completed window stays possible** (the
+  documented late-data correction behaviour in §4): a *partial* unique index enforces
+  `(connection_id, sync_kind, window_start, window_end)` **only over active rows**
+  (`status in (queued, leased, running, retry_wait)`), which dedupes concurrent/duplicate
+  in-flight runs for the same window, while a **completed** run (succeeded/failed/cancelled)
+  leaves the window free to be re-synced. The full re-sync identity is
+  `(connection_id, sync_kind, window_start, window_end, resync_seq)`: a new re-sync bumps
+  `resync_seq`, producing a distinct run row (and, downstream, a new immutable
+  `IntegrationImportArtifact` for late data — invariant 3) without overwriting the prior one.
 - **`IntegrationImportArtifact`** — the immutable, written-once (invariant 3) record of one
   fetched page/batch of provider data. `id`, `sync_run_id`, `connection_id`, `workspace_id`,
   `provider`, `dataset` (e.g. `gsc.searchAnalytics`, `ga4.runReport`, `bing.pageStats`),
@@ -99,12 +119,26 @@ each producing immutable **import artifacts**, from which the consumer surfaces 
   S3-compatible object storage (roadmap) keyed by `payload_hash`; small payloads may be inline
   JSONB. Written once by the claiming worker; a re-sync produces a **new** artifact identity,
   never an overwrite (invariant 3).
+- **`IntegrationPropertyMapping`** — the explicit, constrained bridge from a connection's
+  provider-side property to an owning **project**. `IntegrationConnection` is only
+  workspace-scoped and carries a generic `account_ref`, so `project_id` on a derived row cannot
+  be inferred from the connection alone; this entity supplies it. `id`, `workspace_id`,
+  `connection_id`, `provider`, `property_ref` (the provider property id — GSC site URL / GA4
+  property id), `project_id` (the owning project, in the **same** workspace),
+  `status` (`active | disabled`), `created_at`, `updated_at`. Unique
+  `(connection_id, provider, property_ref)` (one owner per property — invariant 2) and a
+  same-workspace FK constraint so a property can never be mapped to a project in another
+  workspace (invariant 5). Sync/derivation workers **must resolve this mapping to obtain
+  `project_id` before writing any `IntegrationMetricRow`**; a property that is **unmapped or
+  ambiguous** (no active mapping, or more than one) is **rejected** — the run records an
+  `error_code` (e.g. `unmapped_property`) rather than guessing a project.
 - **`IntegrationMetricRow`** — the derived, normalized fact row the consumer surfaces read.
   `id`, `workspace_id`, `project_id`, `provider`, `date`, `dimension_key` (e.g. page URL, query,
   country, referrer), `metrics` (JSONB: impressions/clicks/ctr/position for GSC; sessions/
   conversions/engagement for GA4; etc.), `source_artifact_id` (**provenance**, invariant 4),
-  `importer_version`. One row per (provider, date, dimension_key). A derived row with no
-  traceable `source_artifact_id` + version is invalid (invariant 4).
+  `importer_version`. `project_id` is resolved via `IntegrationPropertyMapping` (above), never
+  from client input or a bare `account_ref`. One row per (provider, date, dimension_key). A
+  derived row with no traceable `source_artifact_id` + version is invalid (invariant 4).
 - **`IntegrationEvent`** — append-only lifecycle/audit events (connect, test, sync start/finish,
   reauth, revoke), same shape as `AuditEvent`. Satisfies the master plan §15 requirement to
   *audit connection creation, testing, rotation, and deletion*.
@@ -121,6 +155,28 @@ Sync runs execute on the **same Postgres `FOR UPDATE SKIP LOCKED` queue** as aud
 required. A dedicated `app/workers/integration_worker.py` (a sibling of `audit_worker.py`, not a
 fork) claims runs:
 
+**TaskQueue contract for `IntegrationSyncRun`.** As coded today the Protocol
+(`app/orchestration/task_queue.py`) and its Postgres implementation
+(`app/orchestration/postgres_task_queue.py`) are **hard-coded to `AuditTask`**: every method is
+typed against `AuditTask`, `claim`/`release_expired` `select(AuditTask)`, and
+`postgres_task_queue.py` reads audit-only knobs (`ERROR_MAX_ATTEMPTS`, `lease_ttl_seconds`, the
+`TASK_STATUS_*` constants) from `app.core.config.audits`. To avoid duplicating the
+claim/lease/heartbeat/expiry/retry logic (invariant 2), the queue is made **generic over the
+task type + its settings** rather than forked: the Protocol becomes `TaskQueue[T]` (generic over
+the queue-row model), and `PostgresTaskQueue` is parameterized with the concrete model
+(`AuditTask` / `IntegrationSyncRun`) and a small settings object supplying `lease_ttl_seconds`,
+`max_attempts`, and the shared `TASK_STATUS_*` / `ERROR_MAX_ATTEMPTS` values (moved to a
+queue-neutral config, with `config/audits.py` re-exporting them for the audit path). Because
+`IntegrationSyncRun` reuses the exact same queue-row column contract (`status`, `lease_owner`,
+`lease_expires_at`, `heartbeat_at`, `attempt_count`, `max_attempts`, `available_at`,
+`idempotency_key`, `error_code`/`error_detail`), the identical `FOR UPDATE SKIP LOCKED`
+claim/heartbeat/sweeper code serves both task types unchanged — same claim/lease/heartbeat/
+expiry/retry semantics, one implementation. `integration_worker.py` then depends only on
+`TaskQueue[IntegrationSyncRun]`, never on a concrete class. (Ordering columns like
+`priority`/`randomized_position` used by the audit `ORDER BY` are either mirrored on the
+integration row or supplied via a settings-provided ordering, so no audit-specific column is
+assumed.)
+
 1. In one short transaction: select eligible `IntegrationSyncRun` rows in priority order, lock
    with `FOR UPDATE SKIP LOCKED`, set `leased` + `lease_owner` + `lease_expires_at`, return.
 2. **Commit the claim before any network I/O** (invariant 8) — never hold a DB transaction open
@@ -132,14 +188,18 @@ fork) claims runs:
    `max_attempts`.
 5. After the raw import lands, derive normalized `IntegrationMetricRow`s (with
    `source_artifact_id` + `importer_version` provenance, invariant 4) — a projection step, never
-   a second fetch.
+   a second fetch. The derivation worker first **resolves the property's
+   `IntegrationPropertyMapping` to obtain `project_id`** (§3); if the property is unmapped or
+   ambiguous it fails the run with `unmapped_property` instead of assigning a project.
 6. Cancellation is **cooperative** (invariant 9): the worker stops at the page boundary.
 
 **Scheduling.** Scheduled syncs are enqueued by a lightweight periodic dispatcher (the same
 mechanism the roadmap "recurring audit schedules" uses — one owner, invariant 2) that inserts a
-`scheduled` `IntegrationSyncRun` per active connection per cadence, deduped by the unique
-`(connection_id, sync_kind, window_start, window_end)` constraint so a missed tick never
-double-imports. On-demand syncs are enqueued by `POST /integrations/{id}/sync`.
+`scheduled` `IntegrationSyncRun` per active connection per cadence, deduped by the
+**active-only** partial unique index on `(connection_id, sync_kind, window_start, window_end)`
+(§3) so a missed tick never double-imports a window that already has a run in flight — while a
+deliberate re-sync of an already-completed window is still allowed (it bumps `resync_seq`).
+On-demand syncs are enqueued by `POST /integrations/{id}/sync`.
 
 **Idempotency + late data.** GSC/GA4 data is revised for ~2–3 days after the fact. Re-syncing a
 recent window creates a **new** artifact + new derived rows keyed to a newer `importer_version`;
@@ -163,8 +223,17 @@ No endpoint ever returns a token (invariant 6).
   date window); 202 + the run id. 409 if a run for the same window is already active.
 - `GET /integrations/{id}/syncs` / `GET /integrations/{id}/syncs/{sync_id}` — sync-run history +
   detail projection (status, window, row counts) — projection only (invariant 7).
-- `DELETE /integrations/{id}` — revoke at the provider (best-effort), mark `revoked`, and drop
-  the encrypted tokens. Appends an `IntegrationEvent`.
+- `DELETE /integrations/{id}` — disconnect the connection, revoking the grant at the provider.
+  **Local disconnect and provider revocation are separated so a failed remote revoke can never
+  orphan a live remote grant:** the connection is first moved out of active use, then provider
+  revocation is attempted. **On successful** provider revocation the connection is marked
+  `revoked` and the encrypted tokens are dropped. **On failed** provider revocation the
+  encrypted tokens are **retained** and the connection is moved to a
+  `pending_revocation` (error) state — tokens are **not** deleted and the connection is **not**
+  marked fully `revoked` — so a background retry (or a later manual `DELETE`) can complete the
+  remote revocation before the credentials are destroyed. Either outcome appends an
+  `IntegrationEvent` (audit record preserved, invariant 6). The `status` enum on
+  `IntegrationConnection` (§3) gains `pending_revocation` accordingly.
 
 The **data** the imports feed is served by the consumer surfaces' own endpoints (Traffic,
 LLM-Analytics), which read `IntegrationMetricRow` as versioned persisted evidence (invariant 7)

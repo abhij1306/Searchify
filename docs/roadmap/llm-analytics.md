@@ -62,9 +62,29 @@ classification** with provenance, and a **projection snapshot**.
   `source` (`gsc|ga4|server_log`), `import_id` (FK to the `TrafficImport`/ingest batch that
   produced it — see [`traffic.md`](traffic.md)), `occurred_at`, `landing_url`,
   `referrer_host`, `referrer_url`, `utm_source`, `utm_medium`, `utm_campaign`, `user_agent`,
-  `session_id_hash` (opaque; no PII), `raw` (JSONB: the exact source row for traceability),
-  `content_hash` (dedupe), `ingested_at`. Unique `(import_id, content_hash)` so a re-sync
-  never double-inserts the same event.
+  `session_id_hash` (opaque; no PII), `raw` (JSONB: the **sanitized** source payload for
+  traceability — see the sanitization contract below), `content_hash` (dedupe), `ingested_at`.
+  Unique `(import_id, content_hash)` so a re-sync never double-inserts the same event.
+
+  **Sanitization contract (invariant 6 privacy — applied BEFORE persistence).** The persisted
+  columns must never carry PII, credentials, secrets, or raw device/network identifiers. The
+  ingest worker runs a **deterministic, versioned redaction pass** (`REFERRAL_SANITIZE_VERSION`,
+  in `config/analytics.py`) over every event *before* the immutable write, so the row is
+  sanitized-at-rest and invariant 3 immutability still holds on the sanitized payload:
+  - **`raw` is an allowlisted, redacted payload**, never the verbatim source row. Only fields on
+    the config allowlist survive; everything else is dropped.
+  - **`landing_url` / `referrer_url`** are stored with the query string stripped to a
+    config allowlist of non-PII marketing params (`utm_*`, `ref`); all other query params,
+    fragments, and any embedded credentials (`user:pass@`) are removed.
+  - **`user_agent`** is stored only as far as the UA-rule match needs (family/heuristic token);
+    full fingerprintable UA strings and any embedded ids are dropped.
+  - **Raw IP addresses and device ids are never persisted** — the session is represented only by
+    the opaque, salted `session_id_hash`; the raw client IP/device id is used transiently for
+    hashing and discarded before the write.
+  - **Retention + deletion:** persisted referral data is retained for `REFERRAL_RETENTION_DAYS`
+    (config); a sweeper hard-deletes `ReferralEvent` rows (and their derived
+    `ReferralClassification` rows) past that horizon, and a workspace/project deletion cascades
+    to remove all referral rows. Deletion of the source ingest batch deletes its events.
 - **`ReferralClassification`** — derived row (invariant 4). `id`, `workspace_id`,
   `project_id`, `referral_event_id` (FK — the immutable source, provenance), `is_ai_referral`
   (bool), `ai_source` (`chatgpt|gemini|claude|perplexity|copilot|google_ai_overview|other`),
@@ -165,6 +185,9 @@ Nothing tunable is hard-coded in service/worker code (invariant 1). New knobs:
 - `ANALYTICS_DEFAULT_GRANULARITY`, `ANALYTICS_MAX_WINDOW_DAYS`, `ANALYTICS_SNAPSHOT_TTL_S`
   (snapshot rebuild cadence), `CORRELATION_MIN_SAMPLE` (below which correlation is reported as
   `insufficient_data`, never a fabricated number).
+- `REFERRAL_SANITIZE_VERSION` (stamped on the redaction pass), the `raw`/URL-param allowlists,
+  and `REFERRAL_RETENTION_DAYS` — the sanitization + retention contract for `ReferralEvent`
+  (invariant 6 privacy); redaction is applied before the immutable write.
 
 Reuse the existing `ANALYZER_VERSION`/`SCORING_RULE_VERSION` constants (`config/analysis.py`)
 for the visibility-derived parts of the snapshot — do not fork a second version constant
