@@ -124,6 +124,10 @@
   --shadow-lg: var(--shadow-lg-value);
   --shadow-modal-value: var(--shadow-modal);
 
+  /* Overlay scrim (dialog/drawer backdrop) — bridged so components avoid raw
+     var() escapes (no-raw-hex + token-escape guard). */
+  --color-overlay-scrim: var(--overlay-scrim);
+
   /* Type scale (§5) — size token = Tailwind font-size utility (text-sm, …) */
   --text-2xs: 0.625rem; /* 10px — uppercase micro-labels */
   --text-2xs--line-height: 1.2;
@@ -494,6 +498,29 @@ samp {
 /* Value placeholder — the neutral "—" shown for uncomputed metrics (MVP) */
 .value-placeholder {
   color: var(--value-placeholder);
+}
+
+/* ─── Skeleton shimmer (§11) — ~1.2s loop between base → highlight ───── */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
 }
 
 /* ─── Focus rings — keyboard-only (WCAG 2.4.7 + 2.4.11) ─────────────── */
