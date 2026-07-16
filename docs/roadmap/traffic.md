@@ -64,28 +64,53 @@ duplicate the integrations ownership and create a second, competing source of tr
 `IntegrationMetricRow`:
 
 - **Source of truth (owned by integrations, read-only here):** `IntegrationMetricRow`
-  ([`integrations.md`](integrations.md) §3) supplies the per-`(provider, date, dimension_key)`
-  measures — `impressions/clicks/ctr/position` (GSC) and `sessions/engaged_sessions/
-  conversions` (GA4) — each already carrying `source_artifact_id` + `importer_version`
-  provenance (invariant 4) and a `project_id` resolved via the integrations
-  `IntegrationPropertyMapping`. Traffic filters these rows by `project_id`/`workspace_id`; it
-  never re-fetches from GSC/GA4. The page join (§5) resolves `page_artifact_id` from
-  `IntegrationMetricRow.dimension_key` (the page URL) at projection time.
-- **`TrafficSnapshot`** — projection (invariant 7), computed from persisted
+  ([`integrations.md`](integrations.md) §3) supplies the per-`(project, property, provider,
+  dataset, date, dimension_key)` measures — `impressions/clicks/ctr/position` (GSC) and
+  `sessions/engaged_sessions/conversions` (GA4) — each already carrying `source_artifact_id` +
+  `importer_version` + `resync_seq` provenance (invariant 4) and a `project_id` resolved via the
+  integrations `IntegrationPropertyMapping`. Traffic filters these rows by
+  `project_id`/`workspace_id`; it never re-fetches from GSC/GA4. The page join (§5) resolves
+  `page_artifact_id` from `IntegrationMetricRow.dimension_key` (the page URL) at projection time.
+  - **GA4 inclusion rule (organic + AI-driven only).** Traffic is scoped to *organic and
+    AI-driven* sessions/conversions, so the projection includes **only** the GA4 rows whose
+    default channel grouping is **Organic Search** or whose source/medium is classified as an
+    **AI/LLM referrer** (the same AI-referrer taxonomy [`llm-analytics.md`](llm-analytics.md) §3
+    owns). **Direct, Paid Search / paid social, email, and unrelated referral traffic are
+    excluded** and never fold into the totals. This inclusion predicate is applied at projection
+    time over the GA4 `dimension_key` (channel / source-medium dimensions carried on
+    `IntegrationMetricRow`); the raw integrations rows themselves stay complete and unfiltered
+    (Traffic filters on read, it does not mutate the source of truth).
+- **`TrafficSnapshot`** — the headline projection (invariant 7), computed from persisted
   `IntegrationMetricRow` rows for a `(project, window, granularity)`. `id`, `workspace_id`,
   `project_id`, `window_start`, `window_end`, `granularity` (`day|week|month`), `metrics`
-  (JSONB: totals, top pages/queries, CTR/position distributions, trend series),
+  (JSONB: totals, CTR/position distributions, trend series),
   `source_metric_row_ids` (JSONB — the `IntegrationMetricRow`s aggregated) and
   `source_artifact_ids` (JSONB — their upstream immutable artifacts, so the projection traces
-  to raw evidence), `formula_version`, `analyzer_version`, `created_at`. Rebuildable from the
-  persisted metric rows; holds nothing not traceable to them.
+  to raw evidence), `formula_version`, `normalization_version`, `created_at`. **Exactly one
+  current snapshot per `(project_id, window_start, window_end, granularity)`** — a **unique
+  constraint** on that tuple, and the refresh (§4) writes it as a **transactional upsert**
+  (`INSERT ... ON CONFLICT (...) DO UPDATE`) so concurrent refreshes cannot create duplicate or
+  ambiguous "current" rows. Rebuildable from the persisted metric rows; holds nothing not
+  traceable to them.
+- **`TrafficPageStat` / `TrafficQueryStat`** — persisted **per-page** and **per-query**
+  projection rows so the `/pages` and `/queries` endpoints (§6) page and sort against stored
+  aggregates instead of recomputing from `IntegrationMetricRow` at read time (invariant 7 — no
+  read-time recomputation). Each row: `id`, `workspace_id`, `project_id`, `snapshot_id` (FK →
+  the owning `TrafficSnapshot`, same window/granularity), the aggregated `metrics` (JSONB:
+  impressions/clicks/ctr/position for pages/queries; GA4 sessions/conversions for pages), the
+  key (`page_artifact_id` + canonical URL for `TrafficPageStat`; normalized query string for
+  `TrafficQueryStat`), `source_metric_row_ids` + `source_artifact_ids` (provenance to raw
+  evidence, invariant 4), and `created_at`. Written by the same snapshot-refresh job (§4) in the
+  same transaction as the parent `TrafficSnapshot`; **unique per
+  `(snapshot_id, <page_artifact_id | canonical_url>)`** and `(snapshot_id, normalized_query)`
+  respectively; rebuildable from the persisted metric rows.
 
 Because late-data corrections are handled **upstream** (a re-sync bumps the integrations
-`resync_seq` and lands a **new** immutable `IntegrationImportArtifact` + a newer
-`importer_version` `IntegrationMetricRow`, never an overwrite — [`integrations.md`](integrations.md)
-§3/§4), the Traffic projection simply reads the **latest `importer_version` per
-`(provider, date, dimension_key)`** and rebuilds the snapshot; there is no Traffic-owned
-immutable-import concept to version.
+`resync_seq` and lands a **new** immutable `IntegrationImportArtifact` + a new-`resync_seq`
+`IntegrationMetricRow`, never an overwrite — [`integrations.md`](integrations.md)
+§3/§4), the Traffic projection simply reads the **latest `resync_seq` per
+`(project_id, property_ref, provider, dataset, date, dimension_key)`** and rebuilds the snapshot;
+there is no Traffic-owned immutable-import concept to version.
 
 The `TrafficSnapshot` carries `workspace_id`, a string-UUID PK, and is accessed only via
 `require_workspace_member` (invariant 5). No integer PKs, no `user_id`.
@@ -103,17 +128,20 @@ classification, both as pure projections over already-persisted `IntegrationMetr
    GSC/GA4 property, a **snapshot-refresh** projection job is enqueued (the integrations worker
    fires it as its post-derivation step — [`integrations.md`](integrations.md) §4 step 5). A
    user "refresh" from the UI enqueues the same projection job; it never re-hits a provider.
-2. The snapshot-refresh job reads the **latest-`importer_version`** `IntegrationMetricRow`s for
+2. The snapshot-refresh job reads the **latest-`resync_seq`** `IntegrationMetricRow`s for
    the `(project, window)` (so upstream late-data corrections are picked up automatically) and
-   recomputes `TrafficSnapshot`, stamping `source_metric_row_ids` + `source_artifact_ids` +
-   `formula_version`/`analyzer_version` (invariants 4, 7). It performs **no** network I/O, so
+   recomputes the `TrafficSnapshot` + its `TrafficPageStat`/`TrafficQueryStat` rows in one
+   transaction (upsert on the snapshot's unique `(project_id, window_start, window_end,
+   granularity)` tuple), stamping `source_metric_row_ids` + `source_artifact_ids` +
+   `formula_version`/`normalization_version` (invariants 4, 7). It performs **no** network I/O, so
    the queue's commit-before-I/O rule (invariant 8) is trivially satisfied.
 3. For GA4 rows carrying referral signals, the same completion also triggers the
    `classify_referrals` task ([`llm-analytics.md`](llm-analytics.md) §5) — again a projection
    over `IntegrationMetricRow`, not a second fetch.
 
-Snapshot refresh is idempotent: recomputing from the same latest-version metric rows yields the
-same snapshot, and a new upstream `IntegrationImportArtifact`/`importer_version` (late-data
+Snapshot refresh is idempotent: recomputing from the same latest-`resync_seq` metric rows yields
+the same snapshot (the unique-tuple upsert overwrites the current row in place rather than adding
+a duplicate), and a new upstream `IntegrationImportArtifact`/`resync_seq` (late-data
 re-sync) simply triggers a fresh recompute. Cancellation, where a refresh is queued, is
 cooperative (invariant 9); the projection stops at a metric-row batch boundary.
 
@@ -132,10 +160,13 @@ pages by traffic-vs-visibility gap.
 - `GET /projects/{id}/traffic?from=&to=&granularity=` — headline projection over
   `TrafficSnapshot`: totals + trend series for impressions/clicks/CTR/position (GSC) and
   sessions/conversions (GA4).
-- `GET /projects/{id}/traffic/pages?from=&to=&sort=` — paged page-level rows (projection over
-  the project's `IntegrationMetricRow`s, optionally joined to `PageArtifact`).
-- `GET /projects/{id}/traffic/queries?from=&to=&sort=` — paged GSC query-level rows (projection
-  over `IntegrationMetricRow`).
+- `GET /projects/{id}/traffic/pages?from=&to=&sort=` — paged page-level rows read from the
+  persisted **`TrafficPageStat`** rows (§3) for the matching snapshot, optionally joined to
+  `PageArtifact`. Paging/sorting hit stored aggregates — no read-time recomputation from
+  `IntegrationMetricRow` (invariant 7).
+- `GET /projects/{id}/traffic/queries?from=&to=&sort=` — paged GSC query-level rows read from the
+  persisted **`TrafficQueryStat`** rows (§3) for the matching snapshot; paging/sorting over
+  stored aggregates, no read-time recomputation (invariant 7).
 - `POST /projects/{id}/traffic/sync` — request fresh provider data. This does **not** run its
   own fetch; it enqueues an on-demand `IntegrationSyncRun` on the owning GSC/GA4 connection via
   the integrations surface ([`integrations.md`](integrations.md) §4/§5) and returns the queued
@@ -166,22 +197,28 @@ Nothing tunable is hard-coded (invariant 1). Add a `config/traffic.py` module:
 
 - `TRAFFIC_DEFAULT_WINDOW_DAYS`, `TRAFFIC_MAX_WINDOW_DAYS`, `TRAFFIC_SNAPSHOT_GRANULARITIES`
   (projection window + granularity knobs).
-- `TRAFFIC_FORMULA_VERSION` / `TRAFFIC_NORMALIZATION_VERSION` — the `formula_version` /
-  `analyzer_version` stamped on `TrafficSnapshot` (invariant 4).
+- `TRAFFIC_FORMULA_VERSION` / `TRAFFIC_NORMALIZATION_VERSION` — stamped on `TrafficSnapshot` as
+  the distinct `formula_version` / `normalization_version` provenance fields (invariant 4). These
+  are kept **separate** (normalization is **not** folded into a generic `analyzer_version`) so a
+  consumer can tell a URL/normalization change apart from an analytics-formula change.
 - Provider-fetch knobs (sync window/dimensions, row limits, request timeout, queue retry
   budget, GSC/GA4 API base urls + scopes) belong to the integrations connector config, **not
   here** — Traffic performs no fetch, so it must not duplicate them (invariant 2).
 
 ## 9. Suggested build order
 
-1. Config: `config/traffic.py` projection knobs + version constants; migration for the single
-   `TrafficSnapshot` table (no import/metric tables — those are owned by integrations).
+1. Config: `config/traffic.py` projection knobs + version constants; migration for the three
+   owned projection tables — `TrafficSnapshot`, `TrafficPageStat`, `TrafficQueryStat` (no
+   import/metric tables — those are owned by integrations), with the snapshot's unique
+   `(project_id, window_start, window_end, granularity)` constraint and the per-page/per-query
+   uniqueness on `snapshot_id`.
 2. Normalization: reuse `analysis/normalization.py` URL canonicalization for the page join
    against `IntegrationMetricRow.dimension_key` (table-tested against fixtures).
-3. `TrafficSnapshot` projection builder over `IntegrationMetricRow` (latest-`importer_version`
-   per key) + the snapshot-refresh job triggered by the integrations sync worker. **No**
-   provider fetch and **no** `traffic_sync` task — provider I/O stays in the integrations
-   `IntegrationSyncRun` worker.
+3. `TrafficSnapshot` + `TrafficPageStat`/`TrafficQueryStat` projection builder over
+   `IntegrationMetricRow` (latest-`resync_seq` per key, GA4 organic/AI-only inclusion rule) —
+   writing snapshot + page/query stats in one transactional upsert — plus the snapshot-refresh
+   job triggered by the integrations sync worker. **No** provider fetch and **no** `traffic_sync`
+   task — provider I/O stays in the integrations `IntegrationSyncRun` worker.
 4. API routers (projections + the `POST .../sync` pass-through that enqueues an
    `IntegrationSyncRun`) + zod contracts.
 5. Frontend `/traffic` screen (wire `trend-chart` + tables, flip the disabled nav item live).

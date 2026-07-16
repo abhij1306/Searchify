@@ -123,6 +123,14 @@ Each logical engine can use:
 - its direct provider API; or
 - an OpenRouter transport route.
 
+**MVP route matrix (target-state direct support vs what ships in MVP).** The direct-vs-OpenRouter
+choice above is the *target-state* contract. In the MVP the supported routes are narrower:
+
+- **Gemini / Google** — direct (`google`) **or** OpenRouter.
+- **Claude / Anthropic** — direct (`anthropic`) **or** OpenRouter.
+- **ChatGPT / OpenAI** — **OpenRouter only** in MVP. A direct OpenAI adapter is a reserved
+  fast-follow (see the roadmap `docs/roadmap/openai-adapter.md`), **not** in MVP scope.
+
 #### Discovery and analysis model
 
 A separately configured model used for brand understanding, prompt suggestion, clustering, and optional ambiguity adjudication. Supported transports may include:
@@ -256,8 +264,7 @@ Estimate calls and cost
 
 ```text
 searchify/
-  apps/
-    web/                              # Next.js App Router
+  frontend/                           # Next.js App Router
   backend/
     app/
       api/                            # thin FastAPI route modules
@@ -315,7 +322,7 @@ searchify/
     vercel/
 ```
 
-Use one repository. Vercel can deploy `apps/web` as its root directory, while Railway deploys the API and worker from the backend directory with different start commands.
+Use one repository. Vercel can deploy `frontend/` as its root directory, while Railway deploys the API and worker from the backend directory with different start commands.
 
 ---
 
@@ -797,7 +804,7 @@ Use server-sent events for audit progress. Keep polling as a fallback.
 Deploy:
 
 ```text
-apps/web
+frontend/
 ```
 
 Responsibilities:
@@ -870,7 +877,7 @@ Before upgrading:
 ## 18. MVP acceptance criteria
 
 1. All provider secrets are configured only in Providers & Settings.
-2. Direct or OpenRouter routes work for all three measurement engines.
+2. The supported MVP routes work: direct or OpenRouter for Gemini and Claude, and OpenRouter for ChatGPT/OpenAI (direct OpenAI is a post-MVP fast-follow).
 3. Discovery/analysis model configuration is separate.
 4. AI discovery can be skipped.
 5. Manual and CSV prompt paths work.
@@ -881,11 +888,11 @@ Before upgrading:
 10. Provider failures do not discard unrelated successful evidence.
 11. Every metric is traceable to raw evidence.
 12. Citation normalization and owned-domain classification are inspectable.
-13. HTML, Markdown, CSV, and JSON exports are reproducible.
+13. Markdown and CSV exports (the MVP export surface) are reproducible; HTML and JSON renderers are post-MVP.
 14. Secrets do not appear in logs or artifacts.
 15. Costs, retries, failures, and coverage are visible.
 16. A running audit can be cancelled safely.
-17. Report output is reproducible: re-rendering a completed audit yields identical metrics and exports.
+17. Report output is reproducible: re-rendering a completed audit yields identical metrics and identical Markdown/CSV exports (the MVP export surface).
 18. The product deploys with Vercel, Railway API, Railway worker, and Railway PostgreSQL without Redis.
 
 ---
