@@ -39,6 +39,6 @@ describe('globals.css token set matches docs/design.md', () => {
   it('keeps the teal-green accent (not the reference blue-violet)', () => {
     expect(css).toMatch(/--accent:\s*#0f9d76/);
     expect(css).toMatch(/--accent:\s*#2dd4a7/); // dark
-    expect(css).not.toMatch(/#3557f6/); // CrawlerAI light accent
+    expect(css).not.toMatch(/#3557f6/); // legacy light accent must not leak in
   });
 });

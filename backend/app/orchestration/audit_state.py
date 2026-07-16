@@ -1,7 +1,7 @@
 # Audit lifecycle state machine (invariant 9 — cooperative, deterministic).
 #
-# Adapts CrawlerAI's ``crawl_domain._ALLOWED_TRANSITIONS`` / ``transition_status``
-# table pattern to the Searchify audit lifecycle. A single source of truth for
+# An ``_ALLOWED_TRANSITIONS`` / ``transition_status`` table for the Searchify
+# audit lifecycle. A single source of truth for
 # which status transitions are legal; an illegal transition raises so a caller
 # can never silently drive an audit into an impossible state.
 #

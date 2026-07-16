@@ -1,7 +1,6 @@
-# Deterministic input normalization for projects + prompts (ported B3).
+# Deterministic input normalization for projects + prompts (B3).
 #
-# Adapts the reference ``_normalize_prompts`` / ``_normalize_benchmark_mode``
-# (crawlerai ``ai_visibility/service.py``) to Searchify. Validation of the
+# ``_normalize_prompts`` / ``_normalize_benchmark_mode`` helpers. Validation of the
 # enum *values* happens in the Pydantic schemas; these helpers normalize the
 # free-text fields (trim, casefold intent, drop unknown intents) so what lands
 # in the database is canonical regardless of how it was entered.
