@@ -438,8 +438,15 @@ async def create_audit(
     )
 
     await session.commit()
-    await session.refresh(audit)
-    return audit
+    # `engine_snapshots` is a lazy relationship; a bare ``session.refresh``
+    # only reloads scalar columns, so accessing it later (e.g. from
+    # ``AuditResponse.model_validate`` in the API layer, outside of an async
+    # greenlet) raises ``MissingGreenlet``. Re-fetch through ``get_audit``,
+    # which eagerly loads it via ``selectinload``, so the returned instance is
+    # safe to serialize.
+    return await get_audit(
+        session, workspace_id=workspace_id, audit_id=audit.id
+    )
 
 
 async def get_audit(
@@ -536,5 +543,9 @@ async def cancel_audit(
         payload={"status": AUDIT_STATUS_CANCELLED},
     )
     await session.commit()
-    await session.refresh(audit)
-    return audit
+    # See the comment in ``create_audit``: refresh() would expire (and later
+    # lazy-load) ``engine_snapshots``, which needs to stay eagerly loaded for
+    # safe serialization outside the async greenlet.
+    return await get_audit(
+        session, workspace_id=workspace_id, audit_id=audit.id
+    )
