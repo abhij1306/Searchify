@@ -38,7 +38,7 @@ describe('LoginPage', () => {
     mswServer.use(
       http.post('/api/v1/auth/login', () => {
         loginHandler();
-        return HttpResponse.json(sessionUser);
+        return HttpResponse.json({ user: sessionUser });
       }),
     );
 
@@ -53,7 +53,7 @@ describe('LoginPage', () => {
 
   it('logs in and redirects to the authed landing on success', async () => {
     const user = userEvent.setup();
-    mswServer.use(http.post('/api/v1/auth/login', () => HttpResponse.json(sessionUser)));
+    mswServer.use(http.post('/api/v1/auth/login', () => HttpResponse.json({ user: sessionUser })));
 
     renderWithProviders(<LoginPage />);
     await user.type(screen.getByLabelText(/email/i), 'user@example.com');

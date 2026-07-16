@@ -127,7 +127,7 @@ const evidence = {
 };
 
 test('shell → open run → open execution evidence', async ({ page }) => {
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: user }));
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { user } }));
   await page.route('**/api/v1/projects', (route) => route.fulfill({ json: [project] }));
   await page.route(/\/api\/v1\/audits(\?.*)?$/, (route) => route.fulfill({ json: [audit] }));
   await page.route(`**/api/v1/audits/${AUDIT_ID}`, (route) => route.fulfill({ json: audit }));

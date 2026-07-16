@@ -29,7 +29,8 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  *
  * Mounted at the top of the `(app)` route group. It:
  *   1. loads `GET /auth/me` (React Query; 4xx never retries per F2's policy);
- *   2. redirects to `/login` whenever there is no authenticated user;
+ *   2. redirects to `/login` only on a 401 from `me` (session gone); non-401
+ *      errors (network/5xx) do not log the user out;
  *   3. installs a QueryCache listener so a 401 from ANY query (not just `me`)
  *      clears the cached session and redirects to `/login` (invariant: a cookie
  *      that expired mid-session must not strand the user on a broken screen).
@@ -59,10 +60,13 @@ export function SessionGuard({
     router.replace('/login');
   }, [queryClient, router]);
 
-  // Redirect any unauthenticated visitor (failed `me`) to the login screen.
+  // Redirect only a genuinely unauthenticated visitor: a 401 from `me` means
+  // the session is gone → clear + bounce to /login. A non-401 error (network
+  // blip, 5xx) must NOT log the user out — React Query keeps the last state and
+  // retries, so we leave rendering as-is rather than stranding them at /login.
   useEffect(() => {
-    if (isError) clearSession();
-  }, [isError, clearSession]);
+    if (isError && httpErrorStatus(error) === 401) clearSession();
+  }, [isError, error, clearSession]);
 
   // Global 401 watchdog: a 401 from any in-flight/finished query means the
   // session is gone — clear + redirect once, regardless of which query failed.

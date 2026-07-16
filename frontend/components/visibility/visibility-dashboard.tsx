@@ -56,7 +56,6 @@ export function VisibilityDashboard() {
   const visibilityQuery = useQuery({
     queryKey: queryKeys.visibility.project(projectId ?? '', activeRunId ?? undefined, {
       engine: filters.engine,
-      promptType: filters.promptType,
     }),
     queryFn: ({ signal }) =>
       visibilityApi.getProjectVisibility(

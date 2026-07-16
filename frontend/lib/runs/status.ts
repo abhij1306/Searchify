@@ -10,22 +10,44 @@ import type { AuditStatus, CitationClassification, ExecutionStatus } from '@/lib
 import type { ClassificationValue, RunStatusValue } from '@/components/ui/badge-variants';
 
 /**
- * Audit statuses at which the run is still doing work, so `/runs/[runId]` should
- * keep polling `GET /audits/{id}`. Mirrors B5's `AUDIT_ACTIVE_STATUSES`; every
- * other status is terminal.
+ * Audit statuses that are terminal — the run has stopped and needs no further
+ * polling. Every other status means the run is still progressing.
  */
-const ACTIVE_AUDIT_STATUSES: ReadonlySet<AuditStatus> = new Set<AuditStatus>([
+const TERMINAL_AUDIT_STATUSES: ReadonlySet<AuditStatus> = new Set<AuditStatus>([
+  'completed',
+  'partially_completed',
+  'failed',
+  'cancelled',
+]);
+
+/**
+ * Audit statuses at which a cooperative cancel is still meaningful. Mirrors the
+ * backend `AUDIT_ACTIVE_STATUSES` (core/config/audits.py): `reporting` is
+ * intentionally EXCLUDED — by then execution + analysis are done and the state
+ * machine rejects REPORTING → CANCELLED, so the cancel button must be disabled.
+ */
+const CANCELABLE_AUDIT_STATUSES: ReadonlySet<AuditStatus> = new Set<AuditStatus>([
   'draft',
   'validating',
   'queued',
   'running',
   'analyzing',
-  'reporting',
 ]);
 
-/** True while the run is still progressing (poll) vs terminal (stop). */
-export function isAuditActive(status: AuditStatus): boolean {
-  return ACTIVE_AUDIT_STATUSES.has(status);
+/**
+ * True while `/runs/[runId]` should keep polling `GET /audits/{id}`: the run is
+ * not yet terminal (including `reporting`, which still transitions on its own).
+ */
+export function shouldPollAudit(status: AuditStatus): boolean {
+  return !TERMINAL_AUDIT_STATUSES.has(status);
+}
+
+/**
+ * True when the run can still be cancelled cooperatively. `reporting` and every
+ * terminal status return false — the backend would reject the cancel.
+ */
+export function isAuditCancelable(status: AuditStatus): boolean {
+  return CANCELABLE_AUDIT_STATUSES.has(status);
 }
 
 /**

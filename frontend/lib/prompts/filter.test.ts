@@ -20,7 +20,7 @@ function prompt(overrides: Partial<Prompt> = {}): Prompt {
 const prompts: Prompt[] = [
   prompt({ id: 'a', text: 'Best running shoes?', intent: 'discovery', enabled: true, branded: false }),
   prompt({ id: 'b', text: 'Nike vs Adidas', intent: 'comparison', enabled: false, branded: true, theme: 'Rivals' }),
-  prompt({ id: 'c', text: 'Where to buy trainers', intent: 'purchase', enabled: true, branded: false, theme: null }),
+  prompt({ id: 'c', text: 'Where to buy trainers', intent: 'purchase', enabled: true, branded: false, theme: '' }),
 ];
 
 describe('filterPrompts', () => {

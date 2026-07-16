@@ -39,7 +39,7 @@ afterAll(() => mswServer.close());
 
 describe('SessionGuard', () => {
   it('renders protected content for an authenticated user', async () => {
-    mswServer.use(http.get('/api/v1/auth/me', () => HttpResponse.json(sessionUser)));
+    mswServer.use(http.get('/api/v1/auth/me', () => HttpResponse.json({ user: sessionUser })));
 
     renderWithProviders(
       <SessionGuard fallback={<div>loading</div>}>
@@ -66,11 +66,32 @@ describe('SessionGuard', () => {
     expect(screen.queryByText(/signed in as/i)).not.toBeInTheDocument();
   });
 
+  it('does not log the user out when /auth/me fails with a non-401 error', async () => {
+    // A non-401 error (here a 403; also a network blip / 5xx) is not a session
+    // expiry — the guard must NOT clear the session or redirect to /login.
+    mswServer.use(
+      http.get('/api/v1/auth/me', () =>
+        HttpResponse.json({ detail: 'Forbidden' }, { status: 403 }),
+      ),
+    );
+
+    renderWithProviders(
+      <SessionGuard fallback={<div>loading</div>}>
+        <Protected />
+      </SessionGuard>,
+    );
+
+    // The guard stays on the fallback (no user) but never bounces to /login.
+    await screen.findByText('loading');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('clears the session and redirects when any query returns 401', async () => {
     // `me` succeeds so protected content mounts, then a downstream query 401s
     // (an expired cookie mid-session) — the guard's watchdog must clear + bounce.
     mswServer.use(
-      http.get('/api/v1/auth/me', () => HttpResponse.json(sessionUser)),
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ user: sessionUser })),
       http.get('/api/v1/audits', () => HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })),
     );
 

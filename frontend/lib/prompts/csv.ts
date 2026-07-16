@@ -168,8 +168,10 @@ export function parsePromptCsv(raw: string): ParsedCsv {
     return {
       line: index + 1,
       input: {
+        // Backend `PromptInput.theme` is a non-null string; send '' (not null)
+        // when the column is blank so the import never 422s.
         text,
-        theme: theme || null,
+        theme,
         intent,
         branded: asBool(cell(map.branded), false),
         enabled: asBool(cell(map.enabled), true),

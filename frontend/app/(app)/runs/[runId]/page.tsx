@@ -12,7 +12,7 @@ import { ExecutionsTable } from '@/components/runs/executions-table';
 import { ProgressPanel } from '@/components/runs/progress-panel';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
-import { isAuditActive } from '@/lib/runs/status';
+import { shouldPollAudit } from '@/lib/runs/status';
 
 /** Poll interval (ms) while a run is active. Polling is the baseline; SSE is optional. */
 const POLL_INTERVAL_MS = 3_000;
@@ -41,11 +41,11 @@ export default function RunDetailPage() {
     queryFn: ({ signal }) => runsApi.getAudit(runId, { signal }),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && isAuditActive(status) ? POLL_INTERVAL_MS : false;
+      return status && shouldPollAudit(status) ? POLL_INTERVAL_MS : false;
     },
   });
 
-  const active = auditQuery.data ? isAuditActive(auditQuery.data.status) : false;
+  const active = auditQuery.data ? shouldPollAudit(auditQuery.data.status) : false;
 
   const executionsQuery = useQuery({
     queryKey: queryKeys.runs.executions(runId),
@@ -58,6 +58,10 @@ export default function RunDetailPage() {
     onSuccess: (audit) => {
       queryClient.setQueryData(queryKeys.runs.detail(runId), audit);
       queryClient.invalidateQueries({ queryKey: queryKeys.runs.executions(runId) });
+      // A cancel changes the run's status, so the runs list and any
+      // status-dependent visibility view are now stale — refetch both.
+      queryClient.invalidateQueries({ queryKey: queryKeys.runs.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.visibility.all });
     },
   });
 

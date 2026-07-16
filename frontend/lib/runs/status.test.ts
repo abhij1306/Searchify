@@ -8,18 +8,37 @@ import {
   executionBadgeValue,
   executionStatusLabel,
   formatDateTime,
-  isAuditActive,
+  isAuditCancelable,
+  shouldPollAudit,
 } from './status';
 
-describe('isAuditActive', () => {
-  it('is true for in-flight statuses and false for terminal ones', () => {
-    expect(isAuditActive('running')).toBe(true);
-    expect(isAuditActive('queued')).toBe(true);
-    expect(isAuditActive('reporting')).toBe(true);
-    expect(isAuditActive('completed')).toBe(false);
-    expect(isAuditActive('partially_completed')).toBe(false);
-    expect(isAuditActive('failed')).toBe(false);
-    expect(isAuditActive('cancelled')).toBe(false);
+describe('shouldPollAudit', () => {
+  it('polls while non-terminal (including reporting) and stops when terminal', () => {
+    expect(shouldPollAudit('running')).toBe(true);
+    expect(shouldPollAudit('queued')).toBe(true);
+    // `reporting` is still non-terminal: keep polling until it terminalizes.
+    expect(shouldPollAudit('reporting')).toBe(true);
+    expect(shouldPollAudit('analyzing')).toBe(true);
+    expect(shouldPollAudit('completed')).toBe(false);
+    expect(shouldPollAudit('partially_completed')).toBe(false);
+    expect(shouldPollAudit('failed')).toBe(false);
+    expect(shouldPollAudit('cancelled')).toBe(false);
+  });
+});
+
+describe('isAuditCancelable', () => {
+  it('mirrors the backend AUDIT_ACTIVE_STATUSES (reporting is NOT cancelable)', () => {
+    expect(isAuditCancelable('draft')).toBe(true);
+    expect(isAuditCancelable('validating')).toBe(true);
+    expect(isAuditCancelable('queued')).toBe(true);
+    expect(isAuditCancelable('running')).toBe(true);
+    expect(isAuditCancelable('analyzing')).toBe(true);
+    // The backend rejects REPORTING -> CANCELLED; the button must be disabled.
+    expect(isAuditCancelable('reporting')).toBe(false);
+    expect(isAuditCancelable('completed')).toBe(false);
+    expect(isAuditCancelable('partially_completed')).toBe(false);
+    expect(isAuditCancelable('failed')).toBe(false);
+    expect(isAuditCancelable('cancelled')).toBe(false);
   });
 });
 

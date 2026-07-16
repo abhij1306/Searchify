@@ -4,9 +4,10 @@
  * Pure, framework-free helpers the dashboard uses to pick the default run,
  * format the projection for display, and apply the client-side engine filter.
  * The B6 `/projects/{id}/visibility` endpoint is a selected-run projection
- * keyed only by `audit_id`; engine / prompt-type filters are display filters
- * that also participate in the React Query key (so switching them refetches /
- * re-derives) — no server-side filter is invented here.
+ * keyed only by `audit_id`; the engine filter is a client-side display filter
+ * that also participates in the React Query key. There is NO per-prompt-type
+ * (branded / non-branded) breakdown in `VisibilityResponse` at MVP, so that
+ * control is a disabled "coming soon" affordance and does not affect the query.
  */
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
 import type { AuditStatus, LogicalEngine, RankingRow, Visibility, VisibilityEngine } from '@/lib/api/types';
@@ -14,6 +15,11 @@ import type { AuditStatus, LogicalEngine, RankingRow, Visibility, VisibilityEngi
 /** Audit statuses that carry a dashboard-ready metric snapshot (B6). */
 export const DASHBOARD_STATUSES: readonly AuditStatus[] = ['completed', 'partially_completed'];
 
+/**
+ * Prompt-type filter options, kept for the disabled "coming soon" control. The
+ * backend `VisibilityResponse` has no per-prompt-type breakdown at MVP, so this
+ * is display-only and never sent to the API / folded into the query key.
+ */
 export const PROMPT_TYPE_OPTIONS = [
   { value: 'all', label: 'All prompts' },
   { value: 'branded', label: 'Branded' },
@@ -26,11 +32,9 @@ export type PromptTypeFilter = (typeof PROMPT_TYPE_OPTIONS)[number]['value'];
 export type VisibilityFilters = {
   /** `'all'` shows every engine; otherwise narrows the per-engine comparison. */
   engine: LogicalEngine | 'all';
-  /** Prompt-type scope (roadmap server-side; MVP participates in the key). */
-  promptType: PromptTypeFilter;
 };
 
-export const DEFAULT_FILTERS: VisibilityFilters = { engine: 'all', promptType: 'all' };
+export const DEFAULT_FILTERS: VisibilityFilters = { engine: 'all' };
 
 /** A run option for the selector, ordered latest-first. */
 export type RunOption = {

@@ -2,7 +2,7 @@
 
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import type { EngineRouteOption } from '@/lib/providers/catalog';
+import { isMvpTransport, type EngineRouteOption } from '@/lib/providers/catalog';
 import type { TransportProvider } from '@/lib/api/types';
 
 /**
@@ -41,7 +41,11 @@ export function RouteToggle({
             aria-checked={selected}
             aria-disabled={option.disabled || undefined}
             disabled={option.disabled}
-            onClick={() => !option.disabled && onChange(option.transport_provider)}
+            onClick={() =>
+              !option.disabled &&
+              isMvpTransport(option.transport_provider) &&
+              onChange(option.transport_provider)
+            }
             className={cn(
               'focus-ring rounded-[calc(var(--radius-md)-2px)] px-3 py-1 text-xs font-medium transition-colors',
               selected

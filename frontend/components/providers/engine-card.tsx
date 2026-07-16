@@ -15,6 +15,7 @@ import type { ProviderConnection, TransportProvider } from '@/lib/api/types';
 import {
   connectionForTransport,
   isConfigured,
+  isMvpTransport,
   mergeRoutePayload,
   TRANSPORT_LABELS,
   type EngineCardModel,
@@ -44,8 +45,12 @@ export function EngineCard({
 }: Readonly<{ model: EngineCardModel; connections: ProviderConnection[] }>) {
   const queryClient = useQueryClient();
 
+  // Enabled options are always MVP transports (the reserved `openai` route is
+  // disabled), so the selectable state is the narrow API transport type.
   const enabledOptions = model.options.filter((o) => !o.disabled);
-  const defaultTransport = enabledOptions[0]?.transport_provider ?? null;
+  const firstEnabled = enabledOptions[0]?.transport_provider;
+  const defaultTransport: TransportProvider | null =
+    firstEnabled && isMvpTransport(firstEnabled) ? firstEnabled : null;
 
   const [transport, setTransport] = useState<TransportProvider | null>(defaultTransport);
   const [apiKey, setApiKey] = useState('');

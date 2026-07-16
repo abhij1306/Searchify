@@ -193,10 +193,10 @@ describe('PromptsPage', () => {
   it('parses, previews, and persists a CSV import', async () => {
     const user = userEvent.setup();
     baseHandlers([]);
-    let imported: Record<string, unknown> | null = null;
+    let imported: { prompts: unknown[] } | null = null;
     mswServer.use(
       http.post(`/api/v1/prompt-sets/${SET_ID}/import`, async ({ request }) => {
-        imported = (await request.json()) as Record<string, unknown>;
+        imported = (await request.json()) as { prompts: unknown[] };
         return HttpResponse.json(makeSet([makePrompt({ origin: 'imported' })]), { status: 201 });
       }),
     );
@@ -221,7 +221,9 @@ describe('PromptsPage', () => {
     await user.click(within(dialog).getByRole('button', { name: /Import 1 prompt/ }));
 
     await waitFor(() => expect(imported).not.toBeNull());
-    const rows = (imported as { prompts: unknown[] }).prompts;
+    const payload = imported as { prompts: unknown[] } | null;
+    if (!payload) throw new Error('import payload was not captured');
+    const rows = payload.prompts;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ text: 'Best shoes?', intent: 'discovery' });
   });

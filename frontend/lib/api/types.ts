@@ -11,6 +11,7 @@ import type {
   auditEngineSnapshotSchema,
   auditSchema,
   auditStatusSchema,
+  authResponseSchema,
   benchmarkModeSchema,
   citationClassificationSchema,
   citationSchema,
@@ -29,12 +30,14 @@ import type {
   rankingRowSchema,
   sessionUserSchema,
   transportProviderSchema,
+  uiTransportProviderSchema,
   visibilityEngineSchema,
   visibilitySchema,
   workspaceSchema,
 } from './schemas';
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
+export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type Competitor = z.infer<typeof competitorSchema>;
 export type PromptIntent = z.infer<typeof promptIntentSchema>;
@@ -43,6 +46,8 @@ export type PromptSet = z.infer<typeof promptSetSchema>;
 export type BenchmarkMode = z.infer<typeof benchmarkModeSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type TransportProvider = z.infer<typeof transportProviderSchema>;
+/** Wider UI-only transport space including the reserved/disabled `openai`. */
+export type UiTransportProvider = z.infer<typeof uiTransportProviderSchema>;
 export type LogicalEngine = z.infer<typeof logicalEngineSchema>;
 export type ProviderConnection = z.infer<typeof providerConnectionSchema>;
 export type ProviderRoute = z.infer<typeof providerRouteSchema>;

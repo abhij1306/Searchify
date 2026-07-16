@@ -13,7 +13,16 @@ import type {
   ProviderCatalog,
   ProviderConnection,
   TransportProvider,
+  UiTransportProvider,
 } from '@/lib/api/types';
+
+/** MVP transports accepted by the API DTOs (excludes the reserved `openai`). */
+const MVP_TRANSPORTS: readonly TransportProvider[] = ['anthropic', 'google', 'openrouter'];
+
+/** Narrow a UI transport to an MVP transport the API accepts (else null). */
+export function isMvpTransport(transport: string): transport is TransportProvider {
+  return (MVP_TRANSPORTS as readonly string[]).includes(transport);
+}
 
 /** Logical engines rendered as cards, in display order. */
 export const ENGINE_ORDER: readonly LogicalEngine[] = ['chatgpt', 'gemini', 'claude'] as const;
@@ -25,8 +34,12 @@ export const ENGINE_LABELS: Record<LogicalEngine, string> = {
   claude: 'Claude',
 };
 
-/** Human display names for each transport provider. */
-export const TRANSPORT_LABELS: Record<TransportProvider, string> = {
+/**
+ * Human display names for each transport provider. Keyed by the wider UI
+ * transport space so the reserved/disabled `openai` route still has a label,
+ * even though the API DTOs never accept it.
+ */
+export const TRANSPORT_LABELS: Record<UiTransportProvider, string> = {
   anthropic: 'Anthropic',
   google: 'Google',
   openrouter: 'OpenRouter',
@@ -40,12 +53,12 @@ export function engineLabel(key: string): string {
 
 /** Human label for a transport key (falls back to the raw key). */
 export function transportLabel(key: string): string {
-  return TRANSPORT_LABELS[key as TransportProvider] ?? key;
+  return TRANSPORT_LABELS[key as UiTransportProvider] ?? key;
 }
 
 /** A selectable route option on an engine card. */
 export type EngineRouteOption = {
-  transport_provider: TransportProvider;
+  transport_provider: UiTransportProvider;
   /** The catalog default model for this (engine, transport). */
   default_model: string;
   /** Short toggle label, e.g. "Direct (Google)" or "OpenRouter". */

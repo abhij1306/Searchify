@@ -45,18 +45,23 @@ export const emptyPromptForm: PromptFormValues = {
 export function promptToFormValues(prompt: Prompt): PromptFormValues {
   return {
     text: prompt.text,
-    theme: prompt.theme ?? '',
+    theme: prompt.theme,
     intent: prompt.intent,
     branded: prompt.branded,
     enabled: prompt.enabled,
   };
 }
 
-/** Map validated form values to the API create/update payload. */
+/**
+ * Map validated form values to the API create/update payload. `theme` is sent
+ * as a trimmed string ('' when blank), never null — the backend rejects null
+ * on create/import, and on update an empty string clears the stored theme
+ * (`PromptUpdate.theme` treats only omission/None as "no change").
+ */
 export function formValuesToPromptInput(values: PromptFormValues): PromptInput {
   return {
     text: values.text.trim(),
-    theme: values.theme.trim() || null,
+    theme: values.theme.trim(),
     intent: values.intent,
     branded: values.branded,
     enabled: values.enabled,

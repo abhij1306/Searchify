@@ -13,7 +13,9 @@ const promptSetListSchema = z.array(promptSetSchema);
 
 export type PromptInput = {
   text: string;
-  theme?: string | null;
+  // Backend `PromptInput.theme` is a non-null `str = ""` — create/import 422 on
+  // null. Send an empty string (never null) when unset.
+  theme?: string;
   intent: Prompt['intent'];
   branded: boolean;
   enabled: boolean;

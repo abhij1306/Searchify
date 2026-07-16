@@ -10,7 +10,8 @@ import {
   auditBadgeValue,
   auditStatusLabel,
   formatDateTime,
-  isAuditActive,
+  isAuditCancelable,
+  shouldPollAudit,
 } from '@/lib/runs/status';
 
 /**
@@ -18,7 +19,8 @@ import {
  *
  * Shows the audit's status badge, the requested/completed/failed mono counts,
  * the created + completed timestamps, a Cancel button (enabled only while the
- * run is active), and same-origin CSV/MD export links. Progress is driven by
+ * backend still accepts a cooperative cancel — i.e. not `reporting`/terminal),
+ * and same-origin CSV/MD export links. Progress is driven by
  * the parent's polling of `GET /audits/{id}`; this component is presentational
  * apart from firing the cancel callback.
  */
@@ -33,7 +35,10 @@ export function ProgressPanel({
   cancelPending: boolean;
   cancelError?: string | null;
 }>) {
-  const active = isAuditActive(audit.status);
+  // "Updating…" tracks whether the parent is still polling (not yet terminal);
+  // the Cancel button is enabled only while the backend will accept a cancel.
+  const polling = shouldPollAudit(audit.status);
+  const cancelable = isAuditCancelable(audit.status);
 
   return (
     <Card>
@@ -43,7 +48,7 @@ export function ProgressPanel({
             <Badge variant="run-status" value={auditBadgeValue(audit.status)}>
               {auditStatusLabel(audit.status)}
             </Badge>
-            {active ? (
+            {polling ? (
               <span className="text-xs text-muted" aria-live="polite">
                 Updating…
               </span>
@@ -64,7 +69,7 @@ export function ProgressPanel({
               variant="destructive"
               size="sm"
               onClick={onCancel}
-              disabled={!active || cancelPending}
+              disabled={!cancelable || cancelPending}
             >
               {cancelPending ? 'Cancelling…' : 'Cancel run'}
             </Button>

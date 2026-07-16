@@ -3,13 +3,16 @@ import { z } from 'zod';
 
 import {
   auditSchema,
+  authResponseSchema,
   citationSchema,
   executionEvidenceSchema,
   executionSchema,
   projectSchema,
   providerConnectionSchema,
+  sessionUserSchema,
   strictValidate,
   visibilitySchema,
+  workspaceSchema,
 } from './schemas';
 
 const UUID = '11111111-1111-4111-8111-111111111111';
@@ -30,6 +33,50 @@ describe('strictValidate', () => {
 
   it('throws on a numeric id (contract forbids numeric ids)', () => {
     expect(() => strictValidate(z.object({ id: z.string().uuid() }), { id: 7 }, 'ids')).toThrow();
+  });
+});
+
+describe('auth + workspace contract', () => {
+  const sessionUser = {
+    id: UUID,
+    email: 'user@example.com',
+    role: 'owner',
+    is_active: true,
+    created_at: '2026-07-15T00:00:00Z',
+    updated_at: '2026-07-15T00:00:00Z',
+  };
+
+  it('validates the { user } auth wrapper and rejects a bare SessionUser', () => {
+    expect(strictValidate(authResponseSchema, { user: sessionUser }, 'auth').user.email).toBe(
+      'user@example.com',
+    );
+    // The backend wraps the user; a bare SessionUser is a contract violation.
+    expect(() => strictValidate(authResponseSchema, sessionUser, 'auth')).toThrow();
+  });
+
+  it('rejects an extra key on the auth wrapper (strict)', () => {
+    expect(() =>
+      strictValidate(authResponseSchema, { user: sessionUser, token: 'leaked' }, 'auth'),
+    ).toThrow();
+  });
+
+  it('rejects an extra key on a SessionUser (strict)', () => {
+    expect(() =>
+      strictValidate(sessionUserSchema, { ...sessionUser, password_hash: 'x' }, 'user'),
+    ).toThrow();
+  });
+
+  it('validates a workspace with role (no slug) and rejects a slug key', () => {
+    const workspace = {
+      id: UUID,
+      name: 'Acme',
+      role: 'owner',
+      created_at: '2026-07-15T00:00:00Z',
+      updated_at: '2026-07-15T00:00:00Z',
+    };
+    expect(strictValidate(workspaceSchema, workspace, 'ws').role).toBe('owner');
+    // Backend WorkspaceResponse has no slug — an unexpected key must fail loud.
+    expect(() => strictValidate(workspaceSchema, { ...workspace, slug: 'acme' }, 'ws')).toThrow();
   });
 });
 
@@ -56,6 +103,10 @@ describe('contract schemas', () => {
     expect(strictValidate(projectSchema, project, 'project').benchmark_mode).toBe('consumer_like');
     expect(() =>
       strictValidate(projectSchema, { ...project, benchmark_mode: 'nope' }, 'project'),
+    ).toThrow();
+    // Strict: an unmodeled extra key on a response DTO is a contract drift bug.
+    expect(() =>
+      strictValidate(projectSchema, { ...project, surprise: true }, 'project'),
     ).toThrow();
   });
 
@@ -121,6 +172,8 @@ describe('contract schemas', () => {
     expect(strictValidate(auditSchema, audit, 'audit').status).toBe('completed');
     // The 64-bit seed is a decimal STRING on the wire, never a number.
     expect(() => strictValidate(auditSchema, { ...audit, random_seed: 42 }, 'audit')).toThrow();
+    // Strict: an unmodeled extra key must fail loud, never be silently stripped.
+    expect(() => strictValidate(auditSchema, { ...audit, extra: 'nope' }, 'audit')).toThrow();
   });
 
   it('validates an execution/queue row (AuditTaskResponse shape)', () => {

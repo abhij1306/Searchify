@@ -37,7 +37,7 @@ test('authenticated shell renders sidebar groups and top bar', async ({ page }) 
     updated_at: '2026-01-01T00:00:00Z',
   };
 
-  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: user }));
+  await page.route('**/api/v1/auth/me', (route) => route.fulfill({ json: { user } }));
   await page.route('**/api/v1/projects', (route) => route.fulfill({ json: [project] }));
 
   await page.goto('/visibility');
