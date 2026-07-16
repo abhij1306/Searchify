@@ -226,6 +226,7 @@ npm run test:e2e       # Playwright (requires a browser + running stack)
 | Doc | What it covers |
 |-----|----------------|
 | [`Agents.md`](Agents.md) | Coding-agent bootstrap, unified contract, always-on rules |
+| [`docs/architecture.md`](docs/architecture.md) | Whole-product architecture (authoritative high-level reference) |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Environment setup + full gotchas runbook |
 | [`docs/backend-architecture.md`](docs/backend-architecture.md) | API, models, queue, state machine, analysis |
 | [`docs/frontend-architecture.md`](docs/frontend-architecture.md) | Routes, API-contract layer, data flow |

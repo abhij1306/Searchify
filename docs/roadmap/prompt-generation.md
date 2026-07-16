@@ -10,7 +10,7 @@
 ## 1. Goal & positioning
 
 Implement the **"assisted discovery"** prompt path from the master plan
-([`../../cube27-aeo-visibility-mvp-architecture-plan-v2.md`](../../cube27-aeo-visibility-mvp-architecture-plan-v2.md)
+([`../architecture.md`](../architecture.md)
 §4.2): given a project's brand evidence (and optionally some web evidence), use the configured
 **discovery/analysis model** to *suggest* a user-controlled number of benchmark prompts, which
 the user reviews/edits before they enter the prompt library. This turns the existing stub into a

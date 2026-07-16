@@ -1,12 +1,13 @@
-# Cube27 AI Visibility Audit — MVP Architecture and Migration Plan v2
+# Searchify — Architecture
 
-**Status:** Approved architecture direction  
-**Date:** 2026-07-14  
-**Target:** Standalone Cube27 AEO / AI-visibility audit product  
+**Status:** Authoritative architecture reference  
+**Scope:** Standalone Searchify AEO / AI-visibility audit product  
 **Frontend:** Next.js App Router on Vercel  
 **Backend:** Python / FastAPI on Railway  
 **Primary database and MVP job queue:** PostgreSQL on Railway  
-**MVP boundary:** Migrate the existing AI-visibility audit and reporting behavior into a focused product, then add only the minimum configuration, execution, evidence inspection, and reporting surfaces required for a reliable one-time audit.
+**MVP boundary:** Ship a focused one-time AI-visibility audit product with the minimum configuration, execution, evidence-inspection, and reporting surfaces required for a reliable audit, built on the full target architecture (workspaces, UUID PKs, BYOK, Postgres queue) from day one.
+
+This is the high-level, whole-product architecture document. The supporting docs go deeper on each layer: [`backend-architecture.md`](backend-architecture.md) (API, models, queue, state machine, analysis), [`frontend-architecture.md`](frontend-architecture.md) (routes, API-contract layer, data flow), [`invariants.md`](invariants.md) (the hard rules), and [`design.md`](design.md) (tokens, theme, per-screen layout).
 
 ---
 
@@ -105,48 +106,9 @@ The canonical rule carried into the new project is:
 
 ---
 
-## 2. Findings from the current CrawlerAI repository
+## 2. Provider model: measurement engines vs discovery/analysis model
 
-### 2.1 Reusable engineering patterns
-
-The audited repository already contains useful foundations:
-
-- Python and FastAPI backend conventions.
-- PostgreSQL persistence through SQLAlchemy.
-- Pydantic request and response contracts.
-- Thin route modules.
-- encrypted LLM/API-key configuration;
-- provider catalog and connection testing;
-- task-specific model settings;
-- run configuration snapshots;
-- cost logging;
-- structured logs and diagnostics;
-- immutable artifacts plus canonical derived records;
-- report/export behavior downstream from persisted data;
-- an explicit frontend API-contract layer;
-- typed UI primitives and semantic design tokens.
-
-These patterns should be migrated selectively. The new product should not copy commerce crawling, selector management, domain memory, or acquisition complexity that is unrelated to AI visibility.
-
-### 2.2 Blocking source mismatch
-
-The audited default branch does not expose an identifiable first-class AI-visibility subsystem in its documented frontend routes, backend route map, ORM map, or searchable module ownership.
-
-The currently visible product is primarily a deterministic commerce/jobs crawler with Crawl Studio, run history, product intelligence, enrichment, domain memory, and administrator LLM configuration.
-
-Before file-level migration starts, locate the exact implementation of the existing AI-visibility audit:
-
-1. another branch;
-2. an older commit;
-3. an unpushed local workspace;
-4. a separate repository; or
-5. generated source/artifacts outside the audited branch.
-
-The new architecture can be implemented without that source, but “keep the audit exactly as it is” cannot be verified until its revision and golden outputs are frozen.
-
-### 2.3 Provider layer migration
-
-The current provider layer is a useful starting point for encrypted configuration and broad discovery-model support, but the new product needs two distinct concepts.
+The provider layer separates two distinct concepts. Both use encrypted BYOK configuration and broad transport support, but they play different roles and must never be conflated.
 
 #### Measurement engines
 
@@ -293,7 +255,7 @@ Estimate calls and cost
 ## 5. Repository shape
 
 ```text
-cube27-ai-visibility/
+searchify/
   apps/
     web/                              # Next.js App Router
   backend/
@@ -885,118 +847,7 @@ Use an S3-compatible service for large raw payloads and generated artifacts. Pos
 
 ---
 
-## 17. Migration plan
-
-### Phase 0 — Locate and freeze the source audit
-
-Deliverable: `AI_VISIBILITY_SOURCE_MAP.md`
-
-- identify exact source revision;
-- list routes, models, workers, analyzers, templates, fixtures, and reports;
-- preserve representative inputs and outputs;
-- create a golden evidence bundle;
-- document behavior that must remain unchanged.
-
-### Phase 1 — Characterization tests
-
-Black-box tests for:
-
-- prompt ingestion;
-- provider execution;
-- response parsing;
-- mentions;
-- citations;
-- ranking;
-- competitors;
-- metrics;
-- partial failures;
-- reports and exports.
-
-### Phase 2 — Project skeleton
-
-- monorepo;
-- Next.js application;
-- FastAPI application;
-- PostgreSQL and migrations;
-- PostgreSQL task queue;
-- worker process;
-- authentication and workspace boundaries;
-- object storage;
-- telemetry;
-- local Docker environment.
-
-### Phase 3 — Provider settings
-
-- encrypted provider connections;
-- centralized settings UI;
-- direct and OpenRouter routes;
-- connection tests;
-- model snapshots;
-- cost estimates;
-- strict separation of measurement and discovery settings.
-
-### Phase 4 — Brand and prompt workflow
-
-- evidence fetch;
-- brand snapshot;
-- configurable prompt generation count;
-- manual prompts;
-- CSV import/export;
-- prompt classification and review.
-
-### Phase 5 — Audit execution
-
-- state machine;
-- PostgreSQL task leases;
-- provider adapters;
-- retries;
-- concurrency;
-- rate limits;
-- cancellation;
-- raw evidence;
-- progress events.
-
-### Phase 6 — Analysis migration
-
-- deterministic analyzers first;
-- analyzer versioning;
-- optional LLM adjudication;
-- comparison against golden artifacts.
-
-### Phase 7 — Reporting
-
-- canonical report model;
-- existing report meaning preserved;
-- HTML and Markdown;
-- CSV and JSON evidence;
-- provenance.
-
-### Phase 8 — Frontend
-
-Implement only:
-
-- project overview;
-- brand setup;
-- prompt library;
-- audit setup and progress;
-- response/citation explorer;
-- reports;
-- provider settings.
-
-### Phase 9 — Hardening
-
-- provider fault injection;
-- concurrent-worker tests;
-- lease recovery tests;
-- security review;
-- backup and restore;
-- retention/deletion test;
-- load and cost tests;
-- user acceptance against golden audits.
-
----
-
-## 18. Redis upgrade criteria
+## 17. Redis upgrade criteria
 
 Redis is not scheduled work. Create an architecture decision only when telemetry shows one or more of these:
 
@@ -1016,7 +867,7 @@ Before upgrading:
 
 ---
 
-## 19. MVP acceptance criteria
+## 18. MVP acceptance criteria
 
 1. All provider secrets are configured only in Providers & Settings.
 2. Direct or OpenRouter routes work for all three measurement engines.
@@ -1034,12 +885,12 @@ Before upgrading:
 14. Secrets do not appear in logs or artifacts.
 15. Costs, retries, failures, and coverage are visible.
 16. A running audit can be cancelled safely.
-17. Golden reports match the existing audit within documented tolerances.
+17. Report output is reproducible: re-rendering a completed audit yields identical metrics and exports.
 18. The product deploys with Vercel, Railway API, Railway worker, and Railway PostgreSQL without Redis.
 
 ---
 
-## 20. Post-MVP roadmap
+## 19. Post-MVP roadmap
 
 ### Release 1.1
 
@@ -1075,10 +926,8 @@ Before upgrading:
 
 ---
 
-## 21. References
+## 20. References
 
-- CrawlerAI repository: https://github.com/abhij1306/CrawlerAI
-- CrawlerAI frontend architecture: https://github.com/abhij1306/CrawlerAI/blob/main/docs/frontend-architecture.md
 - PostgreSQL locking and `SKIP LOCKED`: https://www.postgresql.org/docs/current/sql-select.html
 - Next.js App Router: https://nextjs.org/docs/app
 - Vercel monorepos: https://vercel.com/docs/monorepos

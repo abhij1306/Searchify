@@ -13,7 +13,7 @@ Connect a workspace's **Google Search Console (GSC)**, **Google Analytics 4 (GA4
 Webmaster Tools** accounts via OAuth and ingest their search/traffic data on a schedule, so the
 roadmap **Traffic** and **LLM Analytics / AI-referral** surfaces have real first-party data to
 render. This is the Release 1.2 line item from the master plan
-([`../../cube27-aeo-visibility-mvp-architecture-plan-v2.md`](../../cube27-aeo-visibility-mvp-architecture-plan-v2.md)
+([`../architecture.md`](../architecture.md)
 §20): *Google Search Console; Google Analytics 4; AI referral classification; conversion
 correlation; owned-page opportunity mapping.*
 

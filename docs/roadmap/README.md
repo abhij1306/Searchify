@@ -29,6 +29,6 @@ artifacts, provenance + version on every derived row, config-in-config-only, and
 | Direct OpenAI adapter | [`openai-adapter.md`](openai-adapter.md) | Fast-follow; new adapter on the existing contract, disabled at MVP. |
 
 The high-level product rationale for all of these lives in
-[`../../cube27-aeo-visibility-mvp-architecture-plan-v2.md`](../../cube27-aeo-visibility-mvp-architecture-plan-v2.md);
+[`../architecture.md`](../architecture.md);
 the per-surface MVP/roadmap markers live in [`../backend-architecture.md`](../backend-architecture.md)
 §Surface map and [`../frontend-architecture.md`](../frontend-architecture.md) §Route map.

@@ -1,17 +1,16 @@
 # Backend Architecture — Searchify
 
 > The visibility-slice backend of Searchify. Modular monolith: FastAPI **web** + a separate
-> **worker** process, PostgreSQL as durable state **and** MVP task queue (no Redis). Ported
-> from CrawlerAI's AI-visibility tool onto the full target architecture (workspaces, UUID PKs,
-> BYOK, Postgres queue) from day one.
+> **worker** process, PostgreSQL as durable state **and** MVP task queue (no Redis). Built on
+> the full target architecture (workspaces, UUID PKs, BYOK, Postgres queue) from day one.
 > Companion docs: [`../Agents.md`](../Agents.md), [`invariants.md`](invariants.md),
 > [`frontend-architecture.md`](frontend-architecture.md), [`design.md`](design.md).
 
 ## 1. Scope + MVP/roadmap table
 
 Searchify is a full AEO product; the backend **codes only the visibility slice**. Everything
-else is documented as roadmap so the product can grow into it without rework. Every surface
-seen in the reference screenshots is marked below.
+else is documented as roadmap so the product can grow into it without rework. Every
+full-product surface is marked below.
 
 | Screenshot surface | Owning subsystem (target) | Status |
 |---|---|---|
@@ -73,8 +72,8 @@ services.
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
 
-> The reference `/api/ai-visibility` prefix and `brands/analyze`, `audits/estimate`,
-> `audits/{id}/reports`, `reports/{id}/download` endpoints from v2 §14 are **roadmap** — the
+> The `brands/analyze`, `audits/estimate`,
+> `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the
 > MVP surface is exactly the table above.
 
 ## 4. Audit request + settings contract
@@ -112,8 +111,8 @@ prompt  →  slot (prompt × engine × repetition)  →  AuditTask (enqueued, id
         →  MetricSnapshot projection (aggregate at finalize)
 ```
 
-Adapters **execute and normalize only**; they never compute visibility (v2 §10). Analysis is
-deterministic (v2 §11). Metrics are a **projection** of persisted analysis (invariant 7).
+Adapters **execute and normalize only**; they never compute visibility ([architecture.md](architecture.md) §10). Analysis is
+deterministic ([architecture.md](architecture.md) §11). Metrics are a **projection** of persisted analysis (invariant 7).
 
 ## 6. Subsystem ownership
 
@@ -150,7 +149,7 @@ project). No integer PKs, no `user_id` columns.
 | `models/analysis.py` `ResponseAnalysis`, `BrandMention`, `CompetitorMention`, `Citation` | Deterministic per-execution analysis | each references its `RawResponseArtifact` + `analyzer_version` (invariant 4) |
 | `models/analysis.py` `MetricSnapshot` | Aggregate run metrics (projection) | `analyzer_version` + formula version |
 
-Execution row (ported from the reference `AiVisibilityExecution`, UUID-ized) carries:
+The execution row (`AiVisibilityExecution`, UUID-keyed) carries:
 `prompt_index`, `prompt_text_snapshot`, `prompt_theme_snapshot`, `prompt_intent_snapshot`,
 `repetition`, `randomized_position`, `status`, `answer_text`, `search_used`, `search_events`,
 `citations`, `score` (JSONB), `request_snapshot` (**never contains the API key or brand list**),
@@ -189,13 +188,13 @@ transport_model  = <exact model id, e.g. google/gemini-2.x>
 
 **BYOK** (invariant 6): the decrypted key is resolved from `ProviderConnection` at execution
 time, never from env, never persisted into snapshots/logs. `POST /provider-connections/{id}/test`
-mirrors the reference `test-connection` and returns a status without leaking the key.
+returns a connection status without leaking the key.
 `GET /provider-catalog` exposes the approved transports/models + guardrail knobs from
 `config/provider_catalog.py`.
 
 ## 10. Postgres task queue
 
-Postgres is both durable state and the MVP queue (no Redis; v2 §7). Orchestration depends on
+Postgres is both durable state and the MVP queue (no Redis; [architecture.md](architecture.md) §7). Orchestration depends on
 the `TaskQueue` Protocol so a future Redis impl needs no domain rewrite.
 
 **`audit_tasks` (queue+lease) fields:** `id` (UUID), `audit_id`, `prompt_snapshot_id`,
@@ -226,8 +225,8 @@ terminalizes remaining executions.
 
 ## 11. Audit state machine
 
-`app/orchestration/audit_state.py` adapts CrawlerAI's `_ALLOWED_TRANSITIONS` /
-`transition_status` pattern:
+`app/orchestration/audit_state.py` centralizes an `_ALLOWED_TRANSITIONS` /
+`transition_status` state machine:
 
 ```
 DRAFT → VALIDATING → QUEUED → RUNNING → ANALYZING → REPORTING → COMPLETED
@@ -242,12 +241,12 @@ Invalid transitions raise.
 
 ## 12. Analysis + metrics projection
 
-Ported deterministically from the reference (`analysis/normalization.py`, `analysis/scoring.py`):
+Deterministic analysis (`analysis/normalization.py`, `analysis/scoring.py`):
 - Unicode/case normalization, boundary-safe alias matching, explicit alias + domain registry.
 - URL canonicalization + tracking-param removal; **citation classification**: owned /
   competitor / third-party (+ unintended domain).
 - Ordered-list/table/rank detection; deterministic mention detection.
-- **Ported metrics as-is**: brand-mention rate, owned-citation rate, mention→owned conversion,
+- **Metrics**: brand-mention rate, owned-citation rate, mention→owned conversion,
   share-of-voice (response-level + mention-level), fanout injection rates, repeat stability.
 - **Sentiment + average position are NOT computed** at MVP — exposed as nullable/absent and
   marked roadmap (would need an LLM; breaks invariant 9).
@@ -265,7 +264,7 @@ Ported deterministically from the reference (`analysis/normalization.py`, `analy
 ## 13. Full-product surface map (owning subsystem + status)
 
 See §1 for the screenshot-surface → subsystem → MVP/roadmap mapping. Summary of the target
-subsystem layout the product grows into (v2 §5): `domain/{workspaces, brands, prompts,
+subsystem layout the product grows into ([architecture.md](architecture.md) §5): `domain/{workspaces, brands, prompts,
 providers, audits, visibility, citations, reports}`, `connectors/{answer_engines,
 discovery_models, web_evidence, object_storage}`, `orchestration/*`, `analysis/*`,
 `reporting/*`, `workers/*`. **At MVP only** `domain/{auth, workspaces, projects, prompts,
@@ -274,14 +273,12 @@ providers, audits}`, `connectors/answer_engines`, `orchestration/*`, `analysis/*
 
 ## 14. Known Issues / Drift
 
-- **Reference is integer-PK + `user_id`-scoped**; Searchify is UUID + workspace-scoped. The
-  port must translate ids at the boundary — do not copy int-PK models. (Reference lives at
-  `/tmp/crawlerai-aiv`; conventions at `/code/abhij1306/CrawlerAI`.)
-- **Reference metrics assume sentiment/avg-position exist**; here they are nullable. Any ported
-  aggregate must tolerate null.
-- **`request_snapshot` in the reference may embed config**; here it must **exclude** the API
-  key and brand list (invariant 6).
-- **v2 §14 lists roadmap endpoints** (`brands/analyze`, `audits/estimate`, reports/download).
+- **All ids are UUIDs and workspace-scoped** — never integer PKs, never `user_id`-scoped
+  (invariant 5).
+- **Sentiment/avg-position are nullable** at MVP; every aggregate must tolerate null and never
+  back-fill a fake heuristic (invariant 9).
+- **`request_snapshot` must exclude the API key and brand list** (invariant 6).
+- **[architecture.md](architecture.md) §14 lists roadmap endpoints** (`brands/analyze`, `audits/estimate`, reports/download).
   They are intentionally absent from the MVP surface (§3) — do not add them without a plan.
 - **SSE `/events` is MVP on the backend**, but the frontend polls first and consumes SSE
   optionally; keep the endpoint stable even if the UI does not depend on it yet.

@@ -2,40 +2,39 @@
 
 ## Problem & goals
 Searchify is a greenfield AEO / AI-visibility SaaS (an original "Searchable"-class product).
-The repo at `/code/abhij1306/Searchify` is empty except a v2 architecture doc + reference
-screenshots. This plan does two things:
+The repo is a greenfield monorepo whose architecture is captured in `../architecture.md`. This plan
+does two things:
 
 1. **Documentation first** — write repository docs (`Agents.md`, `docs/design.md`,
    `docs/backend-architecture.md`, `docs/frontend-architecture.md`, `docs/invariants.md`) that
-   describe the **whole product** (every screenshot surface) with an explicit **MVP-vs-roadmap**
+   describe the **whole product** (every product surface) with an explicit **MVP-vs-roadmap**
    boundary. `design.md` is a **written design system with concrete token values and per-screen
-   layout prose** — complete enough that any build agent can work **without** the screenshots.
-2. **Code the MVP** — port CrawlerAI's existing **AI-visibility benchmarking tool** (branch
-   `feature/extraction-v3-phase0-eval`, checked out at `/tmp/crawlerai-aiv`) onto the **target
+   layout prose** — complete enough that any build agent can work purely from the written docs.
+2. **Code the MVP** — build Searchify's **AI-visibility benchmarking slice** on the **target
    architecture from day one**: workspaces + workspace-scoped auth, **UUID PKs**, BYOK provider
    settings, a Postgres `FOR UPDATE SKIP LOCKED` task queue, and a full audit state machine. It runs
    prompt × engine × repetition executions across three answer engines (ChatGPT/Gemini/Claude), scores
    them deterministically (mentions / citations / visibility metrics), and surfaces results in a
    Visibility dashboard + Run/Executions evidence explorer.
 
-Goal: a runnable, testable, deployable visibility product implementing the visibility slice of the v2
-doc (§6–§14) on the architecture the whole product grows into, plus documentation an agent can build
-the rest of the product from.
+Goal: a runnable, testable, deployable visibility product implementing the visibility slice of the
+architecture doc (`../architecture.md` §6–§14) on the architecture the whole product grows into, plus
+documentation an agent can build the rest of the product from.
 
-## What we reuse (grounded)
-- **Ported wholesale** from `/tmp/crawlerai-aiv/backend/app/ai_visibility/*` (+ `models/`, `schemas/`,
+## Subsystem scope (grounded)
+- **Implemented as Searchify's own `ai_visibility` domain** (`backend/app/` with `models/`, `schemas/`,
   `api/`, `core/config/ai_visibility.py`, tests): the answer-engine adapters (Gemini grounded working;
   Anthropic + OpenRouter present), the deterministic scoring/normalization/exports, the run-planning +
   deterministic slot shuffle, cooperative cancel, retry/pacing/guardrails.
-- **Conventions from CrawlerAI main** (`/code/abhij1306/CrawlerAI`): FastAPI app-factory + router-per-
+- **Backend conventions**: FastAPI app-factory + router-per-
   domain; async SQLAlchemy 2.0 typed `Mapped`/`Base`/`get_session`; Fernet `encrypt_secret`/
   `decrypt_secret` + argon2 + joserfc; pydantic-settings singleton; queue-lease fields + dispatcher
   Protocol + state-transition table; Alembic async env; structlog/Logfire; provider catalog +
   `POST /test-connection`. Frontend conventions (typed API client, zod `strictValidate`, Tailwind-v4
-  token bridge, CVA primitives, React Query retry policy) lifted from the CrawlerAI frontend — but
-  translated to **Next.js App Router** (Searchify's Vercel target), not Vite.
-- **We do NOT reuse** CrawlerAI's crawler/acquisition/browser engine, its integer-PK/user-scoped model,
-  or its `BackgroundTasks` in-process run loop.
+  token bridge, CVA primitives, React Query retry policy) are built on
+  **Next.js App Router** (Searchify's Vercel target), not Vite.
+- **Searchify does NOT include** a crawler/acquisition/browser engine, and never uses integer-PK/
+  user-scoped models or a `BackgroundTasks` in-process run loop.
 
 ## Architecture at a glance
 Modular monolith: FastAPI web + a **separate worker process**, Postgres as durable state **and** task
@@ -118,8 +117,8 @@ they are now **decided**. Any can be vetoed in plan review.
 - **Roadmap (documented, not coded):** **cross-run Visibility trend history** (MVP dashboard is
   single-run projection only, no date/run-range trend), LLM Analytics / AI referrals, Traffic, **AI
   prompt generation** (CSV import IS in MVP; only AI-suggested generation is roadmap), Content,
-  Opportunities, **Site Health + Issues (a simple HTTP/Screaming-Frog-style crawler — no browser, not
-  CrawlerAI's acquisition engine)**, open-ended Issue catalog, Brand / Competitors / E-E-A-T, Topics,
+  Opportunities, **Site Health + Issues (a simple HTTP/Screaming-Frog-style crawler — no browser, and
+  no full acquisition engine)**, open-ended Issue catalog, Brand / Competitors / E-E-A-T, Topics,
   GSC/GA4/Bing integrations, Agent, MCP, Settings/white-labelling, HTML/JSON report renderers, S3
   artifacts, Redis queue, sentiment + avg position, direct OpenAI adapter, discovery-model prompt
   suggestion + LLM adjudication.
@@ -138,7 +137,7 @@ they are now **decided**. Any can be vetoed in plan review.
 No image/mockup dependency. `design.md` is a written design system with **concrete token values**
 (light/dark hex palettes, px type scale, 4px spacing steps, radii, elevation, semantic/status/sentiment/
 citation-classification/run-status/score-band colors) and **per-screen layout prose for all seven MVP
-screens**, so a build agent never needs the reference PNGs. The other four docs cover the whole product
+screens**, so a build agent can build purely from the written docs. The other four docs cover the whole product
 with an MVP/roadmap marker on every surface and both operational gotchas.
 
 ## Sequencing

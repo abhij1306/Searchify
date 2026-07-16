@@ -11,7 +11,7 @@
 
 A **fast, HTTP-first, Screaming-Frog-style site crawler** that audits a website's technical
 SEO / AEO health and emits a de-duplicated **Issues catalog**. It is deliberately **not** a
-browser-rendering crawler and **not** CrawlerAI's commerce/acquisition engine — those are
+browser-rendering crawler and **not** a commerce/acquisition engine — those are
 heavyweight and out of scope. The design target is **throughput**: crawl tens of thousands of
 URLs in minutes by doing concurrent async HTTP fetches + streaming HTML parsing, with browser
 rendering as an optional, opt-in, per-URL fallback only.
@@ -175,6 +175,6 @@ Nothing tunable is hard-coded in service/worker code (invariant 1).
 
 - No full browser rendering on the fast path (opt-in fallback only).
 - No true field Core Web Vitals without a RUM/CrUX/PageSpeed integration (roadmap+).
-- No reuse of CrawlerAI's commerce/acquisition/selector/domain-memory engine.
+- No commerce/acquisition/selector/domain-memory crawling engine.
 - No LLM in issue detection (deterministic rules only — invariant 9); LLM-written remediation
   copy, if ever added, is a projection layer over deterministic findings, never the detector.
