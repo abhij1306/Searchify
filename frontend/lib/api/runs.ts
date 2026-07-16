@@ -65,6 +65,10 @@ export const runsApi = {
   /** Same-origin export URLs (browser navigation / download links). */
   exportUrl: (auditId: string, format: 'csv' | 'md') =>
     `${API_BASE_URL}/audits/${auditId}/export.${format}`,
-  /** Same-origin SSE endpoint (optional; polling is the baseline). */
-  eventsUrl: (auditId: string) => `${API_BASE_URL}/audits/${auditId}/events`,
+  /**
+   * Same-origin SSE endpoint (optional; polling is the baseline). The backend
+   * `/events` endpoint returns JSON by default and an SSE `text/event-stream`
+   * only with `?stream=true`, so the streaming helper must request it.
+   */
+  eventsUrl: (auditId: string) => `${API_BASE_URL}/audits/${auditId}/events?stream=true`,
 };
