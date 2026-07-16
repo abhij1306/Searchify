@@ -44,5 +44,15 @@ export const queryKeys = {
     all: ['visibility'] as const,
     project: (projectId: string, auditId?: string, filters: ListFilters = {}) =>
       ['visibility', 'project', projectId, auditId ?? 'latest', filters] as const,
+    // Cross-run trend series: every filter (engine, from, to, granularity)
+    // participates in the key so switching a control re-derives the view.
+    trends: (projectId: string, filters: ListFilters = {}) =>
+      ['visibility', 'trends', projectId, filters] as const,
+    // Shared execution-evidence dataset for the Mentions & Citations and Query
+    // Fanout tabs. ONE identical key is used by both tabs so switching between
+    // them reuses the cache instead of refetching. Every shared filter
+    // (audit_id, prompt_id, engine, from, to, limit) participates in the key.
+    evidence: (projectId: string, filters: ListFilters = {}) =>
+      ['visibility', 'evidence', projectId, filters] as const,
   },
 } as const;

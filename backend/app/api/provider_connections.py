@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
 from app.core.config.provider_catalog import (
+    ACTIVE_TRANSPORTS,
     APPROVED_ROUTES,
-    MVP_TRANSPORTS,
 )
 from app.domain.providers.schemas import (
     ProviderCatalogEngine,
@@ -30,6 +30,7 @@ from app.domain.providers.schemas import (
 )
 from app.domain.providers.service import (
     InvalidRouteError,
+    LegacyConnectionReadOnlyError,
     ProviderConnectionNotFoundError,
     connection_to_response,
     create_connection,
@@ -99,6 +100,10 @@ async def update_connection_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND
         ) from exc
+    except LegacyConnectionReadOnlyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
     except InvalidRouteError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
@@ -143,9 +148,14 @@ async def test_connection_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND
         ) from exc
-    return await run_connection_test(
-        session, workspace_id=ctx.workspace_id, connection_id=connection_id
-    )
+    try:
+        return await run_connection_test(
+            session, workspace_id=ctx.workspace_id, connection_id=connection_id
+        )
+    except LegacyConnectionReadOnlyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
 
 
 # --- Provider catalog (read-only reference data) --------------------------
@@ -154,7 +164,7 @@ catalog_router = APIRouter(prefix="/provider-catalog", tags=["providers"])
 
 @catalog_router.get("", response_model=ProviderCatalogResponse)
 async def get_provider_catalog() -> ProviderCatalogResponse:
-    """Approved MVP transports and per-engine routes with default models."""
+    """Approved active transports and per-engine routes with default models."""
     engines = [
         ProviderCatalogEngine(
             logical_engine=engine,
@@ -168,5 +178,5 @@ async def get_provider_catalog() -> ProviderCatalogResponse:
         for engine, routes in APPROVED_ROUTES.items()
     ]
     return ProviderCatalogResponse(
-        transports=sorted(MVP_TRANSPORTS), engines=engines
+        transports=sorted(ACTIVE_TRANSPORTS), engines=engines
     )

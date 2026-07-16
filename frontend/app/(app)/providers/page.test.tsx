@@ -11,23 +11,18 @@ import ProvidersPage from './page';
 const CONNECTION_ID = '11111111-1111-4111-8111-111111111111';
 const WORKSPACE_ID = '22222222-2222-4222-8222-222222222222';
 
+// v2 direct-provider retirement: one direct transport per logical engine.
 const catalog = {
-  transports: ['anthropic', 'google', 'openrouter'],
+  transports: ['openai', 'anthropic', 'google'],
   engines: [
-    { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openrouter', default_model: 'openai/gpt-5.4' }] },
+    { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }] },
     {
       logical_engine: 'gemini',
-      routes: [
-        { transport_provider: 'google', default_model: 'gemini-flash-latest' },
-        { transport_provider: 'openrouter', default_model: 'google/gemini-2.5-flash' },
-      ],
+      routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],
     },
     {
       logical_engine: 'claude',
-      routes: [
-        { transport_provider: 'anthropic', default_model: 'claude-sonnet-4-6' },
-        { transport_provider: 'openrouter', default_model: 'anthropic/claude-sonnet-4.6' },
-      ],
+      routes: [{ transport_provider: 'anthropic', default_model: 'claude-sonnet-4-6' }],
     },
   ],
 };
@@ -36,8 +31,8 @@ function connection(overrides: Record<string, unknown> = {}) {
   return {
     id: CONNECTION_ID,
     workspace_id: WORKSPACE_ID,
-    label: 'gemini',
-    transport_provider: 'google',
+    label: 'chatgpt',
+    transport_provider: 'openai',
     base_url: null,
     active: true,
     api_key_set: true,
@@ -46,10 +41,11 @@ function connection(overrides: Record<string, unknown> = {}) {
     routes: [
       {
         id: '33333333-3333-4333-8333-333333333333',
-        logical_engine: 'gemini',
-        transport_provider: 'google',
-        transport_model: 'gemini-flash-latest',
+        logical_engine: 'chatgpt',
+        transport_provider: 'openai',
+        transport_model: 'gpt-5.4',
         is_default: false,
+        active: true,
       },
     ],
     created_at: '2026-07-15T00:00:00Z',
@@ -83,7 +79,7 @@ describe('ProvidersPage', () => {
     expect(screen.getAllByText('Not configured')).toHaveLength(3);
   });
 
-  it('shows ChatGPT as OpenRouter-only with the direct OpenAI option disabled', async () => {
+  it('shows ChatGPT as a fixed direct OpenAI route with no OpenRouter and no toggle', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
@@ -93,42 +89,38 @@ describe('ProvidersPage', () => {
 
     const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
     const utils = within(chatgptCard);
-    const openrouter = utils.getByRole('radio', { name: /OpenRouter/i });
-    expect(openrouter).toHaveAttribute('aria-checked', 'true');
-    const directOpenai = utils.getByRole('radio', { name: /Direct OpenAI/i });
-    expect(directOpenai).toBeDisabled();
-    expect(directOpenai).toHaveTextContent(/coming soon/i);
+    // Fixed direct route label; the OpenAI model is surfaced.
+    expect(utils.getByText('Direct (OpenAI)')).toBeInTheDocument();
+    expect(utils.getByText(/gpt-5\.4/)).toBeInTheDocument();
+    // No route toggle / radios at all, and no OpenRouter or "coming soon" copy.
+    expect(utils.queryByRole('radio')).toBeNull();
+    expect(utils.queryByText(/openrouter/i)).toBeNull();
+    expect(utils.queryByText(/coming soon/i)).toBeNull();
   });
 
-  it('lets the Gemini route toggle switch transports', async () => {
-    const user = userEvent.setup();
+  it('never renders an OpenRouter control anywhere on the page', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
     );
 
     renderWithProviders(<ProvidersPage />);
-
-    const geminiCard = (await screen.findByRole('heading', { name: 'Gemini' })).closest('section')!;
-    const utils = within(geminiCard);
-    const direct = utils.getByRole('radio', { name: /Direct \(Google\)/i });
-    const openrouter = utils.getByRole('radio', { name: /OpenRouter/i });
-    expect(direct).toHaveAttribute('aria-checked', 'true');
-
-    await user.click(openrouter);
-    expect(openrouter).toHaveAttribute('aria-checked', 'true');
-    expect(direct).toHaveAttribute('aria-checked', 'false');
+    await screen.findByRole('heading', { name: 'ChatGPT' });
+    expect(screen.queryByText(/openrouter/i)).toBeNull();
   });
 
-  it('submits a new key and surfaces a successful connection test', async () => {
+  it('submits a new OpenAI key and surfaces a successful connection test', async () => {
     const user = userEvent.setup();
     let created = false;
+    let createdTransport = '';
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () =>
         HttpResponse.json(created ? [connection()] : []),
       ),
-      http.post('/api/v1/provider-connections', async () => {
+      http.post('/api/v1/provider-connections', async ({ request }) => {
+        const body = (await request.json()) as { transport_provider: string };
+        createdTransport = body.transport_provider;
         created = true;
         return HttpResponse.json(connection(), { status: 201 });
       }),
@@ -139,9 +131,9 @@ describe('ProvidersPage', () => {
           error_code: '',
           detail: 'Connection succeeded',
           latency_ms: 42,
-          logical_engine: 'gemini',
-          transport_provider: 'google',
-          transport_model: 'gemini-flash-latest',
+          logical_engine: 'chatgpt',
+          transport_provider: 'openai',
+          transport_model: 'gpt-5.4',
           tested_at: '2026-07-15T00:00:00Z',
         }),
       ),
@@ -149,14 +141,15 @@ describe('ProvidersPage', () => {
 
     renderWithProviders(<ProvidersPage />);
 
-    const geminiCard = (await screen.findByRole('heading', { name: 'Gemini' })).closest('section')!;
-    const utils = within(geminiCard);
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const utils = within(chatgptCard);
 
     await user.type(utils.getByPlaceholderText(/paste your api key/i), 'sk-test-key');
     await user.click(utils.getByRole('button', { name: /save key/i }));
 
     // After save the connection list refetches → card becomes configured.
     await waitFor(() => expect(utils.getByText('Configured')).toBeInTheDocument());
+    expect(createdTransport).toBe('openai');
 
     await user.click(utils.getByRole('button', { name: /test connection/i }));
     expect(await utils.findByText(/connection succeeded/i)).toBeInTheDocument();
@@ -174,9 +167,9 @@ describe('ProvidersPage', () => {
           error_code: 'auth_failure',
           detail: 'Invalid API key',
           latency_ms: 10,
-          logical_engine: 'gemini',
-          transport_provider: 'google',
-          transport_model: 'gemini-flash-latest',
+          logical_engine: 'chatgpt',
+          transport_provider: 'openai',
+          transport_model: 'gpt-5.4',
           tested_at: '2026-07-15T00:00:00Z',
         }),
       ),
@@ -184,8 +177,8 @@ describe('ProvidersPage', () => {
 
     renderWithProviders(<ProvidersPage />);
 
-    const geminiCard = (await screen.findByRole('heading', { name: 'Gemini' })).closest('section')!;
-    const utils = within(geminiCard);
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const utils = within(chatgptCard);
     expect(utils.getByText('Configured')).toBeInTheDocument();
 
     await user.click(utils.getByRole('button', { name: /test connection/i }));
@@ -200,8 +193,8 @@ describe('ProvidersPage', () => {
 
     renderWithProviders(<ProvidersPage />);
 
-    const geminiCard = (await screen.findByRole('heading', { name: 'Gemini' })).closest('section')!;
-    const utils = within(geminiCard);
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const utils = within(chatgptCard);
     const keyInput = utils.getByPlaceholderText(/stored/i) as HTMLInputElement;
     expect(keyInput).toHaveAttribute('type', 'password');
     expect(keyInput.value).toBe('');

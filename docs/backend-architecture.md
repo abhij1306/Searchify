@@ -24,7 +24,8 @@ full-product surface is marked below.
 | Run/Executions evidence + CSV/MD export | `api/audits` + `analysis/exports` | **MVP — coded** |
 | AI-suggested prompt generation (`/generate`) | `domain/prompts` | Roadmap — **stub returns not-implemented** |
 | Discovery/analysis model (`DiscoveryModelConfig`) | `domain/providers` | Plumbing-only (stored, not invoked) |
-| Cross-run Visibility trend history | `analysis` | Roadmap (MVP dashboard is single-run) |
+| Cross-run Visibility trend history | `analysis` | **Coded** — `GET /projects/{id}/visibility/trends` (Trends tab) |
+| Persisted execution evidence (mentions/citations + query fanout) | `analysis` | **Coded** — `GET /projects/{id}/visibility/evidence` |
 | Sentiment + average position | `analysis` | Roadmap (nullable; not computed) |
 | LLM Analytics / AI referrals | — | Roadmap |
 | Traffic | — | Roadmap |
@@ -38,7 +39,7 @@ full-product surface is marked below.
 | GSC / GA4 / Bing integrations | — | Roadmap |
 | Agent, MCP, Settings/white-labelling | — | Roadmap |
 | HTML/JSON report renderers, S3 artifacts, Redis queue | `reporting` / infra | Roadmap |
-| Direct OpenAI adapter | `connectors/answer_engines` | Fast-follow (disabled at MVP) |
+| Direct OpenAI adapter (`openai.py` + `openai_parser.py`) | `connectors/answer_engines` | **Coded** — active transport (OpenRouter adapter/parser deleted) |
 
 ## 2. Runtime stack
 
@@ -66,7 +67,7 @@ services.
 |---|---|
 | `app/api/auth.py` | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | `app/api/workspaces.py` | `GET /workspaces`, `POST /workspaces` |
-| `app/api/projects.py` | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `GET /projects/{id}/visibility?audit_id=` |
+| `app/api/projects.py` | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `GET /projects/{id}/visibility?audit_id=`, `GET /projects/{id}/visibility/trends`, `GET /projects/{id}/visibility/evidence` |
 | `app/api/prompts.py` | `GET/POST /prompt-sets`, prompt CRUD (`PATCH/DELETE /prompts/{id}`), `POST /prompt-sets/{id}/import` (MVP CSV bulk-create), `POST /prompt-sets/{id}/generate` (**stub, not-implemented**) |
 | `app/api/provider_connections.py` | `GET/POST /provider-connections`, `PATCH/DELETE /provider-connections/{id}`, `POST /provider-connections/{id}/test`; `GET /provider-catalog` |
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
@@ -124,7 +125,7 @@ deterministic ([architecture.md](architecture.md) §11). Metrics are a **project
 | `app/models/*` | SQLAlchemy persistence (UUID PKs, provenance columns). |
 | `app/schemas/*` | Pydantic request/response DTOs (secrets never present). |
 | `app/domain/{auth,workspaces,projects,prompts,providers,audits}/*` | Services + business rules per resource. |
-| `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openrouter). |
+| `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openai — direct OpenAI Responses API). The retired OpenRouter adapter/parser were deleted. |
 | `app/orchestration/{audit_state,task_queue,postgres_task_queue}.py` + `domain/audits/planner.py` | State machine, `TaskQueue` Protocol + Postgres impl, slot planning. |
 | `app/analysis/{normalization,scoring,exports}.py` | Deterministic scoring, aggregation, CSV/MD export. |
 | `app/workers/audit_worker.py` | Separate process: claim → execute → persist → analyze → transition. |
@@ -174,17 +175,26 @@ The execution row (`AiVisibilityExecution`, UUID-keyed) carries:
 **Logical vs transport identity** (invariant 10) is persisted on every route + attempt:
 
 ```
-logical_engine   = gemini | chatgpt | claude
-transport_provider = google | anthropic | openrouter
-transport_model  = <exact model id, e.g. google/gemini-2.x>
+logical_engine     = gemini | chatgpt | claude
+transport_provider = google | anthropic | openai   # active; `openrouter` is historical-only
+transport_model    = <exact model id, e.g. gemini-flash-latest>
 ```
 
-**MVP engine transports:**
-- `gemini` → direct (`google`) **or** via `openrouter`. Working direct adapter (grounding +
+**Active engine transports (v2 direct-only, `provider_catalog.py`):** exactly one approved
+route per engine —
+- `gemini` → direct `google`, model `gemini-flash-latest`. Working direct adapter (grounding +
   citation parsing).
-- `claude` → direct (`anthropic`) **or** via `openrouter`. Working direct adapter.
-- `chatgpt` → **`openrouter` only** at MVP. A **direct OpenAI adapter is a fast-follow, not in
-  MVP** and not covered by MVP tests.
+- `claude` → direct `anthropic`, model `claude-sonnet-4-6`. Working direct adapter.
+- `chatgpt` → direct `openai` via the **OpenAI Responses API** (`openai.py` +
+  `openai_parser.py`), model `gpt-5.4`.
+
+`ACTIVE_TRANSPORTS` is `{openai, anthropic, google}`. `openrouter` is **retired** as an active
+transport — it lives on only in `HISTORICAL_TRANSPORTS` so retired rows read safely (never an
+active/approved/write route). Migration
+`migrations/versions/0008_direct_openai_retirement.py` (marker `openrouter_retired_v2`) retires
+active OpenRouter connections/routes and adds `provider_connections.deactivation_reason`,
+`provider_routes.active`, and `provider_routes.deactivation_reason`. The OpenRouter
+adapter/parser files were deleted.
 
 **BYOK** (invariant 6): the decrypted key is resolved from `ProviderConnection` at execution
 time, never from env, never persisted into snapshots/logs. `POST /provider-connections/{id}/test`
@@ -253,11 +263,19 @@ Deterministic analysis (`analysis/normalization.py`, `analysis/scoring.py`):
 
 **Dashboard/metrics endpoints (projections, no provider calls):**
 - `GET /audits/{id}/metrics` — single-run `MetricSnapshot` projection.
-- `GET /projects/{id}/visibility?audit_id=<id>` — **selected-run** dashboard projection:
-  Visibility Score, **per-engine comparison** for that run, and the **brand-vs-competitor
-  rankings** table (Visibility% + SOV populated; sentiment + avg-position present but null).
-  Defaults to the project's latest completed audit when `audit_id` is omitted. **No cross-run
-  trend at MVP** (roadmap).
+- `GET /projects/{id}/visibility?audit_id=<id>` — **selected-run** projection behind the
+  **Overview** tab: Visibility Score, **per-engine comparison** for that run, and the
+  **brand-vs-competitor rankings** table (Visibility% + SOV populated; sentiment + avg-position
+  present but null). Defaults to the project's latest completed audit when `audit_id` is omitted.
+- `GET /projects/{id}/visibility/trends` — cross-run projection behind the **Trends** tab: an
+  ordered `VisibilityTrendPoint` series from persisted `MetricSnapshot` rows, optional
+  `engine`/`from`/`to` filters and `granularity=run|week|month`. Empty history → `[]` (not 404).
+- `GET /projects/{id}/visibility/evidence` — shared persisted dataset behind the **Mentions &
+  Citations** and **Query Fanout** tabs: `VisibilityEvidenceResponse{items, truncated}`, a
+  read-only projection of persisted mentions/citations plus normalized query-fanout events.
+  Optional `audit_id`/`prompt_id`/`engine`/`from`/`to` filters and a bounded `limit`. Each item
+  carries a fanout `state` of `queries_available | count_only | no_search`. No provider is
+  called and no evidence is inferred/backfilled (invariant 7).
 - `GET /executions/{id}` — single-execution evidence.
 - `GET /audits/{id}/export.{csv,md}` — reproducible exports (`analysis/exports.py`).
 

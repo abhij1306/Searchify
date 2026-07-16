@@ -1,0 +1,49 @@
+{
+  "id": "resp_grounded_1",
+  "object": "response",
+  "status": "completed",
+  "model": "gpt-5.4",
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_1",
+      "summary": [{"type": "summary_text", "text": "private chain of thought"}]
+    },
+    {
+      "type": "web_search_call",
+      "id": "ws_1",
+      "status": "completed",
+      "action": {"type": "search", "query": "affordable baby clothes australia"}
+    },
+    {
+      "type": "web_search_call",
+      "id": "ws_2",
+      "status": "completed",
+      "action": {
+        "type": "search",
+        "queries": ["cheap kids clothing sale", "best value baby onesies au"]
+      }
+    },
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Best&Less is a great option for affordable baby clothes.",
+          "annotations": [
+            {
+              "type": "url_citation",
+              "url": "https://www.bestandless.com.au/baby",
+              "title": "Best&Less baby",
+              "start_index": 0,
+              "end_index": 9
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "usage": {"input_tokens": 40, "output_tokens": 60, "total_tokens": 100}
+}

@@ -5,17 +5,26 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { VisibilityDashboard } from '@/components/visibility/visibility-dashboard';
 
 /**
- * Visibility dashboard screen (F9, design.md §9.6).
+ * Visibility workspace screen (F9, four-tab IA).
  *
- * A selected-run projection over the active project's audits: a Visibility
- * Score header, a per-engine comparison for the selected run, and a
- * brand-vs-competitor rankings table (Visibility% / SOV% / Sentiment / Avg
- * Position). A run selector (defaults to the latest completed audit) plus
- * engine / prompt-type filters drive the query. Sentiment + Avg Position are
- * rendered but show the "—" not-yet-computed placeholder (decision B-2). No
- * cross-run trend chart at MVP (roadmap). Consumes the B6
- * `GET /projects/{id}/visibility?audit_id=` endpoint via `visibility.ts` and
- * the active project from the F5 context.
+ * One workspace shell with a shared filter bar above an accessible tablist and
+ * exactly four focused panels:
+ *   - **Overview** (default): the selected-run Visibility Score, both SOV
+ *     definitions, per-engine / logical-engine comparison, and brand-vs-
+ *     competitor rankings, from `GET /projects/{id}/visibility?audit_id=`.
+ *   - **Trends**: cross-run Visibility Score, Share of Voice, and ranking
+ *     movement across completed audits, with engine / date / granularity
+ *     controls and version-boundary markers, from
+ *     `GET /projects/{id}/visibility/trends`.
+ *   - **Mentions & Citations**: persisted brand/competitor mentions and
+ *     classified citation records with task/analysis/artifact provenance.
+ *   - **Query Fanout**: frozen prompts, provider-generated search queries, and
+ *     search-count / text-availability states.
+ * The two evidence tabs share the persisted
+ * `GET /projects/{id}/visibility/evidence` dataset. Sentiment + Avg Position
+ * stay the "—" not-yet-computed placeholder (decision B-2). There are no
+ * Sources, Topics, or Sentiment tabs. All endpoints go through `visibility.ts`,
+ * scoped to the active project from the F5 context.
  */
 export default function VisibilityPage() {
   return (
@@ -24,8 +33,10 @@ export default function VisibilityPage() {
         <div>
           <PageTitle kicker="Analytics">Visibility</PageTitle>
           <p className="mt-1 max-w-2xl text-sm text-secondary">
-            Your brand&apos;s visibility across AI answer engines for a single run — a Visibility
-            Score, a per-engine comparison, and how you rank against competitors.
+            Your brand&apos;s visibility across AI answer engines. Switch between the Overview,
+            Trends, Mentions &amp; Citations, and Query Fanout tabs to inspect a single run, track
+            movement over time, and browse the persisted mention, citation, and search-query
+            evidence behind the scores.
           </p>
         </div>
         <VisibilityDashboard />

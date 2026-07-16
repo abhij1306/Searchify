@@ -201,6 +201,7 @@ async def _resolve_routes(
         )
         .where(
             ProviderRoute.workspace_id == workspace_id,
+            ProviderRoute.active.is_(True),
             ProviderConnection.active.is_(True),
         )
         .order_by(

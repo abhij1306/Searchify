@@ -1,17 +1,16 @@
 # BYOK provider catalog + answer-engine guardrails (invariant 1: config lives
 # in core/config, never inline in service/adapter code).
 #
-# Owns the approved logical-engine -> transport -> model catalog for the MVP,
-# the transport/engine enumerations, and the provider-agnostic guardrail knobs
+# Owns the approved logical-engine -> transport -> model catalog, the
+# transport/engine enumerations, and the provider-agnostic guardrail knobs
 # (token caps, timeouts, endpoint URLs, retry classification tokens). Adapters,
 # services, and routers READ these values; they never hard-code them.
 #
-# Adapted from the reference ``config/ai_visibility.py``. MVP engine transports
-# (decision B-3):
-#   * chatgpt reaches MVP via ``openrouter`` ONLY (direct OpenAI is a reserved
-#     fast-follow, disabled here — no ``openai`` transport is approved);
-#   * gemini via ``google`` (direct) or ``openrouter``;
-#   * claude via ``anthropic`` (direct) or ``openrouter``.
+# v2 direct-provider retirement: ChatGPT is now executable ONLY through the
+# direct OpenAI Responses API (transport ``openai``). OpenRouter is retired as
+# an ACTIVE transport — it survives ONLY as a HISTORICAL token so old rows read
+# safely (invariant 10). Active transports are exactly ``openai | anthropic |
+# google`` and each logical engine has exactly one approved route.
 from __future__ import annotations
 
 from typing import Final
@@ -27,45 +26,33 @@ LOGICAL_ENGINES: Final[frozenset[str]] = frozenset(
 )
 
 # --- Transport providers (how we physically reach the engine) -------------
+TRANSPORT_OPENAI: Final = "openai"
 TRANSPORT_ANTHROPIC: Final = "anthropic"
 TRANSPORT_GOOGLE: Final = "google"
+# Retired legacy transport. Kept ONLY as a token so read/guard comparisons can
+# recognise historical rows; it is NEVER an active/approved route (v2).
 TRANSPORT_OPENROUTER: Final = "openrouter"
-# Reserved fast-follow, DISABLED at MVP (decision B-3). Defined so the enum is
-# stable, but never present in the approved-route catalog below.
-TRANSPORT_OPENAI: Final = "openai"
 
-# Transports a BYOK ``ProviderConnection`` may declare at MVP.
-MVP_TRANSPORTS: Final[frozenset[str]] = frozenset(
-    {TRANSPORT_ANTHROPIC, TRANSPORT_GOOGLE, TRANSPORT_OPENROUTER}
+# Transports a NEW BYOK ``ProviderConnection`` may declare (active surface).
+ACTIVE_TRANSPORTS: Final[frozenset[str]] = frozenset(
+    {TRANSPORT_OPENAI, TRANSPORT_ANTHROPIC, TRANSPORT_GOOGLE}
 )
-# Superset including reserved transports (validation / future use).
-ALL_TRANSPORTS: Final[frozenset[str]] = MVP_TRANSPORTS | {TRANSPORT_OPENAI}
 
 # --- Approved routes: logical engine -> {transport: default model} --------
 # One catalog, the single source of truth for which (engine, transport, model)
-# tuples are allowed at MVP. The ``/provider-catalog`` endpoint projects this;
-# adapters validate their requested model against it.
+# tuples are allowed. The ``/provider-catalog`` endpoint projects this;
+# adapters validate their requested model against it. Exactly one approved
+# transport per engine (v2 direct-only).
 APPROVED_ROUTES: Final[dict[str, dict[str, str]]] = {
     ENGINE_CHATGPT: {
-        # chatgpt is OpenRouter-only at MVP (no direct openai transport).
-        TRANSPORT_OPENROUTER: "openai/gpt-5.4",
-    },
-    ENGINE_GEMINI: {
-        TRANSPORT_GOOGLE: "gemini-flash-latest",
-        TRANSPORT_OPENROUTER: "google/gemini-2.5-flash",
+        TRANSPORT_OPENAI: "gpt-5.4",
     },
     ENGINE_CLAUDE: {
         TRANSPORT_ANTHROPIC: "claude-sonnet-4-6",
-        TRANSPORT_OPENROUTER: "anthropic/claude-sonnet-4.6",
     },
-}
-
-# Model-prefix allowlists for native web-search over OpenRouter, keyed by the
-# logical engine. A requested OpenRouter model must match its engine's surface.
-OPENROUTER_MODEL_PREFIXES: Final[dict[str, tuple[str, ...]]] = {
-    ENGINE_CHATGPT: ("openai/gpt-5", "openai/gpt-4.1", "openai/o3", "openai/o4"),
-    ENGINE_CLAUDE: ("anthropic/claude-",),
-    ENGINE_GEMINI: ("google/gemini-",),
+    ENGINE_GEMINI: {
+        TRANSPORT_GOOGLE: "gemini-flash-latest",
+    },
 }
 
 
@@ -75,8 +62,13 @@ def transports_for_engine(logical_engine: str) -> frozenset[str]:
 
 
 def is_route_approved(logical_engine: str, transport_provider: str) -> bool:
-    """True when (engine, transport) is an approved MVP route."""
+    """True when (engine, transport) is an approved active route."""
     return transport_provider in APPROVED_ROUTES.get(logical_engine, {})
+
+
+def is_active_transport(transport_provider: str) -> bool:
+    """True when a transport may be used on an active (write/execute) path."""
+    return transport_provider in ACTIVE_TRANSPORTS
 
 
 def default_model(logical_engine: str, transport_provider: str) -> str:
@@ -138,13 +130,11 @@ class ProviderCatalogSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PROVIDER_", extra="ignore")
 
     # Endpoint URLs (overridable per environment / for a self-hosted gateway).
+    openai_responses_url: str = "https://api.openai.com/v1/responses"
     google_interactions_url: str = (
         "https://generativelanguage.googleapis.com/v1beta/interactions"
     )
     anthropic_messages_url: str = "https://api.anthropic.com/v1/messages"
-    openrouter_chat_completions_url: str = (
-        "https://openrouter.ai/api/v1/chat/completions"
-    )
     anthropic_version: str = "2023-06-01"
     # Caps server-side web_search invocations per Anthropic request.
     anthropic_max_uses: int = 3
@@ -154,8 +144,6 @@ class ProviderCatalogSettings(BaseSettings):
     request_timeout_seconds: float = 60.0
     # Shorter timeout for the lightweight connectivity probe.
     test_timeout_seconds: float = 20.0
-    # Title header sent to OpenRouter for attribution.
-    openrouter_app_title: str = "Searchify AI Visibility"
 
 
 provider_catalog_settings = ProviderCatalogSettings()

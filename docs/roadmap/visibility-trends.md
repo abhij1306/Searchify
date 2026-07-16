@@ -1,11 +1,21 @@
 # Roadmap — Cross-run Visibility trend history
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
-> an engineer (or agent) can start building without re-deriving the architecture. It follows
-> the same conventions as the MVP: UUID PKs, workspace scoping via `require_workspace_member`,
-> immutable artifacts, provenance + version on every derived row, and config-in-config-only.
-> Read [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every
-> rule there applies here too.
+> **Status: IMPLEMENTED (v2 Visibility Insights).** This spec is retained as a design record;
+> the surface has shipped. Live owners:
+> - Backend: `GET /projects/{id}/visibility/trends` in `backend/app/api/projects.py`, projected
+>   by `get_visibility_trends` in `backend/app/domain/analysis/service.py`
+>   (`VisibilityTrendPoint`). The companion persisted-evidence endpoint
+>   `GET /projects/{id}/visibility/evidence` (`VisibilityEvidenceResponse{items,truncated}`)
+>   feeds the Mentions & Citations + Query Fanout tabs.
+> - Frontend: Trends tab `frontend/components/visibility/visibility-trends.tsx` within the
+>   four-tab workspace `frontend/components/visibility/visibility-dashboard.tsx`.
+> - Tests: `backend/tests/component/test_analysis_http.py`,
+>   `backend/tests/component/test_analysis_api.py`, `frontend/lib/visibility/dashboard.test.ts`,
+>   `frontend/app/(app)/visibility/page.test.tsx`.
+>
+> The design below is preserved for context. It follows the same conventions as the MVP: UUID
+> PKs, workspace scoping via `require_workspace_member`, immutable artifacts, provenance +
+> version on every derived row, and config-in-config-only.
 
 ## 1. Goal & positioning
 

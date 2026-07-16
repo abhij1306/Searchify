@@ -1,28 +1,21 @@
 /**
- * Provider Settings view-model helpers (F8).
+ * Provider Settings view-model helpers (F8, v2 direct-provider retirement).
  *
  * Turns the raw `/provider-catalog` payload + the workspace's
  * `/provider-connections` into the per-engine card model the UI renders. The
  * catalog is the single source of truth for which (logical engine → transport →
- * model) routes are available (decision B-3): ChatGPT is OpenRouter-only at
- * MVP, and a disabled "Direct OpenAI — coming soon" option is surfaced from a
- * static reserved-route table (never from the catalog, which omits it).
+ * model) routes are available. After the direct-provider retirement each
+ * logical engine has exactly ONE direct transport — ChatGPT/OpenAI,
+ * Gemini/Google, Claude/Anthropic — so each card renders a single fixed direct
+ * route with no toggle and no reserved "coming soon" option.
  */
 import type {
+  HistoricalTransportProvider,
   LogicalEngine,
   ProviderCatalog,
   ProviderConnection,
   TransportProvider,
-  UiTransportProvider,
 } from '@/lib/api/types';
-
-/** MVP transports accepted by the API DTOs (excludes the reserved `openai`). */
-const MVP_TRANSPORTS: readonly TransportProvider[] = ['anthropic', 'google', 'openrouter'];
-
-/** Narrow a UI transport to an MVP transport the API accepts (else null). */
-export function isMvpTransport(transport: string): transport is TransportProvider {
-  return (MVP_TRANSPORTS as readonly string[]).includes(transport);
-}
 
 /** Logical engines rendered as cards, in display order. */
 export const ENGINE_ORDER: readonly LogicalEngine[] = ['chatgpt', 'gemini', 'claude'] as const;
@@ -35,15 +28,15 @@ export const ENGINE_LABELS: Record<LogicalEngine, string> = {
 };
 
 /**
- * Human display names for each transport provider. Keyed by the wider UI
- * transport space so the reserved/disabled `openai` route still has a label,
- * even though the API DTOs never accept it.
+ * Human display names for each transport provider. Keyed by the historical
+ * transport space so read-only provenance (e.g. a legacy `openrouter` audit
+ * row) still labels, even though only the three direct transports are writable.
  */
-export const TRANSPORT_LABELS: Record<UiTransportProvider, string> = {
+export const TRANSPORT_LABELS: Record<HistoricalTransportProvider, string> = {
+  openai: 'OpenAI',
   anthropic: 'Anthropic',
   google: 'Google',
   openrouter: 'OpenRouter',
-  openai: 'OpenAI',
 };
 
 /** Human label for an engine key (falls back to the raw key). */
@@ -53,84 +46,58 @@ export function engineLabel(key: string): string {
 
 /** Human label for a transport key (falls back to the raw key). */
 export function transportLabel(key: string): string {
-  return TRANSPORT_LABELS[key as UiTransportProvider] ?? key;
+  return TRANSPORT_LABELS[key as HistoricalTransportProvider] ?? key;
 }
 
-/** A selectable route option on an engine card. */
+/** The single fixed direct route on an engine card. */
 export type EngineRouteOption = {
-  transport_provider: UiTransportProvider;
+  transport_provider: TransportProvider;
   /** The catalog default model for this (engine, transport). */
   default_model: string;
-  /** Short toggle label, e.g. "Direct (Google)" or "OpenRouter". */
+  /** Toggle-free label, e.g. "Direct (OpenAI)". */
   label: string;
-  /** Disabled reserved fast-follow (e.g. direct OpenAI at MVP, B-3). */
-  disabled: boolean;
-  /** Reason shown when disabled, e.g. "coming soon". */
-  disabledReason?: string;
 };
 
 /** The full view-model for one engine card. */
 export type EngineCardModel = {
   logical_engine: LogicalEngine;
   label: string;
-  /** Approved (enabled) + reserved (disabled) route options for this engine. */
-  options: EngineRouteOption[];
-  /** True when only one enabled route exists (no toggle needed, e.g. ChatGPT). */
-  singleRoute: boolean;
+  /** The single direct route for this engine (null if the catalog omits it). */
+  route: EngineRouteOption | null;
 };
 
-/**
- * Reserved, DISABLED route options per engine (decision B-3). Kept static — the
- * live catalog never lists them — so the UI can render a "coming soon" affordance
- * without inventing state. Currently only ChatGPT's direct-OpenAI fast-follow.
- */
-const RESERVED_OPTIONS: Partial<Record<LogicalEngine, EngineRouteOption[]>> = {
-  chatgpt: [
-    {
-      transport_provider: 'openai',
-      default_model: '',
-      label: 'Direct OpenAI',
-      disabled: true,
-      disabledReason: 'coming soon',
-    },
-  ],
-};
-
-/** Toggle label for an approved (enabled) transport on a given engine. */
-function approvedLabel(transport: TransportProvider): string {
-  return transport === 'openrouter' ? 'OpenRouter' : `Direct (${TRANSPORT_LABELS[transport]})`;
+/** Display label for a direct transport route. */
+function directLabel(transport: TransportProvider): string {
+  return `Direct (${TRANSPORT_LABELS[transport]})`;
 }
 
 /**
- * Build the ordered engine card models from the catalog. Enabled options come
- * from the catalog's approved routes; disabled reserved options are appended so
- * ChatGPT shows its greyed-out "Direct OpenAI — coming soon" entry.
+ * Build the ordered engine card models from the catalog. Each engine exposes a
+ * single direct route (the first approved route the catalog lists for it).
  */
 export function buildEngineCards(catalog: ProviderCatalog | undefined): EngineCardModel[] {
   const byEngine = new Map(catalog?.engines.map((e) => [e.logical_engine, e]) ?? []);
   return ENGINE_ORDER.map((engine) => {
     const approved = byEngine.get(engine)?.routes ?? [];
-    const enabled: EngineRouteOption[] = approved.map((route) => ({
-      transport_provider: route.transport_provider,
-      default_model: route.default_model,
-      label: approvedLabel(route.transport_provider),
-      disabled: false,
-    }));
-    const reserved = RESERVED_OPTIONS[engine] ?? [];
-    const options = [...enabled, ...reserved];
+    const first = approved[0];
+    const route: EngineRouteOption | null = first
+      ? {
+          transport_provider: first.transport_provider,
+          default_model: first.default_model,
+          label: directLabel(first.transport_provider),
+        }
+      : null;
     return {
       logical_engine: engine,
       label: ENGINE_LABELS[engine],
-      options,
-      singleRoute: enabled.length <= 1,
+      route,
     };
   });
 }
 
 /**
  * Find the connection that serves a given transport in this workspace. BYOK
- * connections are keyed by `transport_provider`, so one OpenRouter connection
- * can back several engines via its routes.
+ * connections are keyed by `transport_provider`.
  */
 export function connectionForTransport(
   connections: ProviderConnection[],
@@ -146,8 +113,8 @@ export function isConfigured(connection: ProviderConnection | undefined): boolea
 
 /**
  * Merge a logical-engine route into a connection's existing routes for a
- * create/update payload. Preserves other engines' routes (a shared OpenRouter
- * connection) and stamps the catalog default model for the added engine.
+ * create/update payload. Preserves other engines' routes on the same direct
+ * connection and stamps the catalog default model for the added engine.
  */
 export function mergeRoutePayload(
   existing: ProviderConnection | undefined,

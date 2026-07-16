@@ -30,9 +30,12 @@ from app.core.config.audits import (
     audit_settings,
 )
 from app.core.config.provider_catalog import (
+    ENGINE_CHATGPT,
     ENGINE_GEMINI,
+    ERROR_INVALID_SURFACE,
     ERROR_RATE_LIMIT,
     TRANSPORT_GOOGLE,
+    TRANSPORT_OPENAI,
 )
 from app.domain.audits.planner import cancel_audit, create_audit, list_tasks
 from app.models.analysis import MetricSnapshot, ResponseAnalysis
@@ -173,6 +176,120 @@ async def test_worker_runs_all_tasks_and_finalizes(
             .where(ResponseAnalysis.audit_id == audit.id)
         )
         assert analyses == 6
+
+
+class _OpenAIStubAdapter(_StubAdapter):
+    """OpenAI direct stub: records the chatgpt/openai provenance triple."""
+
+    logical_engine = ENGINE_CHATGPT
+    transport_provider = TRANSPORT_OPENAI
+
+
+@pytest.mark.asyncio
+async def test_worker_persists_openai_provenance(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A ChatGPT audit executes over the direct ``openai`` transport and freezes
+    # the chatgpt/openai/gpt-5.4 provenance triple on the task + attempt.
+    async with session_factory() as session:
+        seed = await seed_audit_fixtures(
+            session, prompt_count=1, engines=[ENGINE_CHATGPT]
+        )
+    async with session_factory() as session:
+        audit = await create_audit(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=seed.project_id,
+            engines=seed.engines,
+            prompt_set_id=seed.prompt_set_id,
+            repetitions=1,
+            random_seed="1",
+        )
+
+    monkeypatch.setattr(
+        audit_worker, "build_adapter", lambda **_: _OpenAIStubAdapter()
+    )
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+
+    worker = AuditWorker(session_factory=session_factory, owner="w-openai")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        task = await session.scalar(
+            select(AuditTask).where(AuditTask.audit_id == audit.id)
+        )
+        assert task.status == "succeeded"
+        assert task.logical_engine == ENGINE_CHATGPT
+        assert task.transport_provider == TRANSPORT_OPENAI
+        assert task.transport_model == "gpt-5.4"
+        assert task.result_artifact_id is not None
+
+
+@pytest.mark.asyncio
+async def test_worker_rejects_frozen_openrouter_task_without_network(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A task frozen before the v2 retirement still points at the ``openrouter``
+    # transport. The worker must fail it terminally with ``invalid_surface``
+    # BEFORE the connection-activity check, key decryption, or any network call
+    # (invariant 6/10) — build_adapter must never be reached.
+    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+
+    # Rewrite the frozen task + engine snapshot to the retired transport, as a
+    # persisted pre-v2 OpenRouter task would look.
+    async with session_factory() as session:
+        from app.models.audit import AuditEngineSnapshot
+
+        task = await session.scalar(
+            select(AuditTask).where(AuditTask.audit_id == audit.id)
+        )
+        task.transport_provider = "openrouter"
+        snapshot = await session.get(
+            AuditEngineSnapshot, task.engine_snapshot_id
+        )
+        if snapshot is not None:
+            snapshot.transport_provider = "openrouter"
+        await session.commit()
+
+    def _boom(**_: object):  # noqa: ANN202
+        raise AssertionError("build_adapter must not be called for a retired "
+                             "transport")
+
+    monkeypatch.setattr(audit_worker, "build_adapter", _boom)
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+
+    worker = AuditWorker(session_factory=session_factory, owner="w-frozen")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        tasks = await list_tasks(
+            session, workspace_id=seed.workspace_id, audit_id=audit.id
+        )
+        assert {t.status for t in tasks} == {"failed"}
+        assert {t.error_code for t in tasks} == {ERROR_INVALID_SURFACE}
+        # No external provider call was made (build_adapter would have raised)
+        # → no raw artifact is persisted (invariant 6/10). The single terminal
+        # bookkeeping attempt documents the rejection, not a network round-trip.
+        artifacts = await session.scalar(
+            select(func.count())
+            .select_from(RawResponseArtifact)
+            .where(RawResponseArtifact.audit_id == audit.id)
+        )
+        assert artifacts == 0
+        attempts = (
+            await session.scalars(
+                select(ProviderAttempt).where(
+                    ProviderAttempt.audit_id == audit.id
+                )
+            )
+        ).all()
+        assert all(a.status == "failed" for a in attempts)
+        assert all(a.error_code == ERROR_INVALID_SURFACE for a in attempts)
+        assert all(a.artifact_id is None for a in attempts)
 
 
 @pytest.mark.asyncio

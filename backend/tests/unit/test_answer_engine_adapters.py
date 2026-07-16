@@ -1,15 +1,18 @@
-"""Answer-engine adapter unit tests for ALL MVP engines.
+"""Answer-engine adapter unit tests for the active direct transports.
 
-Covers the B4 adapter acceptance: Gemini direct (``google`` transport, grounding
-+ citation parsing), Claude direct (``anthropic``), and OpenRouter (chatgpt +
-claude). Adapted from the reference
-``tests/unit/test_{anthropic,openrouter}_ai_visibility.py`` plus new
-Gemini-direct coverage. Each parser assertion checks the recorded provenance
-triple — ``logical_engine`` + ``transport_provider`` + ``transport_model``
-(invariant 10). HTTP transports are mocked; no real API spend.
+Covers the adapter acceptance for the v2 direct-provider matrix: OpenAI direct
+(``openai`` transport → ChatGPT, Responses API + web-search grounding), Gemini
+direct (``google``), and Claude direct (``anthropic``). Each parser assertion
+checks the recorded provenance triple — ``logical_engine`` +
+``transport_provider`` + ``transport_model`` (invariant 10). HTTP transports are
+mocked; no real API spend. OpenRouter has no adapter anymore (retired); its
+rejection is covered by the factory/worker/API tests.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -28,16 +31,15 @@ from app.connectors.answer_engines.contracts import AnswerEngineRequest
 from app.connectors.answer_engines.errors import ProviderError
 from app.connectors.answer_engines.gemini import GeminiAnswerEngineAdapter
 from app.connectors.answer_engines.gemini_parser import parse_interaction
-from app.connectors.answer_engines.openrouter import (
-    OpenRouterAnswerEngineAdapter,
-    _model_matches_surface,
-)
-from app.connectors.answer_engines.openrouter import (
-    _payload as openrouter_payload,
-)
-from app.connectors.answer_engines.openrouter_parser import (
-    parse_openrouter_completion,
-)
+from app.connectors.answer_engines.openai import OpenAIAnswerEngineAdapter
+from app.connectors.answer_engines.openai import _payload as openai_payload
+from app.connectors.answer_engines.openai_parser import parse_openai_response
+
+_FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+
+
+def _load_fixture(name: str) -> dict:
+    return json.loads((_FIXTURE_DIR / name).read_text())
 
 
 def _mock_transport(payload: dict, status_code: int = 200) -> httpx.MockTransport:
@@ -130,6 +132,57 @@ def test_gemini_parser_no_search_is_valid_result() -> None:
     assert result.search_used is False
     assert result.citations == ()
     assert result.answer_text == "From memory: A, B."
+
+
+def test_gemini_parser_queries_as_bare_string_not_split_per_char() -> None:
+    payload = {
+        "model": "gemini-flash-latest",
+        "steps": [
+            {
+                "type": "google_search_call",
+                "id": "gs_1",
+                # A malformed payload: queries is a bare string, and args is
+                # exercised as a dict. Must not split per-character or crash.
+                "arguments": {"queries": "nike running shoes"},
+            },
+            {
+                "type": "model_output",
+                "content": [{"type": "text", "text": "Answer."}],
+            },
+        ],
+    }
+    result = parse_interaction(
+        payload,
+        logical_engine="gemini",
+        transport_provider="google",
+        model="gemini-flash-latest",
+        latency_ms=1,
+    )
+    # The bare string yields no per-character queries.
+    assert all(len(e.query) != 1 for e in result.search_events)
+    assert not any(e.query for e in result.search_events)
+
+
+def test_gemini_parser_tolerates_non_dict_arguments() -> None:
+    payload = {
+        "model": "gemini-flash-latest",
+        "steps": [
+            {"type": "google_search_call", "id": "gs_1", "arguments": "oops"},
+            {
+                "type": "model_output",
+                "content": [{"type": "text", "text": "Answer."}],
+            },
+        ],
+    }
+    # Must not raise on a non-dict arguments field.
+    result = parse_interaction(
+        payload,
+        logical_engine="gemini",
+        transport_provider="google",
+        model="gemini-flash-latest",
+        latency_ms=1,
+    )
+    assert result.answer_text == "Answer."
 
 
 async def test_gemini_adapter_executes_and_records_provenance() -> None:
@@ -346,153 +399,186 @@ async def test_anthropic_adapter_executes_and_records_provenance() -> None:
 
 
 # ---------------------------------------------------------------------------
-# OpenRouter (chatgpt + claude transports)
+# OpenAI direct (openai transport → chatgpt) — v2 direct-provider matrix
 # ---------------------------------------------------------------------------
-def test_openrouter_payload_requests_native_search_and_country() -> None:
+def test_openai_payload_is_stateless_brand_free_with_country() -> None:
     request = AnswerEngineRequest(
         prompt="cheap baby clothes",
         system_instruction="Answer for Australia.",
-        model="openai/gpt-5.4",
+        model="gpt-5.4",
         timeout_seconds=30,
     )
-    payload = openrouter_payload(request, country_code="AU")
-    assert payload["messages"] == [
-        {"role": "system", "content": "Answer for Australia."},
-        {"role": "user", "content": "cheap baby clothes"},
-    ]
+    payload = openai_payload(request, country_code="AU")
+    # Only the user prompt goes in ``input``; no brand/competitor/domain list.
+    assert payload["input"] == "cheap baby clothes"
+    assert payload["instructions"] == "Answer for Australia."
+    assert payload["model"] == "gpt-5.4"
+    assert payload["store"] is False
+    assert "max_output_tokens" in payload
     tool = payload["tools"][0]
-    assert tool["type"] == "openrouter:web_search"
-    assert tool["parameters"]["engine"] == "native"
-    assert tool["parameters"]["user_location"]["country"] == "AU"
+    assert tool["type"] == "web_search"
+    assert tool["user_location"] == {"type": "approximate", "country": "AU"}
+    # The request body must never carry a credential.
+    assert "api_key" not in payload
+    assert "Authorization" not in payload
 
 
-@pytest.mark.parametrize(
-    ("logical_engine", "model", "expected"),
-    [
-        ("chatgpt", "openai/gpt-5.4", True),
-        ("chatgpt", "openai/gpt-4o", False),
-        ("claude", "anthropic/claude-sonnet-4.6", True),
-        ("claude", "openai/gpt-5.4", False),
-        ("gemini", "google/gemini-2.5-flash", True),
-    ],
-)
-def test_openrouter_surface_model_allowlist(
-    logical_engine: str, model: str, expected: bool
-) -> None:
-    assert _model_matches_surface(logical_engine, model) is expected
-
-
-def test_openrouter_parser_chatgpt_provenance_and_citations() -> None:
-    payload = {
-        "id": "gen-1",
-        "model": "openai/gpt-5.4",
-        "provider": "OpenAI",
-        "choices": [
-            {
-                "finish_reason": "stop",
-                "message": {
-                    "role": "assistant",
-                    "content": "Best&Less is one option.",
-                    "annotations": [
-                        {
-                            "type": "url_citation",
-                            "url_citation": {
-                                "url": "https://www.bestandless.com.au/baby",
-                                "title": "Best&Less baby clothing",
-                                "start_index": 0,
-                                "end_index": 9,
-                            },
-                        }
-                    ],
-                },
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 20,
-            "completion_tokens": 30,
-            "total_tokens": 50,
-            "server_tool_use": {"web_search_requests": 2},
-        },
-    }
-    result = parse_openrouter_completion(
-        payload,
-        logical_engine="chatgpt",
-        transport_provider="openrouter",
-        requested_model="openai/gpt-5.4",
-        latency_ms=10,
+def test_openai_payload_omits_instructions_and_location_when_absent() -> None:
+    request = AnswerEngineRequest(
+        prompt="school uniforms",
+        system_instruction="",
+        model="gpt-5.4",
+        timeout_seconds=30,
     )
-    # chatgpt reaches MVP via OpenRouter only (decision B-3).
+    payload = openai_payload(request, country_code="")
+    assert "instructions" not in payload
+    assert "user_location" not in payload["tools"][0]
+
+
+def test_openai_parser_grounded_fixture_provenance_and_citations() -> None:
+    result = parse_openai_response(
+        _load_fixture("openai_responses_grounded.json"),
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=15,
+    )
+    # Provenance triple (invariant 10): chatgpt via openai.
     assert result.logical_engine == "chatgpt"
-    assert result.transport_provider == "openrouter"
-    assert result.transport_model == "openai/gpt-5.4"
+    assert result.transport_provider == "openai"
+    assert result.transport_model == "gpt-5.4"
     assert result.search_used is True
-    assert len(result.search_events) == 2
-    assert result.citations[0].domain == "bestandless.com.au"
-    assert result.provider_metadata["routed_provider"] == "OpenAI"
+    # Two search calls: one single query + one call with two queries → 3 events.
+    assert len(result.search_events) == 3
+    assert result.search_events[0].query == "affordable baby clothes australia"
+    assert result.search_events[1].query == "cheap kids clothing sale"
+    assert result.search_events[2].query == "best value baby onesies au"
+    # The two-query call shares one call id / call_sequence.
+    assert result.search_events[1].call_sequence == 1
+    assert result.search_events[2].call_sequence == 1
+    assert result.search_events[1].query_sequence == 0
+    assert result.search_events[2].query_sequence == 1
+    # Citation offsets → cited_text; domain normalized from the url host.
+    citation = result.citations[0]
+    assert citation.domain == "bestandless.com.au"
+    assert citation.cited_text == "Best&Less"
+    assert citation.start_index == 0
+    assert citation.end_index == 9
+    assert result.usage["web_search_requests"] == 2
+    assert result.usage["total_tokens"] == 100
 
 
-def test_openrouter_parser_claude_provenance() -> None:
-    payload = {
-        "id": "gen-2",
-        "model": "anthropic/claude-sonnet-4.6",
-        "choices": [
-            {
-                "finish_reason": "stop",
-                "message": {"role": "assistant", "content": "Answer."},
-            }
-        ],
-        "usage": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10},
-    }
-    result = parse_openrouter_completion(
-        payload,
-        logical_engine="claude",
-        transport_provider="openrouter",
-        requested_model="anthropic/claude-sonnet-4.6",
+def test_openai_parser_no_search_fixture_is_valid_result() -> None:
+    result = parse_openai_response(
+        _load_fixture("openai_responses_no_search.json"),
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
         latency_ms=3,
     )
-    assert result.logical_engine == "claude"
-    assert result.transport_provider == "openrouter"
-    assert result.transport_model == "anthropic/claude-sonnet-4.6"
+    assert result.search_used is False
+    assert result.search_events == ()
+    assert result.citations == ()
+    assert result.answer_text == "From memory: options include A and B."
 
 
-async def test_openrouter_adapter_rejects_off_surface_model() -> None:
-    adapter = OpenRouterAnswerEngineAdapter(
-        api_key="k", logical_engine="chatgpt"
-    )
-    with pytest.raises(ProviderError) as excinfo:
-        await adapter.execute(
-            AnswerEngineRequest(
-                prompt="x",
-                system_instruction="",
-                model="openai/gpt-4o",  # off the approved surface
-                timeout_seconds=5,
-            )
-        )
-    assert excinfo.value.error_code == "invalid_surface"
-
-
-def test_openrouter_adapter_rejects_unknown_engine() -> None:
-    with pytest.raises(ValueError):
-        OpenRouterAnswerEngineAdapter(api_key="k", logical_engine="bogus")
-
-
-async def test_openrouter_adapter_executes_and_records_provenance() -> None:
+def test_openai_parser_count_only_call_preserves_empty_query() -> None:
     payload = {
-        "id": "gen-3",
-        "model": "openai/gpt-5.4",
-        "choices": [
+        "model": "gpt-5.4",
+        "output": [
             {
-                "finish_reason": "stop",
-                "message": {"role": "assistant", "content": "ok"},
+                "type": "web_search_call",
+                "id": "ws_1",
+                "status": "completed",
+                "action": {"type": "search"},
+            },
+            {
+                "type": "message",
+                "id": "msg_1",
+                "content": [{"type": "output_text", "text": "Answer."}],
+            },
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+    }
+    result = parse_openai_response(
+        payload,
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=1,
+    )
+    # A search happened but no query text — count-only, never invented.
+    assert result.search_used is True
+    assert len(result.search_events) == 1
+    assert result.search_events[0].query == ""
+    assert result.usage["web_search_requests"] == 1
+    assert result.provider_metadata["query_text_available"] is False
+
+
+def test_openai_parser_drops_reasoning_and_redacts_metadata() -> None:
+    result = parse_openai_response(
+        _load_fixture("openai_responses_grounded.json"),
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=1,
+    )
+    meta = result.provider_metadata
+    # Reasoning content is never retained in the evidence envelope.
+    for item in meta["evidence_items"]:
+        assert item["type"] != "reasoning"
+    # No credentials / raw headers / request echo in metadata.
+    serialized = json.dumps(meta)
+    assert "Authorization" not in serialized
+    assert "Bearer" not in serialized
+    assert "api_key" not in serialized
+
+
+def test_openai_parser_prefers_provider_returned_model() -> None:
+    payload = {
+        "model": "gpt-5.4-2026",
+        "output": [
+            {
+                "type": "message",
+                "id": "m",
+                "content": [{"type": "output_text", "text": "ok"}],
             }
         ],
-        "usage": {"total_tokens": 2},
     }
-    transport = _mock_transport(payload)
-    adapter = OpenRouterAnswerEngineAdapter(
-        api_key="secret-openrouter-key", logical_engine="chatgpt"
+    result = parse_openai_response(
+        payload,
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=1,
     )
-    import app.connectors.answer_engines.openrouter as openrouter_mod
+    assert result.transport_model == "gpt-5.4-2026"
+
+
+def test_openai_adapter_requires_key() -> None:
+    with pytest.raises(ProviderError) as excinfo:
+        OpenAIAnswerEngineAdapter(api_key="")
+    assert excinfo.value.error_code == "auth_failure"
+    assert excinfo.value.retryable is False
+
+
+async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() -> (
+    None
+):
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["auth"] = request.headers.get("Authorization")
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(
+            200, json=_load_fixture("openai_responses_grounded.json")
+        )
+
+    transport = httpx.MockTransport(handler)
+    adapter = OpenAIAnswerEngineAdapter(
+        api_key="secret-openai-key", country_code="AU"
+    )
+    import app.connectors.answer_engines.openai as openai_mod
 
     orig = httpx.AsyncClient
 
@@ -500,17 +586,170 @@ async def test_openrouter_adapter_executes_and_records_provenance() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    openrouter_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
     try:
         result = await adapter.execute(
             AnswerEngineRequest(
-                prompt="x",
+                prompt="running shoes",
                 system_instruction="",
-                model="openai/gpt-5.4",
+                model="gpt-5.4",
                 timeout_seconds=5,
             )
         )
     finally:
-        openrouter_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+    # BYOK key travels only in the Authorization header, never the body.
+    assert captured["auth"] == "Bearer secret-openai-key"
+    body = captured["body"]
+    assert isinstance(body, dict)
+    assert "secret-openai-key" not in json.dumps(body)
+    assert body["tools"][0]["user_location"]["country"] == "AU"
     assert result.logical_engine == "chatgpt"
-    assert result.transport_provider == "openrouter"
+    assert result.transport_provider == "openai"
+    assert result.search_used is True
+
+
+async def test_openai_adapter_maps_http_status_to_error_code() -> None:
+    adapter = OpenAIAnswerEngineAdapter(api_key="k")
+    transport = _mock_transport({"error": {"message": "rate limited"}}, 429)
+    import app.connectors.answer_engines.openai as openai_mod
+
+    orig = httpx.AsyncClient
+
+    def _client(*args, **kwargs):  # noqa: ANN002, ANN003
+        kwargs["transport"] = transport
+        return orig(*args, **kwargs)
+
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    try:
+        with pytest.raises(ProviderError) as excinfo:
+            await adapter.execute(
+                AnswerEngineRequest(
+                    prompt="x",
+                    system_instruction="",
+                    model="gpt-5.4",
+                    timeout_seconds=5,
+                )
+            )
+    finally:
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+    assert excinfo.value.error_code == "rate_limit"
+    assert excinfo.value.retryable is True
+
+
+async def test_openai_adapter_maps_timeout() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    transport = httpx.MockTransport(handler)
+    adapter = OpenAIAnswerEngineAdapter(api_key="k")
+    import app.connectors.answer_engines.openai as openai_mod
+
+    orig = httpx.AsyncClient
+
+    def _client(*args, **kwargs):  # noqa: ANN002, ANN003
+        kwargs["transport"] = transport
+        return orig(*args, **kwargs)
+
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    try:
+        with pytest.raises(ProviderError) as excinfo:
+            await adapter.execute(
+                AnswerEngineRequest(
+                    prompt="x",
+                    system_instruction="",
+                    model="gpt-5.4",
+                    timeout_seconds=1,
+                )
+            )
+    finally:
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+    assert excinfo.value.error_code == "timeout"
+    assert excinfo.value.retryable is True
+
+
+def test_annotation_offset_falls_through_to_alternate_casing() -> None:
+    from app.connectors.answer_engines.normalization import annotation_offset
+
+    # Primary snake_case key is present but non-integer; must fall through to
+    # the valid camelCase key rather than returning None immediately.
+    annotation = {"start_index": "not-a-number", "startIndex": 7}
+    assert annotation_offset(annotation, "start_index", "startIndex") == 7
+    # All candidates invalid -> None.
+    assert annotation_offset({"start_index": "x"}, "start_index") is None
+
+
+def test_coerce_int_is_tolerant() -> None:
+    from app.connectors.answer_engines.normalization import coerce_int
+
+    assert coerce_int("unknown") == 0
+    assert coerce_int({"raw": 10}) == 0
+    assert coerce_int(None, 5) == 5
+    assert coerce_int("42") == 42
+    assert coerce_int(3.9) == 3
+    # Non-finite floats (e.g. from ``Infinity`` in a lenient JSON payload) raise
+    # OverflowError inside int(); must degrade to the default rather than crash.
+    assert coerce_int(float("inf")) == 0
+    assert coerce_int(float("nan"), 7) == 7
+
+
+def test_openai_parser_queries_as_bare_string_not_split_per_char() -> None:
+    payload = {
+        "model": "gpt-5.4",
+        "output": [
+            {
+                "type": "web_search_call",
+                "id": "ws_1",
+                "status": "completed",
+                # A provider/proxy returns a bare string instead of a list.
+                "action": {"type": "search", "queries": "nike running shoes"},
+            },
+            {
+                "type": "message",
+                "id": "msg_1",
+                "content": [{"type": "output_text", "text": "Answer."}],
+            },
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+    }
+    result = parse_openai_response(
+        payload,
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=1,
+    )
+    # The string must NOT be split into per-character queries.
+    assert result.search_used is True
+    assert len(result.search_events) == 1
+    assert result.search_events[0].query == ""
+    assert all(len(e.query) != 1 for e in result.search_events)
+
+
+def test_openai_parser_tolerates_non_numeric_usage_tokens() -> None:
+    payload = {
+        "model": "gpt-5.4",
+        "output": [
+            {
+                "type": "message",
+                "id": "msg_1",
+                "content": [{"type": "output_text", "text": "Answer."}],
+            }
+        ],
+        "usage": {
+            "input_tokens": "unknown",
+            "output_tokens": {"raw": 10},
+            "total_tokens": None,
+        },
+    }
+    # Must not raise; malformed usage degrades to zeros.
+    result = parse_openai_response(
+        payload,
+        logical_engine="chatgpt",
+        transport_provider="openai",
+        requested_model="gpt-5.4",
+        latency_ms=1,
+    )
+    assert result.usage["total_input_tokens"] == 0
+    assert result.usage["total_output_tokens"] == 0
+    assert result.usage["total_tokens"] == 0

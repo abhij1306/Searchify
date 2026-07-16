@@ -41,13 +41,19 @@ class ProviderConnection(Base):
     )
     # Human label for the connection (e.g. "Prod OpenRouter key").
     label: Mapped[str] = mapped_column(String(255), default="")
-    # One of provider_catalog.MVP_TRANSPORTS: anthropic | google | openrouter.
+    # An active transport (openai|anthropic|google) on new rows; may hold the
+    # historical ``openrouter`` token on legacy rows (read-only, v2).
     transport_provider: Mapped[str] = mapped_column(String(32))
     # Optional endpoint override (self-hosted gateway / proxy); "" = catalog URL.
     base_url: Mapped[str] = mapped_column(String(1024), default="")
     # Fernet ciphertext of the BYOK secret. NEVER returned in a DTO.
     api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Non-empty marker naming why an active row was retired (e.g. the v2
+    # ``openrouter_retired_v2`` migration). "" for rows never auto-deactivated.
+    deactivation_reason: Mapped[str] = mapped_column(
+        String(64), default="", server_default=""
+    )
     # Result of the most recent connectivity test (denormalized for listing).
     last_tested_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -83,7 +89,8 @@ class ProviderRoute(Base):
 
     Records the logical vs transport identity (invariant 10): ``logical_engine``
     is what the user asked for (chatgpt|gemini|claude), ``transport_provider``
-    is how it is reached (anthropic|google|openrouter), and ``transport_model``
+    is how it is reached (openai|anthropic|google, or the historical
+    openrouter token on legacy rows), and ``transport_model``
     is the concrete model. ``is_default`` marks the preferred route for an
     engine within the workspace.
     """
@@ -107,6 +114,15 @@ class ProviderRoute(Base):
     transport_provider: Mapped[str] = mapped_column(String(32))
     transport_model: Mapped[str] = mapped_column(String(255))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # False marks a retired route (e.g. a legacy openrouter route the v2
+    # migration deactivated) so read clients skip it without deleting history.
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
+    # Non-empty marker naming why an active route was retired. "" otherwise.
+    deactivation_reason: Mapped[str] = mapped_column(
+        String(64), default="", server_default=""
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
