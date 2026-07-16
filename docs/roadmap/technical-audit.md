@@ -4,7 +4,7 @@
 > an engineer (or agent) can start building without re-deriving the architecture. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
-> [`../Agents.md`](../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule
+> [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule
 > there applies here too.
 
 ## 1. Goal & positioning
