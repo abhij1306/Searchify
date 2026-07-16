@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -65,7 +65,21 @@ class PostgresTaskQueue[T]:
     def _lease_expiry(self, now: datetime) -> datetime:
         return now + timedelta(seconds=self._spec.lease_ttl())
 
-    async def claim(self, *, owner: str, limit: int = 1) -> list[T]:
+    async def claim(
+        self,
+        *,
+        owner: str,
+        limit: int = 1,
+        kinds: Sequence[str] | None = None,
+    ) -> list[T]:
+        """Claim up to ``limit`` eligible rows for ``owner``.
+
+        ``kinds`` optionally restricts the claim to specific ``task_kind``
+        values (e.g. a discover-only worker leaves reserved ``analyze`` rows
+        untouched in the queue rather than force-failing them). ``None`` (the
+        default) claims every kind, so callers without a ``task_kind`` column
+        (e.g. the audit queue) are unaffected.
+        """
         model = self._model
         now = _utcnow()
         lease_expires = self._lease_expiry(now)
@@ -80,7 +94,11 @@ class PostgresTaskQueue[T]:
                     )
                 )
                 .where(model.available_at <= now)
-                .order_by(*self._spec.claim_order(model))
+            )
+            if kinds is not None:
+                stmt = stmt.where(model.task_kind.in_(list(kinds)))
+            stmt = (
+                stmt.order_by(*self._spec.claim_order(model))
                 .limit(limit)
                 .with_for_update(skip_locked=True)
             )
