@@ -7,7 +7,29 @@
 from __future__ import annotations
 
 from app.core.database import Base
+from app.models.brand import (
+    Brand,
+    BrandAlias,
+    Competitor,
+    OwnedDomain,
+    UnintendedDomain,
+)
+from app.models.project import Project
+from app.models.prompt import Prompt, PromptSet
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
-__all__ = ["Base", "User", "Workspace", "WorkspaceMember"]
+__all__ = [
+    "Base",
+    "Brand",
+    "BrandAlias",
+    "Competitor",
+    "OwnedDomain",
+    "Project",
+    "Prompt",
+    "PromptSet",
+    "UnintendedDomain",
+    "User",
+    "Workspace",
+    "WorkspaceMember",
+]

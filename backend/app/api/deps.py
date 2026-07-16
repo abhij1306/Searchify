@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Cookie, Depends, HTTPException, Path, status
+from fastapi import Cookie, Depends, Header, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -89,6 +89,52 @@ async def require_workspace_member(
     one (invariant 5 — cross-workspace access returns 403/404, not data).
     """
     member = await get_membership(session, workspace_id, user.id)
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
+        )
+    return WorkspaceContext(user=user, member=member)
+
+
+async def require_active_workspace(
+    user: User = Depends(get_current_user),  # noqa: B008 - FastAPI injects.
+    session: AsyncSession = Depends(get_db),  # noqa: B008 - FastAPI injects.
+    x_workspace_id: str | None = Header(default=None),  # noqa: B008
+) -> WorkspaceContext:
+    """Resolve the caller's *active* workspace for flat (non-path) routes.
+
+    The MVP API surface for projects/prompts/providers is flat — the workspace
+    is not in the URL (docs/backend-architecture.md §3). The active workspace is
+    carried in the ``X-Workspace-Id`` header when the client selects one;
+    otherwise it defaults to the caller's earliest-joined workspace. Either way
+    membership is verified (invariant 5): a header naming a workspace the user
+    does not belong to returns 404, never data.
+    """
+    if x_workspace_id:
+        try:
+            workspace_id = uuid.UUID(x_workspace_id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid X-Workspace-Id",
+            ) from exc
+        member = await get_membership(session, workspace_id, user.id)
+        if member is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workspace not found",
+            )
+        return WorkspaceContext(user=user, member=member)
+
+    # No explicit selection: fall back to the earliest membership so a
+    # freshly-registered user (single auto-created workspace) just works.
+    result = await session.execute(
+        select(WorkspaceMember)
+        .where(WorkspaceMember.user_id == user.id)
+        .order_by(WorkspaceMember.created_at.asc())
+        .limit(1)
+    )
+    member = result.scalar_one_or_none()
     if member is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
