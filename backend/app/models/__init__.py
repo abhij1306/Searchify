@@ -1,0 +1,73 @@
+# ORM model registry.
+#
+# Import the shared declarative ``Base`` and re-export it so Alembic's
+# ``migrations/env.py`` binds autogeneration to a single metadata object.
+# Model modules are imported here so their tables register on
+# ``Base.metadata`` before autogenerate / create_all runs.
+from __future__ import annotations
+
+from app.core.database import Base
+from app.models.analysis import (
+    BrandMention,
+    Citation,
+    CompetitorMention,
+    MetricSnapshot,
+    ResponseAnalysis,
+)
+from app.models.audit import (
+    Audit,
+    AuditEngineSnapshot,
+    AuditEvent,
+    AuditPromptSnapshot,
+    AuditTask,
+    ProviderAttempt,
+    RawResponseArtifact,
+)
+from app.models.brand import (
+    Brand,
+    BrandAlias,
+    Competitor,
+    OwnedDomain,
+    UnintendedDomain,
+)
+from app.models.project import Project
+from app.models.prompt import Prompt, PromptSet
+from app.models.provider import (
+    DiscoveryModelConfig,
+    ProviderConnection,
+    ProviderConnectionTest,
+    ProviderRoute,
+)
+from app.models.user import User
+from app.models.workspace import Workspace, WorkspaceMember
+
+__all__ = [
+    "Audit",
+    "AuditEngineSnapshot",
+    "AuditEvent",
+    "AuditPromptSnapshot",
+    "AuditTask",
+    "Base",
+    "Brand",
+    "BrandAlias",
+    "BrandMention",
+    "Citation",
+    "Competitor",
+    "CompetitorMention",
+    "DiscoveryModelConfig",
+    "MetricSnapshot",
+    "OwnedDomain",
+    "Project",
+    "Prompt",
+    "PromptSet",
+    "ProviderAttempt",
+    "ProviderConnection",
+    "ProviderConnectionTest",
+    "ProviderRoute",
+    "RawResponseArtifact",
+    "ResponseAnalysis",
+    "UnintendedDomain",
+    "User",
+    "Workspace",
+    "WorkspaceMember",
+]

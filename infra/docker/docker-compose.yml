@@ -1,0 +1,97 @@
+# Searchify local stack: postgres + backend web + worker.
+#
+# =============================================================================
+# GOTCHA 1 (docs/invariants.md invariant 11) — READ BEFORE `docker compose up`
+# =============================================================================
+# This machine exports POSTGRES_PASSWORD / POSTGRES_USER / POSTGRES_DB /
+# DATABASE_URL into EVERY shell. Compose resolves ${VAR} from the shell
+# environment BEFORE .env, so those inherited shell values silently override
+# the repo .env values (env_file: only injects vars INSIDE the container, not
+# into ${VAR} interpolation). Bring the stack up with the shell vars unset and
+# the repo password re-supplied explicitly:
+#
+#   env -u POSTGRES_PASSWORD -u POSTGRES_USER -u POSTGRES_DB -u DATABASE_URL \
+#     POSTGRES_PASSWORD=<repo-.env-value> \
+#     docker compose -f infra/docker/docker-compose.yml up -d --force-recreate
+#
+# Compose reads infra/docker/.env by default; copy .env.example -> .env there.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-searchify}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-searchify}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Applies migrations once, then exits; web + worker wait on its success.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: "no"
+    env_file:
+      - .env
+    environment: &backend_env
+      APP_ENV: ${APP_ENV:-development}
+      # skipcq: SCT-A000 - password comes from environment, not hardcoded.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-searchify}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Audit worker is a SEPARATE process (Postgres task queue, B5). Placeholder
+    # until B5 lands app/workers/audit_worker.py; keeps the service wired now.
+    command: ["python", "-m", "app.workers.audit_worker"]
+
+volumes:
+  pg_data:

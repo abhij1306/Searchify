@@ -1,0 +1,599 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Searchify — Design System (single token source of truth)
+   Values lifted VERBATIM from docs/design.md. Components consume ONLY the
+   bridged Tailwind semantic tokens below — never raw hex (no-raw-hex guard).
+   Dense clean B2B analytics · teal-green accent · 4px grid · WCAG 2.1 AA.
+═══════════════════════════════════════════════════════════════════════ */
+
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(html[data-theme='dark'] *));
+
+/* ─── TAILWIND v4 TOKEN BRIDGE (§7) ────────────────────────────────────
+   Bridge raw CSS variables to semantic Tailwind utilities. Components use
+   only these bridged names (bg-background, text-foreground, bg-accent,
+   text-success, bg-citation-owned, text-run-completed, bg-score-high, …).
+──────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-primary-family);
+  --font-mono: var(--font-mono-family);
+
+  /* Surfaces */
+  --color-background: var(--bg-base);
+  --color-background-alt: var(--bg-alt);
+  --color-panel: var(--bg-panel);
+  --color-elevated: var(--bg-elevated);
+  --color-well: var(--bg-well);
+  --color-sidebar: var(--bg-sidebar);
+
+  /* Borders */
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  /* Text */
+  --color-foreground: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+
+  /* Accent — teal-green */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-border: var(--accent-border);
+  --color-accent-text: var(--accent-text);
+
+  /* Semantic status */
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+  --color-danger-text: var(--danger-text);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-info-text: var(--info-text);
+  --color-neutral-bg: var(--neutral-bg);
+
+  /* Sentiment */
+  --color-sentiment-positive: var(--sentiment-positive);
+  --color-sentiment-positive-bg: var(--sentiment-positive-bg);
+  --color-sentiment-positive-text: var(--sentiment-positive-text);
+  --color-sentiment-neutral: var(--sentiment-neutral);
+  --color-sentiment-neutral-bg: var(--sentiment-neutral-bg);
+  --color-sentiment-neutral-text: var(--sentiment-neutral-text);
+  --color-sentiment-negative: var(--sentiment-negative);
+  --color-sentiment-negative-bg: var(--sentiment-negative-bg);
+  --color-sentiment-negative-text: var(--sentiment-negative-text);
+
+  /* Citation classification */
+  --color-citation-owned: var(--citation-owned);
+  --color-citation-owned-bg: var(--citation-owned-bg);
+  --color-citation-owned-text: var(--citation-owned-text);
+  --color-citation-competitor: var(--citation-competitor);
+  --color-citation-competitor-bg: var(--citation-competitor-bg);
+  --color-citation-competitor-text: var(--citation-competitor-text);
+  --color-citation-third-party: var(--citation-third-party);
+  --color-citation-third-party-bg: var(--citation-third-party-bg);
+  --color-citation-third-party-text: var(--citation-third-party-text);
+
+  /* Run status */
+  --color-run-draft: var(--run-draft);
+  --color-run-draft-bg: var(--run-draft-bg);
+  --color-run-queued: var(--run-queued);
+  --color-run-queued-bg: var(--run-queued-bg);
+  --color-run-running: var(--run-running);
+  --color-run-running-bg: var(--run-running-bg);
+  --color-run-analyzing: var(--run-analyzing);
+  --color-run-analyzing-bg: var(--run-analyzing-bg);
+  --color-run-completed: var(--run-completed);
+  --color-run-completed-bg: var(--run-completed-bg);
+  --color-run-partial: var(--run-partial);
+  --color-run-partial-bg: var(--run-partial-bg);
+  --color-run-failed: var(--run-failed);
+  --color-run-failed-bg: var(--run-failed-bg);
+  --color-run-cancelled: var(--run-cancelled);
+  --color-run-cancelled-bg: var(--run-cancelled-bg);
+
+  /* Score bands */
+  --color-score-low: var(--score-low);
+  --color-score-low-bg: var(--score-low-bg);
+  --color-score-mid: var(--score-mid);
+  --color-score-mid-bg: var(--score-mid-bg);
+  --color-score-good: var(--score-good);
+  --color-score-good-bg: var(--score-good-bg);
+  --color-score-high: var(--score-high);
+  --color-score-high-bg: var(--score-high-bg);
+
+  /* Shadows / elevation */
+  --shadow-xs: var(--shadow-xs-value);
+  --shadow-sm: var(--shadow-sm-value);
+  --shadow-card: var(--shadow-card-value);
+  --shadow-elevated: var(--shadow-elevated-value);
+  --shadow-lg: var(--shadow-lg-value);
+  --shadow-modal-value: var(--shadow-modal);
+
+  /* Overlay scrim (dialog/drawer backdrop) — bridged so components avoid raw
+     var() escapes (no-raw-hex + token-escape guard). */
+  --color-overlay-scrim: var(--overlay-scrim);
+
+  /* Type scale (§5) — size token = Tailwind font-size utility (text-sm, …) */
+  --text-2xs: 0.625rem; /* 10px — uppercase micro-labels */
+  --text-2xs--line-height: 1.2;
+  --text-xs: 0.6875rem; /* 11px — captions, timestamps, table headers */
+  --text-xs--line-height: 1.35;
+  --text-sm: 0.8125rem; /* 13px — secondary body, table cells */
+  --text-sm--line-height: 1.45;
+  --text-base: 0.875rem; /* 14px — primary body */
+  --text-base--line-height: 1.5;
+  --text-lg: 1.0625rem; /* 17px — section / card headings */
+  --text-lg--line-height: 1.35;
+  --text-xl: 1.3125rem; /* 21px — page headings */
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.8125rem; /* 29px — display (Visibility Score, hero) */
+  --text-2xl--line-height: 1.15;
+
+  /* Font weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Letter spacing */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.06em;
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+
+  /* Radii (§6) */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Motion (§10) */
+  --transition-fast: 100ms;
+  --transition-base: 180ms;
+  --transition-slow: 280ms;
+}
+
+/* ─── LIGHT THEME (§3) — default ───────────────────────────────────────
+   Surface hierarchy (lowest → highest): bg-base → bg-alt → bg-panel →
+   bg-elevated → bg-well. Accent teal-green #0f9d76. Text ≥ 4.5:1.
+──────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  /* Fonts */
+  --font-primary-family: var(--font-sans), system-ui, sans-serif;
+  --font-mono-family: var(--font-mono), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+
+  /* Surfaces */
+  --bg-base: #f7f8f7;
+  --bg-alt: #eef0ee;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-well: #e2e5e2;
+  --bg-sidebar: #f2f4f2;
+  --surface-overlay: rgba(255, 255, 255, 0.88);
+
+  /* Borders */
+  --border-subtle: #edefed;
+  --border: #e2e5e2;
+  --border-strong: #d0d4d0;
+  --border-focus: var(--accent);
+
+  /* Text — all verified ≥ 4.5:1 on bg-base/bg-panel */
+  --text-primary: #1d211f;   /* 14.8:1 on #ffffff */
+  --text-secondary: #4c524f; /* 8.0:1  */
+  --text-muted: #6f756f;     /* 4.9:1  */
+  --text-subtle: #9aa09a;    /* decorative only (icons/dividers), not body text */
+
+  /* Accent — teal-green */
+  --accent: #0f9d76;
+  --accent-hover: #0c8563;
+  --accent-fg: #ffffff;         /* on accent bg: 4.6:1 */
+  --accent-subtle: rgba(15, 157, 118, 0.10);
+  --accent-soft: rgba(15, 157, 118, 0.06);
+  --accent-border: rgba(15, 157, 118, 0.28);
+  --accent-text: #0b6f52;       /* accent as text on light: 5.2:1 */
+
+  /* Semantic status — text values ≥ 4.5:1 on their bg */
+  --success: #059669; --success-bg: #ecfdf5; --success-border: #a7f3d0; --success-text: #065f46;
+  --warning: #d97706; --warning-bg: #fffbeb; --warning-border: #fcd34d; --warning-text: #92400e;
+  --danger:  #dc2626; --danger-bg:  #fef2f2; --danger-border:  #fca5a5; --danger-text:  #991b1b;
+  --info:    #2563eb; --info-bg:    #eff6ff; --info-border:    #bfdbfe; --info-text:    #1d4ed8;
+  --neutral-bg: rgba(29, 33, 31, 0.045);
+
+  /* Sentiment (positive / neutral / negative) */
+  --sentiment-positive: #059669; --sentiment-positive-bg: #ecfdf5; --sentiment-positive-text: #065f46;
+  --sentiment-neutral:  #6f756f; --sentiment-neutral-bg:  #f1f2f1; --sentiment-neutral-text:  #4c524f;
+  --sentiment-negative: #dc2626; --sentiment-negative-bg: #fef2f2; --sentiment-negative-text: #991b1b;
+  /* MVP: sentiment is NOT computed — render the neutral "—" placeholder token below. */
+  --value-placeholder: var(--text-subtle);
+
+  /* Citation classification (owned / competitor / third-party) */
+  --citation-owned: #0f9d76;      --citation-owned-bg: rgba(15, 157, 118, 0.10);  --citation-owned-text: #0b6f52;
+  --citation-competitor: #d97706; --citation-competitor-bg: #fffbeb;              --citation-competitor-text: #92400e;
+  --citation-third-party: #6366f1;--citation-third-party-bg: #eef2ff;             --citation-third-party-text: #4338ca;
+
+  /* Run status (audit lifecycle) */
+  --run-draft:      #6f756f; --run-draft-bg:      #f1f2f1;
+  --run-queued:     #2563eb; --run-queued-bg:     #eff6ff;
+  --run-running:    #0f9d76; --run-running-bg:    rgba(15, 157, 118, 0.12);
+  --run-analyzing:  #7c3aed; --run-analyzing-bg:  #f5f3ff;
+  --run-completed:  #059669; --run-completed-bg:  #ecfdf5;
+  --run-partial:    #d97706; --run-partial-bg:    #fffbeb;
+  --run-failed:     #dc2626; --run-failed-bg:     #fef2f2;
+  --run-cancelled:  #6f756f; --run-cancelled-bg:  #f1f2f1;
+
+  /* Score bands (visibility %) — low→high */
+  --score-low:      #dc2626; --score-low-bg:      #fef2f2;  /* 0–24%   */
+  --score-mid:      #d97706; --score-mid-bg:      #fffbeb;  /* 25–49%  */
+  --score-good:     #2563eb; --score-good-bg:     #eff6ff;  /* 50–74%  */
+  --score-high:     #059669; --score-high-bg:     #ecfdf5;  /* 75–100% */
+
+  /* Shadows / elevation */
+  --shadow-xs-value: 0 1px 0 rgba(18, 22, 20, 0.04);
+  --shadow-sm-value: 0 1px 2px rgba(18, 22, 20, 0.05);
+  --shadow-card-value: 0 12px 28px rgba(18, 22, 20, 0.04);
+  --shadow-elevated-value: 0 18px 42px rgba(18, 22, 20, 0.08), 0 0 0 1px rgba(18, 22, 20, 0.04);
+  --shadow-lg-value: 0 22px 56px rgba(18, 22, 20, 0.10), 0 0 0 1px rgba(18, 22, 20, 0.05);
+  --shadow-modal: 0 24px 60px rgba(18, 22, 20, 0.16);
+  --focus-ring: 0 0 0 3px rgba(15, 157, 118, 0.20);
+  --overlay-scrim: rgba(0, 0, 0, 0.32);
+
+  /* Skeleton */
+  --skeleton-base: #ededeb;
+  --skeleton-highlight: #fafafa;
+
+  /* ─── Shared structural tokens (§5–§6) — theme-independent ─── */
+
+  /* Weights */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Tracking */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.06em;
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+
+  /* Spacing — 4px grid (--space-N = 4px × N) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --card-padding: 20px;
+  --content-gutter: 32px;
+
+  /* Radii */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Controls */
+  --control-height-sm: 30px;
+  --control-height: 34px;
+  --control-height-lg: 38px;
+  --interactive-border-width: 1px;
+
+  /* Table */
+  --table-row-height: 40px;
+  --table-header-height: 32px;
+  --table-font-size: var(--text-sm);
+  --table-header-font-size: var(--text-xs);
+
+  /* Segmented control */
+  --segmented-bg: var(--bg-alt);
+
+  /* Motion */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── DARK THEME (§4) — html[data-theme='dark'] ────────────────────────
+   Only tokens that change are overridden; type scale, spacing, radii, and
+   structural tokens are shared from :root above. Neutral-green-tinted gray,
+   zero blue cast. Accent brightened to #2dd4a7.
+──────────────────────────────────────────────────────────────────────── */
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg-base: #0e0f0e;
+  --bg-alt: #161816;
+  --bg-panel: #1d1f1d;
+  --bg-elevated: #242724;
+  --bg-well: #2e312e;
+  --bg-sidebar: #131513;
+  --surface-overlay: rgba(14, 15, 14, 0.94);
+
+  /* Borders */
+  --border-subtle: #1e201e;
+  --border: #2a2d2a;
+  --border-strong: #383c38;
+
+  /* Text — verified ≥ 4.5:1 on bg-base/bg-panel */
+  --text-primary: #e8ebe8;   /* 14.1:1 on #1d1f1d */
+  --text-secondary: #9ca39c; /* 6.0:1  */
+  --text-muted: #6b716b;     /* decorative-leaning; use secondary for body */
+  --text-subtle: #474b47;    /* decorative only */
+
+  /* Accent — teal-green brightened for dark */
+  --accent: #2dd4a7;
+  --accent-hover: #4fe0ba;
+  --accent-fg: #06231a;         /* dark text on bright accent: 7.9:1 */
+  --accent-subtle: rgba(45, 212, 167, 0.14);
+  --accent-soft: rgba(45, 212, 167, 0.08);
+  --accent-border: rgba(45, 212, 167, 0.32);
+  --accent-text: #58e0bb;       /* accent as text on dark: 8.4:1 */
+
+  /* Semantic status */
+  --success: #3ecf8e; --success-bg: rgba(62, 207, 142, 0.10); --success-border: rgba(62, 207, 142, 0.24); --success-text: #5fdaa2;
+  --warning: #f5a623; --warning-bg: rgba(245, 166, 35, 0.10); --warning-border: rgba(245, 166, 35, 0.24); --warning-text: #f7b854;
+  --danger:  #ff6b6b; --danger-bg:  rgba(255, 107, 107, 0.10);--danger-border:  rgba(255, 107, 107, 0.24);--danger-text:  #ff8f8f;
+  --info:    #6ba5ff; --info-bg:    rgba(107, 165, 255, 0.10);--info-border:    rgba(107, 165, 255, 0.24);--info-text:    #8fbcff;
+  --neutral-bg: rgba(255, 255, 255, 0.04);
+
+  /* Sentiment */
+  --sentiment-positive: #3ecf8e; --sentiment-positive-bg: rgba(62, 207, 142, 0.10); --sentiment-positive-text: #5fdaa2;
+  --sentiment-neutral:  #9ca39c; --sentiment-neutral-bg:  rgba(255, 255, 255, 0.05); --sentiment-neutral-text:  #9ca39c;
+  --sentiment-negative: #ff6b6b; --sentiment-negative-bg: rgba(255, 107, 107, 0.10); --sentiment-negative-text: #ff8f8f;
+  --value-placeholder: var(--text-subtle);
+
+  /* Citation classification */
+  --citation-owned: #2dd4a7;       --citation-owned-bg: rgba(45, 212, 167, 0.12);  --citation-owned-text: #58e0bb;
+  --citation-competitor: #f5a623;  --citation-competitor-bg: rgba(245, 166, 35, 0.12); --citation-competitor-text: #f7b854;
+  --citation-third-party: #8b8fff; --citation-third-party-bg: rgba(139, 143, 255, 0.12); --citation-third-party-text: #a9adff;
+
+  /* Run status */
+  --run-draft:      #9ca39c; --run-draft-bg:      rgba(255, 255, 255, 0.05);
+  --run-queued:     #6ba5ff; --run-queued-bg:     rgba(107, 165, 255, 0.12);
+  --run-running:    #2dd4a7; --run-running-bg:    rgba(45, 212, 167, 0.14);
+  --run-analyzing:  #a78bfa; --run-analyzing-bg:  rgba(167, 139, 250, 0.14);
+  --run-completed:  #3ecf8e; --run-completed-bg:  rgba(62, 207, 142, 0.12);
+  --run-partial:    #f5a623; --run-partial-bg:    rgba(245, 166, 35, 0.12);
+  --run-failed:     #ff6b6b; --run-failed-bg:     rgba(255, 107, 107, 0.12);
+  --run-cancelled:  #9ca39c; --run-cancelled-bg:  rgba(255, 255, 255, 0.05);
+
+  /* Score bands */
+  --score-low:  #ff6b6b; --score-low-bg:  rgba(255, 107, 107, 0.12);
+  --score-mid:  #f5a623; --score-mid-bg:  rgba(245, 166, 35, 0.12);
+  --score-good: #6ba5ff; --score-good-bg: rgba(107, 165, 255, 0.12);
+  --score-high: #3ecf8e; --score-high-bg: rgba(62, 207, 142, 0.12);
+
+  /* Shadows — deep blacks */
+  --shadow-xs-value: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm-value: 0 2px 4px rgba(0, 0, 0, 0.6);
+  --shadow-card-value: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-elevated-value: 0 12px 28px rgba(0, 0, 0, 0.7);
+  --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.8);
+  --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.9);
+  --focus-ring: 0 0 0 3px rgba(45, 212, 167, 0.28);
+  --overlay-scrim: rgba(0, 0, 0, 0.55);
+
+  /* Skeleton */
+  --skeleton-base: #232623;
+  --skeleton-highlight: #2b2e2b;
+
+  /* Segmented control */
+  --segmented-bg: rgba(255, 255, 255, 0.04);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════════════════════════ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg-base);
+  scrollbar-gutter: stable;
+  font-size: 100%; /* respects user font-size (WCAG 1.4.4) */
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-primary-family);
+  font-size: var(--text-base);
+  line-height: 1.5; /* WCAG 1.4.12 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-primary);
+}
+
+p {
+  margin-block-start: 0;
+  margin-block-end: var(--space-4);
+}
+
+p:last-child {
+  margin-block-end: 0;
+}
+
+/* Theme-toggle flash suppression: transitions/animations off during a swap */
+html[data-theme-transition] *,
+html[data-theme-transition] *::before,
+html[data-theme-transition] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* ─── Mono utility — tabular numerals for every metric (§5) ──────────── */
+.mono,
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono-family);
+  font-variant-numeric: tabular-nums;
+  font-synthesis: none;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Value placeholder — the neutral "—" shown for uncomputed metrics (MVP) */
+.value-placeholder {
+  color: var(--value-placeholder);
+}
+
+/* ─── Skeleton shimmer (§11) — ~1.2s loop between base → highlight ───── */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+/* ─── Focus rings — keyboard-only (WCAG 2.4.7 + 2.4.11) ─────────────── */
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  forced-color-adjust: auto;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: var(--focus-ring);
+  border-color: var(--border-focus) !important;
+}
+
+/* ─── Selection ─────────────────────────────────────────────────────── */
+::selection {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY — REDUCED MOTION (WCAG 2.3.3)
+═══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY — FORCED COLORS / HIGH CONTRAST (WCAG 1.4.11)
+   Fall back to system colors; badges keep a text label (never color-only).
+═══════════════════════════════════════════════════════════════════════ */
+@media (forced-colors: active) {
+  :focus-visible,
+  .focus-ring:focus-visible,
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 3px solid ButtonText;
+  }
+
+  .skeleton {
+    background: ButtonFace;
+    animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRINT
+═══════════════════════════════════════════════════════════════════════ */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    background-image: none !important;
+  }
+
+  .skeleton {
+    display: none !important;
+  }
+}
