@@ -134,27 +134,37 @@ describe('contract schemas', () => {
     const visibility = {
       project_id: UUID,
       audit_id: UUID2,
-      score: 72.5,
-      engines: [
+      audit_status: 'completed',
+      analyzer_version: 'v1',
+      scoring_rule_version: 'v1',
+      total_completed: 10,
+      total_failed: 0,
+      visibility_score: 72.5,
+      per_engine: [
         {
           logical_engine: 'gemini',
-          score: 80,
+          total_completed: 5,
           brand_mention_rate: 0.6,
           owned_citation_rate: 0.3,
+          search_use_rate: 0.5,
+          visibility_score: 80,
         },
       ],
       rankings: [
         {
-          entity_id: null,
           name: 'Acme',
           is_brand: true,
-          visibility: 72.5,
+          mention_rate: 0.725,
+          citation_rate: 0.3,
           share_of_voice: 0.4,
+          mention_count: 4,
           sentiment: null,
           avg_position: null,
         },
       ],
-      generated_at: '2026-07-15T00:00:00Z',
+      sentiment: null,
+      avg_position: null,
+      created_at: '2026-07-15T00:00:00Z',
     };
     const parsed = strictValidate(visibilitySchema, visibility, 'visibility');
     expect(parsed.rankings[0]?.sentiment).toBeNull();

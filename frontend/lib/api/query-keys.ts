@@ -42,7 +42,7 @@ export const queryKeys = {
   },
   visibility: {
     all: ['visibility'] as const,
-    project: (projectId: string, auditId?: string) =>
-      ['visibility', 'project', projectId, auditId ?? 'latest'] as const,
+    project: (projectId: string, auditId?: string, filters: ListFilters = {}) =>
+      ['visibility', 'project', projectId, auditId ?? 'latest', filters] as const,
   },
 } as const;

@@ -252,30 +252,47 @@ export const executionSchema = z.object({
 // Visibility dashboard (selected-run projection)
 // ---------------------------------------------------------------------------
 
+// One per-engine comparison row for the selected run (B6 `EngineComparisonRow`).
 export const visibilityEngineSchema = z.object({
-  logical_engine: logicalEngineSchema,
-  score: z.number().nullable(),
+  logical_engine: z.string(),
+  total_completed: z.number().int(),
   brand_mention_rate: z.number().nullable(),
   owned_citation_rate: z.number().nullable(),
+  search_use_rate: z.number().nullable(),
+  visibility_score: z.number().nullable(),
 });
 
+// One brand-vs-competitor rankings-table row (B6 `RankingRow`). `mention_rate`
+// is the Visibility% and `share_of_voice` the SOV%; `sentiment` / `avg_position`
+// are present but null until the roadmap computes them (decision B-2).
 export const rankingRowSchema = z.object({
-  entity_id: uuid().nullable(),
   name: z.string(),
   is_brand: z.boolean(),
-  visibility: z.number().nullable(),
+  mention_rate: z.number().nullable(),
+  citation_rate: z.number().nullable(),
   share_of_voice: z.number().nullable(),
-  sentiment: z.number().nullable(),
+  mention_count: z.number().int(),
+  sentiment: z.string().nullable(),
   avg_position: z.number().nullable(),
 });
 
+// Selected-run dashboard projection (B6 `VisibilityResponse`). Computed
+// server-side from the persisted MetricSnapshot for the selected audit
+// (defaults to the latest completed audit). No cross-run trend at MVP.
 export const visibilitySchema = z.object({
   project_id: uuid(),
   audit_id: uuid(),
-  score: z.number().nullable(),
-  engines: z.array(visibilityEngineSchema),
+  audit_status: auditStatusSchema,
+  analyzer_version: z.string(),
+  scoring_rule_version: z.string(),
+  total_completed: z.number().int(),
+  total_failed: z.number().int(),
+  visibility_score: z.number(),
   rankings: z.array(rankingRowSchema),
-  generated_at: z.string(),
+  per_engine: z.array(visibilityEngineSchema),
+  sentiment: z.string().nullable(),
+  avg_position: z.number().nullable(),
+  created_at: z.string(),
 });
 
 // ---------------------------------------------------------------------------
