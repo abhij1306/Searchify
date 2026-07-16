@@ -20,6 +20,29 @@ import { ApiError, isAbortError } from './errors';
 /** Relative API base. Same-origin; proxied to BACKEND_ORIGIN by next.config rewrites. */
 export const API_BASE_URL = '/api/v1';
 
+/**
+ * Active workspace id, stamped as `X-Workspace-Id` on every request when set.
+ *
+ * The backend's `require_active_workspace` (B3) reads this header to scope flat
+ * (non-path) routes to the selected workspace, falling back to the caller's
+ * default workspace when it is absent (deps.py). The shell's project context
+ * (F5) calls `setActiveWorkspaceId(project.workspace_id)` whenever the active
+ * project changes, so downstream project/prompt/provider/run queries are scoped
+ * to the workspace the user is looking at. Same-origin proxy means a custom
+ * header never triggers a CORS preflight.
+ */
+let activeWorkspaceId: string | null = null;
+
+/** Set (or clear with `null`) the workspace id sent on subsequent requests. */
+export function setActiveWorkspaceId(workspaceId: string | null) {
+  activeWorkspaceId = workspaceId;
+}
+
+/** Current workspace id stamped on requests, or `null` (backend default). */
+export function getActiveWorkspaceId() {
+  return activeWorkspaceId;
+}
+
 export type ApiRequestOptions = {
   signal?: AbortSignal;
   headers?: HeadersInit;
@@ -50,6 +73,11 @@ function buildHeaders(options: InternalRequestOptions, requestId: string) {
     headers.set('X-Request-ID', requestId);
   }
   if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey);
+  // Scope flat routes to the active workspace when one is selected; the backend
+  // falls back to the caller's default workspace when this header is absent.
+  if (activeWorkspaceId && !headers.has('X-Workspace-Id')) {
+    headers.set('X-Workspace-Id', activeWorkspaceId);
+  }
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }

@@ -20,6 +20,9 @@ const lineBudgets = [
   { file: 'app/globals.css', maxLines: 700 },
   { file: 'components/ui/theme-toggle.tsx', maxLines: 120 },
   { file: 'lib/theme.ts', maxLines: 160 },
+  // F5 app shell: composition only — split any sub-piece that outgrows this.
+  { file: 'components/layout/app-shell.tsx', maxLines: 100 },
+  { file: 'app/(app)/layout.tsx', maxLines: 100 },
 ];
 
 // Per-domain API owners under lib/api/. These now exist (F2), so the check is

@@ -157,4 +157,32 @@ describe('apiClient', () => {
     expect(httpErrorStatus({ status: 401 })).toBe(401);
     expect(httpErrorStatus(new Error('no'))).toBeUndefined();
   });
+
+  it('stamps X-Workspace-Id when an active workspace is set, and omits it otherwise', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({})));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, setActiveWorkspaceId, getActiveWorkspaceId } = await import('./client');
+
+    // No active workspace → header absent (backend uses default workspace).
+    await apiClient.get('/projects');
+    expect(
+      new Headers((fetchMock.mock.calls[0]?.[1] as RequestInit).headers).get('X-Workspace-Id'),
+    ).toBeNull();
+
+    // Selecting a workspace stamps it on subsequent requests.
+    setActiveWorkspaceId('ws-123');
+    expect(getActiveWorkspaceId()).toBe('ws-123');
+    await apiClient.get('/projects');
+    expect(
+      new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).get('X-Workspace-Id'),
+    ).toBe('ws-123');
+
+    // Clearing it removes the header again.
+    setActiveWorkspaceId(null);
+    await apiClient.get('/projects');
+    expect(
+      new Headers((fetchMock.mock.calls[2]?.[1] as RequestInit).headers).get('X-Workspace-Id'),
+    ).toBeNull();
+  });
 });
