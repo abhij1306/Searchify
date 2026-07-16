@@ -152,7 +152,12 @@ async def _call_with_retries(
 
 
 def _build_request_snapshot(
-    *, task: AuditTask, request: AnswerEngineRequest, configuration: dict
+    *,
+    logical_engine: str,
+    transport_provider: str,
+    transport_model: str,
+    request: AnswerEngineRequest,
+    configuration: dict,
 ) -> dict:
     """What determined the request. Proves statelessness; never the key/brand.
 
@@ -162,9 +167,9 @@ def _build_request_snapshot(
     (invariant 6).
     """
     return {
-        "logical_engine": task.logical_engine,
-        "transport_provider": task.transport_provider,
-        "transport_model": task.transport_model,
+        "logical_engine": logical_engine,
+        "transport_provider": transport_provider,
+        "transport_model": transport_model,
         "model": request.model,
         "prompt": request.prompt,
         "system_instruction": request.system_instruction,
@@ -409,11 +414,9 @@ class AuditWorker:
             timeout_seconds=audit_settings.request_timeout_seconds,
         )
         request_snapshot = _build_request_snapshot(
-            task=SimpleTask(
-                logical_engine=logical_engine,
-                transport_provider=transport_provider,
-                transport_model=transport_model,
-            ),
+            logical_engine=logical_engine,
+            transport_provider=transport_provider,
+            transport_model=transport_model,
             request=request,
             configuration=configuration,
         )
@@ -775,23 +778,6 @@ class AuditWorker:
                 return
             await finalize_audit_analysis(session, audit=audit)
             await session.commit()
-
-
-class SimpleTask:
-    """Lightweight provenance-triple carrier for the request snapshot builder."""
-
-    __slots__ = ("logical_engine", "transport_provider", "transport_model")
-
-    def __init__(
-        self,
-        *,
-        logical_engine: str,
-        transport_provider: str,
-        transport_model: str,
-    ) -> None:
-        self.logical_engine = logical_engine
-        self.transport_provider = transport_provider
-        self.transport_model = transport_model
 
 
 def main() -> None:  # pragma: no cover - process entrypoint
