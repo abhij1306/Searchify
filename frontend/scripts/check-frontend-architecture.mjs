@@ -1,10 +1,11 @@
 /**
- * Frontend architecture guard (F1).
+ * Frontend architecture guard (F1 → F2).
  *
- * Enforces line budgets and required-file ownership. F1 seeds a placeholder
- * list of required API owners (the per-domain modules F2 will author); the
- * list is checked leniently now (warn) and becomes hard in F2. Line budgets
- * on existing files are enforced.
+ * Enforces line budgets and required-file ownership. The per-domain API owner
+ * modules now exist (F2), so the required-owners check is ENFORCED (hard fail)
+ * rather than warned. Also enforces that the `index.ts` compat facade owns no
+ * transport — it may only spread the per-domain modules, never call `fetch` or
+ * import the transport client.
  *
  * Run: node scripts/check-frontend-architecture.mjs
  */
@@ -21,8 +22,8 @@ const lineBudgets = [
   { file: 'lib/theme.ts', maxLines: 160 },
 ];
 
-// Per-domain API owners F2 will create under lib/api/. Enforced softly in F1
-// (the contract layer does not exist yet); flipped to hard once F2 lands.
+// Per-domain API owners under lib/api/. These now exist (F2), so the check is
+// enforced as a hard failure. ENFORCE_API_OWNERS=0 can soften it for debugging.
 const requiredApiOwners = [
   'auth.ts',
   'projects.ts',
@@ -31,7 +32,7 @@ const requiredApiOwners = [
   'runs.ts',
   'visibility.ts',
 ];
-const ENFORCE_API_OWNERS = process.env.ENFORCE_API_OWNERS === '1';
+const ENFORCE_API_OWNERS = process.env.ENFORCE_API_OWNERS !== '0';
 
 const failures = [];
 const warnings = [];
@@ -61,6 +62,20 @@ for (const owner of requiredApiOwners) {
   const msg = `lib/api/${owner} is missing (API methods split by domain owner).`;
   if (ENFORCE_API_OWNERS) failures.push(msg);
   else warnings.push(msg);
+}
+
+// The index.ts compat facade must own no transport: no fetch, no client import.
+const indexPath = path.join(root, 'lib', 'api', 'index.ts');
+if (fs.existsSync(indexPath)) {
+  const indexSource = fs.readFileSync(indexPath, 'utf8');
+  if (/\bfetch\s*\(/.test(indexSource)) {
+    failures.push('lib/api/index.ts calls fetch() — the facade must own no transport.');
+  }
+  if (/from\s+['"]\.\/client['"]/.test(indexSource)) {
+    failures.push("lib/api/index.ts imports './client' — the facade must own no transport.");
+  }
+} else if (ENFORCE_API_OWNERS) {
+  failures.push('lib/api/index.ts is missing (compat facade spreading the domain modules).');
 }
 
 for (const w of warnings) console.warn(`warning: ${w}`);
