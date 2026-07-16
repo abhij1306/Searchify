@@ -46,9 +46,25 @@ from app.connectors.web_evidence.contracts import (
     FetchRequest,
     FetchResult,
 )
+from app.analysis.site_health.parser import extract_page_facts
+from app.analysis.site_health.rules import RuleEvaluation, evaluate_all
+from app.analysis.site_health.scoring import (
+    AnalysisScoreInput,
+    _Scored,
+    aggregate_scores,
+    score_analysis,
+)
 from app.connectors.web_evidence.fetcher import SecureFetcher
-from app.connectors.web_evidence.url_policy import split_host_port
+from app.connectors.web_evidence.url_policy import (
+    split_host_port,
+)
 from app.core.config.site_health import (
+    ANALYSIS_STATUS_COMPLETED,
+    ANALYSIS_STATUS_FAILED,
+    ANALYSIS_STATUS_PARTIALLY_COMPLETED,
+    ANALYSIS_STATUS_PENDING,
+    ANALYSIS_STATUS_RUNNING,
+    ANALYZER_VERSION,
     CRAWL_STATUS_COMPLETED,
     CRAWL_STATUS_FAILED,
     CRAWL_STATUS_PARTIALLY_COMPLETED,
@@ -59,11 +75,25 @@ from app.core.config.site_health import (
     DISCOVERY_STATUS_SAMPLE_COMPLETED,
     ERROR_HTTP_4XX,
     ERROR_HTTP_5XX,
+    EVENT_ANALYSIS_PROGRESS,
+    EVENT_CRAWL_COMPLETED,
     EVENT_DISCOVERY_PROGRESS,
+    EXTRACTOR_VERSION,
+    FETCH_PURPOSE_ANALYZE,
     FETCH_PURPOSE_DISCOVER,
+    FETCH_PURPOSE_LINK_CHECK,
     HTML_CONTENT_TYPES,
     OBSERVATION_SOURCE_LINK,
     OBSERVATION_SOURCE_ROOT,
+    PAGE_ANALYSIS_STATUS_COMPLETED,
+    PAGE_ANALYSIS_STATUS_FAILED,
+    PAGE_ANALYSIS_STATUS_PARTIALLY_COMPLETED,
+    RULE_CATALOG_VERSION,
+    RULE_OUTCOME_ERROR,
+    RULE_OUTCOME_FAIL,
+    SCORING_VERSION,
+    SELECTION_SOURCE_FREE_SAMPLE,
+    SELECTION_SOURCE_USER,
     SITE_CRAWL_QUEUE_SPEC,
     TASK_KIND_ANALYZE,
     TASK_KIND_DISCOVER,
@@ -72,6 +102,7 @@ from app.core.config.site_health import (
 )
 from app.core.config.task_queue import (
     TASK_STATUS_RUNNING,
+    TASK_STATUS_SUCCEEDED,
     TASK_TERMINAL_STATUSES,
 )
 from app.core.database import SessionLocal
@@ -81,22 +112,32 @@ from app.domain.site_health.discovery import (
     build_frontier_candidates,
     extract_discovery_links,
 )
-from app.domain.site_health.normalization import canonical_identity
+from app.domain.site_health.normalization import (
+    canonical_identity,
+    url_hash as compute_url_hash,
+)
 from app.domain.site_health.schemas import (
     DiscoveryOutput,
     FrontierCandidate,
 )
 from app.domain.site_health.selection import crawl_is_active, lease_is_owned
 from app.domain.site_health.state_events import (
+    apply_analysis_status,
     apply_crawl_status,
     apply_discovery_status,
     record_crawl_event,
 )
 from app.models.site_health import (
+    MonitoredSiteUrl,
     SiteCrawl,
     SiteCrawlTask,
     SiteFetchArtifact,
     SiteFetchAttempt,
+    SiteHealthSnapshot,
+    SiteIssue,
+    SiteLinkReference,
+    SitePageAnalysis,
+    SiteRuleEvaluation,
     SiteUrl,
     SiteUrlObservation,
 )
@@ -196,17 +237,22 @@ class SiteHealthWorker:
         self._transport = transport
 
     async def run_once(self) -> int:
-        """Sweep expired leases, claim a discover batch, execute it.
+        """Sweep expired leases, claim a batch of all task kinds, execute it.
 
-        Only ``discover`` tasks are claimed — reserved ``analyze`` /
-        ``link_check`` tasks (Free auto-enqueues analyze rows during discovery)
-        are left untouched in the queue for Task 5 rather than force-failed.
+        Claims ``discover``, ``analyze``, and ``link_check`` tasks (Task 5): a
+        widened claim + the routed dispatch in ``_run_discover`` must change
+        together — claiming a kind we do not route would force-fail it, and
+        routing a kind we do not claim would leave it queued forever.
         """
         await self._queue.release_expired()
         tasks = await self._queue.claim(
             owner=self.owner,
             limit=max(1, site_health_settings.worker_concurrency),
-            kinds=[TASK_KIND_DISCOVER],
+            kinds=[
+                TASK_KIND_DISCOVER,
+                TASK_KIND_ANALYZE,
+                TASK_KIND_LINK_CHECK,
+            ],
         )
         for task in tasks:
             await self._execute_task(task)
@@ -248,6 +294,7 @@ class SiteHealthWorker:
         """
         task_id = claimed.id
         crawl_id = claimed.crawl_id
+        kind = claimed.task_kind
         try:
             # Cooperative cancel: stop at this boundary if the crawl was
             # cancelled/terminalized since the claim, rather than fetching.
@@ -261,9 +308,9 @@ class SiteHealthWorker:
                 if not crawl_is_active(crawl):
                     await session.rollback()
                     await self._queue.cancel(task_id=task_id)
-                    await self._finalize_discovery(crawl_id)
+                    await self._reconcile_crawl_status(crawl_id)
                     return
-                # First discover task moves the crawl QUEUED -> RUNNING.
+                # The first task moves the crawl QUEUED -> RUNNING.
                 self._ensure_running(crawl)
                 await session.commit()
 
@@ -274,15 +321,27 @@ class SiteHealthWorker:
                 # Lease lost (sweeper reclaimed it); another worker will retry.
                 return
 
-            await self._run_discover(task_id, crawl_id)
+            if kind == TASK_KIND_DISCOVER:
+                await self._run_discover(task_id, crawl_id)
+            elif kind == TASK_KIND_ANALYZE:
+                await self._run_analyze(task_id, crawl_id)
+            elif kind == TASK_KIND_LINK_CHECK:
+                await self._run_link_check(task_id, crawl_id)
+            else:
+                raise NotImplementedError(f"unknown task kind '{kind}'")
         except Exception as exc:  # defensive: never let one task kill the loop
             logger.exception(
-                "site health discover task crashed",
-                extra={"task_id": str(task_id)},
+                "site health task crashed",
+                extra={"task_id": str(task_id), "task_kind": kind},
             )
             await self._record_crash(task_id, exc)
         finally:
-            await self._finalize_discovery(crawl_id)
+            # ONE shared finalize for every kind: it terminalizes the crawl only
+            # when EVERY non-terminal task (all kinds) is drained, so a completing
+            # discover task never drives the crawl terminal while analyze/
+            # link_check work is still queued (which would make a later analysis
+            # finalize raise InvalidSiteCrawlTransition from a terminal state).
+            await self._reconcile_crawl_status(crawl_id)
 
     def _ensure_running(self, crawl: SiteCrawl) -> None:
         if crawl.status == CRAWL_STATUS_RUNNING:
@@ -314,14 +373,10 @@ class SiteHealthWorker:
             include_globs = config.get("include_globs")
             exclude_globs = config.get("exclude_globs")
 
-        # Reserved kinds are never claimed by this worker; if one is ever routed
-        # here it is an explicit, deliberate failure reserved for Task 5.
-        if kind in (TASK_KIND_ANALYZE, TASK_KIND_LINK_CHECK):
-            raise NotImplementedError(
-                f"task kind '{kind}' is reserved for Task 5 analysis"
-            )
         if kind != TASK_KIND_DISCOVER:
-            raise NotImplementedError(f"unknown task kind '{kind}'")
+            # Routing is done in ``_execute_task``; a mis-routed kind here is a
+            # wiring bug (never a silent no-op).
+            raise NotImplementedError(f"unexpected task kind '{kind}'")
 
         # Fetch (heartbeating the lease during the possibly-slow call).
         heartbeat = asyncio.create_task(self._heartbeat_loop(task_id))
