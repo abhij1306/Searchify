@@ -27,6 +27,11 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analysis.service import (
+    analyze_task,
+    build_scoring_config,
+    finalize_audit_analysis,
+)
 from app.connectors.answer_engines.contracts import (
     AnswerEngineRequest,
     AnswerEngineResponse,
@@ -494,6 +499,7 @@ class AuditWorker:
             task = await session.get(AuditTask, task_id)
             if task is None:
                 return
+            audit = await session.get(Audit, audit_id)
             # Immutable raw artifact (invariant 3): written once, never mutated.
             artifact = RawResponseArtifact(
                 audit_id=audit_id,
@@ -518,11 +524,22 @@ class AuditWorker:
             task.search_used = response.search_used
             task.search_events = search_events
             task.citations = citations
+            task.result_artifact_id = artifact_id
             task.request_snapshot = request_snapshot
             task.provider_metadata = dict(response.provider_metadata)
             task.latency_ms = response.latency_ms
             task.error_code = ""
             task.error_detail = ""
+
+            # Score on persist (invariants 4/9): the deterministic analyzer runs
+            # against the just-persisted answer + citations (no provider call)
+            # and writes the derived ResponseAnalysis + mention/citation rows,
+            # each stamped with the raw-artifact provenance + analyzer_version.
+            if audit is not None:
+                config = build_scoring_config(audit.configuration)
+                analysis = await analyze_task(session, task=task, config=config)
+                if analysis is not None:
+                    task.score = analysis.score
 
             session.add(
                 ProviderAttempt(
@@ -680,11 +697,13 @@ class AuditWorker:
         """Move a finished-execution audit off ``running`` at the boundary.
 
         Runs after each task terminalizes. When no non-terminal task remains,
-        counts outcomes and transitions RUNNING -> ANALYZING (>=1 success, B6
-        picks it up) or RUNNING -> FAILED (0 successes). A cancelled audit keeps
-        its status. Guarded with ``FOR UPDATE`` so concurrent workers don't
+        counts outcomes and transitions RUNNING -> ANALYZING (>=1 success) or
+        RUNNING -> FAILED (0 successes). On ANALYZING it hands straight to the
+        analysis stage (aggregate + terminal). A cancelled audit keeps its
+        status. Guarded with ``FOR UPDATE`` so concurrent workers don't
         double-finalize.
         """
+        reached_analyzing = False
         async with self._session_factory() as session:
             audit = await session.get(Audit, audit_id, with_for_update=True)
             if audit is None or audit.status in AUDIT_TERMINAL_STATUSES:
@@ -726,7 +745,7 @@ class AuditWorker:
                     )
                     audit.error_message = "no successful executions"
                 else:
-                    # Execution done; analysis (B6) takes over from analyzing.
+                    # Execution done; hand to the deterministic analysis stage.
                     apply_transition(
                         session,
                         audit=audit,
@@ -734,6 +753,27 @@ class AuditWorker:
                         message="execution complete; ready for analysis",
                         payload={"completed": succeeded, "failed": total - succeeded},
                     )
+                    reached_analyzing = True
+            await session.commit()
+
+        if reached_analyzing:
+            await self._finalize_analysis(audit_id)
+
+    async def _finalize_analysis(self, audit_id: uuid.UUID) -> None:
+        """Aggregate the MetricSnapshot + resolve the terminal status (B6).
+
+        Runs once an audit reaches ANALYZING. Aggregates from persisted analyses
+        only (invariant 7 — no provider call) and drives ANALYZING -> REPORTING
+        -> COMPLETED / PARTIALLY_COMPLETED. Guarded with ``FOR UPDATE`` so
+        concurrent workers don't double-finalize.
+        """
+        async with self._session_factory() as session:
+            audit = await session.get(Audit, audit_id, with_for_update=True)
+            if audit is None or audit.status != AUDIT_STATUS_ANALYZING:
+                if audit is not None:
+                    await session.rollback()
+                return
+            await finalize_audit_analysis(session, audit=audit)
             await session.commit()
 
 

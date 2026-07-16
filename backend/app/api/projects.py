@@ -9,10 +9,15 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
+from app.domain.analysis.schemas import VisibilityResponse
+from app.domain.analysis.service import (
+    AnalysisNotFoundError,
+    get_visibility,
+)
 from app.domain.projects.schemas import (
     ProjectCreate,
     ProjectResponse,
@@ -67,6 +72,43 @@ async def get_project_endpoint(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         ) from exc
     return project_to_response(project)
+
+
+@router.get("/{project_id}/visibility", response_model=VisibilityResponse)
+async def get_visibility_endpoint(
+    project_id: uuid.UUID,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+    audit_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> VisibilityResponse:
+    """Selected-run dashboard projection for a project (invariant 7).
+
+    Visibility Score + per-engine comparison + brand-vs-competitor rankings,
+    computed server-side from the persisted ``MetricSnapshot``. Defaults to the
+    project's latest completed audit when ``audit_id`` is omitted. No provider
+    is called; no cross-run trend at MVP (roadmap).
+    """
+    # Authorize the project first (404 for a cross-workspace/missing project).
+    try:
+        await get_project(
+            session, workspace_id=ctx.workspace_id, project_id=project_id
+        )
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        ) from exc
+    try:
+        return await get_visibility(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            audit_id=audit_id,
+        )
+    except AnalysisNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No visibility metrics available for project",
+        ) from exc
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)

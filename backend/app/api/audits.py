@@ -21,13 +21,20 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analysis.exports import audit_to_csv, audit_to_markdown
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
 from app.core.config.audits import AUDIT_TERMINAL_STATUSES
 from app.core.database import SessionLocal
+from app.domain.analysis.schemas import MetricsResponse
+from app.domain.analysis.service import (
+    AnalysisNotFoundError,
+    get_metrics,
+    load_export_bundle,
+)
 from app.domain.audits.planner import (
     AuditNotFoundError,
     AuditValidationError,
@@ -139,6 +146,78 @@ async def list_executions_endpoint(
             status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
         ) from exc
     return [AuditTaskResponse.model_validate(t) for t in tasks]
+
+
+@router.get("/{audit_id}/metrics", response_model=MetricsResponse)
+async def get_metrics_endpoint(
+    audit_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> MetricsResponse:
+    """Single-run ``MetricSnapshot`` projection (invariant 7 — no provider).
+
+    Reads only the persisted aggregate; 404 until the audit has been analyzed
+    or for a cross-workspace/missing audit (invariant 5).
+    """
+    # Authorize the audit first so a cross-workspace id is a 404, not a leak.
+    await _get_or_404(session, ctx.workspace_id, audit_id)
+    try:
+        return await get_metrics(
+            session, workspace_id=ctx.workspace_id, audit_id=audit_id
+        )
+    except AnalysisNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Metrics not available for audit",
+        ) from exc
+
+
+@router.get("/{audit_id}/export.csv")
+async def export_csv_endpoint(
+    audit_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> Response:
+    """Download the per-execution evidence as CSV (renders persisted rows)."""
+    try:
+        audit, tasks = await load_export_bundle(
+            session, workspace_id=ctx.workspace_id, audit_id=audit_id
+        )
+    except AnalysisNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
+        ) from exc
+    body = audit_to_csv(audit, tasks)
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="audit-{audit_id}.csv"'
+            )
+        },
+    )
+
+
+@router.get("/{audit_id}/export.md")
+async def export_markdown_endpoint(
+    audit_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> PlainTextResponse:
+    """Download the benchmark report as Markdown (renders persisted summary)."""
+    try:
+        audit, tasks = await load_export_bundle(
+            session, workspace_id=ctx.workspace_id, audit_id=audit_id
+        )
+    except AnalysisNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
+        ) from exc
+    body = audit_to_markdown(audit, tasks)
+    return PlainTextResponse(
+        content=body,
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="audit-{audit_id}.md"'
+            )
+        },
+    )
 
 
 @router.get("/{audit_id}/events", response_model=list[AuditEventResponse])

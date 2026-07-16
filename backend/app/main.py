@@ -10,6 +10,7 @@ from fastapi.responses import Response
 
 from app.api.audits import router as audits_router
 from app.api.auth import router as auth_router
+from app.api.executions import router as executions_router
 from app.api.projects import router as projects_router
 from app.api.prompts import router as prompts_router
 from app.api.provider_connections import (
@@ -42,6 +43,7 @@ _ROUTERS = (
     provider_connections_router,
     provider_catalog_router,
     audits_router,
+    executions_router,
 )
 
 

@@ -3,8 +3,9 @@
 Provider calls are MOCKED (no network, no spend). Exercises the real
 claim/lease loop against a Postgres schema:
   - a full audit runs every task to ``succeeded``, writes one immutable
-    RawResponseArtifact + ProviderAttempt each, and finalizes RUNNING ->
-    ANALYZING;
+    RawResponseArtifact + ProviderAttempt each, scores each on persist, and
+    finalizes RUNNING -> ANALYZING -> REPORTING -> COMPLETED with an aggregated
+    MetricSnapshot (B6);
   - a cooperatively-cancelled audit stops at the task boundary (no artifact);
   - the per-run wall-clock deadline terminalizes remaining tasks.
 """
@@ -21,12 +22,13 @@ from app.connectors.answer_engines.contracts import (
     SearchEventResult,
 )
 from app.core.config.audits import (
-    AUDIT_STATUS_ANALYZING,
     AUDIT_STATUS_CANCELLED,
+    AUDIT_STATUS_COMPLETED,
     audit_settings,
 )
 from app.core.config.provider_catalog import ENGINE_GEMINI, TRANSPORT_GOOGLE
 from app.domain.audits.planner import cancel_audit, create_audit, list_tasks
+from app.models.analysis import MetricSnapshot, ResponseAnalysis
 from app.models.audit import (
     Audit,
     ProviderAttempt,
@@ -134,12 +136,35 @@ async def test_worker_runs_all_tasks_and_finalizes(
         assert artifacts == 6
         assert attempts == 6
 
+        # Each succeeded task was scored on persist (B6, invariant 4).
+        assert all(t.score is not None for t in tasks)
+
         refreshed = await session.get(Audit, audit.id)
-        # Execution complete -> audit ready for analysis (B6).
-        assert refreshed.status == AUDIT_STATUS_ANALYZING
+        # Execution complete -> analysis stage runs -> audit COMPLETED (B6).
+        assert refreshed.status == AUDIT_STATUS_COMPLETED
         assert refreshed.completed_count == 6
         assert refreshed.failed_count == 0
         assert refreshed.started_at is not None
+        assert refreshed.completed_at is not None
+
+        # One aggregated MetricSnapshot with a populated Visibility Score.
+        snapshot = await session.scalar(
+            select(MetricSnapshot).where(MetricSnapshot.audit_id == audit.id)
+        )
+        assert snapshot is not None
+        assert snapshot.total_completed == 6
+        assert snapshot.total_failed == 0
+        # The stub always mentions "Acme" (the brand) -> 100% Visibility.
+        assert snapshot.visibility_score == 100.0
+        assert snapshot.analyzer_version
+
+        # One ResponseAnalysis per succeeded execution (invariant 4).
+        analyses = await session.scalar(
+            select(func.count())
+            .select_from(ResponseAnalysis)
+            .where(ResponseAnalysis.audit_id == audit.id)
+        )
+        assert analyses == 6
 
 
 @pytest.mark.asyncio

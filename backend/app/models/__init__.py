@@ -7,6 +7,13 @@
 from __future__ import annotations
 
 from app.core.database import Base
+from app.models.analysis import (
+    BrandMention,
+    Citation,
+    CompetitorMention,
+    MetricSnapshot,
+    ResponseAnalysis,
+)
 from app.models.audit import (
     Audit,
     AuditEngineSnapshot,
@@ -43,8 +50,12 @@ __all__ = [
     "Base",
     "Brand",
     "BrandAlias",
+    "BrandMention",
+    "Citation",
     "Competitor",
+    "CompetitorMention",
     "DiscoveryModelConfig",
+    "MetricSnapshot",
     "OwnedDomain",
     "Project",
     "Prompt",
@@ -54,6 +65,7 @@ __all__ = [
     "ProviderConnectionTest",
     "ProviderRoute",
     "RawResponseArtifact",
+    "ResponseAnalysis",
     "UnintendedDomain",
     "User",
     "Workspace",
