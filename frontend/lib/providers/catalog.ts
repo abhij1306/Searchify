@@ -33,6 +33,16 @@ export const TRANSPORT_LABELS: Record<TransportProvider, string> = {
   openai: 'OpenAI',
 };
 
+/** Human label for an engine key (falls back to the raw key). */
+export function engineLabel(key: string): string {
+  return ENGINE_LABELS[key as LogicalEngine] ?? key;
+}
+
+/** Human label for a transport key (falls back to the raw key). */
+export function transportLabel(key: string): string {
+  return TRANSPORT_LABELS[key as TransportProvider] ?? key;
+}
+
 /** A selectable route option on an engine card. */
 export type EngineRouteOption = {
   transport_provider: TransportProvider;

@@ -11,17 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ENGINE_LABELS, TRANSPORT_LABELS } from '@/lib/providers/catalog';
-import type { Execution, LogicalEngine, TransportProvider } from '@/lib/api/types';
+import { engineLabel, transportLabel } from '@/lib/providers/catalog';
+import type { Execution } from '@/lib/api/types';
 import { executionBadgeValue, executionStatusLabel } from '@/lib/runs/status';
-
-function engineLabel(engine: string): string {
-  return ENGINE_LABELS[engine as LogicalEngine] ?? engine;
-}
-
-function transportLabel(transport: string): string {
-  return TRANSPORT_LABELS[transport as TransportProvider] ?? transport;
-}
 
 /**
  * Executions table for a run (F10, design.md §9.7).

@@ -8,7 +8,7 @@
  * that also participate in the React Query key (so switching them refetches /
  * re-derives) — no server-side filter is invented here.
  */
-import { ENGINE_LABELS, ENGINE_ORDER } from '@/lib/providers/catalog';
+import { ENGINE_ORDER } from '@/lib/providers/catalog';
 import type { AuditStatus, LogicalEngine, RankingRow, Visibility, VisibilityEngine } from '@/lib/api/types';
 
 /** Audit statuses that carry a dashboard-ready metric snapshot (B6). */
@@ -88,10 +88,7 @@ export function formatRunLabel(timestamp: string): string {
   });
 }
 
-/** Human label for an engine key (falls back to the raw key). */
-export function engineLabel(key: string): string {
-  return ENGINE_LABELS[key as LogicalEngine] ?? key;
-}
+export { engineLabel } from '@/lib/providers/catalog';
 
 /**
  * Per-engine comparison rows for display: apply the engine filter, then order

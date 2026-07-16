@@ -3,21 +3,9 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/typography';
-import { ENGINE_LABELS, TRANSPORT_LABELS } from '@/lib/providers/catalog';
-import type {
-  ExecutionEvidence,
-  LogicalEngine,
-  TransportProvider,
-} from '@/lib/api/types';
+import { engineLabel, transportLabel } from '@/lib/providers/catalog';
+import type { ExecutionEvidence } from '@/lib/api/types';
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
-
-function engineLabel(engine: string): string {
-  return ENGINE_LABELS[engine as LogicalEngine] ?? engine;
-}
-
-function transportLabel(transport: string): string {
-  return TRANSPORT_LABELS[transport as TransportProvider] ?? transport;
-}
 
 /** Render a `score` dict entry value as a compact string. */
 function formatScoreValue(value: unknown): string {
