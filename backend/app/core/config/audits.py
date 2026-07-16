@@ -41,7 +41,9 @@ AUDIT_TERMINAL_STATUSES: Final[frozenset[str]] = frozenset(
     }
 )
 # Statuses at which a cooperative cancel is still meaningful (a live worker can
-# stop at its boundary).
+# stop at its boundary). ``reporting`` is intentionally excluded: by then
+# execution + analysis are done and the state machine treats REPORTING ->
+# CANCELLED as illegal (there is no live worker left to stop cooperatively).
 AUDIT_ACTIVE_STATUSES: Final[frozenset[str]] = frozenset(
     {
         AUDIT_STATUS_DRAFT,
@@ -49,7 +51,6 @@ AUDIT_ACTIVE_STATUSES: Final[frozenset[str]] = frozenset(
         AUDIT_STATUS_QUEUED,
         AUDIT_STATUS_RUNNING,
         AUDIT_STATUS_ANALYZING,
-        AUDIT_STATUS_REPORTING,
     }
 )
 

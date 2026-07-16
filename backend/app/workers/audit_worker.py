@@ -22,6 +22,7 @@ import contextlib
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -53,6 +54,7 @@ from app.core.config.audits import (
     EVENT_TASK_FAILED,
     EVENT_TASK_RETRY,
     EVENT_TASK_SUCCEEDED,
+    TASK_STATUS_RUNNING,
     TASK_STATUS_SUCCEEDED,
     TASK_TERMINAL_STATUSES,
     audit_settings,
@@ -107,21 +109,39 @@ async def pace_provider_request(transport_provider: str) -> None:
         _provider_last_request_started[transport_provider] = time.monotonic()
 
 
+@dataclass
+class CallAttempt:
+    """The outcome of ONE actual provider call (a success or a failure).
+
+    ``_call_with_retries`` returns one of these per real call it made so the
+    caller can persist an append-only ``ProviderAttempt`` row for EACH attempt
+    (retryable failures + the final success/failure), not just the last one.
+    """
+
+    response: AnswerEngineResponse | None
+    error: ProviderError | None
+
+    @property
+    def succeeded(self) -> bool:
+        return self.response is not None
+
+
 async def _call_with_retries(
     adapter, request: AnswerEngineRequest
-) -> tuple[AnswerEngineResponse | None, ProviderError | None, int]:
+) -> list[CallAttempt]:
     """Call the provider with pacing, a hard per-call ceiling, and retries.
 
-    Returns ``(response, None, attempts)`` on success or
-    ``(None, last_error, attempts)`` once the budget is spent. A single call can
-    never run past ``max_call_seconds`` (``asyncio.wait_for`` guards the HTTP
-    client); the loop is bounded by ``max_attempts``.
+    Returns one ``CallAttempt`` per actual provider call made (never empty). The
+    last entry is the terminal outcome: a success (``response`` set) or the final
+    failure once the retry budget is spent / a non-retryable error is hit.
+    Earlier entries are retryable failures. A single call can never run past
+    ``max_call_seconds`` (``asyncio.wait_for`` guards the HTTP client); the loop
+    is bounded by ``max_attempts``.
     """
     attempts = max(1, audit_settings.max_attempts)
-    last_error: ProviderError | None = None
-    made = 0
+    results: list[CallAttempt] = []
     for attempt in range(attempts):
-        made = attempt + 1
+        error: ProviderError | None = None
         try:
             await pace_provider_request(adapter.transport_provider)
             # Hard per-call ceiling independent of the HTTP client timeout: a
@@ -130,25 +150,26 @@ async def _call_with_retries(
                 adapter.execute(request),
                 timeout=audit_settings.max_call_seconds,
             )
-            return response, None, made
+            results.append(CallAttempt(response=response, error=None))
+            return results
         except TimeoutError:
-            last_error = ProviderError(
+            error = ProviderError(
                 "provider call exceeded max_call_seconds "
                 f"({audit_settings.max_call_seconds}s)",
                 error_code=ERROR_TIMEOUT,
                 retryable=True,
             )
         except ProviderError as exc:
-            last_error = exc
-            if not (exc.retryable and exc.error_code in RETRYABLE_ERRORS):
-                break
-        if attempt == attempts - 1:
-            break
-        retry_after = getattr(last_error, "retry_after_seconds", None)
-        await asyncio.sleep(
-            audit_settings.retry_delay(attempt, retry_after)
+            error = exc
+        results.append(CallAttempt(response=None, error=error))
+        retryable = bool(
+            error and error.retryable and error.error_code in RETRYABLE_ERRORS
         )
-    return None, last_error, made
+        if not retryable or attempt == attempts - 1:
+            break
+        retry_after = getattr(error, "retry_after_seconds", None)
+        await asyncio.sleep(audit_settings.retry_delay(attempt, retry_after))
+    return results
 
 
 def _build_request_snapshot(
@@ -384,7 +405,6 @@ class AuditWorker:
                 )
             configuration = dict(audit.configuration or {})
             system_instruction = audit.system_instruction or ""
-            attempt_number = task.attempt_count + 1
             logical_engine = task.logical_engine
             transport_provider = task.transport_provider
             transport_model = task.transport_model
@@ -396,7 +416,6 @@ class AuditWorker:
             await self._fail_terminal(
                 task_id=task_id,
                 audit_id=audit_id,
-                attempt_number=attempt_number,
                 logical_engine=logical_engine,
                 transport_provider=transport_provider,
                 transport_model=transport_model,
@@ -433,7 +452,6 @@ class AuditWorker:
             await self._fail_terminal(
                 task_id=task_id,
                 audit_id=audit_id,
-                attempt_number=attempt_number,
                 logical_engine=logical_engine,
                 transport_provider=transport_provider,
                 transport_model=transport_model,
@@ -446,34 +464,33 @@ class AuditWorker:
         # Heartbeat the lease while the (possibly slow) call runs.
         heartbeat = asyncio.create_task(self._heartbeat_loop(task_id))
         try:
-            response, error, attempts_made = await _call_with_retries(
-                adapter, request
-            )
+            attempts = await _call_with_retries(adapter, request)
         finally:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat
 
-        if response is None:
-            await self._handle_failure(
+        final = attempts[-1]
+        if final.succeeded:
+            await self._persist_success(
                 task_id=task_id,
                 audit_id=audit_id,
-                attempts_made=attempts_made,
+                attempts=attempts,
                 logical_engine=logical_engine,
                 transport_provider=transport_provider,
                 transport_model=transport_model,
-                error=error,
                 request_snapshot=request_snapshot,
             )
-            return
-
-        await self._persist_success(
-            task_id=task_id,
-            audit_id=audit_id,
-            attempts_made=attempts_made,
-            response=response,
-            request_snapshot=request_snapshot,
-        )
+        else:
+            await self._handle_failure(
+                task_id=task_id,
+                audit_id=audit_id,
+                attempts=attempts,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                request_snapshot=request_snapshot,
+            )
 
     async def _heartbeat_loop(
         self, task_id: uuid.UUID
@@ -486,23 +503,117 @@ class AuditWorker:
         except asyncio.CancelledError:
             raise
 
+    async def _lock_owned_running_task(
+        self,
+        session: AsyncSession,
+        *,
+        task_id: uuid.UUID,
+        audit_id: uuid.UUID,
+    ) -> tuple[AuditTask, Audit] | None:
+        """Lock the task FOR UPDATE and verify we still own it before writing.
+
+        Guards invariant 3/8 (single writer / no double-claim). Between the
+        provider call finishing and this write, the lease could have expired
+        (sweeper -> another worker claimed it) or the audit could have been
+        cancelled. Returns ``(task, audit)`` only when the task is still leased
+        to THIS worker, still ``running``, and the audit is not cancelled or
+        terminal; otherwise ``None`` and the stale provider result is discarded.
+        """
+        task = await session.get(AuditTask, task_id, with_for_update=True)
+        if task is None:
+            return None
+        if task.lease_owner != self.owner or task.status != TASK_STATUS_RUNNING:
+            return None
+        audit = await session.get(Audit, audit_id)
+        if audit is None or audit.status == AUDIT_STATUS_CANCELLED or (
+            audit.status in AUDIT_TERMINAL_STATUSES
+        ):
+            return None
+        return task, audit
+
+    def _record_attempts(
+        self,
+        session: AsyncSession,
+        *,
+        task: AuditTask,
+        audit_id: uuid.UUID,
+        attempts: list[CallAttempt],
+        logical_engine: str,
+        transport_provider: str,
+        transport_model: str,
+        artifact_id: uuid.UUID | None,
+    ) -> None:
+        """Append one immutable ProviderAttempt per actual provider call.
+
+        ProviderAttempt is append-only "one row per attempt" (invariant 3): a
+        run that retried twice then succeeded records three rows (two failed +
+        one succeeded), not a single collapsed row. Advances ``attempt_count``
+        by the number of calls made and stamps each row's ``attempt_number``.
+        """
+        base = task.attempt_count
+        for offset, attempt in enumerate(attempts, start=1):
+            attempt_number = base + offset
+            if attempt.succeeded:
+                response = attempt.response
+                session.add(
+                    ProviderAttempt(
+                        task_id=task.id,
+                        audit_id=audit_id,
+                        attempt_number=attempt_number,
+                        logical_engine=response.logical_engine,
+                        transport_provider=response.transport_provider,
+                        transport_model=response.transport_model,
+                        status=ATTEMPT_STATUS_SUCCEEDED,
+                        latency_ms=response.latency_ms,
+                        artifact_id=artifact_id,
+                    )
+                )
+            else:
+                error = attempt.error
+                error_code = error.error_code if error else ERROR_PARSE
+                error_detail = str(error) if error else "unknown provider error"
+                session.add(
+                    ProviderAttempt(
+                        task_id=task.id,
+                        audit_id=audit_id,
+                        attempt_number=attempt_number,
+                        logical_engine=logical_engine,
+                        transport_provider=transport_provider,
+                        transport_model=transport_model,
+                        status=ATTEMPT_STATUS_FAILED,
+                        error_code=error_code,
+                        error_detail=error_detail[:2000],
+                    )
+                )
+        task.attempt_count = base + len(attempts)
+
     async def _persist_success(
         self,
         *,
         task_id: uuid.UUID,
         audit_id: uuid.UUID,
-        attempts_made: int,
-        response: AnswerEngineResponse,
+        attempts: list[CallAttempt],
+        logical_engine: str,
+        transport_provider: str,
+        transport_model: str,
         request_snapshot: dict,
     ) -> None:
+        response = attempts[-1].response
+        assert response is not None  # caller only invokes on a success
         search_events = _serialize_search_events(response)
         citations = _serialize_citations(response)
         artifact_id: uuid.UUID | None = None
         async with self._session_factory() as session:
-            task = await session.get(AuditTask, task_id)
-            if task is None:
+            # Owner + liveness check under a row lock BEFORE writing any evidence
+            # (invariant 3/8). If the lease was lost or the audit cancelled, the
+            # provider response is discarded — no artifact/attempt/analysis.
+            locked = await self._lock_owned_running_task(
+                session, task_id=task_id, audit_id=audit_id
+            )
+            if locked is None:
+                await session.rollback()
                 return
-            audit = await session.get(Audit, audit_id)
+            task, audit = locked
             # Immutable raw artifact (invariant 3): written once, never mutated.
             artifact = RawResponseArtifact(
                 audit_id=audit_id,
@@ -522,7 +633,6 @@ class AuditWorker:
             await session.flush()
             artifact_id = artifact.id
 
-            task.attempt_count += attempts_made
             task.answer_text = response.answer_text
             task.search_used = response.search_used
             task.search_events = search_events
@@ -538,24 +648,21 @@ class AuditWorker:
             # against the just-persisted answer + citations (no provider call)
             # and writes the derived ResponseAnalysis + mention/citation rows,
             # each stamped with the raw-artifact provenance + analyzer_version.
-            if audit is not None:
-                config = build_scoring_config(audit.configuration)
-                analysis = await analyze_task(session, task=task, config=config)
-                if analysis is not None:
-                    task.score = analysis.score
+            config = build_scoring_config(audit.configuration)
+            analysis = await analyze_task(session, task=task, config=config)
+            if analysis is not None:
+                task.score = analysis.score
 
-            session.add(
-                ProviderAttempt(
-                    task_id=task_id,
-                    audit_id=audit_id,
-                    attempt_number=task.attempt_count,
-                    logical_engine=response.logical_engine,
-                    transport_provider=response.transport_provider,
-                    transport_model=response.transport_model,
-                    status=ATTEMPT_STATUS_SUCCEEDED,
-                    latency_ms=response.latency_ms,
-                    artifact_id=artifact_id,
-                )
+            # One ProviderAttempt per actual call (retries + final success).
+            self._record_attempts(
+                session,
+                task=task,
+                audit_id=audit_id,
+                attempts=attempts,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                artifact_id=artifact_id,
             )
             record_event(
                 session,
@@ -575,39 +682,44 @@ class AuditWorker:
         *,
         task_id: uuid.UUID,
         audit_id: uuid.UUID,
-        attempts_made: int,
+        attempts: list[CallAttempt],
         logical_engine: str,
         transport_provider: str,
         transport_model: str,
-        error: ProviderError | None,
         request_snapshot: dict,
     ) -> None:
+        error = attempts[-1].error
         error_code = error.error_code if error else ERROR_PARSE
         error_detail = str(error) if error else "unknown provider error"
         retryable = bool(error and error.retryable and error_code in RETRYABLE_ERRORS)
         retry_after = getattr(error, "retry_after_seconds", None)
 
+        will_retry = False
+        attempt_number = 0
         async with self._session_factory() as session:
-            task = await session.get(AuditTask, task_id)
-            if task is None:
+            # Owner + liveness check under a row lock before writing evidence
+            # (invariant 3/8): a stale/cancelled worker must not touch the task.
+            locked = await self._lock_owned_running_task(
+                session, task_id=task_id, audit_id=audit_id
+            )
+            if locked is None:
+                await session.rollback()
                 return
-            task.attempt_count += attempts_made
+            task, _audit = locked
             task.request_snapshot = request_snapshot
+            # One ProviderAttempt per actual call (all failed on this path).
+            self._record_attempts(
+                session,
+                task=task,
+                audit_id=audit_id,
+                attempts=attempts,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                artifact_id=None,
+            )
             attempt_number = task.attempt_count
             exhausted = task.attempt_count >= task.max_attempts
-            session.add(
-                ProviderAttempt(
-                    task_id=task_id,
-                    audit_id=audit_id,
-                    attempt_number=attempt_number,
-                    logical_engine=logical_engine,
-                    transport_provider=transport_provider,
-                    transport_model=transport_model,
-                    status=ATTEMPT_STATUS_FAILED,
-                    error_code=error_code,
-                    error_detail=error_detail[:2000],
-                )
-            )
             will_retry = retryable and not exhausted
             record_event(
                 session,
@@ -641,7 +753,6 @@ class AuditWorker:
         *,
         task_id: uuid.UUID,
         audit_id: uuid.UUID,
-        attempt_number: int,
         logical_engine: str,
         transport_provider: str,
         transport_model: str,
@@ -651,9 +762,16 @@ class AuditWorker:
     ) -> None:
         """Terminally fail a task (non-retryable misconfiguration)."""
         async with self._session_factory() as session:
-            task = await session.get(AuditTask, task_id)
-            if task is None:
+            # Owner + liveness check under a row lock before writing evidence
+            # (invariant 3/8): even a terminal fail must not touch a task this
+            # worker no longer owns or an audit that was cancelled meanwhile.
+            locked = await self._lock_owned_running_task(
+                session, task_id=task_id, audit_id=audit_id
+            )
+            if locked is None:
+                await session.rollback()
                 return
+            task, _audit = locked
             task.attempt_count += 1
             if request_snapshot is not None:
                 task.request_snapshot = request_snapshot

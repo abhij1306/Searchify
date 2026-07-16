@@ -21,16 +21,24 @@ from app.connectors.answer_engines.contracts import (
     CitationResult,
     SearchEventResult,
 )
+from app.connectors.answer_engines.errors import ProviderError
 from app.core.config.audits import (
+    ATTEMPT_STATUS_FAILED,
+    ATTEMPT_STATUS_SUCCEEDED,
     AUDIT_STATUS_CANCELLED,
     AUDIT_STATUS_COMPLETED,
     audit_settings,
 )
-from app.core.config.provider_catalog import ENGINE_GEMINI, TRANSPORT_GOOGLE
+from app.core.config.provider_catalog import (
+    ENGINE_GEMINI,
+    ERROR_RATE_LIMIT,
+    TRANSPORT_GOOGLE,
+)
 from app.domain.audits.planner import cancel_audit, create_audit, list_tasks
 from app.models.analysis import MetricSnapshot, ResponseAnalysis
 from app.models.audit import (
     Audit,
+    AuditTask,
     ProviderAttempt,
     RawResponseArtifact,
 )
@@ -266,3 +274,194 @@ async def test_worker_fails_task_with_missing_connection(
         )
         assert {t.status for t in tasks} == {"failed"}
         assert {t.error_code for t in tasks} == {"provider_connection_missing"}
+
+
+class _HookAdapter(_StubAdapter):
+    """Runs an async callback mid-call, then returns a normal success.
+
+    Simulates something happening on the row (cancel, lease loss) WHILE the
+    provider call is in flight, so the persist-time owner/liveness guard can be
+    exercised.
+    """
+
+    def __init__(self, hook) -> None:
+        self._hook = hook
+
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
+        await self._hook()
+        return await super().execute(request)
+
+
+@pytest.mark.asyncio
+async def test_worker_discards_success_when_cancelled_mid_call(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A user cancels the audit while the provider call is in flight. The
+    # in-flight worker must NOT persist success evidence for a cancelled task.
+    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+
+    async def _cancel_mid_call() -> None:
+        async with session_factory() as session:
+            await cancel_audit(
+                session, workspace_id=seed.workspace_id, audit_id=audit.id
+            )
+
+    monkeypatch.setattr(
+        audit_worker, "build_adapter", lambda **_: _HookAdapter(_cancel_mid_call)
+    )
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+
+    worker = AuditWorker(session_factory=session_factory, owner="w-midcancel")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        refreshed = await session.get(Audit, audit.id)
+        assert refreshed.status == AUDIT_STATUS_CANCELLED
+        # The stale success was discarded: no artifact/attempt/analysis rows.
+        artifacts = await session.scalar(
+            select(func.count())
+            .select_from(RawResponseArtifact)
+            .where(RawResponseArtifact.audit_id == audit.id)
+        )
+        attempts = await session.scalar(
+            select(func.count())
+            .select_from(ProviderAttempt)
+            .where(ProviderAttempt.audit_id == audit.id)
+        )
+        analyses = await session.scalar(
+            select(func.count())
+            .select_from(ResponseAnalysis)
+            .where(ResponseAnalysis.audit_id == audit.id)
+        )
+        assert artifacts == 0
+        assert attempts == 0
+        assert analyses == 0
+        tasks = await list_tasks(
+            session, workspace_id=seed.workspace_id, audit_id=audit.id
+        )
+        assert {t.status for t in tasks} == {"cancelled"}
+        assert all(t.result_artifact_id is None for t in tasks)
+
+
+@pytest.mark.asyncio
+async def test_worker_discards_success_when_lease_lost_mid_call(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Worker A's lease expires mid-call and Worker B claims the task. When A
+    # returns it must NOT write rows for a task it no longer owns (invariant 3/8).
+    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+
+    async def _steal_lease() -> None:
+        async with session_factory() as session:
+            task = await session.scalar(
+                select(AuditTask).where(AuditTask.audit_id == audit.id)
+            )
+            task.lease_owner = "worker-b"  # another worker holds it now
+            await session.commit()
+
+    monkeypatch.setattr(
+        audit_worker, "build_adapter", lambda **_: _HookAdapter(_steal_lease)
+    )
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+
+    worker = AuditWorker(session_factory=session_factory, owner="worker-a")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        # Stale Worker A wrote nothing.
+        artifacts = await session.scalar(
+            select(func.count())
+            .select_from(RawResponseArtifact)
+            .where(RawResponseArtifact.audit_id == audit.id)
+        )
+        attempts = await session.scalar(
+            select(func.count())
+            .select_from(ProviderAttempt)
+            .where(ProviderAttempt.audit_id == audit.id)
+        )
+        assert artifacts == 0
+        assert attempts == 0
+        task = await session.scalar(
+            select(AuditTask).where(AuditTask.audit_id == audit.id)
+        )
+        # The task still belongs to Worker B, not finalized by the stale worker.
+        assert task.lease_owner == "worker-b"
+        assert task.status == "running"
+        assert task.result_artifact_id is None
+
+
+class _FlakyAdapter(_StubAdapter):
+    """Fails with a retryable error ``fail_times`` times, then succeeds."""
+
+    def __init__(self, *, fail_times: int) -> None:
+        self._fail_times = fail_times
+        self.calls = 0
+
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            raise ProviderError(
+                "temporary rate limit",
+                error_code=ERROR_RATE_LIMIT,
+                retryable=True,
+            )
+        return await super().execute(request)
+
+
+@pytest.mark.asyncio
+async def test_worker_records_one_attempt_per_provider_call(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Two retryable failures then a success -> three append-only ProviderAttempt
+    # rows (invariant 3: one row per attempt), not a single collapsed row.
+    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+
+    adapter = _FlakyAdapter(fail_times=2)
+    monkeypatch.setattr(audit_worker, "build_adapter", lambda **_: adapter)
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+    # Zero the delay knobs so the internal retry loop is fast + deterministic.
+    monkeypatch.setattr(audit_settings, "retry_base_delay_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "retry_jitter_seconds", 0.0)
+
+    worker = AuditWorker(session_factory=session_factory, owner="w-flaky")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        task = await session.scalar(
+            select(AuditTask).where(AuditTask.audit_id == audit.id)
+        )
+        assert task.status == "succeeded"
+        assert task.attempt_count == 3
+
+        attempts = (
+            await session.scalars(
+                select(ProviderAttempt)
+                .where(ProviderAttempt.audit_id == audit.id)
+                .order_by(ProviderAttempt.attempt_number.asc())
+            )
+        ).all()
+        assert len(attempts) == 3
+        assert [a.status for a in attempts] == [
+            ATTEMPT_STATUS_FAILED,
+            ATTEMPT_STATUS_FAILED,
+            ATTEMPT_STATUS_SUCCEEDED,
+        ]
+        assert [a.attempt_number for a in attempts] == [1, 2, 3]
+        # The first two carry the retryable error; the last carries the artifact.
+        assert attempts[0].error_code == ERROR_RATE_LIMIT
+        assert attempts[1].error_code == ERROR_RATE_LIMIT
+        assert attempts[-1].artifact_id is not None
+
+        # Exactly one immutable artifact for the single successful call.
+        artifacts = await session.scalar(
+            select(func.count())
+            .select_from(RawResponseArtifact)
+            .where(RawResponseArtifact.audit_id == audit.id)
+        )
+        assert artifacts == 1

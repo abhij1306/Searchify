@@ -179,3 +179,69 @@ async def test_create_audit_rejects_engine_without_route(
                 prompt_set_id=seed.prompt_set_id,
                 repetitions=1,
             )
+
+
+@pytest.mark.asyncio
+async def test_create_audit_rejects_unknown_or_disabled_prompt_ids(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    import uuid
+
+    from sqlalchemy import select
+
+    from app.models.prompt import Prompt
+
+    async with session_factory() as session:
+        seed = await seed_audit_fixtures(session, prompt_count=3)
+
+    # Disable one of the seeded prompts.
+    async with session_factory() as session:
+        disabled_id = seed.prompt_ids[0]
+        prompt = await session.get(Prompt, disabled_id)
+        prompt.enabled = False
+        await session.commit()
+
+    # A request that includes the disabled prompt is rejected, not silently
+    # narrowed to the enabled subset.
+    async with session_factory() as session:
+        with pytest.raises(AuditValidationError):
+            await create_audit(
+                session,
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                engines=seed.engines,
+                prompt_ids=seed.prompt_ids,  # includes the disabled one
+                repetitions=1,
+            )
+
+    # A request that references a completely unknown id is also rejected.
+    async with session_factory() as session:
+        with pytest.raises(AuditValidationError):
+            await create_audit(
+                session,
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                engines=seed.engines,
+                prompt_ids=[seed.prompt_ids[1], uuid.uuid4()],
+                repetitions=1,
+            )
+
+    # Sanity: an explicit list of only enabled, in-project ids still works.
+    async with session_factory() as session:
+        enabled = (
+            await session.scalars(
+                select(Prompt.id)
+                .join(Prompt.prompt_set)
+                .where(Prompt.enabled.is_(True))
+            )
+        ).all()
+        audit = await create_audit(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=seed.project_id,
+            engines=seed.engines,
+            prompt_ids=[seed.prompt_ids[1], seed.prompt_ids[2]],
+            repetitions=1,
+        )
+        assert audit.requested_count == 2
+        assert len(enabled) == 2

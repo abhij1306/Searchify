@@ -47,7 +47,7 @@ from app.core.config.provider_catalog import (
     LOGICAL_ENGINES,
     is_route_approved,
 )
-from app.domain.audits.state_events import record_event
+from app.domain.audits.state_events import apply_transition, record_event
 from app.domain.projects.shim import project_scoring_identity
 from app.models.audit import (
     Audit,
@@ -154,6 +154,19 @@ async def _resolve_prompts(
             "Either prompt_set_id or prompt_ids is required"
         )
     prompts = list((await session.scalars(stmt)).all())
+    # For an explicit id list, reject the whole request if any requested prompt
+    # is missing / disabled / from another project or workspace, rather than
+    # silently auditing a smaller set than the caller asked for.
+    if prompt_ids:
+        requested = set(prompt_ids)
+        resolved_ids = {prompt.id for prompt in prompts}
+        unavailable = requested - resolved_ids
+        if unavailable:
+            missing = ", ".join(str(pid) for pid in sorted(map(str, unavailable)))
+            raise AuditValidationError(
+                "Prompt(s) not found, disabled, or not in this project: "
+                f"{missing}"
+            )
     if not prompts:
         raise AuditValidationError("No enabled prompts to audit")
     return prompts
@@ -395,9 +408,20 @@ async def create_audit(
             )
         )
 
-    # Move DRAFT -> VALIDATING -> QUEUED (validation succeeded, tasks enqueued).
-    audit.status = AUDIT_STATUS_VALIDATING
-    audit.status = AUDIT_STATUS_QUEUED
+    # Move DRAFT -> VALIDATING -> QUEUED through the state machine so an illegal
+    # move raises instead of silently corrupting the lifecycle (invariant 9).
+    apply_transition(
+        session,
+        audit=audit,
+        target=AUDIT_STATUS_VALIDATING,
+        message="audit validating",
+    )
+    apply_transition(
+        session,
+        audit=audit,
+        target=AUDIT_STATUS_QUEUED,
+        message="audit queued",
+    )
     record_event(
         session,
         audit_id=audit.id,
@@ -482,8 +506,16 @@ async def cancel_audit(
     if audit.status not in AUDIT_ACTIVE_STATUSES:
         raise AuditValidationError("Only active audits can be cancelled")
     now = datetime.now(UTC)
-    audit.status = AUDIT_STATUS_CANCELLED
     audit.completed_at = now
+    # Route the flip through the state machine (invariant 9): AUDIT_ACTIVE_STATUSES
+    # only contains statuses the machine allows to reach CANCELLED, so this never
+    # raises here, but it keeps the single enforcement path and records the event.
+    apply_transition(
+        session,
+        audit=audit,
+        target=AUDIT_STATUS_CANCELLED,
+        message="audit cancelled",
+    )
     await session.execute(
         update(AuditTask)
         .where(AuditTask.audit_id == audit.id)

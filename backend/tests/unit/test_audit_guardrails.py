@@ -13,10 +13,15 @@ import asyncio
 
 import pytest
 
-from app.connectors.answer_engines.contracts import AnswerEngineRequest
+from app.connectors.answer_engines.contracts import (
+    AnswerEngineRequest,
+    AnswerEngineResponse,
+)
 from app.connectors.answer_engines.errors import ProviderError
 from app.core.config.audits import audit_settings
 from app.core.config.provider_catalog import (
+    ENGINE_GEMINI,
+    ERROR_RATE_LIMIT,
     ERROR_TIMEOUT,
     TRANSPORT_GOOGLE,
 )
@@ -79,12 +84,14 @@ async def test_call_ceiling_cuts_off_a_stalled_provider(
         audit_worker, "pace_provider_request", lambda provider: asyncio.sleep(0)
     )
 
-    response, error, attempts = await audit_worker._call_with_retries(
+    attempts = await audit_worker._call_with_retries(
         _StallingAdapter(), _request()
     )
 
-    assert response is None
-    assert attempts == 1
+    assert len(attempts) == 1
+    final = attempts[-1]
+    assert final.response is None
+    error = final.error
     assert isinstance(error, ProviderError)
     # A stall surfaces as a retryable timeout, not a hang.
     assert error.error_code == ERROR_TIMEOUT
@@ -107,12 +114,64 @@ async def test_call_ceiling_retries_then_gives_up(
     )
     adapter = _CountingStallAdapter()
 
-    response, error, attempts = await audit_worker._call_with_retries(
-        adapter, _request()
-    )
+    attempts = await audit_worker._call_with_retries(adapter, _request())
 
-    assert response is None
-    # max_attempts=3 -> 3 attempts total, each cut off by the ceiling.
+    # max_attempts=3 -> 3 attempts total, each cut off by the ceiling, and one
+    # CallAttempt record per actual call.
     assert adapter.calls == 3
-    assert attempts == 3
-    assert error is not None and error.error_code == ERROR_TIMEOUT
+    assert len(attempts) == 3
+    assert all(a.response is None for a in attempts)
+    final_error = attempts[-1].error
+    assert final_error is not None and final_error.error_code == ERROR_TIMEOUT
+
+
+class _FlakyAdapter:
+    """Fails with a retryable error N times, then returns a success."""
+
+    transport_provider = TRANSPORT_GOOGLE
+
+    def __init__(self, *, fail_times: int) -> None:
+        self._fail_times = fail_times
+        self.calls = 0
+
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            raise ProviderError(
+                "temporary rate limit",
+                error_code=ERROR_RATE_LIMIT,
+                retryable=True,
+            )
+        return AnswerEngineResponse(
+            logical_engine=ENGINE_GEMINI,
+            transport_provider=TRANSPORT_GOOGLE,
+            transport_model=request.model,
+            answer_text="ok",
+            search_used=False,
+            search_events=(),
+            citations=(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_call_records_one_attempt_per_call_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(audit_settings, "max_attempts", 5)
+    monkeypatch.setattr(audit_settings, "retry_base_delay_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "retry_jitter_seconds", 0.0)
+    monkeypatch.setattr(
+        audit_worker, "pace_provider_request", lambda provider: asyncio.sleep(0)
+    )
+    adapter = _FlakyAdapter(fail_times=2)
+
+    attempts = await audit_worker._call_with_retries(adapter, _request())
+
+    # Two retryable failures then a success -> three CallAttempt records, with
+    # the terminal one carrying the success (invariant 3: one row per call).
+    assert adapter.calls == 3
+    assert len(attempts) == 3
+    assert [a.succeeded for a in attempts] == [False, False, True]
+    assert attempts[0].error is not None
+    assert attempts[0].error.error_code == ERROR_RATE_LIMIT
+    assert attempts[-1].response is not None
