@@ -500,6 +500,11 @@ export const pageAnalysisStatusSchema = z.enum([
   'completed',
   'partially_completed',
   'failed',
+  // Presentation-only terminal states. `blocked` = the latest analyze task
+  // ended under a config-owned policy denial (robots/SSRF); `error` = any other
+  // terminal-unsuccessful analysis. `failed` stays an internal persistence
+  // state (the API never surfaces it as page copy).
+  'error',
   'blocked',
   'cancelled',
 ]);
@@ -723,6 +728,7 @@ export const pageSummarySchema = z
     normalized_url: z.string(),
     display_url: z.string(),
     title: z.string().nullable(),
+    monitored: z.boolean(),
     analysis_status: pageAnalysisStatusSchema,
     error_code: z.string(),
     issue_count: z.number().int().nullable(),

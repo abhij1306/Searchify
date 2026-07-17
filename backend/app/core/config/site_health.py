@@ -345,6 +345,16 @@ SITE_FETCH_ERROR_TOKENS: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Policy-denial/blocking codes: when the latest analyze task ended under one of
+# these, the page's presentation status is `blocked` (rather than the generic
+# `error`). All other terminal-unsuccessful analysis maps to `error`.
+POLICY_BLOCKING_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    {
+        ERROR_ROBOTS_DENIED,
+        ERROR_SSRF_BLOCKED,
+    }
+)
+
 # =========================================================================
 # Coded API failures (stable tokens returned to the client)
 # =========================================================================
@@ -406,6 +416,7 @@ class SiteHealthRule:
         "applicability_key",
         "description",
         "remediation",
+        "display_label",
     )
 
     def __init__(
@@ -420,6 +431,7 @@ class SiteHealthRule:
         applicability_key: str,
         description: str,
         remediation: str,
+        display_label: str = "",
     ) -> None:
         self.rule_id = rule_id
         self.rule_version = rule_version
@@ -430,6 +442,10 @@ class SiteHealthRule:
         self.applicability_key = applicability_key
         self.description = description
         self.remediation = remediation
+        # Current human-facing catalog title (mockup 710/711). The persisted
+        # issue/evaluation rows never store this; the API reads it live so a
+        # relabel takes effect immediately. Empty falls back to ``rule_id``.
+        self.display_label = display_label or rule_id
 
 
 # The rule catalog. Task 5 evaluates these; defined here so the catalog has one
@@ -446,6 +462,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="always",
         description="Page has a non-empty <title>.",
         remediation="Add a concise, descriptive <title> element to the page.",
+        display_label="Missing page title",
     ),
     SiteHealthRule(
         rule_id="technical.meta_description_present",
@@ -457,6 +474,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="always",
         description="Page has a non-empty meta description.",
         remediation="Add a meta description summarizing the page content.",
+        display_label="Missing meta description",
     ),
     SiteHealthRule(
         rule_id="technical.canonical_present",
@@ -468,6 +486,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="always",
         description="Page declares a canonical URL.",
         remediation="Add a <link rel=\"canonical\"> pointing at the preferred URL.",
+        display_label="Missing canonical URL",
     ),
     SiteHealthRule(
         rule_id="technical.indexable",
@@ -479,6 +498,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="always",
         description="Page is not blocked from indexing by a robots meta noindex.",
         remediation="Remove the noindex directive if the page should be indexed.",
+        display_label="Page blocked from indexing",
     ),
     SiteHealthRule(
         rule_id="technical.https",
@@ -490,6 +510,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="always",
         description="Final URL is served over HTTPS.",
         remediation="Serve the page over HTTPS and redirect HTTP to HTTPS.",
+        display_label="Not served over HTTPS",
     ),
     SiteHealthRule(
         rule_id="technical.single_h1",
@@ -501,6 +522,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="has_html",
         description="Page has exactly one <h1> heading.",
         remediation="Use a single <h1> that describes the page's primary topic.",
+        display_label="Multiple or missing H1",
     ),
     SiteHealthRule(
         rule_id="aeo.structured_data_present",
@@ -512,6 +534,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="has_html",
         description="Page includes JSON-LD or microdata structured data.",
         remediation="Add schema.org structured data (JSON-LD preferred).",
+        display_label="Missing structured data",
     ),
     SiteHealthRule(
         rule_id="aeo.open_graph_present",
@@ -523,6 +546,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="has_html",
         description="Page declares Open Graph title/description metadata.",
         remediation="Add og:title and og:description meta tags.",
+        display_label="Missing Open Graph metadata",
     ),
     SiteHealthRule(
         rule_id="aeo.sufficient_text",
@@ -534,6 +558,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         applicability_key="has_html",
         description="Page has enough extractable body text to answer queries.",
         remediation="Add substantive, answer-oriented body content to the page.",
+        display_label="Insufficient page text",
     ),
 )
 

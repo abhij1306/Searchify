@@ -1,4 +1,189 @@
-# Site Health — Handoff (Tasks 5 → 9)
+# Site Health — Authoritative Handoff (Slices 6–9)
+
+> **Updated 2026-07-17. This section supersedes stale status text below.** The older
+> Task 5 notes are retained as implementation history only. Branch:
+> `vorflux/site-health`, based on completed Task 5 commit `6f8bfb1`.
+>
+> **Delivery rule:** finish, verify, commit, and push each slice separately to this
+> same branch. Do not create another feature branch. The checkpoint committed with
+> this handoff contains the current Slice 6 work in progress; independent review and
+> verification findings listed below still need a follow-up commit.
+
+## Current state
+
+- Slices 1–5 are implemented and were verified before Slice 6 began.
+- Slice 5 is complete at `6f8bfb1` (`feat(site-health): complete analysis worker pipeline`).
+- Slice 6 currently adds the API/router/service/DTO/cursor/export implementation,
+  minimal frontend schema alignment, and focused tests. Before the latest review,
+  focused Ruff passed and the full backend suite reported **351 passed**.
+- This is intentionally a continuation checkpoint, not a claim that Slice 6 has
+  passed the final independent verification cycle.
+- Slices 7–9 remain for the next agent. Prioritize direct reuse and speed; the hard
+  crawler, selection, analysis, issues, scoring, event, and snapshot logic already exists.
+
+### Current Slice 6 files
+
+- `backend/app/api/site_health.py`
+- `backend/app/domain/site_health/api_schemas.py`
+- `backend/app/domain/site_health/service.py`
+- `backend/app/domain/site_health/normalization.py`
+- `backend/app/analysis/site_health/exports.py`
+- `backend/app/core/config/site_health.py`
+- `backend/app/main.py`
+- `backend/tests/unit/test_site_health_exports.py`
+- `backend/tests/unit/test_site_health_service_pure.py`
+- `backend/tests/component/test_site_health_api.py`
+- `backend/tests/component/test_health.py`
+- `frontend/lib/api/schemas.ts`
+
+### Outstanding Slice 6 review/verification work
+
+Do not assume these are fixed merely because this checkpoint is pushed:
+
+1. Scope inventory/pages/page-detail/exports to URLs admitted to the selected crawl,
+   not the project's historical URL catalog; test Free-after-Starter downgrade leakage.
+2. Finish minimal frontend transport support: create uses `seed` (not `random_seed`),
+   page params/query keys include `monitored`, SSE uses abortable credentialed fetch
+   streaming with `X-Workspace-Id`, and exports use authenticated `getBlob` plus
+   object-URL cleanup instead of plain navigation.
+3. Page detail must include all persisted rule evaluations and deduplicated link
+   references, with current rule-label fallback and bounded crawl/workspace scoping.
+4. Keep grouped issue canonical identity stable across filters (earliest unfiltered
+   `(created_at, id)`), paginate grouped SQL results without splitting groups, and
+   reject/canonicalize non-representative detail IDs.
+5. Bound issue history to crawls at or before the selected crawl chronology.
+6. Fix sparse status-filter pagination, typed cursor errors (400, not 500), and CSV
+   spreadsheet-formula neutralization for cells beginning `=`, `+`, `-`, or `@`.
+7. Independently verify create/cancel/selection/dashboard, successful non-default
+   workspace SSE/export, stream resume/timeout/disconnect, and full endpoint isolation.
+
+## Owner mockups (committed in this repository)
+
+These images are the source of truth. Keep the existing Searchify shell, tokens,
+components, typography, and light/dark behavior; do not invent a new design system.
+
+| Mockup | File | Slice | Required state |
+|---|---|---:|---|
+| 708 | `docs/mockups/site-health/708.png` | 7 | Free URL discovery in progress, sample/upgrade notice, preview table |
+| 709 | `docs/mockups/site-health/709.png` | 7 | Completed discovery, inventory, staged monitored selection, quota |
+| 712 | `docs/mockups/site-health/712.png` | 7 | Live analysis progress and per-page queued/running/completed states |
+| 713 | `docs/mockups/site-health/713.png` | 7 | Completed dashboard, scores, coverage, tabs, page rows and View actions |
+| 710 | `docs/mockups/site-health/710.png` | 8 | Grouped Issues catalog, severity summaries/filters/remediation |
+| 711 | `docs/mockups/site-health/711.png` | 8 | Per-URL detail, scores, delivery facts, ordered issues |
+
+Session-only design translations (if the continuation runs on the same machine) are
+under `/code/.plans/designs/`: `discovery-live-*`, `inventory-selection-*`,
+`dashboard-analyzing-*`, `dashboard-completed-*`, `issues-catalog-*`, and
+`url-detail-*`, with metadata in `/code/.plans/designs/design-plan.json`.
+The detailed approved execution plan is
+`/code/.plans/v1-searchify-site-health-slices-6-7.md` (its content covers Slices 6–8).
+
+## Slice 7 — Site Health discovery, selection, analysis, dashboard
+
+Implement `/site-health` from mockups 708, 709, 712, and 713.
+
+- Reuse `useProjectContext`, Task 2 Site Health schemas/query factories/filter and
+  staged-selection helpers, and existing card/table/badge/score/alert/skeleton primitives.
+- Discovery: create/cancel crawl and show progressive admitted URLs without implying
+  hidden Free totals. Free remains read-only and sample-scoped.
+- Starter inventory: cursor pagination, search/status filters, staged IDs retained
+  across pages, quota from server entitlement, full-set versioned commit, and stale
+  conflict refetch/rebase followed by explicit resubmission.
+- Analysis: poll crawl/dashboard/pages while active. SSE is only an invalidation
+  accelerator; dropped streams must not stop polling. Invalidate all page queries so
+  rows move queued → running → completed/error/blocked without reload.
+- Dashboard tabs must be server-backed and cursor-safe: monitored, all discovered,
+  and errors/blocked. Never filter only the current client page.
+- Missing/failed scores render `—`, never fabricated zeroes.
+- Exports must be authenticated blob downloads so a selected non-default workspace's
+  `X-Workspace-Id` is preserved.
+- Enable Site Health navigation in Slice 7. Keep View actions disabled until Slice 8
+  lands so the Slice 7 commit contains no broken route.
+- Verify focused frontend tests, lint/build, then the real app/backend/Postgres in a
+  browser. Capture evidence matching all four Slice 7 mockups. Commit and push Slice 7.
+
+Expected route/components:
+
+- `frontend/app/(app)/site-health/page.tsx`
+- `frontend/components/site-health/site-health-screen.tsx`
+- `discovery-progress.tsx`, `inventory-selection.tsx`, `analysis-progress.tsx`
+- `health-dashboard.tsx`, `pages-table.tsx`
+- credentialed `frontend/lib/site-health/use-crawl-events.ts`
+- authenticated `frontend/lib/site-health/download.ts`
+
+## Slice 8 — Issues catalog and per-URL detail
+
+The owner explicitly chose to include Slice 8 so mockup 713's View actions have a
+real destination. Implement mockups 710 and 711.
+
+- `/issues`: current crawl, API-owned occurrence/severity/affected-page summaries,
+  grouped issue search/filters/pagination, current catalog title with `rule_id`
+  fallback, persisted remediation, affected URL navigation, and client-only copy.
+- Do not add unsupported “mark reviewed/resolved” persistence merely because the
+  mockup displays an action.
+- Per-URL route:
+  `/site-health/crawls/[crawlId]/pages/[siteUrlId]`.
+  Render URL metadata, overall/Technical/AEO scores, persisted delivery/normalized
+  facts, all current evaluations/issues ordered by severity, bounded evidence and
+  remediation, deduplicated link references, and paginated crawl-bounded history.
+- Add strict frontend detail/history/issues schemas, API readers, and query keys in
+  this slice (not earlier unless required by Slice 6 contract tests).
+- Activate dashboard View links and Issues navigation only after both destinations work.
+- Browser-check mockups 710/711 and navigation from 713 in a non-default workspace.
+  Commit and push Slice 8.
+
+## Slice 9 — integration, documentation, and end-to-end verification
+
+Use the repository's original roadmap/spec as authority for final closure. Keep this
+slice focused on integration rather than redesigning Slices 1–8.
+
+- Update README/product/API documentation for Site Health setup, entitlements,
+  Free sample behavior, Starter monitored selection, statuses, exports, and routes.
+- Add/finish broad create → discover → select → analyze → dashboard → issues → URL
+  detail → export end-to-end coverage with deterministic fixtures; include cancellation,
+  stale selection, partial/error handling, Free redaction, and non-default workspace.
+- Run full backend and frontend suites, lint, build, migration checks, and browser
+  accessibility/responsive smoke checks. Verify no raw HTML or forbidden totals leak.
+- Reconcile docs/contracts with actual endpoint fields and status vocabulary.
+- Capture final evidence, update the handoff/status, commit and push Slice 9.
+
+## Environment and commands learned in this session
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+export TEST_DATABASE_URL="postgresql+asyncpg://postgres:searchify_dev_password@localhost:55432/test_db"
+cd infra/docker && docker compose up -d db
+cd ../../backend && uv sync --extra dev
+uv run ruff check .
+uv run pytest -q
+cd ../frontend && pnpm install --frozen-lockfile
+pnpm lint
+pnpm build
+```
+
+- PostgreSQL container: `searchify_pg`, port `55432`.
+- Tests create isolated schemas in `test_db`.
+- Real SSE verification needs a migrated live database/server because the stream opens
+  independent `SessionLocal()` sessions rather than the component-test schema override.
+- A live test DB named `searchify_live` was prepared during this session, but a future
+  machine should recreate it rather than assume it exists.
+
+## Guardrails and continuation checklist
+
+- Do not modify `selection.py`, `entitlements.py`, migration `0008_site_health`, shared
+  queue claim ordering, or unrelated `backend/app/analysis/scoring.py` without a proven need.
+- Keep workspace resolution on `require_active_workspace`; foreign/missing IDs must be
+  indistinguishable 404s. Preserve Free count/event/export redaction.
+- Prefer existing helpers/contracts and direct components. Avoid speculative layers,
+  migrations, worker redesign, PageSpeed/CrUX, raw HTML storage, or unrelated cleanup.
+- Before coding: pull `origin/vorflux/site-health`, read this top section, inspect the
+  latest commit/diff, and rerun focused tests. Treat later text below as historical when
+  it conflicts with this authoritative section.
+- After each slice: simplify/review/test, fix findings, commit, and push to the same branch.
+
+---
+
+## Historical handoff (superseded where inconsistent)
 
 > This branch (`vorflux/site-health`) is a **work-in-progress checkpoint**. The
 > tip commit (`a8bd8a8`) intentionally contains **non-importable WIP**: the
