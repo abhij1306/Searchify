@@ -13,8 +13,11 @@ explorer**.
 This repository is the **MVP visibility slice** built on the full target architecture from
 day one — workspaces, workspace-scoped auth, UUID primary keys everywhere, BYOK provider
 settings, a Postgres `FOR UPDATE SKIP LOCKED` task queue (no Redis), and a complete audit
-state machine. Every other AEO surface (LLM Analytics, Traffic, Content, Site Health,
-Topics, integrations, Agent, MCP) is documented as **roadmap** and not yet coded.
+state machine. The **Site Health** surface (an in-house HTTP crawler + on-page/AEO
+analysis with a discovery → selection → analysis → dashboard → issues flow) is also
+implemented — see [`docs/site-health.md`](docs/site-health.md). The remaining AEO surfaces
+(LLM Analytics, Traffic, Content, Topics, integrations, Agent, MCP) are documented as
+**roadmap** and not yet coded.
 
 ---
 
@@ -220,6 +223,11 @@ pnpm test:e2e         # Playwright (requires a browser + running stack)
 - **Prompt intents.** `discovery | comparison | purchase | service | local`.
 - **BYOK security.** Provider API keys are Fernet-encrypted at rest, resolved only at
   execution time, and never returned in a DTO, logged, or sent as part of a prompt.
+- **Site Health capabilities.** Site Health is capability-gated per workspace
+  (`free | starter`). Free runs a deterministic, read-only **sample** crawl and never
+  discloses the discovered/full-site total; Starter runs the full progressive inventory and
+  lets the user pick a monitored URL set (quota-limited) that is analyzed and dashboarded.
+  See [`docs/site-health.md`](docs/site-health.md).
 
 ## Documentation map
 
@@ -232,6 +240,7 @@ pnpm test:e2e         # Playwright (requires a browser + running stack)
 | [`docs/frontend-architecture.md`](docs/frontend-architecture.md) | Routes, API-contract layer, data flow |
 | [`docs/invariants.md`](docs/invariants.md) | The 12 hard rules (review-blocking) |
 | [`docs/design.md`](docs/design.md) | Design tokens, theme, per-screen layout |
+| [`docs/site-health.md`](docs/site-health.md) | Site Health: entitlements, statuses, API endpoints, routes, exports |
 | [`docs/plans/`](docs/plans/) | Approved implementation plan + task graph |
 | [`docs/roadmap/`](docs/roadmap/) | Design specs for roadmap surfaces (e.g. the [Technical Audit crawler](docs/roadmap/technical-audit.md)) |
 

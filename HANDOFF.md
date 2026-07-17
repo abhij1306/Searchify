@@ -13,13 +13,28 @@
 
 - Slices 1–5 are implemented and were verified before Slice 6 began.
 - Slice 5 is complete at `6f8bfb1` (`feat(site-health): complete analysis worker pipeline`).
-- Slice 6 currently adds the API/router/service/DTO/cursor/export implementation,
-  minimal frontend schema alignment, and focused tests. Before the latest review,
-  focused Ruff passed and the full backend suite reported **351 passed**.
-- This is intentionally a continuation checkpoint, not a claim that Slice 6 has
-  passed the final independent verification cycle.
-- Slices 7–9 remain for the next agent. Prioritize direct reuse and speed; the hard
-  crawler, selection, analysis, issues, scoring, event, and snapshot logic already exists.
+- **Slices 6–9 are implemented on this branch** (final *independent* verification by
+  the external tester is still pending — see the note at the end of this section):
+  - **Slice 6** (API/router/service/DTO/cursor/export + frontend schema alignment)
+    committed, with the reconciliation follow-up (`0c021e3`) proving handoff items 1–7.
+  - **Slice 7** (`04c7c6a`) — discovery / inventory selection / live analysis /
+    dashboard UI, Site Health nav enabled.
+  - **Slice 8** (`bd0470f`) — grouped Issues catalog + per-URL detail UI, dashboard
+    View links + Issues nav activated.
+  - **Slice 9** (this commit) — integration & documentation closure: docs reconciled
+    to the shipped endpoint fields/status vocabulary (new `docs/site-health.md`; README,
+    backend/frontend architecture, design, roadmap docs updated) and broad deterministic
+    backend E2E coverage added (`backend/tests/component/test_site_health_e2e.py`):
+    full create→discover→select→analyze→dashboard→issues→URL-detail→export read journey,
+    create/cancel lifecycle, stale-selection 409, partial/error page projection, Free
+    redaction end to end, and the same journey in a non-default workspace.
+- **Verification state at the Slice 9 commit:** backend `ruff` clean and the full
+  backend suite green (**373 passed**, DB-backed); frontend `vitest` green
+  (**275 passed**). The live SSE / real-worker browser dry run against a migrated live
+  server remains for the external testing agent (it needs a live DB/server because the
+  stream opens independent `SessionLocal()` sessions, not the component-test override).
+- Prioritize direct reuse and speed; the hard crawler, selection, analysis, issues,
+  scoring, event, and snapshot logic already exists.
 
 ### Current Slice 6 files
 
@@ -133,6 +148,17 @@ real destination. Implement mockups 710 and 711.
   Commit and push Slice 8.
 
 ## Slice 9 — integration, documentation, and end-to-end verification
+
+> **Implemented on this branch (Slice 9 commit).** Docs reconciled to the shipped
+> endpoint fields/status vocabulary and broad deterministic backend E2E coverage added
+> (`backend/tests/component/test_site_health_e2e.py`, reusing the Slice 6 seed helpers —
+> no fixture duplication). New reference: `docs/site-health.md`. Updated: `README.md`,
+> `docs/backend-architecture.md`, `docs/frontend-architecture.md`, `docs/design.md`,
+> `docs/roadmap/technical-audit.md`, `docs/roadmap/README.md`.
+>
+> **Still pending (external tester only):** the live SSE / real-worker browser dry run
+> against a migrated live server, plus the accessibility/responsive browser smoke checks
+> and final evidence capture. These are intentionally not duplicated here.
 
 Use the repository's original roadmap/spec as authority for final closure. Keep this
 slice focused on integration rather than redesigning Slices 1–8.
