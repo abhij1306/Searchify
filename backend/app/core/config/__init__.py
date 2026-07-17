@@ -153,7 +153,7 @@ def _check_secret_defaults() -> None:
     msg = (
         "SECURITY WARNING: insecure default secrets detected: "
         + "; ".join(issues)
-        + '. Generate secure values: '
+        + ". Generate secure values: "
         + 'python -c "import secrets; print(secrets.token_urlsafe(64))"'
     )
     if is_non_dev:

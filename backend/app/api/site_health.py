@@ -85,9 +85,7 @@ def _not_found(detail: str = "Not found") -> HTTPException:
 
 
 def _bad_cursor(exc: InvalidCursorError) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-    )
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 # =========================================================================
@@ -97,9 +95,7 @@ def _bad_cursor(exc: InvalidCursorError) -> HTTPException:
 async def get_entitlements_endpoint(
     ctx: _WorkspaceDep, session: _SessionDep
 ) -> EntitlementResponse:
-    view = await service.get_entitlement_view(
-        session, workspace_id=ctx.workspace_id
-    )
+    view = await service.get_entitlement_view(session, workspace_id=ctx.workspace_id)
     await session.commit()  # persist the fail-closed Free seed on first use
     return EntitlementResponse.model_validate(view)
 
@@ -335,9 +331,7 @@ async def get_pages_endpoint(
     return PagesPage.model_validate(page)
 
 
-@router.get(
-    "/site-crawls/{crawl_id}/pages/{site_url_id}", response_model=PageDetail
-)
+@router.get("/site-crawls/{crawl_id}/pages/{site_url_id}", response_model=PageDetail)
 async def get_page_detail_endpoint(
     crawl_id: uuid.UUID,
     site_url_id: uuid.UUID,
@@ -527,9 +521,7 @@ async def get_issue_detail_endpoint(
 # =========================================================================
 # Dashboard
 # =========================================================================
-@router.get(
-    "/projects/{project_id}/site-health", response_model=DashboardResponse
-)
+@router.get("/projects/{project_id}/site-health", response_model=DashboardResponse)
 async def get_dashboard_endpoint(
     project_id: uuid.UUID,
     ctx: _WorkspaceDep,
@@ -552,24 +544,16 @@ async def get_dashboard_endpoint(
 # Events (JSON replay or redacted SSE tail)
 # =========================================================================
 def _sse_payload(event, *, count_disclosure: bool) -> str:
-    payload = redact_event_payload(
-        event.payload, count_disclosure=count_disclosure
-    )
+    payload = redact_event_payload(event.payload, count_disclosure=count_disclosure)
     body = {
         "id": str(event.id),
         "crawl_id": str(event.crawl_id),
         "event_type": event.event_type,
         "message": event.message or "",
         "payload": payload or {},
-        "created_at": event.created_at.isoformat()
-        if event.created_at
-        else None,
+        "created_at": event.created_at.isoformat() if event.created_at else None,
     }
-    return (
-        f"event: {event.event_type}\n"
-        f"id: {event.id}\n"
-        f"data: {json.dumps(body)}\n\n"
-    )
+    return f"event: {event.event_type}\nid: {event.id}\ndata: {json.dumps(body)}\n\n"
 
 
 async def _event_stream(
@@ -637,13 +621,9 @@ async def get_events_endpoint(
                 "crawl_id": str(e.crawl_id),
                 "event_type": e.event_type,
                 "message": e.message or "",
-                "payload": redact_event_payload(
-                    e.payload, count_disclosure=disclose
-                )
+                "payload": redact_event_payload(e.payload, count_disclosure=disclose)
                 or {},
-                "created_at": e.created_at.isoformat()
-                if e.created_at
-                else None,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
             }
             for e in events
         ]
@@ -661,9 +641,7 @@ async def get_events_endpoint(
         except ValueError:
             last_event_id = None
     return StreamingResponse(
-        _event_stream(
-            ctx.workspace_id, crawl_id, last_event_id=last_event_id
-        ),
+        _event_stream(ctx.workspace_id, crawl_id, last_event_id=last_event_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

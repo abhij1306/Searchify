@@ -7,6 +7,7 @@ pass-through (not raised), redirect following + re-validation, redirect-limit,
 redirect-escapes-scope, redirect-to-private (SSRF), timeout, wire-byte cap, and
 the decoded-byte (gzip compression bomb) cap.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -60,9 +61,7 @@ class _FakeResolver:
 
 
 def _fetcher(handler, resolver) -> SecureFetcher:
-    return SecureFetcher(
-        resolver=resolver, transport=httpx.MockTransport(handler)
-    )
+    return SecureFetcher(resolver=resolver, transport=httpx.MockTransport(handler))
 
 
 # --- redact_headers -------------------------------------------------------
@@ -109,9 +108,7 @@ async def test_fetch_success_returns_bounded_result():
 
 async def test_fetch_rejects_unsupported_content_type():
     def handler(request: httpx.Request) -> httpx.Response:
-        return _html_response(
-            body=b"%PDF-1.4", content_type="application/pdf"
-        )
+        return _html_response(body=b"%PDF-1.4", content_type="application/pdf")
 
     resolver = _FakeResolver({})
     async with _fetcher(handler, resolver) as fetcher:
@@ -152,9 +149,7 @@ async def test_fetch_returns_http_error_statuses(status):
 async def test_fetch_follows_in_scope_redirect_and_records_chain():
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/old":
-            return httpx.Response(
-                301, headers={"location": "https://example.com/new"}
-            )
+            return httpx.Response(301, headers={"location": "https://example.com/new"})
         return _html_response(body=b"<html></html>")
 
     resolver = _FakeResolver({"example.com": [_PUBLIC_IP]})
@@ -202,9 +197,7 @@ async def test_fetch_redirect_limit_exceeded():
 
 async def test_fetch_redirect_escaping_scope_blocked():
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            302, headers={"location": "https://evil.com/x"}
-        )
+        return httpx.Response(302, headers={"location": "https://evil.com/x"})
 
     resolver = _FakeResolver({"example.com": [_PUBLIC_IP], "evil.com": [_PUBLIC_IP]})
     async with _fetcher(handler, resolver) as fetcher:
@@ -404,9 +397,7 @@ async def test_fetch_flushed_tail_still_enforces_decoded_cap():
 
 async def test_fetch_extracts_declared_charset():
     def handler(request: httpx.Request) -> httpx.Response:
-        return _html_response(
-            content_type="text/html; charset=ISO-8859-1"
-        )
+        return _html_response(content_type="text/html; charset=ISO-8859-1")
 
     resolver = _FakeResolver({})
     async with _fetcher(handler, resolver) as fetcher:

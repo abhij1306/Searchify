@@ -8,6 +8,7 @@ Searchify's UUID + workspace-scoped model. Covers the B3 acceptance:
   - CSV bulk-import persists prompts as ``imported``;
   - cross-workspace access is denied (reuses the B2 isolation pattern).
 """
+
 from __future__ import annotations
 
 import io
@@ -73,9 +74,7 @@ async def test_project_list_and_update_and_delete(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "p2@example.com")
-    created = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    created = (await client.post("/api/v1/projects", json=_project_payload())).json()
 
     listing = await client.get("/api/v1/projects")
     assert listing.status_code == 200
@@ -113,9 +112,7 @@ async def test_prompt_set_and_prompt_crud_and_intent_validation(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "p4@example.com")
-    project = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    project = (await client.post("/api/v1/projects", json=_project_payload())).json()
 
     ps = await client.post(
         "/api/v1/prompt-sets",
@@ -166,9 +163,7 @@ async def test_csv_import_bulk_creates_imported_prompts(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "p5@example.com")
-    project = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    project = (await client.post("/api/v1/projects", json=_project_payload())).json()
     prompt_set_id = (
         await client.post(
             "/api/v1/prompt-sets",
@@ -196,9 +191,7 @@ async def test_csv_import_bulk_creates_imported_prompts(
 @pytest.mark.asyncio
 async def test_csv_import_accepts_json_rows(client: httpx.AsyncClient) -> None:
     await _register(client, "p5b@example.com")
-    project = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    project = (await client.post("/api/v1/projects", json=_project_payload())).json()
     prompt_set_id = (
         await client.post(
             "/api/v1/prompt-sets",
@@ -220,9 +213,7 @@ async def test_generate_is_not_implemented_stub(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "p6@example.com")
-    project = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    project = (await client.post("/api/v1/projects", json=_project_payload())).json()
     prompt_set_id = (
         await client.post(
             "/api/v1/prompt-sets",
@@ -230,9 +221,7 @@ async def test_generate_is_not_implemented_stub(
         )
     ).json()["id"]
 
-    resp = await client.post(
-        f"/api/v1/prompt-sets/{prompt_set_id}/generate"
-    )
+    resp = await client.post(f"/api/v1/prompt-sets/{prompt_set_id}/generate")
     assert resp.status_code == 501
     assert resp.json()["detail"]["code"] == "not_implemented"
 
@@ -248,9 +237,7 @@ async def test_cross_workspace_project_isolation(
 ) -> None:
     """User B cannot see or fetch user A's project (invariant 5)."""
     await _register(client, "owner-a@example.com")
-    a_project = (
-        await client.post("/api/v1/projects", json=_project_payload())
-    ).json()
+    a_project = (await client.post("/api/v1/projects", json=_project_payload())).json()
 
     # Switch to user B (fresh session cookie in the same client).
     client.cookies.clear()

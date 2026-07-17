@@ -4,6 +4,7 @@ Pure, offline: local HTML byte fixtures only (no live internet). Covers full
 fact extraction, malformed/partial pages, the bounded limits, delivery/security
 facts, and JSON-LD / microdata validation against the config schema map.
 """
+
 from __future__ import annotations
 
 from app.analysis.site_health.parser import extract_page_facts
@@ -109,9 +110,7 @@ def test_links_and_assets_classification():
     internal = {a["url"]: a["is_internal"] for a in links["anchors"]}
     assert internal["https://acme.example.com/about"] is True
     assert internal["https://external.org/x"] is False
-    assert [a["rel"] for a in links["anchors"] if "about" in a["url"]] == [
-        "nofollow"
-    ]
+    assert [a["rel"] for a in links["anchors"] if "about" in a["url"]] == ["nofollow"]
     assert len(links["scripts"]) == 2
     assert len(links["stylesheets"]) == 1
     # One sync script blocks; async does not; one stylesheet blocks.
@@ -201,8 +200,7 @@ def test_link_bound_enforced(monkeypatch):
     # Build a page with more anchors than the configured bound.
     limit = site_health_settings.max_links_per_page
     anchors = "".join(
-        f'<a href="https://acme.example.com/p{i}">l</a>'
-        for i in range(limit + 25)
+        f'<a href="https://acme.example.com/p{i}">l</a>' for i in range(limit + 25)
     )
     body = (
         f"<html><head><title>x</title></head><body>{anchors}</body></html>"
@@ -225,8 +223,7 @@ def test_structured_data_block_bound_enforced():
 def test_text_bound_enforced():
     long_text = "word " * 5000
     body = (
-        f"<html><head><title>x</title></head>"
-        f"<body><p>{long_text}</p></body></html>"
+        f"<html><head><title>x</title></head><body><p>{long_text}</p></body></html>"
     ).encode()
     facts = extract_page_facts(
         body,
@@ -238,9 +235,7 @@ def test_text_bound_enforced():
 
 
 def test_jsonld_missing_required_property_invalid():
-    facts = parse_jsonld_blocks(
-        ['{"@type":"Article","headline":"H"}'], max_blocks=10
-    )
+    facts = parse_jsonld_blocks(['{"@type":"Article","headline":"H"}'], max_blocks=10)
     assert len(facts) == 1
     assert facts[0]["type"] == "Article"
     assert facts[0]["valid"] is False
@@ -260,9 +255,7 @@ def test_jsonld_graph_and_type_url_normalization():
 
 
 def test_unrecognized_jsonld_type_ignored():
-    facts = parse_jsonld_blocks(
-        ['{"@type":"UnknownThing","name":"x"}'], max_blocks=10
-    )
+    facts = parse_jsonld_blocks(['{"@type":"UnknownThing","name":"x"}'], max_blocks=10)
     assert facts == []
 
 
@@ -297,8 +290,8 @@ def test_empty_charset_auto_detects():
 def test_valid_declared_charset_is_honored():
     # A Latin-1 page whose non-ASCII byte must be decoded with the declared
     # charset (not UTF-8) to yield the correct title character.
-    body = (
-        "<html><head><title>Caf\u00e9</title></head><body>x</body></html>"
-    ).encode("latin-1")
+    body = ("<html><head><title>Caf\u00e9</title></head><body>x</body></html>").encode(
+        "latin-1"
+    )
     facts = _facts(body, charset="ISO-8859-1")
     assert facts["title"] == "Caf\u00e9"

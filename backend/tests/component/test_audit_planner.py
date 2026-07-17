@@ -7,6 +7,7 @@ Exercises ``create_audit`` against a real Postgres schema:
   - ``cancel_audit`` flips the audit to ``cancelled`` and terminalizes every
     non-terminal task so a live worker stops at its boundary.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -166,9 +167,7 @@ async def test_create_audit_rejects_engine_without_route(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        seed = await seed_audit_fixtures(
-            session, prompt_count=1, engines=["gemini"]
-        )
+        seed = await seed_audit_fixtures(session, prompt_count=1, engines=["gemini"])
     async with session_factory() as session:
         with pytest.raises(AuditValidationError):
             await create_audit(
@@ -193,9 +192,7 @@ async def test_create_audit_ignores_inactive_legacy_route(
     from app.models.provider import ProviderConnection, ProviderRoute
 
     async with session_factory() as session:
-        seed = await seed_audit_fixtures(
-            session, prompt_count=1, engines=["gemini"]
-        )
+        seed = await seed_audit_fixtures(session, prompt_count=1, engines=["gemini"])
 
     async with session_factory() as session:
         connection = ProviderConnection(

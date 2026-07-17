@@ -1,4 +1,5 @@
 """Unit tests for the MVP prompt CSV parser (B3)."""
+
 from __future__ import annotations
 
 from app.domain.prompts.csv_import import parse_prompt_csv

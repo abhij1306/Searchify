@@ -179,15 +179,11 @@ def _score_summary(crawl: SiteCrawl) -> dict | None:
         "aeo_score": summary.get("aeo_score"),
         "selected_count": int(summary.get("selected_count", 0) or 0),
         "analyzed_count": int(
-            summary.get(
-                "analyzed_count", summary.get("analyzed_url_count", 0)
-            )
-            or 0
+            summary.get("analyzed_count", summary.get("analyzed_url_count", 0)) or 0
         ),
         "issue_count": int(summary.get("issue_count", 0) or 0),
         "scoring_version": str(
-            summary.get("scoring_version") or crawl.scoring_version
-            or SCORING_VERSION
+            summary.get("scoring_version") or crawl.scoring_version or SCORING_VERSION
         ),
     }
 
@@ -226,9 +222,7 @@ def project_crawl(crawl: SiteCrawl) -> dict:
             if (disclose and crawl.inventory_complete)
             else None
         ),
-        "has_more_site_urls": (
-            (not crawl.inventory_complete) if disclose else None
-        ),
+        "has_more_site_urls": ((not crawl.inventory_complete) if disclose else None),
         "score_summary": _score_summary(crawl),
         "extractor_version": crawl.extractor_version,
         "analyzer_version": crawl.analyzer_version,
@@ -323,9 +317,7 @@ async def get_entitlement_view(
 async def get_crawl_summary(
     session: AsyncSession, *, workspace_id: uuid.UUID, crawl_id: uuid.UUID
 ) -> dict:
-    crawl = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     return project_crawl(crawl)
 
 
@@ -345,9 +337,7 @@ async def list_crawls(
     stmt = select(SiteCrawl).where(SiteCrawl.workspace_id == workspace_id)
     if project_id is not None:
         # Authorize the project so a foreign id is a 404, not an empty page.
-        await _load_project(
-            session, workspace_id=workspace_id, project_id=project_id
-        )
+        await _load_project(session, workspace_id=workspace_id, project_id=project_id)
         stmt = stmt.where(SiteCrawl.project_id == project_id)
 
     if cursor:
@@ -365,9 +355,9 @@ async def list_crawls(
             )
         )
 
-    stmt = stmt.order_by(
-        SiteCrawl.created_at.desc(), SiteCrawl.id.desc()
-    ).limit(limit + 1)
+    stmt = stmt.order_by(SiteCrawl.created_at.desc(), SiteCrawl.id.desc()).limit(
+        limit + 1
+    )
     rows = list((await session.scalars(stmt)).all())
 
     next_cursor: str | None = None
@@ -458,9 +448,7 @@ async def cancel_crawl(
         count_disclosure=_crawl_count_disclosure(crawl),
     )
     await session.commit()
-    refreshed = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    refreshed = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     return project_crawl(refreshed)
 
 
@@ -624,9 +612,7 @@ async def get_inventory(
     the endpoint + filter fingerprint so a filter change invalidates it. Nullable
     latest-analysis summaries are attached per row.
     """
-    crawl = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     limit = _clamp_limit(limit)
     project_id = crawl.project_id
     scope = "inventory"
@@ -653,9 +639,7 @@ async def get_inventory(
             )
         )
 
-    monitored_ids = await _monitored_site_url_ids(
-        session, project_id=project_id
-    )
+    monitored_ids = await _monitored_site_url_ids(session, project_id=project_id)
     if monitored is True:
         if not monitored_ids:
             return {"items": [], "next_cursor": None}
@@ -673,9 +657,9 @@ async def get_inventory(
     # presentation status) can still return a full page.
     fetch = limit + 1
     fetch_size = fetch if status is None else fetch * 4
-    stmt = stmt.order_by(
-        SiteUrl.normalized_url.asc(), SiteUrl.id.asc()
-    ).limit(fetch_size)
+    stmt = stmt.order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc()).limit(
+        fetch_size
+    )
     rows = list((await session.scalars(stmt)).all())
 
     site_ids = [r.id for r in rows]
@@ -719,9 +703,7 @@ async def get_inventory(
                 "technical_score": (
                     analysis.technical_score if analysis is not None else None
                 ),
-                "aeo_score": (
-                    analysis.aeo_score if analysis is not None else None
-                ),
+                "aeo_score": (analysis.aeo_score if analysis is not None else None),
                 "overall_score": (
                     analysis.overall_score if analysis is not None else None
                 ),
@@ -745,11 +727,7 @@ async def get_inventory(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif (
-        status is not None
-        and last_scanned is not None
-        and len(rows) >= fetch_size
-    ):
+    elif status is not None and last_scanned is not None and len(rows) >= fetch_size:
         # A sparse status filter can leave a partial (or even empty) page while
         # more matching rows exist beyond the scanned window. We fetched a full
         # window, so emit a cursor at the last SCANNED row (not the last matched
@@ -768,9 +746,7 @@ def _decode_url_keyset(
     # Any typed-cursor failure (scope/filter mismatch, tamper, or a malformed
     # id payload) becomes an InvalidCursorError so the router returns 400.
     try:
-        url_raw, id_raw = decode_keyset_cursor(
-            cursor, scope=scope, filters=filters
-        )
+        url_raw, id_raw = decode_keyset_cursor(cursor, scope=scope, filters=filters)
         return url_raw, uuid.UUID(id_raw)
     except CursorScopeError as exc:
         raise InvalidCursorError(str(exc)) from exc
@@ -783,9 +759,7 @@ def _decode_created_id_keyset(
 ) -> tuple[datetime, uuid.UUID]:
     """Decode a ``(created_at, id)`` keyset cursor (400 on any failure)."""
     try:
-        created_raw, id_raw = decode_keyset_cursor(
-            cursor, scope=scope, filters=filters
-        )
+        created_raw, id_raw = decode_keyset_cursor(cursor, scope=scope, filters=filters)
         return datetime.fromisoformat(created_raw), uuid.UUID(id_raw)
     except CursorScopeError as exc:
         raise InvalidCursorError(str(exc)) from exc
@@ -800,13 +774,9 @@ async def get_monitored_set(
     session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
 ) -> dict:
     """Project's persistent monitored set + selection version + workspace quota."""
-    await _load_project(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
+    await _load_project(session, workspace_id=workspace_id, project_id=project_id)
     profile = await session.scalar(
-        select(SiteHealthProfile).where(
-            SiteHealthProfile.project_id == project_id
-        )
+        select(SiteHealthProfile).where(SiteHealthProfile.project_id == project_id)
     )
     selection_version = int(profile.selection_version) if profile else 0
 
@@ -884,9 +854,7 @@ async def get_pages(
     cursor fingerprint. Rows are the crawl's project ``SiteUrl`` set, projected
     with the latest analysis and derived presentation status.
     """
-    crawl = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     limit = _clamp_limit(limit)
     project_id = crawl.project_id
     scope = "pages"
@@ -896,9 +864,7 @@ async def get_pages(
         "monitored": (str(monitored) if monitored is not None else None),
     }
 
-    monitored_ids = await _monitored_site_url_ids(
-        session, project_id=project_id
-    )
+    monitored_ids = await _monitored_site_url_ids(session, project_id=project_id)
     # Scope to URLs admitted to THIS crawl (see `get_inventory`): a downgraded
     # / different later crawl never exposes a prior crawl's fuller URL set.
     stmt = select(SiteUrl).where(
@@ -913,18 +879,16 @@ async def get_pages(
         stmt = stmt.where(SiteUrl.id.notin_(list(monitored_ids)))
 
     if cursor:
-        cur_url, cur_id = _decode_url_keyset(
-            cursor, scope=scope, filters=filters
-        )
+        cur_url, cur_id = _decode_url_keyset(cursor, scope=scope, filters=filters)
         stmt = stmt.where(
             tuple_(SiteUrl.normalized_url, SiteUrl.id) > (cur_url, cur_id)
         )
 
     fetch = limit + 1
     fetch_size = fetch if status is None else fetch * 4
-    stmt = stmt.order_by(
-        SiteUrl.normalized_url.asc(), SiteUrl.id.asc()
-    ).limit(fetch_size)
+    stmt = stmt.order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc()).limit(
+        fetch_size
+    )
     rows = list((await session.scalars(stmt)).all())
 
     site_ids = [r.id for r in rows]
@@ -966,9 +930,7 @@ async def get_pages(
                 "technical_score": (
                     analysis.technical_score if analysis is not None else None
                 ),
-                "aeo_score": (
-                    analysis.aeo_score if analysis is not None else None
-                ),
+                "aeo_score": (analysis.aeo_score if analysis is not None else None),
                 "overall_score": (
                     analysis.overall_score if analysis is not None else None
                 ),
@@ -992,11 +954,7 @@ async def get_pages(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif (
-        status is not None
-        and last_scanned is not None
-        and len(rows) >= fetch_size
-    ):
+    elif status is not None and last_scanned is not None and len(rows) >= fetch_size:
         # Sparse status filter: a full window yielded a partial/empty page while
         # more matching rows may exist. Advance the cursor to the last SCANNED
         # row so traversal keeps making progress across empty windows.
@@ -1128,9 +1086,7 @@ async def get_page_detail(
     site_url_id: uuid.UUID,
 ) -> dict:
     """Full per-URL detail from persisted rows only (never a network call)."""
-    crawl = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     # Only a URL admitted to THIS crawl has a detail here (404 otherwise), so a
     # detail request can never surface a URL the crawl did not observe.
     site_url = await session.scalar(
@@ -1143,9 +1099,7 @@ async def get_page_detail(
     if site_url is None:
         raise SiteHealthNotFoundError("Site URL not found")
 
-    monitored_ids = await _monitored_site_url_ids(
-        session, project_id=crawl.project_id
-    )
+    monitored_ids = await _monitored_site_url_ids(session, project_id=crawl.project_id)
     analyses = await _latest_analysis_by_site_url(
         session, crawl_id=crawl_id, site_url_ids=[site_url_id]
     )
@@ -1225,17 +1179,11 @@ async def get_page_detail(
         "analysis_status": pres_status,
         "error_code": error_code,
         "field_cwv_available": False,
-        "technical_score": (
-            analysis.technical_score if analysis is not None else None
-        ),
+        "technical_score": (analysis.technical_score if analysis is not None else None),
         "aeo_score": analysis.aeo_score if analysis is not None else None,
-        "overall_score": (
-            analysis.overall_score if analysis is not None else None
-        ),
+        "overall_score": (analysis.overall_score if analysis is not None else None),
         "issue_count": len(issues) if analysis is not None else None,
-        "last_audited": (
-            _iso(analysis.finalized_at) if analysis is not None else None
-        ),
+        "last_audited": (_iso(analysis.finalized_at) if analysis is not None else None),
         "facts": _page_facts(facts),
         "delivery": _delivery_facts(facts, html_bytes=html_bytes),
         "issues": issues,
@@ -1367,9 +1315,12 @@ async def _issues_summary(
     session: AsyncSession, *, crawl_id: uuid.UUID, clauses: list
 ) -> dict:
     """Crawl-level occurrence/severity + distinct affected/monitored counts."""
-    total = await session.scalar(
-        select(func.count()).select_from(SiteIssue).where(*clauses)
-    ) or 0
+    total = (
+        await session.scalar(
+            select(func.count()).select_from(SiteIssue).where(*clauses)
+        )
+        or 0
+    )
     sev_rows = await session.execute(
         select(SiteIssue.severity, func.count())
         .where(*clauses)
@@ -1378,22 +1329,28 @@ async def _issues_summary(
     severity_counts = {name: 0 for name in _SEVERITY_ORDER}
     for name, count in sev_rows.all():
         severity_counts[name] = int(count)
-    affected = await session.scalar(
-        select(func.count(func.distinct(SiteIssue.site_url_id))).where(*clauses)
-    ) or 0
-    # Distinct affected URLs that are also active monitored members.
-    monitored_affected = await session.scalar(
-        select(func.count(func.distinct(SiteIssue.site_url_id)))
-        .select_from(SiteIssue)
-        .join(
-            MonitoredSiteUrl,
-            and_(
-                MonitoredSiteUrl.site_url_id == SiteIssue.site_url_id,
-                MonitoredSiteUrl.active.is_(True),
-            ),
+    affected = (
+        await session.scalar(
+            select(func.count(func.distinct(SiteIssue.site_url_id))).where(*clauses)
         )
-        .where(*clauses)
-    ) or 0
+        or 0
+    )
+    # Distinct affected URLs that are also active monitored members.
+    monitored_affected = (
+        await session.scalar(
+            select(func.count(func.distinct(SiteIssue.site_url_id)))
+            .select_from(SiteIssue)
+            .join(
+                MonitoredSiteUrl,
+                and_(
+                    MonitoredSiteUrl.site_url_id == SiteIssue.site_url_id,
+                    MonitoredSiteUrl.active.is_(True),
+                ),
+            )
+            .where(*clauses)
+        )
+        or 0
+    )
     return {
         "issue_count": int(total),
         "severity_counts": severity_counts,
@@ -1444,9 +1401,7 @@ async def get_issues(
         rule=rule,
         site_url_id=site_url_id,
     )
-    groups = await _load_issue_groups(
-        session, crawl_id=crawl_id, clauses=clauses
-    )
+    groups = await _load_issue_groups(session, crawl_id=crawl_id, clauses=clauses)
 
     start = 0
     if cursor:
@@ -1503,9 +1458,7 @@ async def get_issues(
         }
         for g in window
     ]
-    summary = await _issues_summary(
-        session, crawl_id=crawl_id, clauses=clauses
-    )
+    summary = await _issues_summary(session, crawl_id=crawl_id, clauses=clauses)
     return {"items": items, "next_cursor": next_cursor, "summary": summary}
 
 
@@ -1559,12 +1512,15 @@ async def get_issue_detail(
         "canonical_id": str(canonical.id),
     }
 
-    total = await session.scalar(
-        select(func.count(func.distinct(SiteIssue.site_url_id))).where(
-            SiteIssue.crawl_id == crawl_id,
-            SiteIssue.rule_id == canonical.rule_id,
+    total = (
+        await session.scalar(
+            select(func.count(func.distinct(SiteIssue.site_url_id))).where(
+                SiteIssue.crawl_id == crawl_id,
+                SiteIssue.rule_id == canonical.rule_id,
+            )
         )
-    ) or 0
+        or 0
+    )
 
     # Distinct affected URLs, ordered (normalized_url, site_url_id).
     aff_stmt = (
@@ -1583,9 +1539,7 @@ async def get_issue_detail(
         .order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc())
     )
     if cursor:
-        cur_url, cur_id = _decode_url_keyset(
-            cursor, scope=scope, filters=filters
-        )
+        cur_url, cur_id = _decode_url_keyset(cursor, scope=scope, filters=filters)
         aff_stmt = aff_stmt.where(
             tuple_(SiteUrl.normalized_url, SiteUrl.id) > (cur_url, cur_id)
         )
@@ -1645,9 +1599,7 @@ async def get_issue_history(
     AND to crawls at or before the selected crawl in the project chronology, so
     an older crawl's detail never shows issues from a later crawl.
     """
-    crawl = await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     # The URL must be admitted to the selected crawl (404 otherwise), matching
     # the page-detail scope; history then spans that crawl and prior ones.
     site_url = await session.scalar(
@@ -1704,9 +1656,9 @@ async def get_issue_history(
                 ),
             )
         )
-    stmt = stmt.order_by(
-        SiteIssue.created_at.desc(), SiteIssue.id.desc()
-    ).limit(limit + 1)
+    stmt = stmt.order_by(SiteIssue.created_at.desc(), SiteIssue.id.desc()).limit(
+        limit + 1
+    )
     rows = list((await session.scalars(stmt)).all())
 
     next_cursor: str | None = None
@@ -1754,9 +1706,7 @@ async def get_dashboard(
     rollups (Slice 7 does not need them). Quota is the workspace-wide active
     monitored count over the entitlement limit.
     """
-    await _load_project(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
+    await _load_project(session, workspace_id=workspace_id, project_id=project_id)
     crawl: SiteCrawl | None
     if crawl_id is not None:
         crawl = await session.scalar(
@@ -1831,6 +1781,4 @@ async def load_crawl_for_stream(
     session: AsyncSession, *, workspace_id: uuid.UUID, crawl_id: uuid.UUID
 ) -> SiteCrawl:
     """Load a crawl for the SSE loop (workspace-scoped; None-safe caller)."""
-    return await _load_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl_id
-    )
+    return await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)

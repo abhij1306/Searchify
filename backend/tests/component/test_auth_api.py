@@ -5,6 +5,7 @@ Covers the B2 acceptance:
   - a workspace is auto-created on first login and the user is a member;
   - cross-workspace access is rejected (403/404).
 """
+
 from __future__ import annotations
 
 import httpx

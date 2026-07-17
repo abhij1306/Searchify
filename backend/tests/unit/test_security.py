@@ -1,4 +1,5 @@
 """Unit tests for core security helpers: argon2, JWT, Fernet."""
+
 from __future__ import annotations
 
 import pytest

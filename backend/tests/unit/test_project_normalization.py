@@ -4,6 +4,7 @@ Ports the reference ``_normalize_prompts`` / ``_normalize_benchmark_mode``
 behaviour: intents are casefolded + validated (unknown -> ""), empty-text
 prompts are dropped, and benchmark modes are validated against the enum.
 """
+
 from __future__ import annotations
 
 import pytest

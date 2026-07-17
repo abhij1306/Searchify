@@ -10,6 +10,7 @@ every lookup is workspace-scoped; a foreign/missing id is a 404). Covers:
   - second-workspace isolation (X-Workspace-Id) for reads, exports, events;
   - SSE event replay.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -72,9 +73,7 @@ async def _register(client: httpx.AsyncClient, email: str) -> None:
     assert reg.status_code == 201
 
 
-async def _seed_scenario(
-    session: AsyncSession, *, email: str
-) -> Scenario:
+async def _seed_scenario(session: AsyncSession, *, email: str) -> Scenario:
     """Seed a completed crawl with 3 URLs, one monitored, one with an issue."""
     root = "https://acme.test/"
     workspace = Workspace(name="Acme WS")
@@ -85,9 +84,7 @@ async def _seed_scenario(
     user = await session.scalar(select(User).where(User.email == email))
     assert user is not None
     session.add(
-        WorkspaceMember(
-            workspace_id=workspace.id, user_id=user.id, role="owner"
-        )
+        WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner")
     )
 
     project = Project(
@@ -343,9 +340,7 @@ async def test_crawl_summary_and_list(
         scn = await _seed_scenario(session, email="crawl@example.com")
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
-    summary = await client.get(
-        f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers
-    )
+    summary = await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers)
     assert summary.status_code == 200
     body = summary.json()
     assert body["id"] == str(scn.crawl_id)
@@ -356,9 +351,7 @@ async def test_crawl_summary_and_list(
         f"/api/v1/site-crawls?project_id={scn.project_id}", headers=headers
     )
     assert listing.status_code == 200
-    assert any(
-        row["id"] == str(scn.crawl_id) for row in listing.json()["items"]
-    )
+    assert any(row["id"] == str(scn.crawl_id) for row in listing.json()["items"])
 
 
 async def test_inventory_monitored_filter(
@@ -431,9 +424,7 @@ async def test_pages_and_issues_projection(
     # the strict `monitored` flag and a derived presentation status.
     assert len(items) == 3
     assert all("monitored" in row for row in items)
-    monitored_flags = {
-        row["site_url_id"]: row["monitored"] for row in items
-    }
+    monitored_flags = {row["site_url_id"]: row["monitored"] for row in items}
     assert monitored_flags[str(scn.monitored_url_id)] is True
     # The analyzed URLs surface a completed status.
     statuses = {row["site_url_id"]: row["analysis_status"] for row in items}
@@ -474,8 +465,7 @@ async def test_pages_and_issues_projection(
     assert dbody["title"] == "Missing page title"
     assert dbody["affected_url_count"] == 1
     assert any(
-        au["site_url_id"] == str(scn.issue_url_id)
-        for au in dbody["affected_urls"]
+        au["site_url_id"] == str(scn.issue_url_id) for au in dbody["affected_urls"]
     )
 
 
@@ -501,14 +491,10 @@ async def test_page_detail_and_history(
     assert body["delivery"]["field_cwv_available"] is False
     assert body["delivery"]["html_bytes"] == 2048
     # The failing rule surfaces as an issue row on the page detail.
-    assert any(
-        iss["rule_id"] == "technical.title_present"
-        for iss in body["issues"]
-    )
+    assert any(iss["rule_id"] == "technical.title_present" for iss in body["issues"])
 
     history = await client.get(
-        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}"
-        "/issue-history",
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}/issue-history",
         headers=headers,
     )
     assert history.status_code == 200
@@ -595,9 +581,7 @@ async def test_second_workspace_isolation(
 
     # Crawl summary, exports, and events are all scoped to the workspace.
     assert (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}", headers=other_headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=other_headers)
     ).status_code == 404
     assert (
         await client.get(
@@ -614,9 +598,7 @@ async def test_second_workspace_isolation(
     # The correct workspace still resolves the crawl.
     ok_headers = {"X-Workspace-Id": str(scn.workspace_id)}
     assert (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}", headers=ok_headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=ok_headers)
     ).status_code == 200
 
 
@@ -637,9 +619,7 @@ async def _add_second_crawl(
     historical catalog.
     """
     profile = await session.scalar(
-        select(SiteHealthProfile).where(
-            SiteHealthProfile.project_id == scn.project_id
-        )
+        select(SiteHealthProfile).where(SiteHealthProfile.project_id == scn.project_id)
     )
     assert profile is not None
     crawl = SiteCrawl(
@@ -822,9 +802,7 @@ async def test_selected_crawl_scoping_no_downgrade_leakage(
     inv_urls = {row["normalized_url"] for row in inv.json()["items"]}
     assert inv_urls == {"https://acme.test/a"}
 
-    pages = await client.get(
-        f"/api/v1/site-crawls/{second_id}/pages", headers=headers
-    )
+    pages = await client.get(f"/api/v1/site-crawls/{second_id}/pages", headers=headers)
     assert {row["normalized_url"] for row in pages.json()["items"]} == {
         "https://acme.test/a"
     }
@@ -878,8 +856,7 @@ async def test_issue_history_bounded_to_crawl_chronology(
 
     # Earlier crawl: only the earlier issue is in history.
     earlier = await client.get(
-        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}"
-        "/issue-history",
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}/issue-history",
         headers=headers,
     )
     assert earlier.status_code == 200
@@ -888,8 +865,7 @@ async def test_issue_history_bounded_to_crawl_chronology(
 
     # Later crawl: history spans that crawl and prior ones (both issues).
     later = await client.get(
-        f"/api/v1/site-crawls/{second_id}/pages/{scn.issue_url_id}"
-        "/issue-history",
+        f"/api/v1/site-crawls/{second_id}/pages/{scn.issue_url_id}/issue-history",
         headers=headers,
     )
     assert later.status_code == 200
@@ -1109,9 +1085,7 @@ async def test_non_default_workspace_reads_and_exports_succeed(
 
     # Reads resolve in the non-default workspace.
     assert (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers)
     ).status_code == 200
     assert (
         await client.get(
@@ -1119,9 +1093,7 @@ async def test_non_default_workspace_reads_and_exports_succeed(
         )
     ).status_code == 200
     assert (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}/issues", headers=headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}/issues", headers=headers)
     ).status_code == 200
 
     # Exports resolve in the non-default workspace (X-Workspace-Id honored).
@@ -1166,8 +1138,7 @@ async def test_rerun_page_from_completed_crawl_mints_new_crawl(
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
     resp = await client.post(
-        f"/api/v1/site-crawls/{scn.crawl_id}"
-        f"/pages/{scn.monitored_url_id}/rerun",
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.monitored_url_id}/rerun",
         headers=headers,
     )
     assert resp.status_code == 202, resp.text
@@ -1195,12 +1166,14 @@ async def test_rerun_page_from_completed_crawl_mints_new_crawl(
         # Exactly one analyze task was seeded for the reran URL — and no
         # discover root task (so the worker never re-crawls the whole site).
         seeded = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == new_crawl_id
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(SiteCrawlTask.crawl_id == new_crawl_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(seeded) == 1
         assert seeded[0].task_kind == TASK_KIND_ANALYZE
         assert seeded[0].site_url_id == scn.monitored_url_id
@@ -1233,8 +1206,7 @@ async def test_rerun_page_unmonitored_url_is_conflict(
 
     # ``issue_url_id`` (url_b) is analyzed/admitted but NOT monitored.
     resp = await client.post(
-        f"/api/v1/site-crawls/{scn.crawl_id}"
-        f"/pages/{scn.issue_url_id}/rerun",
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}/rerun",
         headers=headers,
     )
     assert resp.status_code == 409, resp.text

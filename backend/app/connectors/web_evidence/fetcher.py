@@ -161,7 +161,8 @@ class SecureFetcher:
             request.max_wire_bytes or s.max_response_wire_bytes,
             request.max_decoded_bytes or s.max_response_decoded_bytes,
             request.timeout_seconds or s.request_timeout_seconds,
-            request.max_redirects if request.max_redirects is not None
+            request.max_redirects
+            if request.max_redirects is not None
             else s.max_redirects,
         )
 
@@ -187,9 +188,7 @@ class SecureFetcher:
                 if ":" in target.connect_ip
                 else target.connect_ip
             )
-            dial_url = parts._replace(
-                netloc=f"{ip_literal}:{target.port}"
-            ).geturl()
+            dial_url = parts._replace(netloc=f"{ip_literal}:{target.port}").geturl()
             headers["host"] = host_header
             return self._client.build_request(
                 method,
@@ -244,12 +243,11 @@ class SecureFetcher:
                 timeout=timeout,
             )
             try:
-                response = await self._client.send(
-                    httpx_request, stream=True
-                )
+                response = await self._client.send(httpx_request, stream=True)
             except httpx.TimeoutException as exc:
                 raise FetchError(
-                    "request timed out", error_code=ERROR_TIMEOUT,
+                    "request timed out",
+                    error_code=ERROR_TIMEOUT,
                     retryable=True,
                 ) from exc
             except httpx.HTTPError as exc:
@@ -296,9 +294,7 @@ class SecureFetcher:
                 max_decoded=max_decoded,
             )
 
-        raise FetchError(
-            "too many redirects", error_code=ERROR_REDIRECT_LIMIT
-        )
+        raise FetchError("too many redirects", error_code=ERROR_REDIRECT_LIMIT)
 
     async def _resolve(
         self,
@@ -320,9 +316,7 @@ class SecureFetcher:
             )
         except UrlPolicyError as exc:
             # Out-of-scope / disallowed scheme-port-userinfo on a redirect hop.
-            raise FetchError(
-                str(exc), error_code=ERROR_SSRF_BLOCKED
-            ) from exc
+            raise FetchError(str(exc), error_code=ERROR_SSRF_BLOCKED) from exc
 
     def _resolve_location(self, base_url: str, location: str) -> str:
         from urllib.parse import urljoin
@@ -405,8 +399,7 @@ class SecureFetcher:
                     decoded_total += len(out)
                     if decoded_total > max_decoded:
                         raise FetchError(
-                            "response exceeded decoded byte cap "
-                            "(compression bomb)",
+                            "response exceeded decoded byte cap (compression bomb)",
                             error_code=ERROR_RESPONSE_TOO_LARGE,
                         )
                     decoded_chunks.append(out)
@@ -429,8 +422,7 @@ class SecureFetcher:
                     decoded_total += len(tail)
                     if decoded_total > max_decoded:
                         raise FetchError(
-                            "response exceeded decoded byte cap "
-                            "(compression bomb)",
+                            "response exceeded decoded byte cap (compression bomb)",
                             error_code=ERROR_RESPONSE_TOO_LARGE,
                         )
                     decoded_chunks.append(tail)
@@ -442,7 +434,8 @@ class SecureFetcher:
                     )
         except httpx.TimeoutException as exc:
             raise FetchError(
-                "request timed out", error_code=ERROR_TIMEOUT,
+                "request timed out",
+                error_code=ERROR_TIMEOUT,
                 retryable=True,
             ) from exc
         except httpx.HTTPError as exc:

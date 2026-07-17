@@ -140,14 +140,10 @@ def _normalize_globs(globs: list[str] | None, *, label: str) -> list[str]:
         if not pattern:
             continue
         if len(pattern) > MAX_GLOB_LENGTH:
-            raise CrawlPlanError(
-                f"{label} glob exceeds max length {MAX_GLOB_LENGTH}"
-            )
+            raise CrawlPlanError(f"{label} glob exceeds max length {MAX_GLOB_LENGTH}")
         cleaned.append(pattern)
     if len(cleaned) > MAX_NARROWING_GLOBS:
-        raise CrawlPlanError(
-            f"too many {label} globs (max {MAX_NARROWING_GLOBS})"
-        )
+        raise CrawlPlanError(f"too many {label} globs (max {MAX_NARROWING_GLOBS})")
     return cleaned
 
 
@@ -170,9 +166,7 @@ async def _load_project(
     return project
 
 
-async def _has_active_crawl(
-    session: AsyncSession, *, project_id: uuid.UUID
-) -> bool:
+async def _has_active_crawl(session: AsyncSession, *, project_id: uuid.UUID) -> bool:
     existing = await session.scalar(
         select(func.count())
         .select_from(SiteCrawl)
@@ -202,9 +196,7 @@ async def _upsert_profile(
     without disturbing the persistent monitored set or ``selection_version``.
     """
     profile = await session.scalar(
-        select(SiteHealthProfile).where(
-            SiteHealthProfile.project_id == project_id
-        )
+        select(SiteHealthProfile).where(SiteHealthProfile.project_id == project_id)
     )
     if profile is None:
         profile = SiteHealthProfile(
@@ -256,9 +248,7 @@ def _frozen_configuration(
         "sample_mode": _is_sample_mode(profile),
         "count_disclosure": profile.count_disclosure,
         "sample_url_limit": int(getattr(entitlement, "sample_url_limit", 0)),
-        "monitored_url_limit": int(
-            getattr(entitlement, "monitored_url_limit", 0)
-        ),
+        "monitored_url_limit": int(getattr(entitlement, "monitored_url_limit", 0)),
         "discovery_url_cap": profile.discovery_url_cap,
         "root_registrable_domain": root_registrable_domain,
         "include_globs": include_globs,
@@ -308,21 +298,15 @@ async def create_crawl(
     )
 
     if await _has_active_crawl(session, project_id=project_id):
-        raise CrawlAlreadyActiveError(
-            "Project already has an active crawl"
-        )
+        raise CrawlAlreadyActiveError("Project already has an active crawl")
 
     raw_root = str(project.website_url or "").strip()
     if not raw_root:
-        raise CrawlPlanError(
-            "Project has no website_url to crawl", code="invalid_root"
-        )
+        raise CrawlPlanError("Project has no website_url to crawl", code="invalid_root")
     try:
         root_url = canonicalize(raw_root)
     except UrlPolicyError as exc:
-        raise CrawlPlanError(
-            f"invalid crawl root: {exc}", code="invalid_root"
-        ) from exc
+        raise CrawlPlanError(f"invalid crawl root: {exc}", code="invalid_root") from exc
 
     root_host, _port = split_host_port(root_url)
     root_registrable_domain = registrable_domain(root_url)
@@ -439,9 +423,7 @@ async def create_crawl(
     )
 
     await session.commit()
-    return await get_crawl(
-        session, workspace_id=workspace_id, crawl_id=crawl.id
-    )
+    return await get_crawl(session, workspace_id=workspace_id, crawl_id=crawl.id)
 
 
 async def create_page_rerun_crawl(
@@ -550,9 +532,7 @@ async def create_page_rerun_crawl(
         url_hash=site_url.url_hash,
         depth=0,
         generation=0,
-        idempotency_key=(
-            f"{crawl.id}:{TASK_KIND_ANALYZE}:{site_url.url_hash}:0"
-        ),
+        idempotency_key=(f"{crawl.id}:{TASK_KIND_ANALYZE}:{site_url.url_hash}:0"),
         status=TASK_STATUS_QUEUED,
         randomized_position=0,
     )

@@ -168,11 +168,7 @@ def _citations(blocks: list[dict[str, Any]]) -> tuple[CitationResult, ...]:
             start = annotation_offset(annotation, "start_index", "startIndex")
             end = annotation_offset(annotation, "end_index", "endIndex")
             cited_text = ""
-            if (
-                start is not None
-                and end is not None
-                and 0 <= start < end <= len(text)
-            ):
+            if start is not None and end is not None and 0 <= start < end <= len(text):
                 cited_text = text[start:end]
             else:
                 start = None
@@ -245,9 +241,7 @@ def _sanitize_metadata(
         "query_text_available": any(
             _item_type(item) == "web_search_call"
             and _action_queries(
-                item.get("action")
-                if isinstance(item.get("action"), dict)
-                else {}
+                item.get("action") if isinstance(item.get("action"), dict) else {}
             )
             for item in items
         ),
@@ -261,9 +255,7 @@ def _normalized_usage(payload: dict[str, Any]) -> dict[str, Any]:
     usage = usage if isinstance(usage, dict) else {}
     input_tokens = coerce_int(usage.get("input_tokens"))
     output_tokens = coerce_int(usage.get("output_tokens"))
-    total_tokens = coerce_int(
-        usage.get("total_tokens"), input_tokens + output_tokens
-    )
+    total_tokens = coerce_int(usage.get("total_tokens"), input_tokens + output_tokens)
     return {
         "total_input_tokens": input_tokens,
         "total_output_tokens": output_tokens,

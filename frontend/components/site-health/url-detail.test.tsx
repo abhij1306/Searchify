@@ -309,6 +309,31 @@ describe('UrlDetail', () => {
     expect(push).toHaveBeenCalledTimes(1);
   });
 
+  it('shows a helpful alert when rerun is rejected for an unmonitored page', async () => {
+    mswServer.use(
+      ...handlers(detail({ analysis_status: 'completed' })),
+      http.post(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/rerun`, () =>
+        HttpResponse.json(
+          { detail: 'rerun_not_allowed' },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<UrlDetail crawlId={CRAWL} siteUrlId={URL_ID} />);
+
+    await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 });
+    await user.click(screen.getByRole('button', { name: 'Re-audit this page' }));
+
+    // `role="alert"` does not take its accessible name from its contents, so
+    // find the alert and assert on its text.
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'This page is not part of the active monitored selection, so it cannot be re-audited. Add it to your monitored set first.',
+    );
+  });
+
   it(
     'landing on a fresh rerun crawl with ?rerun=1 begins polling immediately',
     async () => {

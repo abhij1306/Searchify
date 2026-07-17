@@ -22,9 +22,7 @@ from app.connectors.web_evidence.url_policy import canonicalize
 
 def url_hash(normalized_url: str) -> str:
     """Return the stable 64-char identity hash for a canonical URL."""
-    return hashlib.sha256(
-        str(normalized_url).encode("utf-8")
-    ).hexdigest()[:64]
+    return hashlib.sha256(str(normalized_url).encode("utf-8")).hexdigest()[:64]
 
 
 def canonical_identity(url: str, *, base_url: str | None = None) -> tuple[str, str]:
@@ -131,7 +129,5 @@ def decode_keyset_cursor(
     except (binascii.Error, ValueError, KeyError, TypeError) as exc:
         raise ValueError("invalid cursor") from exc
     if stored_fp != filter_fingerprint(scope, filters):
-        raise CursorScopeError(
-            "cursor does not match the current endpoint filters"
-        )
+        raise CursorScopeError("cursor does not match the current endpoint filters")
     return values

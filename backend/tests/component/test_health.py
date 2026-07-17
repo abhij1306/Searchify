@@ -1,4 +1,5 @@
 """Component test: the app imports cleanly and /health returns 200."""
+
 from __future__ import annotations
 
 import httpx

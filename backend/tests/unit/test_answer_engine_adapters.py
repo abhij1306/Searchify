@@ -259,9 +259,7 @@ def test_anthropic_payload_uses_native_web_search_and_top_level_system() -> None
     )
     payload = anthropic_payload(request, country_code="AU")
     assert payload["system"] == "Answer for Australia."
-    assert payload["messages"] == [
-        {"role": "user", "content": "cheap baby clothes"}
-    ]
+    assert payload["messages"] == [{"role": "user", "content": "cheap baby clothes"}]
     tool = payload["tools"][0]
     assert tool["type"] == "web_search_20250305"
     assert tool["name"] == "web_search"
@@ -562,22 +560,16 @@ def test_openai_adapter_requires_key() -> None:
     assert excinfo.value.retryable is False
 
 
-async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() -> (
-    None
-):
+async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() -> None:
     captured: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["auth"] = request.headers.get("Authorization")
         captured["body"] = json.loads(request.content.decode())
-        return httpx.Response(
-            200, json=_load_fixture("openai_responses_grounded.json")
-        )
+        return httpx.Response(200, json=_load_fixture("openai_responses_grounded.json"))
 
     transport = httpx.MockTransport(handler)
-    adapter = OpenAIAnswerEngineAdapter(
-        api_key="secret-openai-key", country_code="AU"
-    )
+    adapter = OpenAIAnswerEngineAdapter(api_key="secret-openai-key", country_code="AU")
     import app.connectors.answer_engines.openai as openai_mod
 
     orig = httpx.AsyncClient

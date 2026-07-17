@@ -65,13 +65,13 @@ export function LaunchDialog({
   });
 
   const promptSets = promptSetsQuery.data ?? [];
-  const connections = connectionsQuery.data ?? [];
+  const connections = connectionsQuery.data;
 
   // A logical engine is selectable only when a BYOK connection with a stored
   // key backs a route for it (the backend rejects a launch otherwise).
   const configuredEngines = useMemo<LogicalEngine[]>(() => {
     const configured = new Set<LogicalEngine>();
-    for (const connection of connections) {
+    for (const connection of connections ?? []) {
       if (!connection.api_key_set) continue;
       for (const route of connection.routes ?? []) {
         configured.add(route.logical_engine);

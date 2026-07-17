@@ -296,9 +296,7 @@ class AuditWorker:
                 logger.exception("audit worker loop iteration failed")
                 ran = 0
             if ran == 0:
-                await asyncio.sleep(
-                    max(0.05, audit_settings.poll_interval_seconds)
-                )
+                await asyncio.sleep(max(0.05, audit_settings.poll_interval_seconds))
 
     # --- per-task execution ------------------------------------------------
 
@@ -350,9 +348,7 @@ class AuditWorker:
                 await session.commit()
 
             # Mark the queue row running (still owned) before the network call.
-            if not await self._queue.mark_running(
-                task_id=task_id, owner=self.owner
-            ):
+            if not await self._queue.mark_running(task_id=task_id, owner=self.owner):
                 # Lease lost (sweeper reclaimed it); another worker will retry.
                 return
 
@@ -388,9 +384,7 @@ class AuditWorker:
                 message="audit running",
             )
 
-    async def _run_provider_call(
-        self, task_id: uuid.UUID, audit_id: uuid.UUID
-    ) -> None:
+    async def _run_provider_call(self, task_id: uuid.UUID, audit_id: uuid.UUID) -> None:
         # Load everything the call needs in one short session, then close it
         # before the (long) network call so no txn is held across provider I/O.
         async with self._session_factory() as session:
@@ -398,9 +392,7 @@ class AuditWorker:
             audit = await session.get(Audit, audit_id)
             if task is None or audit is None:
                 return
-            snapshot = await session.get(
-                AuditEngineSnapshot, task.engine_snapshot_id
-            )
+            snapshot = await session.get(AuditEngineSnapshot, task.engine_snapshot_id)
             connection: ProviderConnection | None = None
             if snapshot is not None and snapshot.connection_id is not None:
                 connection = await session.get(
@@ -544,8 +536,10 @@ class AuditWorker:
         if task.lease_owner != self.owner or task.status != TASK_STATUS_RUNNING:
             return None
         audit = await session.get(Audit, audit_id)
-        if audit is None or audit.status == AUDIT_STATUS_CANCELLED or (
-            audit.status in AUDIT_TERMINAL_STATUSES
+        if (
+            audit is None
+            or audit.status == AUDIT_STATUS_CANCELLED
+            or (audit.status in AUDIT_TERMINAL_STATUSES)
         ):
             return None
         return task, audit
@@ -753,9 +747,7 @@ class AuditWorker:
             await self._queue.retry(
                 task_id=task_id,
                 owner=self.owner,
-                delay_seconds=audit_settings.retry_delay(
-                    attempt_number, retry_after
-                ),
+                delay_seconds=audit_settings.retry_delay(attempt_number, retry_after),
                 error_code=error_code,
                 error_detail=error_detail,
             )

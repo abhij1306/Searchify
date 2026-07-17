@@ -7,6 +7,7 @@ Covers the provider-agnostic knobs that bound a run in time and attempts:
   - ``_call_with_retries`` cuts off a stalled provider at ``max_call_seconds``
     and gives up after ``max_attempts``, surfacing a retryable timeout.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -84,9 +85,7 @@ async def test_call_ceiling_cuts_off_a_stalled_provider(
         audit_worker, "pace_provider_request", lambda provider: asyncio.sleep(0)
     )
 
-    attempts = await audit_worker._call_with_retries(
-        _StallingAdapter(), _request()
-    )
+    attempts = await audit_worker._call_with_retries(_StallingAdapter(), _request())
 
     assert len(attempts) == 1
     final = attempts[-1]

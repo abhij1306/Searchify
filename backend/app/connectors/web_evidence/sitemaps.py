@@ -60,8 +60,7 @@ def maybe_gunzip(body: bytes, *, content_type: str = "") -> bytes:
                 out.write(chunk)
                 if out.tell() > cap:
                     raise SitemapParseError(
-                        "gzip sitemap exceeded decoded byte cap "
-                        "(compression bomb)"
+                        "gzip sitemap exceeded decoded byte cap (compression bomb)"
                     )
     except OSError as exc:
         raise SitemapParseError("malformed gzip sitemap") from exc
@@ -85,9 +84,7 @@ class SitemapDocument:
         self.is_index = is_index
 
 
-def parse_sitemap_document(
-    body: bytes, *, content_type: str = ""
-) -> SitemapDocument:
+def parse_sitemap_document(body: bytes, *, content_type: str = "") -> SitemapDocument:
     """Parse ONE sitemap document (gunzip if needed) into a bounded result.
 
     Recognizes a ``<sitemapindex>`` (returns child ``<loc>`` sitemap refs) and

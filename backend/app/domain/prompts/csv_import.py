@@ -50,9 +50,7 @@ def parse_prompt_csv(content: str) -> list[PromptInput]:
     if not has_header:
         # Headerless: treat the first column of each row as the prompt text.
         return [
-            PromptInput(text=row[0].strip())
-            for row in rows
-            if row and row[0].strip()
+            PromptInput(text=row[0].strip()) for row in rows if row and row[0].strip()
         ]
 
     def _col(keys: set[str]) -> int | None:

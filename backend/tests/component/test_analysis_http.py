@@ -9,6 +9,7 @@ schema with the ORM/worker seeding so a fully-analyzed audit is reachable:
   - ``GET /audits/{id}/export.{csv,md}`` download with the right media types;
   - all are auth-protected + workspace-scoped (a foreign workspace 404s).
 """
+
 from __future__ import annotations
 
 import uuid as _uuid
@@ -71,9 +72,7 @@ class _StubAdapter:
 
 @pytest.fixture
 def _stub_adapter(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(
-        audit_worker, "build_adapter", lambda **_: _StubAdapter()
-    )
+    monkeypatch.setattr(audit_worker, "build_adapter", lambda **_: _StubAdapter())
     monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
     monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
 
@@ -139,16 +138,12 @@ async def test_endpoints_serve_projections_over_http(
     # must share one id space: the id from GET /audits/{id}/executions must
     # resolve at GET /executions/{id} (regression: it used to 404 because the
     # single-execution route keyed on the internal analysis id).
-    execs = await client.get(
-        f"/api/v1/audits/{audit.id}/executions", headers=headers
-    )
+    execs = await client.get(f"/api/v1/audits/{audit.id}/executions", headers=headers)
     assert execs.status_code == 200
     exec_rows = execs.json()
     assert exec_rows
     execution_id = exec_rows[0]["id"]
-    e = await client.get(
-        f"/api/v1/executions/{execution_id}", headers=headers
-    )
+    e = await client.get(f"/api/v1/executions/{execution_id}", headers=headers)
     assert e.status_code == 200
     ebody = e.json()
     assert ebody["brand_mentioned"] is True
@@ -166,9 +161,7 @@ async def test_endpoints_serve_projections_over_http(
     assert csv_resp.headers["content-type"].startswith("text/csv")
     assert "attachment" in csv_resp.headers["content-disposition"]
 
-    md_resp = await client.get(
-        f"/api/v1/audits/{audit.id}/export.md", headers=headers
-    )
+    md_resp = await client.get(f"/api/v1/audits/{audit.id}/export.md", headers=headers)
     assert md_resp.status_code == 200
     assert md_resp.headers["content-type"].startswith("text/markdown")
     assert "# AI Search Visibility Benchmark" in md_resp.text
@@ -322,15 +315,11 @@ async def test_trends_endpoint_query_parsing_and_422(
     assert ok.json() == []
 
     # Invalid granularity -> 422.
-    bad_gran = await client.get(
-        base, params={"granularity": "daily"}, headers=headers
-    )
+    bad_gran = await client.get(base, params={"granularity": "daily"}, headers=headers)
     assert bad_gran.status_code == 422
 
     # Unknown engine -> 422.
-    bad_engine = await client.get(
-        base, params={"engine": "bing"}, headers=headers
-    )
+    bad_engine = await client.get(base, params={"engine": "bing"}, headers=headers)
     assert bad_engine.status_code == 422
 
     # Reversed range -> 422.
@@ -570,9 +559,7 @@ async def test_evidence_endpoint_query_parsing_and_422(
     assert len(ok.json()["items"]) == 1
 
     # Unknown engine -> 422.
-    bad_engine = await client.get(
-        base, params={"engine": "bing"}, headers=headers
-    )
+    bad_engine = await client.get(base, params={"engine": "bing"}, headers=headers)
     assert bad_engine.status_code == 422
 
     # Reversed range -> 422.

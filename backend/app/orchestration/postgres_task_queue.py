@@ -88,11 +88,7 @@ class PostgresTaskQueue[T]:
             # ORDER BY (spec-supplied) makes claim order deterministic.
             stmt = (
                 select(model)
-                .where(
-                    model.status.in_(
-                        [TASK_STATUS_QUEUED, TASK_STATUS_RETRY_WAIT]
-                    )
-                )
+                .where(model.status.in_([TASK_STATUS_QUEUED, TASK_STATUS_RETRY_WAIT]))
                 .where(model.available_at <= now)
             )
             if kinds is not None:
@@ -165,9 +161,7 @@ class PostgresTaskQueue[T]:
             task_id=task_id,
             owner=owner,
             status=TASK_STATUS_SUCCEEDED,
-            mutate=lambda task: setattr(
-                task, "result_artifact_id", result_artifact_id
-            ),
+            mutate=lambda task: setattr(task, "result_artifact_id", result_artifact_id),
         )
 
     async def fail(
@@ -273,11 +267,7 @@ class PostgresTaskQueue[T]:
         async with self._session_factory() as session:
             stmt = (
                 select(model)
-                .where(
-                    model.status.in_(
-                        [TASK_STATUS_LEASED, TASK_STATUS_RUNNING]
-                    )
-                )
+                .where(model.status.in_([TASK_STATUS_LEASED, TASK_STATUS_RUNNING]))
                 .where(model.lease_expires_at.is_not(None))
                 .where(model.lease_expires_at < now)
                 .order_by(model.lease_expires_at.asc(), model.id.asc())
@@ -293,9 +283,7 @@ class PostgresTaskQueue[T]:
                     task.completed_at = now
                     if not task.error_code:
                         task.error_code = self._spec.max_attempts_error
-                        task.error_detail = (
-                            "lease expired after max attempts exhausted"
-                        )
+                        task.error_detail = "lease expired after max attempts exhausted"
                 else:
                     task.status = TASK_STATUS_RETRY_WAIT
                     task.available_at = now

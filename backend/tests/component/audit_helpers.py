@@ -5,6 +5,7 @@ one approved provider route/connection per requested engine, directly through
 the ORM (no HTTP), so the planner + worker + queue can be exercised against a
 real Postgres schema.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -58,9 +59,7 @@ async def seed_audit_fixtures(
     await session.flush()
 
     session.add(
-        WorkspaceMember(
-            workspace_id=workspace.id, user_id=user.id, role="owner"
-        )
+        WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner")
     )
 
     project = Project(

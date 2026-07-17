@@ -64,9 +64,7 @@ class LegacyConnectionReadOnlyError(RuntimeError):
 
 
 def _connection_query():
-    return select(ProviderConnection).options(
-        selectinload(ProviderConnection.routes)
-    )
+    return select(ProviderConnection).options(selectinload(ProviderConnection.routes))
 
 
 def connection_to_response(
@@ -84,8 +82,7 @@ def connection_to_response(
         last_tested_at=connection.last_tested_at,
         last_test_status=connection.last_test_status,
         routes=[
-            ProviderRouteResponse.model_validate(route)
-            for route in connection.routes
+            ProviderRouteResponse.model_validate(route) for route in connection.routes
         ],
         created_at=connection.created_at,
         updated_at=connection.updated_at,
@@ -103,8 +100,7 @@ def _build_routes(
         logical_engine = item.logical_engine
         if not is_route_approved(logical_engine, transport_provider):
             raise InvalidRouteError(
-                f"Route not approved at MVP: {logical_engine} via "
-                f"{transport_provider}"
+                f"Route not approved at MVP: {logical_engine} via {transport_provider}"
             )
         model = (item.transport_model or "").strip() or default_model(
             logical_engine, transport_provider

@@ -29,9 +29,7 @@ class Brand(Base):
     """
 
     __tablename__ = "brands"
-    __table_args__ = (
-        UniqueConstraint("project_id", name="uq_brand_project"),
-    )
+    __table_args__ = (UniqueConstraint("project_id", name="uq_brand_project"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -112,9 +110,7 @@ class Competitor(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
-    project: Mapped[Project] = relationship(
-        "Project", back_populates="competitors"
-    )
+    project: Mapped[Project] = relationship("Project", back_populates="competitors")
 
 
 class OwnedDomain(Base):
@@ -135,9 +131,7 @@ class OwnedDomain(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-    project: Mapped[Project] = relationship(
-        "Project", back_populates="owned_domains"
-    )
+    project: Mapped[Project] = relationship("Project", back_populates="owned_domains")
 
 
 class UnintendedDomain(Base):

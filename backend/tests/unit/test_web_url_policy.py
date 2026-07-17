@@ -6,6 +6,7 @@ every unsafe IPv4/IPv6 class, mixed / rebinding DNS answers, and per-hop
 ``resolve_target`` (scope + DNS + pinning). No network: the PSL extractor is
 pinned offline and DNS goes through an injected fake resolver.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -138,9 +139,7 @@ def test_in_scope_respects_public_suffix_boundary():
 
 
 def test_narrow_empty_include_allows_all():
-    assert narrow(
-        "https://example.com/x", include_globs=[], exclude_globs=[]
-    )
+    assert narrow("https://example.com/x", include_globs=[], exclude_globs=[])
 
 
 def test_narrow_include_requires_match():

@@ -79,9 +79,7 @@ class RobotsPolicy:
             except Exception:
                 declared = None
         delay = (
-            declared
-            if declared is not None
-            else settings.default_crawl_delay_seconds
+            declared if declared is not None else settings.default_crawl_delay_seconds
         )
         return max(0.0, min(delay, settings.max_crawl_delay_seconds))
 

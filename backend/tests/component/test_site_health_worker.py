@@ -16,6 +16,7 @@ injected fake DNS resolver + ``httpx.MockTransport`` (fully offline). Covers:
     ``_finalize_discovery`` prematurely complete the crawl.
   - Attempt numbering: the first attempt row is ``attempt_number == 1``.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -79,8 +80,7 @@ class _FakeResolver:
 def _html(links: list[str], *, title: str = "Page") -> bytes:
     anchors = "".join(f'<a href="{u}">l</a>' for u in links)
     return (
-        f"<html><head><title>{title}</title></head>"
-        f"<body>{anchors}</body></html>"
+        f"<html><head><title>{title}</title></head><body>{anchors}</body></html>"
     ).encode()
 
 
@@ -228,12 +228,16 @@ async def test_starter_discover_admits_children_and_completes(
 
         # Root + 2 in-scope children admitted; external.org excluded.
         urls = (
-            await session.execute(
-                select(SiteUrl.normalized_url).where(
-                    SiteUrl.project_id == seed.project_id
+            (
+                await session.execute(
+                    select(SiteUrl.normalized_url).where(
+                        SiteUrl.project_id == seed.project_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert "https://example.com/" in urls
         assert "https://example.com/a" in urls
         assert "https://example.com/b" in urls
@@ -241,61 +245,75 @@ async def test_starter_discover_admits_children_and_completes(
 
         # Host populated on the identity rows (not blank).
         hosts = (
-            await session.execute(
-                select(SiteUrl.host).where(
-                    SiteUrl.project_id == seed.project_id
+            (
+                await session.execute(
+                    select(SiteUrl.host).where(SiteUrl.project_id == seed.project_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert all(h == "example.com" for h in hosts)
 
         # Immutable evidence written for each fetched URL.
         obs_count = await session.scalar(
-            select(func.count()).select_from(SiteUrlObservation).where(
-                SiteUrlObservation.crawl_id == seed.crawl_id
-            )
+            select(func.count())
+            .select_from(SiteUrlObservation)
+            .where(SiteUrlObservation.crawl_id == seed.crawl_id)
         )
         assert obs_count == 3  # root + a + b
         artifact_count = await session.scalar(
-            select(func.count()).select_from(SiteFetchArtifact).where(
-                SiteFetchArtifact.crawl_id == seed.crawl_id
-            )
+            select(func.count())
+            .select_from(SiteFetchArtifact)
+            .where(SiteFetchArtifact.crawl_id == seed.crawl_id)
         )
         assert artifact_count == 3
 
         # Every discover task succeeded.
         statuses = (
-            await session.execute(
-                select(SiteCrawlTask.status).where(
-                    SiteCrawlTask.crawl_id == seed.crawl_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_DISCOVER,
+            (
+                await session.execute(
+                    select(SiteCrawlTask.status).where(
+                        SiteCrawlTask.crawl_id == seed.crawl_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_DISCOVER,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert statuses and all(s == TASK_STATUS_SUCCEEDED for s in statuses)
 
         # Every succeeded discover task points at its fetch artifact (mirrors
         # the audit worker's result_artifact_id contract).
         result_artifact_ids = (
-            await session.execute(
-                select(SiteCrawlTask.result_artifact_id).where(
-                    SiteCrawlTask.crawl_id == seed.crawl_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_DISCOVER,
+            (
+                await session.execute(
+                    select(SiteCrawlTask.result_artifact_id).where(
+                        SiteCrawlTask.crawl_id == seed.crawl_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_DISCOVER,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert result_artifact_ids and all(
             aid is not None for aid in result_artifact_ids
         )
 
         # First attempt row is numbered 1 (not 0).
         attempt_numbers = (
-            await session.execute(
-                select(SiteFetchAttempt.attempt_number).where(
-                    SiteFetchAttempt.crawl_id == seed.crawl_id
+            (
+                await session.execute(
+                    select(SiteFetchAttempt.attempt_number).where(
+                        SiteFetchAttempt.crawl_id == seed.crawl_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert attempt_numbers and all(n == 1 for n in attempt_numbers)
 
 
@@ -349,13 +367,15 @@ async def test_inventory_rows_present_before_crawl_terminalizes(
         # Crawl is still active (children pending) but inventory already exists.
         assert crawl.status == CRAWL_STATUS_RUNNING
         admitted = await session.scalar(
-            select(func.count()).select_from(SiteUrl).where(
-                SiteUrl.project_id == seed.project_id
-            )
+            select(func.count())
+            .select_from(SiteUrl)
+            .where(SiteUrl.project_id == seed.project_id)
         )
         assert admitted >= 3  # root + 2 children admitted during discovery
         pending_children = await session.scalar(
-            select(func.count()).select_from(SiteCrawlTask).where(
+            select(func.count())
+            .select_from(SiteCrawlTask)
+            .where(
                 SiteCrawlTask.crawl_id == seed.crawl_id,
                 SiteCrawlTask.task_kind == TASK_KIND_DISCOVER,
                 SiteCrawlTask.status == TASK_STATUS_QUEUED,
@@ -486,11 +506,12 @@ async def test_free_sample_stops_at_ten_across_two_projects(
     async with session_factory() as session:
         # Workspace-wide free_sample monitored rows capped at exactly 10.
         sample_count = await session.scalar(
-            select(func.count()).select_from(MonitoredSiteUrl).where(
+            select(func.count())
+            .select_from(MonitoredSiteUrl)
+            .where(
                 MonitoredSiteUrl.workspace_id == seed_a.workspace_id,
                 MonitoredSiteUrl.active.is_(True),
-                MonitoredSiteUrl.selection_source
-                == SELECTION_SOURCE_FREE_SAMPLE,
+                MonitoredSiteUrl.selection_source == SELECTION_SOURCE_FREE_SAMPLE,
             )
         )
         assert sample_count == 10
@@ -498,20 +519,24 @@ async def test_free_sample_stops_at_ten_across_two_projects(
         # Project B genuinely contributed to the shared budget: at least one
         # /b* URL was admitted as a free-sample monitored row.
         monitored_urls = (
-            await session.execute(
-                select(SiteUrl.normalized_url)
-                .join(
-                    MonitoredSiteUrl,
-                    MonitoredSiteUrl.site_url_id == SiteUrl.id,
-                )
-                .where(
-                    MonitoredSiteUrl.workspace_id == seed_a.workspace_id,
-                    MonitoredSiteUrl.active.is_(True),
-                    MonitoredSiteUrl.selection_source
-                    == SELECTION_SOURCE_FREE_SAMPLE,
+            (
+                await session.execute(
+                    select(SiteUrl.normalized_url)
+                    .join(
+                        MonitoredSiteUrl,
+                        MonitoredSiteUrl.site_url_id == SiteUrl.id,
+                    )
+                    .where(
+                        MonitoredSiteUrl.workspace_id == seed_a.workspace_id,
+                        MonitoredSiteUrl.active.is_(True),
+                        MonitoredSiteUrl.selection_source
+                        == SELECTION_SOURCE_FREE_SAMPLE,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert any(u in set(links_b) for u in monitored_urls)
 
         # Auto-enqueued analyze tasks (priority=1 by the Free sample path) are
@@ -519,22 +544,26 @@ async def test_free_sample_stops_at_ten_across_two_projects(
         # free-sample cap of 10 still holds (10 monitored URLs -> 10 analyze
         # tasks total), but they are succeeded rather than left queued.
         analyze_statuses = (
-            await session.execute(
-                select(SiteCrawlTask.status).where(
-                    SiteCrawlTask.workspace_id == seed_a.workspace_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+            (
+                await session.execute(
+                    select(SiteCrawlTask.status).where(
+                        SiteCrawlTask.workspace_id == seed_a.workspace_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert analyze_statuses
         assert all(s == TASK_STATUS_SUCCEEDED for s in analyze_statuses)
         assert len(analyze_statuses) == 10
 
         # Each executed analyze task produced a completed page analysis.
         analysis_count = await session.scalar(
-            select(func.count()).select_from(SitePageAnalysis).where(
-                SitePageAnalysis.workspace_id == seed_a.workspace_id
-            )
+            select(func.count())
+            .select_from(SitePageAnalysis)
+            .where(SitePageAnalysis.workspace_id == seed_a.workspace_id)
         )
         assert analysis_count == 10
 
@@ -716,10 +745,7 @@ def _rich_html() -> bytes:
 def _thin_html() -> bytes:
     """A page that FAILS several rules (no meta desc, no canonical, no h1,
     no og, no structured data, thin text)."""
-    return (
-        b"<html><head><title>Thin</title></head>"
-        b"<body><p>too short</p></body></html>"
-    )
+    return b"<html><head><title>Thin</title></head><body><p>too short</p></body></html>"
 
 
 async def _seed_analyze_ready(
@@ -815,14 +841,14 @@ async def test_run_once_claims_one_task_to_keep_lease_heartbeated(
 
     async with session_factory() as session:
         leased = await session.scalar(
-            select(func.count()).select_from(SiteCrawlTask).where(
-                SiteCrawlTask.status == TASK_STATUS_LEASED
-            )
+            select(func.count())
+            .select_from(SiteCrawlTask)
+            .where(SiteCrawlTask.status == TASK_STATUS_LEASED)
         )
         queued = await session.scalar(
-            select(func.count()).select_from(SiteCrawlTask).where(
-                SiteCrawlTask.status == TASK_STATUS_QUEUED
-            )
+            select(func.count())
+            .select_from(SiteCrawlTask)
+            .where(SiteCrawlTask.status == TASK_STATUS_QUEUED)
         )
         assert leased == 1
         assert queued == 1
@@ -854,9 +880,9 @@ async def test_analyze_guard_blocks_live_entitlement_downgrade_before_io(
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
         artifact_count = await session.scalar(
-            select(func.count()).select_from(SiteFetchArtifact).where(
-                SiteFetchArtifact.task_id == task_id
-            )
+            select(func.count())
+            .select_from(SiteFetchArtifact)
+            .where(SiteFetchArtifact.task_id == task_id)
         )
         assert requests == []
         assert task.status == TASK_STATUS_CANCELLED
@@ -871,9 +897,7 @@ async def test_cancelled_user_analysis_does_not_penalize_applicable_free_sample(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """Mixed cancelled+succeeded work is complete over applicable coverage."""
-    seed, _user_site_url_id, user_task_id = await _seed_analyze_ready(
-        session_factory
-    )
+    seed, _user_site_url_id, user_task_id = await _seed_analyze_ready(session_factory)
     sample_url = "https://example.com/sample"
     canonical, sample_hash = canonical_identity(sample_url)
     async with session_factory() as session:
@@ -978,14 +1002,14 @@ async def test_analyze_guard_discards_result_when_membership_removed_mid_fetch(
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
         artifact_count = await session.scalar(
-            select(func.count()).select_from(SiteFetchArtifact).where(
-                SiteFetchArtifact.task_id == task_id
-            )
+            select(func.count())
+            .select_from(SiteFetchArtifact)
+            .where(SiteFetchArtifact.task_id == task_id)
         )
         analysis_count = await session.scalar(
-            select(func.count()).select_from(SitePageAnalysis).where(
-                SitePageAnalysis.crawl_id == seed.crawl_id
-            )
+            select(func.count())
+            .select_from(SitePageAnalysis)
+            .where(SitePageAnalysis.crawl_id == seed.crawl_id)
         )
         assert fetched is True
         assert task.status == TASK_STATUS_CANCELLED
@@ -1045,14 +1069,14 @@ async def test_reclaimed_analyze_acknowledges_already_persisted_analysis(
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
         artifacts = await session.scalar(
-            select(func.count()).select_from(SiteFetchArtifact).where(
-                SiteFetchArtifact.task_id == task_id
-            )
+            select(func.count())
+            .select_from(SiteFetchArtifact)
+            .where(SiteFetchArtifact.task_id == task_id)
         )
         analyses = await session.scalar(
-            select(func.count()).select_from(SitePageAnalysis).where(
-                SitePageAnalysis.crawl_id == seed.crawl_id
-            )
+            select(func.count())
+            .select_from(SitePageAnalysis)
+            .where(SitePageAnalysis.crawl_id == seed.crawl_id)
         )
         assert task.status == TASK_STATUS_SUCCEEDED
         assert artifacts == 1
@@ -1062,8 +1086,7 @@ async def test_reclaimed_analyze_acknowledges_already_persisted_analysis(
         # legitimate, separate task) may generate requests, and even those
         # target link probes, never a GET of the analyze target itself.
         assert not any(
-            req.method == "GET" and req.url.path == "/rich"
-            for req in requests
+            req.method == "GET" and req.url.path == "/rich" for req in requests
         )
 
 
@@ -1103,18 +1126,18 @@ async def test_analyze_task_persists_analysis_evaluations_issues_scores(
         assert analysis.site_url_id == site_url_id
 
         eval_count = await session.scalar(
-            select(func.count()).select_from(SiteRuleEvaluation).where(
-                SiteRuleEvaluation.analysis_id == analysis.id
-            )
+            select(func.count())
+            .select_from(SiteRuleEvaluation)
+            .where(SiteRuleEvaluation.analysis_id == analysis.id)
         )
         # One evaluation per catalog rule.
         assert eval_count == 9
 
         # A rich page passes every rule, so no issues are snapshotted.
         issue_count = await session.scalar(
-            select(func.count()).select_from(SiteIssue).where(
-                SiteIssue.crawl_id == seed.crawl_id
-            )
+            select(func.count())
+            .select_from(SiteIssue)
+            .where(SiteIssue.crawl_id == seed.crawl_id)
         )
         assert issue_count == 0
 
@@ -1156,12 +1179,14 @@ async def test_thin_page_generates_multiple_issues(
 
     async with session_factory() as session:
         issues = (
-            await session.execute(
-                select(SiteIssue.rule_id).where(
-                    SiteIssue.crawl_id == seed.crawl_id
+            (
+                await session.execute(
+                    select(SiteIssue.rule_id).where(SiteIssue.crawl_id == seed.crawl_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         # Thin page fails: meta description, canonical, https, single h1,
         # structured data, open graph, sufficient text.
         assert "technical.meta_description_present" in issues
@@ -1551,12 +1576,16 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
 
     async with session_factory() as session:
         refs = (
-            await session.execute(
-                select(SiteLinkReference).where(
-                    SiteLinkReference.workspace_id == seed.workspace_id
+            (
+                await session.execute(
+                    select(SiteLinkReference).where(
+                        SiteLinkReference.workspace_id == seed.workspace_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         by_url = {ref.target_url: ref for ref in refs}
         assert set(by_url) == {
             "https://example.com/ok",
@@ -1570,9 +1599,9 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
         assert by_url["https://example.com/ok"].evidence_fingerprint.startswith(
             "reachable:"
         )
-        assert by_url[
-            "https://example.com/fallback"
-        ].evidence_fingerprint.startswith("reachable:")
+        assert by_url["https://example.com/fallback"].evidence_fingerprint.startswith(
+            "reachable:"
+        )
         assert by_url[
             "https://example.com/base/missing"
         ].evidence_fingerprint.startswith("unreachable:")
@@ -1580,9 +1609,7 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
 
     assert ("HEAD", "/ok") in requests
     assert ("GET", "/ok") not in requests
-    assert requests.index(("HEAD", "/fallback")) < requests.index(
-        ("GET", "/fallback")
-    )
+    assert requests.index(("HEAD", "/fallback")) < requests.index(("GET", "/fallback"))
     assert ("HEAD", "/base/missing") in requests
     assert ("GET", "/base/missing") not in requests
 
@@ -1655,9 +1682,9 @@ async def test_reclaimed_link_check_does_not_reprobe(
         assert probe_paths, "first run should have probed the link"
         probes_after_first = len(probe_paths)
         refs_after_first = await session.scalar(
-            select(func.count()).select_from(SiteLinkReference).where(
-                SiteLinkReference.target_task_id == link_task_id
-            )
+            select(func.count())
+            .select_from(SiteLinkReference)
+            .where(SiteLinkReference.target_task_id == link_task_id)
         )
         assert refs_after_first == 1
         # Simulate a lost queue ack: the task committed its references but the
@@ -1689,9 +1716,9 @@ async def test_reclaimed_link_check_does_not_reprobe(
     async with session_factory() as session:
         link_task = await session.get(SiteCrawlTask, link_task_id)
         refs_after_reclaim = await session.scalar(
-            select(func.count()).select_from(SiteLinkReference).where(
-                SiteLinkReference.target_task_id == link_task_id
-            )
+            select(func.count())
+            .select_from(SiteLinkReference)
+            .where(SiteLinkReference.target_task_id == link_task_id)
         )
         assert link_task.status == TASK_STATUS_SUCCEEDED
         assert refs_after_reclaim == 1
@@ -1778,18 +1805,16 @@ async def test_rerun_from_completed_crawl_worker_analyzes_only_reran_url(
         # The new crawl's analyze task ran and produced a completed analysis
         # for the reran URL.
         tasks = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == new_crawl_id
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(SiteCrawlTask.crawl_id == new_crawl_id)
                 )
             )
-        ).scalars().all()
-        analyze_tasks = [
-            t for t in tasks if t.task_kind == TASK_KIND_ANALYZE
-        ]
-        discover_tasks = [
-            t for t in tasks if t.task_kind == TASK_KIND_DISCOVER
-        ]
+            .scalars()
+            .all()
+        )
+        analyze_tasks = [t for t in tasks if t.task_kind == TASK_KIND_ANALYZE]
+        discover_tasks = [t for t in tasks if t.task_kind == TASK_KIND_DISCOVER]
         # No discover task at all -> the site is never re-crawled.
         assert discover_tasks == []
         assert len(analyze_tasks) == 1
@@ -1797,12 +1822,16 @@ async def test_rerun_from_completed_crawl_worker_analyzes_only_reran_url(
         assert analyze_tasks[0].site_url_id == site_url_id
 
         analyses = (
-            await session.execute(
-                select(SitePageAnalysis).where(
-                    SitePageAnalysis.crawl_id == new_crawl_id
+            (
+                await session.execute(
+                    select(SitePageAnalysis).where(
+                        SitePageAnalysis.crawl_id == new_crawl_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(analyses) == 1
         assert analyses[0].site_url_id == site_url_id
         assert analyses[0].status == ANALYSIS_STATUS_COMPLETED
@@ -1840,11 +1869,12 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
 
     async def _sample_count(session, workspace_id) -> int:
         return await session.scalar(
-            select(func.count()).select_from(MonitoredSiteUrl).where(
+            select(func.count())
+            .select_from(MonitoredSiteUrl)
+            .where(
                 MonitoredSiteUrl.workspace_id == workspace_id,
                 MonitoredSiteUrl.active.is_(True),
-                MonitoredSiteUrl.selection_source
-                == SELECTION_SOURCE_FREE_SAMPLE,
+                MonitoredSiteUrl.selection_source == SELECTION_SOURCE_FREE_SAMPLE,
             )
         )
 
@@ -1875,9 +1905,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # allowance is consumed (one active sample row).
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
-        await admit_candidates(
-            session, crawl=crawl, candidates=[candidate]
-        )
+        await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
 
@@ -1885,15 +1913,13 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # unchanged (the WHERE-guarded upsert is a no-op, no decrement).
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
-        await admit_candidates(
-            session, crawl=crawl, candidates=[candidate]
-        )
+        await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
         total_rows = await session.scalar(
-            select(func.count()).select_from(MonitoredSiteUrl).where(
-                MonitoredSiteUrl.workspace_id == seed.workspace_id
-            )
+            select(func.count())
+            .select_from(MonitoredSiteUrl)
+            .where(MonitoredSiteUrl.workspace_id == seed.workspace_id)
         )
         assert total_rows == 1
 
@@ -1911,9 +1937,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # consume one allowance unit again.
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
-        await admit_candidates(
-            session, crawl=crawl, candidates=[candidate]
-        )
+        await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
         membership = await session.scalar(
@@ -1926,8 +1950,8 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
         assert membership.selection_source == SELECTION_SOURCE_FREE_SAMPLE
         # Still exactly one row: reactivation happened IN PLACE, never a dup.
         total_rows = await session.scalar(
-            select(func.count()).select_from(MonitoredSiteUrl).where(
-                MonitoredSiteUrl.workspace_id == seed.workspace_id
-            )
+            select(func.count())
+            .select_from(MonitoredSiteUrl)
+            .where(MonitoredSiteUrl.workspace_id == seed.workspace_id)
         )
         assert total_rows == 1

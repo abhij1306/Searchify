@@ -210,9 +210,7 @@ def _body_text(root: Any, *, max_chars: int) -> dict[str, Any]:
     node = body_nodes[0] if body_nodes else root
     # Drop non-content subtrees before reading text.
     try:
-        for junk in node.xpath(
-            ".//script | .//style | .//noscript | .//template"
-        ):
+        for junk in node.xpath(".//script | .//style | .//noscript | .//template"):
             junk.getparent().remove(junk)
     except Exception:
         pass
@@ -252,9 +250,7 @@ def _links_and_assets(
             if len(anchors) >= max_links:
                 break
             href = (anchor.get("href") or "").strip()
-            if not href or href.startswith(
-                ("#", "javascript:", "mailto:", "tel:")
-            ):
+            if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
                 continue
             anchors.append(
                 {
@@ -352,9 +348,7 @@ def _structured_data(root: Any, *, max_blocks: int) -> dict[str, Any]:
                 itemtypes.append(itemtype)
     except Exception:
         itemtypes = []
-    microdata_facts = validate_microdata_types(
-        itemtypes, max_blocks=max_blocks
-    )
+    microdata_facts = validate_microdata_types(itemtypes, max_blocks=max_blocks)
 
     blocks = (jsonld_facts + microdata_facts)[:max_blocks]
     return {
@@ -384,18 +378,14 @@ def _delivery_facts(
     wire/decoded bytes / HTTP version, compression + cache directives, and the
     PRESENCE of each security header (never the value).
     """
-    headers = {
-        str(k).lower(): str(v) for k, v in (redacted_headers or {}).items()
-    }
+    headers = {str(k).lower(): str(v) for k, v in (redacted_headers or {}).items()}
     scheme = ""
     try:
         scheme = (urlsplit(final_url).scheme or "").lower()
     except Exception:
         scheme = ""
     content_encoding = headers.get("content-encoding", "").strip().lower()
-    security_headers = {
-        name: name in headers for name in _SECURITY_HEADERS
-    }
+    security_headers = {name: name in headers for name in _SECURITY_HEADERS}
     return {
         "final_url": (final_url or "")[:_MAX_URL_CHARS],
         "scheme": scheme,
@@ -407,8 +397,7 @@ def _delivery_facts(
         "wire_bytes": wire_bytes,
         "decoded_bytes": decoded_bytes,
         "content_encoding": content_encoding,
-        "is_compressed": bool(content_encoding)
-        and content_encoding != "identity",
+        "is_compressed": bool(content_encoding) and content_encoding != "identity",
         "cache_control": headers.get("cache-control", ""),
         "security_headers": security_headers,
         # Static blocking-resource heuristic: render-blocking assets are the

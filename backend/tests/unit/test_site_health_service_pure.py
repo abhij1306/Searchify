@@ -9,6 +9,7 @@ Covers the logic that does not need a database:
     vs generic ``error`` split and the invariant that ``failed`` is never
     surfaced as page copy.
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -75,15 +76,11 @@ def test_cursor_replay_across_filters_raises_scope_error() -> None:
         scope="pages", filters={"status": "completed"}, sort_values=["u", "i"]
     )
     with pytest.raises(CursorScopeError):
-        decode_keyset_cursor(
-            cursor, scope="pages", filters={"status": "error"}
-        )
+        decode_keyset_cursor(cursor, scope="pages", filters={"status": "error"})
 
 
 def test_cursor_replay_across_scope_raises_scope_error() -> None:
-    cursor = encode_keyset_cursor(
-        scope="pages", filters={}, sort_values=["u", "i"]
-    )
+    cursor = encode_keyset_cursor(scope="pages", filters={}, sort_values=["u", "i"])
     with pytest.raises(CursorScopeError):
         decode_keyset_cursor(cursor, scope="inventory", filters={})
 

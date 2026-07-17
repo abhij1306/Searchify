@@ -280,9 +280,7 @@ FETCH_PURPOSE_SITEMAP: Final = "sitemap"
 # =========================================================================
 DIMENSION_TECHNICAL: Final = "technical"
 DIMENSION_AEO: Final = "aeo"
-RULE_DIMENSIONS: Final[frozenset[str]] = frozenset(
-    {DIMENSION_TECHNICAL, DIMENSION_AEO}
-)
+RULE_DIMENSIONS: Final[frozenset[str]] = frozenset({DIMENSION_TECHNICAL, DIMENSION_AEO})
 
 RULE_OUTCOME_PASS: Final = "pass"
 RULE_OUTCOME_FAIL: Final = "fail"
@@ -490,7 +488,7 @@ SITE_HEALTH_RULES: Final[tuple[SiteHealthRule, ...]] = (
         weight=2.0,
         applicability_key="always",
         description="Page declares a canonical URL.",
-        remediation="Add a <link rel=\"canonical\"> pointing at the preferred URL.",
+        remediation='Add a <link rel="canonical"> pointing at the preferred URL.',
         display_label="Missing canonical URL",
     ),
     SiteHealthRule(
@@ -659,9 +657,7 @@ class SiteHealthSettings(BaseSettings):
     1).
     """
 
-    model_config = SettingsConfigDict(
-        env_prefix="SITE_HEALTH_", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="SITE_HEALTH_", extra="ignore")
 
     # --- Frontier / discovery bounds ---
     # Absolute frontier ceiling for a FULL (Starter) crawl to bound memory/time.

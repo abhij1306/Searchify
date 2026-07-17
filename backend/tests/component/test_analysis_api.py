@@ -12,6 +12,7 @@ one MetricSnapshot, then exercises the projection service + exports directly:
   - CSV + Markdown exports render from persisted rows;
   - projections are workspace-scoped (a foreign workspace gets nothing).
 """
+
 from __future__ import annotations
 
 import uuid as _uuid
@@ -246,9 +247,7 @@ async def test_provenance_and_citation_classification_persisted(
         owned = [c for c in citations if c.classification == "owned"]
         competitor = [c for c in citations if c.classification == "competitor"]
         assert owned and all(c.is_owned for c in owned)
-        assert competitor and all(
-            c.matched_competitor == "Globex" for c in competitor
-        )
+        assert competitor and all(c.matched_competitor == "Globex" for c in competitor)
 
 
 @pytest.mark.asyncio
@@ -260,9 +259,7 @@ async def test_execution_evidence_projection(
 
     async with session_factory() as session:
         analysis = await session.scalar(
-            select(ResponseAnalysis).where(
-                ResponseAnalysis.audit_id == audit.id
-            )
+            select(ResponseAnalysis).where(ResponseAnalysis.audit_id == audit.id)
         )
         # Keyed on the execution (AuditTask) id, matching the id clients get
         # from GET /audits/{id}/executions — not the internal analysis id.
@@ -430,9 +427,7 @@ async def test_aggregation_preserves_provider_usage(
     Regression: the aggregate input was rebuilt with an empty
     ``provider_metadata``, so token/cost metrics were always zero.
     """
-    monkeypatch.setattr(
-        audit_worker, "build_adapter", lambda **_: _UsageStubAdapter()
-    )
+    monkeypatch.setattr(audit_worker, "build_adapter", lambda **_: _UsageStubAdapter())
     monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
     monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
 
@@ -612,8 +607,7 @@ async def test_trends_raw_points_chronological_with_provenance(
     assert points[0].sentiment is None
     assert points[0].avg_position is None
     assert all(
-        r.sentiment is None and r.avg_position is None
-        for r in points[0].rankings
+        r.sentiment is None and r.avg_position is None for r in points[0].rankings
     )
     # Headline values project the persisted snapshot exactly.
     assert points[0].visibility_score == 100.0
@@ -1186,9 +1180,7 @@ async def _seed_evidence_execution(
                 domain=domain,
                 classification=classification,
                 is_owned=classification == "owned",
-                matched_competitor="Globex"
-                if classification == "competitor"
-                else None,
+                matched_competitor="Globex" if classification == "competitor" else None,
             )
         )
     await session.flush()
@@ -1310,9 +1302,7 @@ async def test_evidence_artifact_first_then_task_fallback(
     assert [e.query for e in by_index[0].search_events] == ["fallback query"]
     assert by_index[1].event_source == "audit_task"
     assert by_index[1].artifact_id is None
-    assert [e.query for e in by_index[1].search_events] == [
-        "pruned artifact query"
-    ]
+    assert [e.query for e in by_index[1].search_events] == ["pruned artifact query"]
 
 
 @pytest.mark.asyncio
@@ -1749,10 +1739,8 @@ async def test_evidence_never_calls_provider_and_is_read_only(
         before_analyses = await session.scalar(
             select(func.count()).select_from(ResponseAnalysis)
         )
-        before_events = (
-            await session.scalar(
-                select(RawResponseArtifact.search_events).limit(1)
-            )
+        before_events = await session.scalar(
+            select(RawResponseArtifact.search_events).limit(1)
         )
         await get_visibility_evidence(
             session,
@@ -1762,10 +1750,8 @@ async def test_evidence_never_calls_provider_and_is_read_only(
         after_analyses = await session.scalar(
             select(func.count()).select_from(ResponseAnalysis)
         )
-        after_events = (
-            await session.scalar(
-                select(RawResponseArtifact.search_events).limit(1)
-            )
+        after_events = await session.scalar(
+            select(RawResponseArtifact.search_events).limit(1)
         )
     # A pure read: no derived rows created and stored events unchanged.
     assert before_analyses == after_analyses == 1

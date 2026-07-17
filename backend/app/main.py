@@ -75,9 +75,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def correlation_middleware(request: Request, call_next) -> Response:
         header_name = settings.request_id_header
-        correlation_id = (
-            request.headers.get(header_name) or generate_correlation_id()
-        )
+        correlation_id = request.headers.get(header_name) or generate_correlation_id()
         request.state.correlation_id = correlation_id
         token = set_correlation_id(correlation_id)
         try:

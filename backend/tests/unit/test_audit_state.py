@@ -4,6 +4,7 @@ Guards the single source of truth for legal audit lifecycle transitions: the
 happy path advances, terminal states are dead ends, and any illegal move raises
 ``InvalidAuditTransition`` rather than silently corrupting the lifecycle.
 """
+
 from __future__ import annotations
 
 import pytest

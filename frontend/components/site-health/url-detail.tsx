@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScoreRing } from '@/components/ui/score-ring';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/typography';
+import { ApiError } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/api/query-keys';
 import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
 import type { DeliveryFacts, PageDetail, RerunPageResponse, SiteIssue } from '@/lib/api/types';
@@ -72,6 +73,7 @@ export function UrlDetail({
   // polling to stop once we've actually observed a non-terminal snapshot
   // since the rerun was requested.
   const [hasObservedActiveRerun, setHasObservedActiveRerun] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
   const detailQuery = useQuery({
     ...siteHealthQueries.page(crawlId, siteUrlId),
     // Poll while a rerun is in flight so the snapshot advances past the
@@ -133,6 +135,18 @@ export function UrlDetail({
         detail={detail}
         crawlId={crawlId}
         siteUrlId={siteUrlId}
+        onRerunStart={() => setRerunError(null)}
+        onRerunError={(error) => {
+          if (error instanceof ApiError && error.status === 409) {
+            setRerunError(
+              'This page is not part of the active monitored selection, so it cannot be re-audited. Add it to your monitored set first.',
+            );
+          } else if (error instanceof ApiError && error.status === 403) {
+            setRerunError('Re-auditing pages requires a Starter plan.');
+          } else {
+            setRerunError('Could not re-audit this page. Please try again.');
+          }
+        }}
         onRerunComplete={(result) => {
           // The backend may run the rerun in the SAME active crawl or mint a
           // fresh single-page crawl (when the source crawl was terminal). Poll
@@ -161,6 +175,8 @@ export function UrlDetail({
         }}
       />
 
+      {rerunError ? <Alert tone="danger">{rerunError}</Alert> : null}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <ScoreTile label="Technical Health" value={detail.technical_score} />
         <ScoreTile label="AEO Health" value={detail.aeo_score} />
@@ -180,11 +196,15 @@ function HeaderCard({
   detail,
   crawlId,
   siteUrlId,
+  onRerunStart,
+  onRerunError,
   onRerunComplete,
 }: Readonly<{
   detail: PageDetail;
   crawlId: string;
   siteUrlId: string;
+  onRerunStart: () => void;
+  onRerunError: (error: unknown) => void;
   onRerunComplete: (result: RerunPageResponse) => void;
 }>) {
   const queryClient = useQueryClient();
@@ -204,6 +224,7 @@ function HeaderCard({
       }
       onRerunComplete(result);
     },
+    onError: onRerunError,
   });
 
   return (
@@ -217,7 +238,10 @@ function HeaderCard({
           </div>
           <Button
             size="sm"
-            onClick={() => rerun.mutate({ crawlId, siteUrlId })}
+            onClick={() => {
+              onRerunStart();
+              rerun.mutate({ crawlId, siteUrlId });
+            }}
             disabled={rerun.isPending}
           >
             {rerun.isPending ? 'Re-auditing…' : reaudited ? 'Re-audit queued' : 'Re-audit this page'}

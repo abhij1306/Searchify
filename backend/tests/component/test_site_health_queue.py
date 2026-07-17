@@ -6,6 +6,7 @@ Proves the ONE generic ``PostgresTaskQueue`` — parameterized by
 ``SiteCrawlTask`` rows, and that the audit-queue and site-queue instances never
 claim each other's rows. Requires a real Postgres.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -74,12 +75,14 @@ async def test_site_queue_sweeper_reclaims_expired_lease(
 
     async with session_factory() as session:
         rows = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == seed.crawl_id
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(SiteCrawlTask.crawl_id == seed.crawl_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # Back to claimable (attempts remain under the site max_attempts budget);
     # the sweeper returns reclaimed rows to a claimable status.
     assert all(r.status in TASK_CLAIMABLE_STATUSES for r in rows)

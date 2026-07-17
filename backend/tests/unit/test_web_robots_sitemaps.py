@@ -7,6 +7,7 @@ caps, malformed / entity-attack XML rejection, and the bounded, loop-safe
 ``SitemapCollector`` (depth cap + visited-set so a recursive index can't loop).
 All pure parsing — no network.
 """
+
 from __future__ import annotations
 
 import gzip
@@ -29,17 +30,13 @@ _UA = "SearchifySiteHealthBot/1.0"
 
 
 def test_robots_disallow_blocks_matching_path():
-    policy = RobotsPolicy.parse(
-        "User-agent: *\nDisallow: /private/\n", user_agent=_UA
-    )
+    policy = RobotsPolicy.parse("User-agent: *\nDisallow: /private/\n", user_agent=_UA)
     assert not policy.can_fetch("https://example.com/private/x")
     assert policy.can_fetch("https://example.com/public/x")
 
 
 def test_robots_wildcard_disallow():
-    policy = RobotsPolicy.parse(
-        "User-agent: *\nDisallow: /*.pdf$\n", user_agent=_UA
-    )
+    policy = RobotsPolicy.parse("User-agent: *\nDisallow: /*.pdf$\n", user_agent=_UA)
     assert not policy.can_fetch("https://example.com/doc.pdf")
     assert policy.can_fetch("https://example.com/page.html")
 
@@ -82,18 +79,13 @@ def test_robots_malformed_parser_fails_open(monkeypatch):
     monkeypatch.setattr(
         "app.connectors.web_evidence.robots.Protego.parse", staticmethod(_raise)
     )
-    policy = RobotsPolicy.parse(
-        "User-agent: *\nDisallow: /private/\n", user_agent=_UA
-    )
+    policy = RobotsPolicy.parse("User-agent: *\nDisallow: /private/\n", user_agent=_UA)
     assert policy.can_fetch("https://example.com/private/x")
     assert policy.can_fetch("https://example.com/anything")
 
 
 def test_robots_declares_sitemaps():
-    body = (
-        "User-agent: *\nDisallow:\n"
-        "Sitemap: https://example.com/sitemap.xml\n"
-    )
+    body = "User-agent: *\nDisallow:\nSitemap: https://example.com/sitemap.xml\n"
     policy = RobotsPolicy.parse(body, user_agent=_UA)
     assert "https://example.com/sitemap.xml" in policy.sitemaps()
 
@@ -169,17 +161,13 @@ def test_maybe_gunzip_passes_through_plain_body():
 
 
 def test_maybe_gunzip_plain_body_over_cap_raises(monkeypatch):
-    monkeypatch.setattr(
-        site_health_settings, "max_sitemap_decoded_bytes", 10
-    )
+    monkeypatch.setattr(site_health_settings, "max_sitemap_decoded_bytes", 10)
     with pytest.raises(SitemapParseError):
         maybe_gunzip(b"x" * 100)
 
 
 def test_maybe_gunzip_bomb_over_cap_raises(monkeypatch):
-    monkeypatch.setattr(
-        site_health_settings, "max_sitemap_decoded_bytes", 1000
-    )
+    monkeypatch.setattr(site_health_settings, "max_sitemap_decoded_bytes", 1000)
     body = gzip.compress(b"A" * 100_000)
     with pytest.raises(SitemapParseError):
         maybe_gunzip(body, content_type="gzip")

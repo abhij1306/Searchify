@@ -63,9 +63,7 @@ _SSE_POLL_SECONDS = 1.0
 _SSE_TERMINAL_GRACE_POLLS = 2
 
 
-@router.post(
-    "", response_model=AuditResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=AuditResponse, status_code=status.HTTP_201_CREATED)
 async def create_audit_endpoint(
     payload: AuditCreate, ctx: _WorkspaceDep, session: _SessionDep
 ) -> AuditResponse:
@@ -131,9 +129,7 @@ async def cancel_audit_endpoint(
     return AuditResponse.model_validate(audit)
 
 
-@router.get(
-    "/{audit_id}/executions", response_model=list[AuditTaskResponse]
-)
+@router.get("/{audit_id}/executions", response_model=list[AuditTaskResponse])
 async def list_executions_endpoint(
     audit_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> list[AuditTaskResponse]:
@@ -188,9 +184,7 @@ async def export_csv_endpoint(
         content=body,
         media_type="text/csv",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="audit-{audit_id}.csv"'
-            )
+            "Content-Disposition": (f'attachment; filename="audit-{audit_id}.csv"')
         },
     )
 
@@ -213,9 +207,7 @@ async def export_markdown_endpoint(
         content=body,
         media_type="text/markdown",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="audit-{audit_id}.md"'
-            )
+            "Content-Disposition": (f'attachment; filename="audit-{audit_id}.md"')
         },
     )
 
@@ -249,9 +241,7 @@ async def _get_or_404(
     session: AsyncSession, workspace_id: uuid.UUID, audit_id: uuid.UUID
 ) -> Audit:
     try:
-        return await get_audit(
-            session, workspace_id=workspace_id, audit_id=audit_id
-        )
+        return await get_audit(session, workspace_id=workspace_id, audit_id=audit_id)
     except AuditNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
@@ -286,15 +276,9 @@ def _sse_payload(event: AuditEvent) -> str:
         "event_type": event.event_type,
         "message": event.message,
         "payload": event.payload,
-        "created_at": event.created_at.isoformat()
-        if event.created_at
-        else None,
+        "created_at": event.created_at.isoformat() if event.created_at else None,
     }
-    return (
-        f"event: {event.event_type}\n"
-        f"id: {event.id}\n"
-        f"data: {json.dumps(body)}\n\n"
-    )
+    return f"event: {event.event_type}\nid: {event.id}\ndata: {json.dumps(body)}\n\n"
 
 
 async def _event_stream(

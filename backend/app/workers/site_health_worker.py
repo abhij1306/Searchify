@@ -370,9 +370,7 @@ class SiteHealthWorker:
                 await session.commit()
 
             # Mark the queue row running (still owned) before the fetch.
-            if not await self._queue.mark_running(
-                task_id=task_id, owner=self.owner
-            ):
+            if not await self._queue.mark_running(task_id=task_id, owner=self.owner):
                 # Lease lost (sweeper reclaimed it); another worker will retry.
                 return
 
@@ -405,9 +403,7 @@ class SiteHealthWorker:
             crawl.started_at = _utcnow()
         apply_crawl_status(crawl, CRAWL_STATUS_RUNNING)
 
-    async def _run_discover(
-        self, task_id: uuid.UUID, crawl_id: uuid.UUID
-    ) -> None:
+    async def _run_discover(self, task_id: uuid.UUID, crawl_id: uuid.UUID) -> None:
         """Fetch + parse the target, then persist observation/admission atomically.
 
         Loads the crawl config in one short session, closes it before the fetch
@@ -655,9 +651,7 @@ class SiteHealthWorker:
                 if admission.sample_capped:
                     # Free stop-at-10: terminate discovery at the cap. No
                     # total-bearing value is computed or persisted.
-                    apply_discovery_status(
-                        crawl, DISCOVERY_STATUS_SAMPLE_COMPLETED
-                    )
+                    apply_discovery_status(crawl, DISCOVERY_STATUS_SAMPLE_COMPLETED)
                 record_crawl_event(
                     session,
                     crawl_id=crawl_id,
@@ -709,9 +703,7 @@ class SiteHealthWorker:
     ) -> list[FrontierCandidate]:
         # The discover task's own position is its randomized_position; children
         # inherit deterministic order via (parent_position, link_ordinal, hash).
-        candidates = build_frontier_candidates(
-            output, parent_position=0, depth=depth
-        )
+        candidates = build_frontier_candidates(output, parent_position=0, depth=depth)
         if depth == 0:
             # The root/fetched identity itself must also go through admission
             # (not just its extracted child links): a Free crawl's sample
@@ -824,9 +816,7 @@ class SiteHealthWorker:
                 content_type=(output.content_type or "")[:128],
                 title=(output.title or "")[:1024],
             )
-            .on_conflict_do_nothing(
-                index_elements=["crawl_id", "site_url_id"]
-            )
+            .on_conflict_do_nothing(index_elements=["crawl_id", "site_url_id"])
         )
 
     async def _resolve_site_url_id(
@@ -917,22 +907,16 @@ class SiteHealthWorker:
                 status_code=outcome.status_code,
                 latency_ms=outcome.latency_ms,
                 wire_bytes=(
-                    outcome.result.wire_bytes
-                    if outcome.result is not None
-                    else None
+                    outcome.result.wire_bytes if outcome.result is not None else None
                 ),
                 decoded_bytes=(
-                    outcome.result.decoded_bytes
-                    if outcome.result is not None
-                    else None
+                    outcome.result.decoded_bytes if outcome.result is not None else None
                 ),
                 artifact_id=artifact_id,
             )
         )
 
-    async def _record_crash(
-        self, task_id: uuid.UUID, exc: Exception
-    ) -> None:
+    async def _record_crash(self, task_id: uuid.UUID, exc: Exception) -> None:
         detail = f"{type(exc).__name__}: {exc}"
         await self._queue.fail(
             task_id=task_id,
@@ -985,9 +969,7 @@ class SiteHealthWorker:
 
     # --- analyze flow ------------------------------------------------------
 
-    async def _run_analyze(
-        self, task_id: uuid.UUID, crawl_id: uuid.UUID
-    ) -> None:
+    async def _run_analyze(self, task_id: uuid.UUID, crawl_id: uuid.UUID) -> None:
         """Fetch + deep-analyze one monitored URL, persisting evidence atomically.
 
         Mirrors the discover flow: load config in one short session, fetch the
@@ -1076,9 +1058,7 @@ class SiteHealthWorker:
                 .limit(1)
             )
 
-    async def _persisted_link_check_done(
-        self, task_id: uuid.UUID
-    ) -> bool:
+    async def _persisted_link_check_done(self, task_id: uuid.UUID) -> bool:
         """Return True if this link-check task already persisted references.
 
         The presence of any ``SiteLinkReference`` row tagged with this task's
@@ -1114,9 +1094,7 @@ class SiteHealthWorker:
             monitored_stmt = monitored_stmt.with_for_update()
             entitlement_stmt = entitlement_stmt.with_for_update()
         monitored = (await session.execute(monitored_stmt)).scalar_one_or_none()
-        entitlement = (
-            await session.execute(entitlement_stmt)
-        ).scalar_one_or_none()
+        entitlement = (await session.execute(entitlement_stmt)).scalar_one_or_none()
         return evaluate_task_guard(
             crawl=crawl,
             task=task,
@@ -1245,7 +1223,9 @@ class SiteHealthWorker:
             decoded_bytes=result.decoded_bytes,
         )
         return _AnalyzeOutcome(
-            result=result, facts=facts, status_code=status,
+            result=result,
+            facts=facts,
+            status_code=status,
             latency_ms=result.latency_ms,
         )
 
@@ -1426,8 +1406,7 @@ class SiteHealthWorker:
                         severity=ev.severity,
                         evidence=ev.evidence,
                         remediation=ev.remediation,
-                        analyzer_version=crawl.analyzer_version
-                        or ANALYZER_VERSION,
+                        analyzer_version=crawl.analyzer_version or ANALYZER_VERSION,
                         rule_version=ev.rule_version,
                     )
                 )
@@ -1461,9 +1440,7 @@ class SiteHealthWorker:
 
     # --- link-check flow ---------------------------------------------------
 
-    async def _run_link_check(
-        self, task_id: uuid.UUID, crawl_id: uuid.UUID
-    ) -> None:
+    async def _run_link_check(self, task_id: uuid.UUID, crawl_id: uuid.UUID) -> None:
         """Deduped HEAD-first + bounded GET-fallback link check for one page.
 
         Reads the source page's persisted analyze artifact facts, dedupes the
@@ -1501,9 +1478,7 @@ class SiteHealthWorker:
             return
 
         analysis_id, artifact_id, source_final_url, facts = source
-        targets = self._link_check_targets(
-            facts, source_final_url=source_final_url
-        )
+        targets = self._link_check_targets(facts, source_final_url=source_final_url)
 
         heartbeat = asyncio.create_task(self._heartbeat_loop(task_id))
         try:
@@ -1557,9 +1532,7 @@ class SiteHealthWorker:
             return None
         row = (
             await session.execute(
-                select(
-                    SitePageAnalysis.id, SitePageAnalysis.artifact_id
-                )
+                select(SitePageAnalysis.id, SitePageAnalysis.artifact_id)
                 .where(
                     SitePageAnalysis.crawl_id == crawl.id,
                     SitePageAnalysis.site_url_id == site_url_id,
@@ -1577,9 +1550,7 @@ class SiteHealthWorker:
         facts = dict(artifact.normalized_facts or {})
         return analysis_id, artifact_id, artifact.final_url, facts
 
-    def _link_check_targets(
-        self, facts: dict, *, source_final_url: str
-    ) -> list[dict]:
+    def _link_check_targets(self, facts: dict, *, source_final_url: str) -> list[dict]:
         """Return a bounded, deduped list of link targets from page facts.
 
         Deduplicates on ``(kind, target_hash)`` so a page linking the same URL
@@ -1597,9 +1568,7 @@ class SiteHealthWorker:
                 if not raw_url:
                     continue
                 url = urljoin(source_final_url, raw_url)
-                target_hash = hashlib.sha256(
-                    url.encode("utf-8")
-                ).hexdigest()[:64]
+                target_hash = hashlib.sha256(url.encode("utf-8")).hexdigest()[:64]
                 entry_kind = str(entry.get("kind") or kind)
                 key = (entry_kind, target_hash)
                 if key in seen:
@@ -1612,9 +1581,7 @@ class SiteHealthWorker:
                         "target_hash": target_hash,
                         "is_internal": bool(entry.get("is_internal")),
                         "rel": str(entry.get("rel") or "")[:128],
-                        "anchor_text": str(entry.get("anchor_text") or "")[
-                            :1024
-                        ],
+                        "anchor_text": str(entry.get("anchor_text") or "")[:1024],
                     }
                 )
         return collected
@@ -1675,9 +1642,7 @@ class SiteHealthWorker:
             ).encode()
         ).hexdigest()
         outcome_prefix = "reachable:" if probe.reachable else "unreachable:"
-        fingerprint = (
-            outcome_prefix + evidence_digest[: 64 - len(outcome_prefix)]
-        )
+        fingerprint = outcome_prefix + evidence_digest[: 64 - len(outcome_prefix)]
         await session.execute(
             pg_insert(SiteLinkReference)
             .values(
@@ -1732,9 +1697,7 @@ class SiteHealthWorker:
         sets in the transition tables).
         """
         async with self._session_factory() as session:
-            crawl = await session.get(
-                SiteCrawl, crawl_id, with_for_update=True
-            )
+            crawl = await session.get(SiteCrawl, crawl_id, with_for_update=True)
             if crawl is None or not crawl_is_active(crawl):
                 if crawl is not None:
                     await session.rollback()
@@ -1760,18 +1723,13 @@ class SiteHealthWorker:
                     if fully_failed:
                         apply_discovery_status(crawl, DISCOVERY_STATUS_FAILED)
                     else:
-                        apply_discovery_status(
-                            crawl, DISCOVERY_STATUS_COMPLETED
-                        )
+                        apply_discovery_status(crawl, DISCOVERY_STATUS_COMPLETED)
                 crawl.inventory_complete = not fully_failed
 
             # Analysis lifecycle: move pending -> running once any analyze task
             # exists (work has been admitted), so a later terminal transition
             # is legal.
-            if (
-                analyze_total > 0
-                and crawl.analysis_status == ANALYSIS_STATUS_PENDING
-            ):
+            if analyze_total > 0 and crawl.analysis_status == ANALYSIS_STATUS_PENDING:
                 apply_analysis_status(crawl, ANALYSIS_STATUS_RUNNING)
 
             all_drained = (
@@ -1786,10 +1744,7 @@ class SiteHealthWorker:
             # Every task of every kind is terminal: terminalize analysis + the
             # overall crawl exactly once.
             analysis_terminalized = False
-            if (
-                analyze_total == 0
-                and crawl.analysis_status == ANALYSIS_STATUS_PENDING
-            ):
+            if analyze_total == 0 and crawl.analysis_status == ANALYSIS_STATUS_PENDING:
                 # An empty analysis plan is a successful, terminal lifecycle,
                 # not a crawl left permanently "pending". Traverse the legal
                 # state machine and persist the corresponding empty snapshot.
@@ -1800,9 +1755,7 @@ class SiteHealthWorker:
                 elif analyze_succeeded == analyze_applicable:
                     apply_analysis_status(crawl, ANALYSIS_STATUS_COMPLETED)
                 elif analyze_succeeded > 0:
-                    apply_analysis_status(
-                        crawl, ANALYSIS_STATUS_PARTIALLY_COMPLETED
-                    )
+                    apply_analysis_status(crawl, ANALYSIS_STATUS_PARTIALLY_COMPLETED)
                 else:
                     apply_analysis_status(crawl, ANALYSIS_STATUS_FAILED)
                 analysis_terminalized = True
@@ -1815,12 +1768,9 @@ class SiteHealthWorker:
                 if fully_failed:
                     apply_crawl_status(crawl, CRAWL_STATUS_FAILED)
                 elif discovery_partial or (
-                    analyze_applicable > 0
-                    and analyze_succeeded < analyze_applicable
+                    analyze_applicable > 0 and analyze_succeeded < analyze_applicable
                 ):
-                    apply_crawl_status(
-                        crawl, CRAWL_STATUS_PARTIALLY_COMPLETED
-                    )
+                    apply_crawl_status(crawl, CRAWL_STATUS_PARTIALLY_COMPLETED)
                 else:
                     apply_crawl_status(crawl, CRAWL_STATUS_COMPLETED)
                 record_crawl_event(
@@ -1845,11 +1795,7 @@ class SiteHealthWorker:
                     .select_from(SiteCrawlTask)
                     .where(SiteCrawlTask.crawl_id == crawl_id)
                     .where(SiteCrawlTask.task_kind == kind)
-                    .where(
-                        SiteCrawlTask.status.not_in(
-                            list(TASK_TERMINAL_STATUSES)
-                        )
-                    )
+                    .where(SiteCrawlTask.status.not_in(list(TASK_TERMINAL_STATUSES)))
                 )
                 or 0
             )
@@ -1944,8 +1890,7 @@ class SiteHealthWorker:
                     ranked.c.technical_score,
                     ranked.c.aeo_score,
                     ranked.c.overall_score,
-                )
-                .where(ranked.c.latest_rank == 1)
+                ).where(ranked.c.latest_rank == 1)
             )
         ).all()
 

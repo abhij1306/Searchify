@@ -6,6 +6,7 @@ identity is inlined here as a plain scoring-identity dict (the same shape
 ``project_scoring_identity`` produces + ``ScoringConfig.from_project`` consumes).
 Verifies the ported scorer matches the reference behavior exactly.
 """
+
 from __future__ import annotations
 
 import pytest

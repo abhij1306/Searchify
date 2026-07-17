@@ -259,9 +259,7 @@ class Citation(Base):
     classification: Mapped[str] = mapped_column(String(24), default="third_party")
     is_owned: Mapped[bool] = mapped_column(Boolean, default=False)
     is_unintended: Mapped[bool] = mapped_column(Boolean, default=False)
-    matched_competitor: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    matched_competitor: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -281,9 +279,7 @@ class MetricSnapshot(Base):
     """
 
     __tablename__ = "metric_snapshots"
-    __table_args__ = (
-        UniqueConstraint("audit_id", name="uq_metric_snapshot_audit"),
-    )
+    __table_args__ = (UniqueConstraint("audit_id", name="uq_metric_snapshot_audit"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -316,12 +312,8 @@ class MetricSnapshot(Base):
     # computed from — the ``ResponseAnalysis`` ids and their source raw
     # ``artifact_id``s. Every derived row, including this aggregate, must be
     # traceable to the raw evidence + analyzer/rule versions.
-    source_analysis_ids: Mapped[list | None] = mapped_column(
-        JSONB, nullable=True
-    )
-    source_artifact_ids: Mapped[list | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    source_analysis_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    source_artifact_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )

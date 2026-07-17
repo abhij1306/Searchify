@@ -113,9 +113,7 @@ def _normalize_query(query: str) -> str:
 # ``%2F`` -> ``/`` or ``%25`` -> ``%``) MUST stay percent-encoded, or two
 # server-distinct URLs (e.g. a path segment containing a literal ``/``) would
 # canonicalize to the same identity.
-_UNRESERVED = (
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-)
+_UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
 _PERCENT_ESCAPE_RE = re.compile(r"%([0-9A-Fa-f]{2})")
 
 
@@ -174,8 +172,10 @@ def canonicalize(url: str, *, base_url: str | None = None) -> str:
         raise UrlPolicyError(f"scheme not allowed: {scheme or '(none)'}")
 
     # Reject credentials-in-URL (userinfo) outright.
-    if parts.username is not None or parts.password is not None or (
-        "@" in parts.netloc
+    if (
+        parts.username is not None
+        or parts.password is not None
+        or ("@" in parts.netloc)
     ):
         raise UrlPolicyError("userinfo (credentials) not allowed in URL")
 
@@ -294,9 +294,7 @@ def is_admissible(
     """Scope + narrowing gate for a canonical URL (does NOT do DNS/SSRF)."""
     if not is_in_scope(url, root_registrable_domain):
         return False
-    return narrow(
-        url, include_globs=include_globs, exclude_globs=exclude_globs
-    )
+    return narrow(url, include_globs=include_globs, exclude_globs=exclude_globs)
 
 
 def _is_unsafe_ip(ip: ipaddress._BaseAddress) -> bool:

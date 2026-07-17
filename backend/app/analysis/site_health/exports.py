@@ -130,9 +130,7 @@ def rows_to_csv(view: str, items: list[dict]) -> str:
     """
     columns = _VIEW_COLUMNS[view]
     buffer = io.StringIO()
-    writer = csv.DictWriter(
-        buffer, fieldnames=columns, extrasaction="ignore"
-    )
+    writer = csv.DictWriter(buffer, fieldnames=columns, extrasaction="ignore")
     writer.writeheader()
     for item in items:
         writer.writerow({col: _csv_cell(item.get(col)) for col in columns})

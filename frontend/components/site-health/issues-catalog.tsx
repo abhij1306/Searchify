@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/typography';
 import { siteHealthQueries, type IssuesParams } from '@/lib/api/site-health';
 import type { IssueDimension, SiteIssue } from '@/lib/api/types';
 import {
-  SUMMARY_SEVERITIES,
   dimensionLabel,
   issueTitle,
   severityBadgeValue,

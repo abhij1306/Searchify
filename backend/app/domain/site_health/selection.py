@@ -101,9 +101,7 @@ class QuotaExceededError(SelectionError):
 
     code = CODE_QUOTA_EXCEEDED
 
-    def __init__(
-        self, message: str, *, limit: int, currently_used: int
-    ) -> None:
+    def __init__(self, message: str, *, limit: int, currently_used: int) -> None:
         super().__init__(message)
         self.limit = limit
         self.currently_used = currently_used
@@ -455,9 +453,7 @@ async def replace_monitored_set(
         )
 
     # Apply the full-set delta against the project's memberships (locked).
-    memberships = await _load_project_memberships(
-        session, project_id=project_id
-    )
+    memberships = await _load_project_memberships(session, project_id=project_id)
     by_url_id = {m.site_url_id: m for m in memberships}
     now = _utcnow()
     new_version = profile.selection_version + 1
@@ -518,9 +514,7 @@ async def replace_monitored_set(
     if crawl is not None:
         if removed_ids:
             removed_hashes = [
-                site_urls[rid].url_hash
-                for rid in removed_ids
-                if rid in site_urls
+                site_urls[rid].url_hash for rid in removed_ids if rid in site_urls
             ]
             # A removed row may not be in ``site_urls`` (it was not requested),
             # so resolve its hash from its membership's SiteUrl if needed.
@@ -529,9 +523,7 @@ async def replace_monitored_set(
                 extra = await _load_project_site_urls(
                     session, project_id=project_id, ids=missing
                 )
-                removed_hashes.extend(
-                    row.url_hash for row in extra.values()
-                )
+                removed_hashes.extend(row.url_hash for row in extra.values())
             cancelled_task_ids = await _cancel_pending_analyze_tasks(
                 session, crawl_id=crawl.id, url_hashes=removed_hashes
             )
@@ -555,9 +547,7 @@ async def replace_monitored_set(
                 enqueued_task_ids.append(task.id)
         await session.flush()
 
-    active_ids = tuple(
-        m.site_url_id for m in by_url_id.values() if m.active
-    )
+    active_ids = tuple(m.site_url_id for m in by_url_id.values() if m.active)
     return SelectionResult(
         selection_version=new_version,
         active_ids=active_ids,
@@ -855,8 +845,6 @@ def evaluate_task_guard(
     if not monitored_is_active(monitored):
         return GuardDecision(ok=False, reason="not_actively_monitored")
     source = getattr(monitored, "selection_source", SELECTION_SOURCE_USER)
-    if not entitlement_allows_monitored_analysis(
-        entitlement, selection_source=source
-    ):
+    if not entitlement_allows_monitored_analysis(entitlement, selection_source=source):
         return GuardDecision(ok=False, reason="entitlement_revoked")
     return GuardDecision(ok=True)

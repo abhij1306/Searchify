@@ -20,9 +20,7 @@ from app.core.config.projects import (
 )
 from app.domain.prompts.schemas import PromptSetResponse
 
-BenchmarkMode = Literal[
-    "consumer_like", "controlled_localized", "forced_grounded"
-]
+BenchmarkMode = Literal["consumer_like", "controlled_localized", "forced_grounded"]
 
 
 # --------------------------------------------------------------------------
@@ -65,9 +63,7 @@ class ProjectCreate(BaseModel):
     country_code: str = Field(default="", max_length=8)
     language_code: str = Field(default="", max_length=16)
     benchmark_mode: BenchmarkMode = DEFAULT_BENCHMARK_MODE
-    default_repetitions: int = Field(
-        default=3, ge=MIN_REPETITIONS, le=MAX_REPETITIONS
-    )
+    default_repetitions: int = Field(default=3, ge=MIN_REPETITIONS, le=MAX_REPETITIONS)
 
     @property
     def brand_aliases(self) -> list[str]:

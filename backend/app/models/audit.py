@@ -167,9 +167,7 @@ class AuditPromptSnapshot(Base):
         DateTime(timezone=True), default=_utcnow
     )
 
-    audit: Mapped[Audit] = relationship(
-        "Audit", back_populates="prompt_snapshots"
-    )
+    audit: Mapped[Audit] = relationship("Audit", back_populates="prompt_snapshots")
 
 
 class AuditEngineSnapshot(Base):
@@ -210,9 +208,7 @@ class AuditEngineSnapshot(Base):
         DateTime(timezone=True), default=_utcnow
     )
 
-    audit: Mapped[Audit] = relationship(
-        "Audit", back_populates="engine_snapshots"
-    )
+    audit: Mapped[Audit] = relationship("Audit", back_populates="engine_snapshots")
 
 
 class AuditTask(Base):
@@ -228,9 +224,7 @@ class AuditTask(Base):
 
     __tablename__ = "audit_tasks"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_audit_task_idempotency_key"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_audit_task_idempotency_key"),
         UniqueConstraint(
             "audit_id",
             "prompt_index",
@@ -272,9 +266,7 @@ class AuditTask(Base):
     # Frozen prompt text (denormalized from the snapshot for the worker).
     prompt_text: Mapped[str] = mapped_column(Text, default="")
     # Frozen route resolution for this slot (never contains the key).
-    provider_route_snapshot: Mapped[dict | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    provider_route_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128))
 
     # --- Queue + lease state ---------------------------------------------
@@ -285,9 +277,7 @@ class AuditTask(Base):
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, index=True
     )
-    lease_owner: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    lease_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
     lease_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -412,9 +402,7 @@ class ProviderAttempt(Base):
         DateTime(timezone=True), default=_utcnow
     )
 
-    task: Mapped[AuditTask] = relationship(
-        "AuditTask", back_populates="attempts"
-    )
+    task: Mapped[AuditTask] = relationship("AuditTask", back_populates="attempts")
 
 
 class AuditEvent(Base):

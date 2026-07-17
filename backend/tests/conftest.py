@@ -6,6 +6,7 @@ a running Postgres — e.g. the Docker container used for migration verification
 
     postgresql+asyncpg://postgres:<pw>@localhost:55432/test_db
 """
+
 from __future__ import annotations
 
 import itertools
@@ -44,15 +45,11 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
 
     The schema is dropped on teardown so tests never leak state into each other.
     """
-    suffix = re.sub(
-        r"[^a-zA-Z0-9_]", "_", f"{_TEST_RUN_ID}_{next(_COUNTER)}"
-    )
+    suffix = re.sub(r"[^a-zA-Z0-9_]", "_", f"{_TEST_RUN_ID}_{next(_COUNTER)}")
     schema_name = f"test_{suffix}"
     quoted = f'"{schema_name}"'
     engine = create_async_engine(TEST_DATABASE_URL, future=True, echo=False)
-    scoped_engine = engine.execution_options(
-        schema_translate_map={None: schema_name}
-    )
+    scoped_engine = engine.execution_options(schema_translate_map={None: schema_name})
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {quoted}"))
     async with scoped_engine.begin() as conn:

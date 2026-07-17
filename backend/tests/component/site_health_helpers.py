@@ -5,6 +5,7 @@ Builds a workspace + project + Site Health profile + crawl, and enqueues
 ``PostgresTaskQueue`` (parameterized by ``SITE_CRAWL_QUEUE_SPEC``) can be
 exercised against a real Postgres schema exactly like the audit queue.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -63,8 +64,8 @@ async def seed_site_crawl(
     # joins task URLs safely (no "https://host page-0" malformed URL).
     canonical_root = canonicalize(root_url)
     root_host, _root_port = split_host_port(canonical_root)
-    root_base = canonical_root if canonical_root.endswith("/") else (
-        canonical_root + "/"
+    root_base = (
+        canonical_root if canonical_root.endswith("/") else (canonical_root + "/")
     )
 
     workspace = Workspace(name="Site WS")
@@ -75,9 +76,7 @@ async def seed_site_crawl(
     session.add(user)
     await session.flush()
     session.add(
-        WorkspaceMember(
-            workspace_id=workspace.id, user_id=user.id, role="owner"
-        )
+        WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner")
     )
 
     project = Project(

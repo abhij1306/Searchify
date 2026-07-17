@@ -60,9 +60,7 @@ def project_to_response(project: Project) -> ProjectResponse:
         brand_name=(brand.name if brand is not None else project.brand_name),
         brand=BrandResponse(
             aliases=(
-                [alias.alias for alias in brand.aliases]
-                if brand is not None
-                else []
+                [alias.alias for alias in brand.aliases] if brand is not None else []
             )
         ),
         website_url=project.website_url,
@@ -77,9 +75,7 @@ def project_to_response(project: Project) -> ProjectResponse:
             )
             for c in project.competitors
         ],
-        prompt_sets=[
-            prompt_set_to_response(ps) for ps in project.prompt_sets
-        ],
+        prompt_sets=[prompt_set_to_response(ps) for ps in project.prompt_sets],
         country_code=project.country_code,
         language_code=project.language_code,
         benchmark_mode=project.benchmark_mode,
@@ -141,14 +137,11 @@ async def create_project(
         OwnedDomain(domain=d) for d in _clean_list(payload.owned_domains)
     ]
     project.unintended_domains = [
-        UnintendedDomain(domain=d)
-        for d in _clean_list(payload.unintended_domains)
+        UnintendedDomain(domain=d) for d in _clean_list(payload.unintended_domains)
     ]
     session.add(project)
     await session.commit()
-    return await get_project(
-        session, workspace_id=workspace_id, project_id=project.id
-    )
+    return await get_project(session, workspace_id=workspace_id, project_id=project.id)
 
 
 async def list_projects(
@@ -199,10 +192,7 @@ async def update_project(
         project.language_code = data["language_code"]
     if "benchmark_mode" in data and data["benchmark_mode"] is not None:
         project.benchmark_mode = normalize_benchmark_mode(data["benchmark_mode"])
-    if (
-        "default_repetitions" in data
-        and data["default_repetitions"] is not None
-    ):
+    if "default_repetitions" in data and data["default_repetitions"] is not None:
         project.default_repetitions = data["default_repetitions"]
 
     # Brand name / aliases are rebuilt together so the alias set stays
@@ -231,14 +221,11 @@ async def update_project(
         ]
     if "unintended_domains" in data and data["unintended_domains"] is not None:
         project.unintended_domains = [
-            UnintendedDomain(domain=d)
-            for d in _clean_list(data["unintended_domains"])
+            UnintendedDomain(domain=d) for d in _clean_list(data["unintended_domains"])
         ]
 
     await session.commit()
-    return await get_project(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
+    return await get_project(session, workspace_id=workspace_id, project_id=project_id)
 
 
 async def delete_project(

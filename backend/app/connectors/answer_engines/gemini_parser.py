@@ -115,11 +115,7 @@ def _extract_citations(blocks: list[dict[str, Any]]) -> list[CitationResult]:
             # Derive cited text from the answer where offsets are valid, rather
             # than trusting a possibly-stale provider-duplicated field.
             cited_text = ""
-            if (
-                start is not None
-                and end is not None
-                and 0 <= start < end <= len(text)
-            ):
+            if start is not None and end is not None and 0 <= start < end <= len(text):
                 cited_text = text[start:end]
             else:
                 start = None
@@ -222,9 +218,7 @@ def parse_interaction(
     )
     citations = _extract_citations(blocks)
 
-    search_used = any(
-        _step_type(step) == "google_search_call" for step in steps
-    )
+    search_used = any(_step_type(step) == "google_search_call" for step in steps)
 
     return AnswerEngineResponse(
         logical_engine=logical_engine,

@@ -9,6 +9,7 @@ claim/lease loop against a Postgres schema:
   - a cooperatively-cancelled audit stops at the task boundary (no artifact);
   - the per-run wall-clock deadline terminalizes remaining tasks.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -207,9 +208,7 @@ async def test_worker_persists_openai_provenance(
             random_seed="1",
         )
 
-    monkeypatch.setattr(
-        audit_worker, "build_adapter", lambda **_: _OpenAIStubAdapter()
-    )
+    monkeypatch.setattr(audit_worker, "build_adapter", lambda **_: _OpenAIStubAdapter())
     monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
     monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
 
@@ -247,16 +246,13 @@ async def test_worker_rejects_frozen_openrouter_task_without_network(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
         task.transport_provider = "openrouter"
-        snapshot = await session.get(
-            AuditEngineSnapshot, task.engine_snapshot_id
-        )
+        snapshot = await session.get(AuditEngineSnapshot, task.engine_snapshot_id)
         if snapshot is not None:
             snapshot.transport_provider = "openrouter"
         await session.commit()
 
     def _boom(**_: object):  # noqa: ANN202
-        raise AssertionError("build_adapter must not be called for a retired "
-                             "transport")
+        raise AssertionError("build_adapter must not be called for a retired transport")
 
     monkeypatch.setattr(audit_worker, "build_adapter", _boom)
     monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
@@ -282,9 +278,7 @@ async def test_worker_rejects_frozen_openrouter_task_without_network(
         assert artifacts == 0
         attempts = (
             await session.scalars(
-                select(ProviderAttempt).where(
-                    ProviderAttempt.audit_id == audit.id
-                )
+                select(ProviderAttempt).where(ProviderAttempt.audit_id == audit.id)
             )
         ).all()
         assert all(a.status == "failed" for a in attempts)
@@ -301,9 +295,7 @@ async def test_worker_stops_at_boundary_when_cancelled(
 
     # Kill the audit before the worker picks anything up.
     async with session_factory() as session:
-        await cancel_audit(
-            session, workspace_id=seed.workspace_id, audit_id=audit.id
-        )
+        await cancel_audit(session, workspace_id=seed.workspace_id, audit_id=audit.id)
 
     worker = AuditWorker(session_factory=session_factory, owner="w-cancel")
     await worker.run_until_idle()

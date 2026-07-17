@@ -50,9 +50,7 @@ _RETRYABLE_SEARCH_ERRORS = {
 }
 
 
-def _payload(
-    request: AnswerEngineRequest, *, country_code: str
-) -> dict[str, Any]:
+def _payload(request: AnswerEngineRequest, *, country_code: str) -> dict[str, Any]:
     tool: dict[str, Any] = {
         "type": _WEB_SEARCH_TOOL_TYPE,
         "name": "web_search",
@@ -115,13 +113,9 @@ class AnthropicAnswerEngineAdapter:
             )
         self._api_key = api_key
         self._country_code = country_code
-        self._url = (
-            base_url or provider_catalog_settings.anthropic_messages_url
-        )
+        self._url = base_url or provider_catalog_settings.anthropic_messages_url
 
-    async def execute(
-        self, request: AnswerEngineRequest
-    ) -> AnswerEngineResponse:
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
         headers = {
             "x-api-key": self._api_key,
             "anthropic-version": provider_catalog_settings.anthropic_version,
@@ -129,9 +123,7 @@ class AnthropicAnswerEngineAdapter:
         }
         started = time.monotonic()
         try:
-            async with httpx.AsyncClient(
-                timeout=request.timeout_seconds
-            ) as client:
+            async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
                 response = await client.post(
                     self._url,
                     json=_payload(request, country_code=self._country_code),
@@ -155,9 +147,7 @@ class AnthropicAnswerEngineAdapter:
             ) from exc
         latency_ms = int((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
-            error_code, retryable = classify_provider_status(
-                response.status_code
-            )
+            error_code, retryable = classify_provider_status(response.status_code)
             raise ProviderError(
                 f"Anthropic returned HTTP {response.status_code}",
                 error_code=error_code,

@@ -7,6 +7,7 @@ has exactly the shape ``from_project`` expects — including the contract that t
 shim does NOT prepend ``brand_name`` into ``brand_aliases`` (the scorer does
 that itself).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -64,9 +65,7 @@ class _ScoringConfig:
                         for a in ([item.get("name"), *(item.get("aliases") or [])])
                         if a
                     ),
-                    domains=tuple(
-                        str(d) for d in (item.get("domains") or []) if d
-                    ),
+                    domains=tuple(str(d) for d in (item.get("domains") or []) if d),
                 )
                 for item in (config.get("competitors") or [])
             ),

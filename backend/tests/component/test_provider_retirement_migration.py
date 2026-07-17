@@ -106,9 +106,7 @@ async def _seed(dsn: str) -> dict[str, uuid.UUID]:
         )
         ids["workspace"] = ws
 
-        async def add_connection(
-            key: str, transport: str, active: bool
-        ) -> uuid.UUID:
+        async def add_connection(key: str, transport: str, active: bool) -> uuid.UUID:
             cid = uuid.uuid4()
             await conn.execute(
                 "INSERT INTO provider_connections "
@@ -192,8 +190,7 @@ def test_migration_retires_only_marked_rows(
         for r in asyncio.run(
             _fetch_all(
                 dsn,
-                "SELECT id, active, deactivation_reason FROM "
-                "provider_connections",
+                "SELECT id, active, deactivation_reason FROM provider_connections",
             )
         )
     }
@@ -272,8 +269,7 @@ def test_migration_retires_only_marked_rows(
         for r in asyncio.run(
             _fetch_all(
                 dsn,
-                "SELECT id, active, deactivation_reason FROM "
-                "provider_connections",
+                "SELECT id, active, deactivation_reason FROM provider_connections",
             )
         )
     }

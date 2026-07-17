@@ -41,6 +41,7 @@ def _validate_base_url(value: str | None) -> str | None:
         raise ValueError("base_url must use https (http allowed only for localhost)")
     return value
 
+
 # Enumerations mirror provider_catalog (kept as Literals so FastAPI validates
 # the request body; the service re-validates against the catalog for routes).
 #

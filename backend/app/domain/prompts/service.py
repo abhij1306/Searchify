@@ -214,9 +214,7 @@ async def update_prompt(
     prompt_id: uuid.UUID,
     payload: Any,
 ) -> Prompt:
-    prompt = await _get_prompt(
-        session, workspace_id=workspace_id, prompt_id=prompt_id
-    )
+    prompt = await _get_prompt(session, workspace_id=workspace_id, prompt_id=prompt_id)
     data = payload.model_dump(exclude_unset=True)
     if data.get("text") is not None:
         prompt.text = data["text"].strip()
@@ -236,9 +234,7 @@ async def update_prompt(
 async def delete_prompt(
     session: AsyncSession, *, workspace_id: uuid.UUID, prompt_id: uuid.UUID
 ) -> None:
-    prompt = await _get_prompt(
-        session, workspace_id=workspace_id, prompt_id=prompt_id
-    )
+    prompt = await _get_prompt(session, workspace_id=workspace_id, prompt_id=prompt_id)
     await session.delete(prompt)
     await session.commit()
 

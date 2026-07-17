@@ -97,7 +97,6 @@ def transition_status(current: str, target: str) -> str:
         return target_status
     if target_status not in _ALLOWED_TRANSITIONS[current_status]:
         raise InvalidAuditTransition(
-            f"Invalid audit status transition: {current_status} -> "
-            f"{target_status}"
+            f"Invalid audit status transition: {current_status} -> {target_status}"
         )
     return target_status

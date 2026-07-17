@@ -4,6 +4,7 @@ Verifies each rule maps to the right check and each outcome (pass / fail /
 not_applicable / error) is produced with exact evidence + provenance. Pure,
 offline.
 """
+
 from __future__ import annotations
 
 from app.analysis.site_health.rules import (
@@ -127,9 +128,7 @@ def test_structured_data_absent_fails():
 
 
 def test_open_graph_incomplete_fails():
-    ev = _outcome(
-        _html_facts(open_graph={"og:title": "T"}), "aeo.open_graph_present"
-    )
+    ev = _outcome(_html_facts(open_graph={"og:title": "T"}), "aeo.open_graph_present")
     assert ev.outcome == RULE_OUTCOME_FAIL
     assert ev.evidence["has_og_description"] is False
 
@@ -156,10 +155,7 @@ def test_has_html_rules_not_applicable_without_html():
     }
     evals = {e.rule_id: e for e in evaluate_all(facts)}
     assert evals["technical.single_h1"].outcome == RULE_OUTCOME_NOT_APPLICABLE
-    assert (
-        evals["aeo.structured_data_present"].outcome
-        == RULE_OUTCOME_NOT_APPLICABLE
-    )
+    assert evals["aeo.structured_data_present"].outcome == RULE_OUTCOME_NOT_APPLICABLE
     assert evals["aeo.open_graph_present"].outcome == RULE_OUTCOME_NOT_APPLICABLE
     assert evals["aeo.sufficient_text"].outcome == RULE_OUTCOME_NOT_APPLICABLE
     # "always" rules still evaluate (https passes; title fails).

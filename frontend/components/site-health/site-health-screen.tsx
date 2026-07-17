@@ -14,7 +14,7 @@ import { DiscoveryProgress } from '@/components/site-health/discovery-progress';
 import { HealthDashboard } from '@/components/site-health/health-dashboard';
 import { InventorySelection } from '@/components/site-health/inventory-selection';
 import { queryKeys } from '@/lib/api/query-keys';
-import { siteHealthApi, siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
+import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
 import { useProjectContext } from '@/lib/project/project-context';
 import type { SiteCrawl } from '@/lib/api/types';
 import { downloadCrawlExport } from '@/lib/site-health/download';

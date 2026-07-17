@@ -23,6 +23,7 @@ These are deliberately broad, deterministic, and DB-backed. They do not attempt
 the live SSE / real-worker dry run the final testing agent owns (that needs a
 migrated live server, per the handoff).
 """
+
 from __future__ import annotations
 
 import httpx
@@ -82,9 +83,7 @@ async def test_full_read_journey_completed_crawl(
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
     # 1. Crawl summary (dashboard header).
-    summary = await client.get(
-        f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers
-    )
+    summary = await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers)
     assert summary.status_code == 200
     assert summary.json()["status"] == CRAWL_STATUS_COMPLETED
 
@@ -103,9 +102,7 @@ async def test_full_read_journey_completed_crawl(
     )
     assert monitored.status_code == 200
     m_body = monitored.json()
-    monitored_ids = {
-        row["site_url_id"] for row in m_body["monitored_urls"]
-    }
+    monitored_ids = {row["site_url_id"] for row in m_body["monitored_urls"]}
     assert str(scn.monitored_url_id) in monitored_ids
 
     # 4. Pages (dashboard rows) reflect analysis status + monitored flag.
@@ -132,14 +129,12 @@ async def test_full_read_journey_completed_crawl(
     )
     assert detail.status_code == 200
     assert any(
-        iss["rule_id"] == "technical.title_present"
-        for iss in detail.json()["issues"]
+        iss["rule_id"] == "technical.title_present" for iss in detail.json()["issues"]
     )
 
     # 7. That URL's crawl-bounded issue history.
     history = await client.get(
-        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}"
-        "/issue-history",
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}/issue-history",
         headers=headers,
     )
     assert history.status_code == 200
@@ -221,9 +216,7 @@ async def test_create_and_cancel_crawl_lifecycle(
             select(User).where(User.email == "lifecycle@example.com")
         )
         session.add(
-            WorkspaceMember(
-                workspace_id=other.id, user_id=user.id, role="owner"
-            )
+            WorkspaceMember(workspace_id=other.id, user_id=user.id, role="owner")
         )
         await session.commit()
         other_id = other.id
@@ -292,9 +285,9 @@ async def test_stale_monitored_selection_conflict_409(
     assert after.status_code == 200
     after_body = after.json()
     assert after_body["selection_version"] == 1
-    assert {
-        row["site_url_id"] for row in after_body["monitored_urls"]
-    } == set(url_ids[:2])
+    assert {row["site_url_id"] for row in after_body["monitored_urls"]} == set(
+        url_ids[:2]
+    )
 
 
 async def test_partial_error_crawl_surfaces_failed_pages(
@@ -402,15 +395,11 @@ async def test_partial_error_crawl_surfaces_failed_pages(
         crawl_id = crawl.id
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
-    summary = await client.get(
-        f"/api/v1/site-crawls/{crawl_id}", headers=headers
-    )
+    summary = await client.get(f"/api/v1/site-crawls/{crawl_id}", headers=headers)
     assert summary.status_code == 200
     assert summary.json()["status"] == CRAWL_STATUS_PARTIALLY_COMPLETED
 
-    pages = await client.get(
-        f"/api/v1/site-crawls/{crawl_id}/pages", headers=headers
-    )
+    pages = await client.get(f"/api/v1/site-crawls/{crawl_id}/pages", headers=headers)
     assert pages.status_code == 200
     rows = pages.json()["items"]
     assert len(rows) == 1
@@ -444,9 +433,7 @@ async def test_free_redaction_end_to_end(
     assert ent.json()["plan_key"] == "free"
 
     crawl = (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers)
     ).json()
     assert crawl["discovered_count"] is None
     assert crawl["total_url_count"] is None
@@ -455,9 +442,7 @@ async def test_free_redaction_end_to_end(
     assert crawl["visible_url_count"] == 3
 
     events = (
-        await client.get(
-            f"/api/v1/site-crawls/{scn.crawl_id}/events", headers=headers
-        )
+        await client.get(f"/api/v1/site-crawls/{scn.crawl_id}/events", headers=headers)
     ).json()
     forbidden = {
         "discovered_total",
@@ -485,9 +470,7 @@ async def test_journey_resolves_in_non_default_workspace(
     """
     await _register(client, "nondefault-e2e@example.com")
     async with session_factory() as session:
-        scn = await _seed_scenario(
-            session, email="nondefault-e2e@example.com"
-        )
+        scn = await _seed_scenario(session, email="nondefault-e2e@example.com")
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
     for path in (

@@ -91,13 +91,9 @@ class GeminiAnswerEngineAdapter:
                 retryable=False,
             )
         self._api_key = api_key
-        self._url = (
-            base_url or provider_catalog_settings.google_interactions_url
-        )
+        self._url = base_url or provider_catalog_settings.google_interactions_url
 
-    async def execute(
-        self, request: AnswerEngineRequest
-    ) -> AnswerEngineResponse:
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
         payload = _build_payload(request)
         headers = {
             "x-goog-api-key": self._api_key,
@@ -105,12 +101,8 @@ class GeminiAnswerEngineAdapter:
         }
         started = time.monotonic()
         try:
-            async with httpx.AsyncClient(
-                timeout=request.timeout_seconds
-            ) as client:
-                response = await client.post(
-                    self._url, json=payload, headers=headers
-                )
+            async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
+                response = await client.post(self._url, json=payload, headers=headers)
         except (
             httpx.ConnectTimeout,
             httpx.ReadTimeout,
@@ -130,9 +122,7 @@ class GeminiAnswerEngineAdapter:
 
         latency_ms = int((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
-            error_code, retryable = classify_provider_status(
-                response.status_code
-            )
+            error_code, retryable = classify_provider_status(response.status_code)
             retry_after = parse_retry_after(response.headers.get("retry-after"))
             # Never log the response body verbatim (could echo the request),
             # only the status and a short reason token.

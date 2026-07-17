@@ -196,9 +196,7 @@ async def _active_free_sample_count(
         .select_from(MonitoredSiteUrl)
         .where(MonitoredSiteUrl.workspace_id == workspace_id)
         .where(MonitoredSiteUrl.active.is_(True))
-        .where(
-            MonitoredSiteUrl.selection_source == SELECTION_SOURCE_FREE_SAMPLE
-        )
+        .where(MonitoredSiteUrl.selection_source == SELECTION_SOURCE_FREE_SAMPLE)
     )
     return int(result or 0)
 
@@ -238,9 +236,7 @@ async def _upsert_site_url(
             first_seen_at=now,
             last_seen_at=now,
         )
-        .on_conflict_do_nothing(
-            index_elements=["project_id", "url_hash"]
-        )
+        .on_conflict_do_nothing(index_elements=["project_id", "url_hash"])
         .returning(SiteUrl.id)
     )
     inserted_id = await session.scalar(stmt)
@@ -424,15 +420,10 @@ async def admit_candidates(
         # serialized across concurrent crawls in different projects.
         entitlement = await session.scalar(
             select(WorkspaceSiteHealthEntitlement)
-            .where(
-                WorkspaceSiteHealthEntitlement.workspace_id
-                == crawl.workspace_id
-            )
+            .where(WorkspaceSiteHealthEntitlement.workspace_id == crawl.workspace_id)
             .with_for_update()
         )
-        sample_limit = (
-            entitlement.sample_url_limit if entitlement is not None else 0
-        )
+        sample_limit = entitlement.sample_url_limit if entitlement is not None else 0
         used = await _active_free_sample_count(session, crawl.workspace_id)
         remaining = max(0, int(sample_limit) - used)
         if remaining <= 0:
@@ -453,8 +444,7 @@ async def admit_candidates(
         # Starter frontier ceiling.
         if (
             not crawl.sample_mode
-            and crawl.admitted_url_count + admitted
-            >= settings.max_frontier_urls
+            and crawl.admitted_url_count + admitted >= settings.max_frontier_urls
         ):
             break
 
@@ -501,9 +491,7 @@ async def admit_candidates(
             )
 
     crawl.admitted_url_count += admitted
-    sample_capped = bool(
-        crawl.sample_mode and remaining is not None and remaining <= 0
-    )
+    sample_capped = bool(crawl.sample_mode and remaining is not None and remaining <= 0)
     return AdmissionResult(
         admitted=admitted,
         sample_capped=sample_capped,

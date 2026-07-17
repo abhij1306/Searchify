@@ -85,9 +85,7 @@ class AuditResponse(BaseModel):
     completed_count: int
     failed_count: int
     error_message: str = ""
-    engine_snapshots: list[AuditEngineSnapshotResponse] = Field(
-        default_factory=list
-    )
+    engine_snapshots: list[AuditEngineSnapshotResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     started_at: datetime | None = None

@@ -8,6 +8,7 @@ remove/re-add + generation increment, remove mid-fetch, Free->Starter sample
 conversion + quota accounting, downgrade enforcement, persistent selection on a
 second crawl, and unselected-URL analysis isolation.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -173,9 +174,7 @@ async def _seed_workspace(
     session.add(user)
     await session.flush()
     session.add(
-        WorkspaceMember(
-            workspace_id=workspace.id, user_id=user.id, role="owner"
-        )
+        WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role="owner")
     )
     await session.flush()
 
@@ -198,9 +197,7 @@ async def test_stale_selection_version_rejected(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        seed = await _seed_workspace(
-            session, projects=[{"name": "a", "url_count": 3}]
-        )
+        seed = await _seed_workspace(session, projects=[{"name": "a", "url_count": 3}])
     proj = seed.projects[0]
 
     async with session_factory() as session:
@@ -314,9 +311,7 @@ async def test_two_project_quota_race_blocks_over_50(
 
     # Both request 30 concurrently -> 60 > 50. The FOR UPDATE lock on the
     # entitlement row serializes them; exactly one wins.
-    results = await asyncio.gather(
-        _select(proj_a), _select(proj_b)
-    )
+    results = await asyncio.gather(_select(proj_a), _select(proj_b))
     assert sorted(results) == ["ok", "quota"]
 
     # Never more than 50 active workspace-wide.
@@ -382,9 +377,7 @@ async def test_add_during_discovery_enqueues_analyze(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 3, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 3, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
 
@@ -401,13 +394,17 @@ async def test_add_during_discovery_enqueues_analyze(
 
     async with session_factory() as session:
         tasks = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == proj.crawl_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(
+                        SiteCrawlTask.crawl_id == proj.crawl_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert len(tasks) == 2
     assert all(t.status == TASK_STATUS_QUEUED for t in tasks)
     assert all(t.generation == INITIAL_TASK_GENERATION for t in tasks)
@@ -420,9 +417,7 @@ async def test_remove_readd_allocates_next_generation(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 2, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 2, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
     target = proj.site_url_ids[0]
@@ -466,15 +461,19 @@ async def test_remove_readd_allocates_next_generation(
 
     async with session_factory() as session:
         tasks = (
-            await session.execute(
-                select(SiteCrawlTask)
-                .where(
-                    SiteCrawlTask.crawl_id == proj.crawl_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+            (
+                await session.execute(
+                    select(SiteCrawlTask)
+                    .where(
+                        SiteCrawlTask.crawl_id == proj.crawl_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+                    )
+                    .order_by(SiteCrawlTask.generation.asc())
                 )
-                .order_by(SiteCrawlTask.generation.asc())
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # Two task identities: the cancelled gen-0 and the fresh gen-1.
     assert [t.generation for t in tasks] == [0, 1]
     gen0, gen1 = tasks
@@ -493,9 +492,7 @@ async def test_remove_mid_fetch_guard_blocks_persistence(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 1, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 1, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
     target = proj.site_url_ids[0]
@@ -513,12 +510,14 @@ async def test_remove_mid_fetch_guard_blocks_persistence(
     # Simulate a worker that claimed + is running the analyze task.
     async with session_factory() as session:
         task = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == proj.crawl_id
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(SiteCrawlTask.crawl_id == proj.crawl_id)
                 )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         task.status = TASK_STATUS_RUNNING
         task.lease_owner = "worker-1"
         await session.commit()
@@ -538,21 +537,29 @@ async def test_remove_mid_fetch_guard_blocks_persistence(
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, proj.crawl_id)
         task = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == proj.crawl_id,
-                    SiteCrawlTask.status == TASK_STATUS_RUNNING,
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(
+                        SiteCrawlTask.crawl_id == proj.crawl_id,
+                        SiteCrawlTask.status == TASK_STATUS_RUNNING,
+                    )
                 )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         monitored = (
-            await session.execute(
-                select(MonitoredSiteUrl).where(
-                    MonitoredSiteUrl.project_id == proj.project_id,
-                    MonitoredSiteUrl.site_url_id == target,
+            (
+                await session.execute(
+                    select(MonitoredSiteUrl).where(
+                        MonitoredSiteUrl.project_id == proj.project_id,
+                        MonitoredSiteUrl.site_url_id == target,
+                    )
                 )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         entitlement = await resolve_entitlement(session, seed.workspace_id)
 
         decision = evaluate_task_guard(
@@ -621,12 +628,16 @@ async def test_free_to_starter_converts_and_deactivates_samples(
 
     async with session_factory() as session:
         rows = (
-            await session.execute(
-                select(MonitoredSiteUrl).where(
-                    MonitoredSiteUrl.project_id == proj.project_id
+            (
+                await session.execute(
+                    select(MonitoredSiteUrl).where(
+                        MonitoredSiteUrl.project_id == proj.project_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     by_id = {r.site_url_id: r for r in rows}
     # Kept sample row converted to user-managed and stays active.
     assert by_id[keep].active
@@ -648,9 +659,7 @@ async def test_downgrade_blocks_user_row_but_allows_sample(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        seed = await _seed_workspace(
-            session, capability=CAPABILITY_FREE, projects=[]
-        )
+        seed = await _seed_workspace(session, capability=CAPABILITY_FREE, projects=[])
     async with session_factory() as session:
         free = await resolve_entitlement(session, seed.workspace_id)
         # Free entitlement blocks NEW analysis of a user-managed row...
@@ -674,9 +683,7 @@ async def test_guard_helpers_lease_and_crawl(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 1, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 1, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
     async with session_factory() as session:
@@ -711,9 +718,7 @@ async def test_second_crawl_seeds_active_monitored_only(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 5, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 5, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
     monitored_ids = proj.site_url_ids[:2]
@@ -749,13 +754,17 @@ async def test_second_crawl_seeds_active_monitored_only(
 
     async with session_factory() as session:
         tasks = (
-            await session.execute(
-                select(SiteCrawlTask).where(
-                    SiteCrawlTask.crawl_id == crawl2_id,
-                    SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+            (
+                await session.execute(
+                    select(SiteCrawlTask).where(
+                        SiteCrawlTask.crawl_id == crawl2_id,
+                        SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # Only the 2 active monitored URLs get analyze tasks — the other 3
     # discovered-but-unselected URLs never do (analysis isolation).
     assert len(tasks) == 2
@@ -770,9 +779,7 @@ async def test_seed_monitored_targets_is_idempotent(
     async with session_factory() as session:
         seed = await _seed_workspace(
             session,
-            projects=[
-                {"name": "a", "url_count": 2, "with_active_crawl": True}
-            ],
+            projects=[{"name": "a", "url_count": 2, "with_active_crawl": True}],
         )
     proj = seed.projects[0]
     async with session_factory() as session:
@@ -883,9 +890,7 @@ async def test_full_crawl_and_page_rerun_cannot_both_create_active_crawl(
                     site_url_id=proj.site_url_ids[0],
                 )
                 await session.commit()
-                return (
-                    "minted" if result.created_new_crawl else "reused_active"
-                )
+                return "minted" if result.created_new_crawl else "reused_active"
             except CrawlAlreadyActiveError:
                 await session.rollback()
                 return "already_active"
@@ -926,9 +931,7 @@ async def test_page_rerun_before_full_crawl_blocks_second_active_crawl(
     lock the rerun released on commit) and refuses to create a second one.
     """
     async with session_factory() as session:
-        seed = await _seed_workspace(
-            session, projects=[{"name": "a", "url_count": 1}]
-        )
+        seed = await _seed_workspace(session, projects=[{"name": "a", "url_count": 1}])
         proj = seed.projects[0]
         session.add(
             MonitoredSiteUrl(
@@ -987,9 +990,7 @@ async def test_full_crawl_before_page_rerun_reuses_active_crawl(
     active crawl and enqueues into it instead of minting a second crawl.
     """
     async with session_factory() as session:
-        seed = await _seed_workspace(
-            session, projects=[{"name": "a", "url_count": 1}]
-        )
+        seed = await _seed_workspace(session, projects=[{"name": "a", "url_count": 1}])
         proj = seed.projects[0]
         session.add(
             MonitoredSiteUrl(

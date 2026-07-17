@@ -3,6 +3,7 @@
 A member is authorized; a non-member and an unauthenticated caller are
 rejected. This is the single gate every downstream query relies on.
 """
+
 from __future__ import annotations
 
 import uuid

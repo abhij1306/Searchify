@@ -63,9 +63,7 @@ async def _resolve_workspace_id(db_session) -> object:
 
     from app.models.workspace import Workspace
 
-    return (
-        await db_session.execute(select(Workspace))
-    ).scalars().first().id
+    return (await db_session.execute(select(Workspace))).scalars().first().id
 
 
 async def _seed_legacy_openrouter(db_session):
@@ -109,9 +107,7 @@ async def test_create_connection_redacts_secret_in_response(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "prov1@example.com")
-    resp = await client.post(
-        "/api/v1/provider-connections", json=_connection_payload()
-    )
+    resp = await client.post("/api/v1/provider-connections", json=_connection_payload())
     assert resp.status_code == 201
     body = resp.json()
     assert "-" in body["id"] and "-" in body["workspace_id"]
@@ -146,22 +142,16 @@ async def test_create_openrouter_connection_rejected(
 
 
 @pytest.mark.asyncio
-async def test_secret_encrypted_at_rest(
-    client: httpx.AsyncClient, db_session
-) -> None:
+async def test_secret_encrypted_at_rest(client: httpx.AsyncClient, db_session) -> None:
     from sqlalchemy import select
 
     from app.models.provider import ProviderConnection
 
     await _register(client, "prov2@example.com")
-    resp = await client.post(
-        "/api/v1/provider-connections", json=_connection_payload()
-    )
+    resp = await client.post("/api/v1/provider-connections", json=_connection_payload())
     assert resp.status_code == 201
 
-    row = (
-        await db_session.execute(select(ProviderConnection))
-    ).scalar_one()
+    row = (await db_session.execute(select(ProviderConnection))).scalar_one()
     # Ciphertext at rest is NOT the plaintext, and decrypts back to it.
     assert row.api_key_encrypted != _SECRET
     assert _SECRET not in row.api_key_encrypted
@@ -173,9 +163,7 @@ async def test_list_and_get_never_return_secret(
     client: httpx.AsyncClient,
 ) -> None:
     await _register(client, "prov3@example.com")
-    await client.post(
-        "/api/v1/provider-connections", json=_connection_payload()
-    )
+    await client.post("/api/v1/provider-connections", json=_connection_payload())
     listed = await client.get("/api/v1/provider-connections")
     assert listed.status_code == 200
     _assert_no_secret(listed.json())
@@ -205,9 +193,7 @@ async def test_update_rotates_key_without_exposing_it(
     assert resp.json()["label"] == "Renamed"
     _assert_no_secret(resp.json())
 
-    row = (
-        await db_session.execute(select(ProviderConnection))
-    ).scalar_one()
+    row = (await db_session.execute(select(ProviderConnection))).scalar_one()
     assert decrypt_secret(row.api_key_encrypted) == new_secret
 
 
@@ -228,9 +214,7 @@ async def test_update_without_key_leaves_secret_unchanged(
         f"/api/v1/provider-connections/{conn_id}",
         json={"active": False},
     )
-    row = (
-        await db_session.execute(select(ProviderConnection))
-    ).scalar_one()
+    row = (await db_session.execute(select(ProviderConnection))).scalar_one()
     assert decrypt_secret(row.api_key_encrypted) == _SECRET
     assert row.active is False
 
@@ -303,9 +287,7 @@ async def test_test_endpoint_returns_status_success(
 
     monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _fake_client)
 
-    resp = await client.post(
-        f"/api/v1/provider-connections/{conn_id}/test"
-    )
+    resp = await client.post(f"/api/v1/provider-connections/{conn_id}/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
@@ -340,9 +322,7 @@ async def test_test_endpoint_reports_failure_and_redacts_logs(
     monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _fake_client)
 
     with caplog.at_level(logging.DEBUG):
-        resp = await client.post(
-            f"/api/v1/provider-connections/{conn_id}/test"
-        )
+        resp = await client.post(f"/api/v1/provider-connections/{conn_id}/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "failed"
@@ -362,9 +342,7 @@ async def test_legacy_openrouter_reads_but_update_and_test_are_409(
     # Read remains safe: the historical connection lists with its provenance.
     listed = await client.get("/api/v1/provider-connections")
     assert listed.status_code == 200
-    legacy = next(
-        c for c in listed.json() if c["transport_provider"] == "openrouter"
-    )
+    legacy = next(c for c in listed.json() if c["transport_provider"] == "openrouter")
     assert legacy["active"] is False
     assert legacy["routes"][0]["active"] is False
     # The internal deactivation marker is never exposed to read clients.
@@ -385,9 +363,7 @@ async def test_legacy_openrouter_reads_but_update_and_test_are_409(
 
     monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _boom)
 
-    tested = await client.post(
-        f"/api/v1/provider-connections/{conn_id}/test"
-    )
+    tested = await client.post(f"/api/v1/provider-connections/{conn_id}/test")
     assert tested.status_code == 409
 
 
@@ -403,17 +379,11 @@ async def test_provider_catalog_lists_direct_routes_only(
     assert "openrouter" not in body["transports"]
     engines = {e["logical_engine"]: e for e in body["engines"]}
     # chatgpt is served ONLY via direct openai now.
-    chatgpt_transports = {
-        r["transport_provider"] for r in engines["chatgpt"]["routes"]
-    }
+    chatgpt_transports = {r["transport_provider"] for r in engines["chatgpt"]["routes"]}
     assert chatgpt_transports == {"openai"}
-    gemini_transports = {
-        r["transport_provider"] for r in engines["gemini"]["routes"]
-    }
+    gemini_transports = {r["transport_provider"] for r in engines["gemini"]["routes"]}
     assert gemini_transports == {"google"}
-    claude_transports = {
-        r["transport_provider"] for r in engines["claude"]["routes"]
-    }
+    claude_transports = {r["transport_provider"] for r in engines["claude"]["routes"]}
     assert claude_transports == {"anthropic"}
 
 
@@ -440,7 +410,5 @@ async def test_cross_workspace_access_denied(
         json={"label": "hijack"},
     )
     assert got.status_code == 404
-    tested = await client.post(
-        f"/api/v1/provider-connections/{conn_id}/test"
-    )
+    tested = await client.post(f"/api/v1/provider-connections/{conn_id}/test")
     assert tested.status_code == 404

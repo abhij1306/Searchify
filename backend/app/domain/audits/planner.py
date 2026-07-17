@@ -89,16 +89,13 @@ def _prompt_panel_snapshot(rows: list[dict]) -> dict:
     """Stable hash of the frozen prompt panel (audit-scoping evidence)."""
     import json
 
-    encoded = json.dumps(rows, sort_keys=True, ensure_ascii=False).encode(
-        "utf-8"
-    )
+    encoded = json.dumps(rows, sort_keys=True, ensure_ascii=False).encode("utf-8")
     digest = hashlib.sha256(encoded).hexdigest()
     return {
         "panel_id": digest[:16],
         "panel_hash": digest,
         "prompt_hashes": [
-            hashlib.sha256(str(r["text"]).encode("utf-8")).hexdigest()
-            for r in rows
+            hashlib.sha256(str(r["text"]).encode("utf-8")).hexdigest() for r in rows
         ],
     }
 
@@ -150,9 +147,7 @@ async def _resolve_prompts(
     elif prompt_set_id is not None:
         stmt = stmt.where(Prompt.prompt_set_id == prompt_set_id)
     else:
-        raise AuditValidationError(
-            "Either prompt_set_id or prompt_ids is required"
-        )
+        raise AuditValidationError("Either prompt_set_id or prompt_ids is required")
     prompts = list((await session.scalars(stmt)).all())
     # For an explicit id list, reject the whole request if any requested prompt
     # is missing / disabled / from another project or workspace, rather than
@@ -164,8 +159,7 @@ async def _resolve_prompts(
         if unavailable:
             missing = ", ".join(str(pid) for pid in sorted(map(str, unavailable)))
             raise AuditValidationError(
-                "Prompt(s) not found, disabled, or not in this project: "
-                f"{missing}"
+                f"Prompt(s) not found, disabled, or not in this project: {missing}"
             )
     if not prompts:
         raise AuditValidationError("No enabled prompts to audit")
@@ -211,9 +205,7 @@ async def _resolve_routes(
     )
     routes: dict[str, tuple[ProviderRoute, ProviderConnection]] = {}
     for route, connection in result.all():
-        if not is_route_approved(
-            route.logical_engine, route.transport_provider
-        ):
+        if not is_route_approved(route.logical_engine, route.transport_provider):
             continue
         routes.setdefault(route.logical_engine, (route, connection))
 
@@ -226,8 +218,7 @@ async def _resolve_routes(
             missing.append(engine)
     if missing:
         raise AuditValidationError(
-            "No active provider route configured for engine(s): "
-            + ", ".join(missing)
+            "No active provider route configured for engine(s): " + ", ".join(missing)
         )
     return resolved
 
@@ -266,15 +257,12 @@ async def create_audit(
         prompt_set_id=prompt_set_id,
         prompt_ids=list(prompt_ids or []),
     )
-    routes = await _resolve_routes(
-        session, workspace_id=workspace_id, engines=engines
-    )
+    routes = await _resolve_routes(session, workspace_id=workspace_id, engines=engines)
 
     reps = int(repetitions or project.default_repetitions or 1)
     if reps < MIN_REPETITIONS or reps > MAX_REPETITIONS:
         raise AuditValidationError(
-            f"repetitions must be between {MIN_REPETITIONS} and "
-            f"{MAX_REPETITIONS}"
+            f"repetitions must be between {MIN_REPETITIONS} and {MAX_REPETITIONS}"
         )
 
     engine_list = list(routes.keys())
@@ -381,9 +369,7 @@ async def create_audit(
         prompt_snapshot = prompt_snapshots[prompt_index]
         engine_snapshot = engine_snapshots[engine]
         route, connection = routes[engine]
-        idempotency_key = (
-            f"{audit.id}:{prompt_index}:{repetition}:{engine}"
-        )
+        idempotency_key = f"{audit.id}:{prompt_index}:{repetition}:{engine}"
         session.add(
             AuditTask(
                 audit_id=audit.id,
@@ -445,9 +431,7 @@ async def create_audit(
     # greenlet) raises ``MissingGreenlet``. Re-fetch through ``get_audit``,
     # which eagerly loads it via ``selectinload``, so the returned instance is
     # safe to serialize.
-    return await get_audit(
-        session, workspace_id=workspace_id, audit_id=audit.id
-    )
+    return await get_audit(session, workspace_id=workspace_id, audit_id=audit.id)
 
 
 async def get_audit(
@@ -508,9 +492,7 @@ async def cancel_audit(
     and the UI stay consistent. This also cleans up a zombie audit whose worker
     died mid-run.
     """
-    audit = await get_audit(
-        session, workspace_id=workspace_id, audit_id=audit_id
-    )
+    audit = await get_audit(session, workspace_id=workspace_id, audit_id=audit_id)
     if audit.status not in AUDIT_ACTIVE_STATUSES:
         raise AuditValidationError("Only active audits can be cancelled")
     now = datetime.now(UTC)
@@ -547,6 +529,4 @@ async def cancel_audit(
     # See the comment in ``create_audit``: refresh() would expire (and later
     # lazy-load) ``engine_snapshots``, which needs to stay eagerly loaded for
     # safe serialization outside the async greenlet.
-    return await get_audit(
-        session, workspace_id=workspace_id, audit_id=audit.id
-    )
+    return await get_audit(session, workspace_id=workspace_id, audit_id=audit.id)

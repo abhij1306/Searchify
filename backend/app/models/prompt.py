@@ -46,9 +46,7 @@ class PromptSet(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
-    project: Mapped[Project] = relationship(
-        "Project", back_populates="prompt_sets"
-    )
+    project: Mapped[Project] = relationship("Project", back_populates="prompt_sets")
     prompts: Mapped[list[Prompt]] = relationship(
         "Prompt",
         back_populates="prompt_set",
@@ -83,12 +81,8 @@ class Prompt(Base):
     intent: Mapped[str] = mapped_column(String(32), default="")
     branded: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    origin: Mapped[str] = mapped_column(
-        String(32), default=DEFAULT_PROMPT_ORIGIN
-    )
-    generation_evidence: Mapped[dict | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    origin: Mapped[str] = mapped_column(String(32), default=DEFAULT_PROMPT_ORIGIN)
+    generation_evidence: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -98,9 +92,7 @@ class Prompt(Base):
         onupdate=lambda: datetime.now(UTC),
     )
 
-    prompt_set: Mapped[PromptSet] = relationship(
-        "PromptSet", back_populates="prompts"
-    )
+    prompt_set: Mapped[PromptSet] = relationship("PromptSet", back_populates="prompts")
 
 
 from app.models.project import Project  # noqa: E402

@@ -123,9 +123,7 @@ async def update_prompt_set_endpoint(
     return prompt_set_to_response(prompt_set)
 
 
-@router.delete(
-    "/prompt-sets/{prompt_set_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/prompt-sets/{prompt_set_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_prompt_set_endpoint(
     prompt_set_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> None:
@@ -201,9 +199,7 @@ async def delete_prompt_endpoint(
     prompt_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> None:
     try:
-        await delete_prompt(
-            session, workspace_id=ctx.workspace_id, prompt_id=prompt_id
-        )
+        await delete_prompt(session, workspace_id=ctx.workspace_id, prompt_id=prompt_id)
     except PromptNotFoundError as exc:
         raise _not_found("Prompt not found") from exc
 

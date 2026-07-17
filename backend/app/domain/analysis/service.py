@@ -174,8 +174,7 @@ async def get_visibility_trends(
     sources = [
         source
         for snapshot, audit in rows
-        if (source := _trend_source(snapshot, audit, logical_engine))
-        is not None
+        if (source := _trend_source(snapshot, audit, logical_engine)) is not None
     ]
     if not sources:
         return []
@@ -389,9 +388,7 @@ async def load_export_bundle(
 ) -> tuple[Audit, list[AuditTask]]:
     """Load the audit + its execution rows for CSV/MD export (invariant 7)."""
     audit = await session.scalar(
-        select(Audit).where(
-            Audit.id == audit_id, Audit.workspace_id == workspace_id
-        )
+        select(Audit).where(Audit.id == audit_id, Audit.workspace_id == workspace_id)
     )
     if audit is None:
         raise AnalysisNotFoundError("Audit not found")
@@ -401,9 +398,7 @@ async def load_export_bundle(
                 select(AuditTask)
                 .where(AuditTask.audit_id == audit_id)
                 .where(AuditTask.workspace_id == workspace_id)
-                .order_by(
-                    AuditTask.prompt_index.asc(), AuditTask.repetition.asc()
-                )
+                .order_by(AuditTask.prompt_index.asc(), AuditTask.repetition.asc())
             )
         ).all()
     )
@@ -427,9 +422,7 @@ async def _mentions_by_analysis(
     """Batch-load persisted mention rows grouped by analysis id."""
     if not analysis_ids:
         return {}
-    name_attr = (
-        model.brand_name if kind == "brand" else model.competitor_name
-    )
+    name_attr = model.brand_name if kind == "brand" else model.competitor_name
     rows = list(
         (
             await session.scalars(
@@ -807,9 +800,7 @@ def _validate_trend_query(
 
 def _require_aware(label: str, value: datetime | None) -> None:
     if value is not None and value.tzinfo is None:
-        raise TrendQueryError(
-            f"'{label}' must be a timezone-aware timestamp"
-        )
+        raise TrendQueryError(f"'{label}' must be a timezone-aware timestamp")
 
 
 def _to_utc(value: datetime | None) -> datetime | None:
@@ -877,9 +868,7 @@ def _trend_source(
         if not engine_metrics:
             return None
         rate = engine_metrics.get("brand_mention_rate")
-        visibility_score = (
-            round(float(rate) * 100, 2) if rate is not None else None
-        )
+        visibility_score = round(float(rate) * 100, 2) if rate is not None else None
     return _TrendSource(
         snapshot_id=snapshot.id,
         audit_id=snapshot.audit_id,
@@ -1026,9 +1015,7 @@ def _is_mixed_version(bucket: list[_TrendSource]) -> bool:
     return len(analyzers) > 1 or len(scorings) > 1
 
 
-def _fold_bucket(
-    key: datetime, bucket: list[_TrendSource]
-) -> VisibilityTrendPoint:
+def _fold_bucket(key: datetime, bucket: list[_TrendSource]) -> VisibilityTrendPoint:
     logical_engine = bucket[0].logical_engine
     visibility = _RateAccumulator()
     brand_rate = _RateAccumulator()

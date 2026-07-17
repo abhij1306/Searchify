@@ -47,9 +47,7 @@ from app.core.config.provider_catalog import (
 logger = logging.getLogger(__name__)
 
 
-def _payload(
-    request: AnswerEngineRequest, *, country_code: str
-) -> dict[str, Any]:
+def _payload(request: AnswerEngineRequest, *, country_code: str) -> dict[str, Any]:
     """Build a stateless, brand-free Responses API request body.
 
     Only the user prompt, a neutral instruction, the built-in web-search tool,
@@ -98,18 +96,14 @@ class OpenAIAnswerEngineAdapter:
         self._country_code = country_code
         self._url = base_url or provider_catalog_settings.openai_responses_url
 
-    async def execute(
-        self, request: AnswerEngineRequest
-    ) -> AnswerEngineResponse:
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
         started = time.monotonic()
         try:
-            async with httpx.AsyncClient(
-                timeout=request.timeout_seconds
-            ) as client:
+            async with httpx.AsyncClient(timeout=request.timeout_seconds) as client:
                 response = await client.post(
                     self._url,
                     json=_payload(request, country_code=self._country_code),
@@ -134,9 +128,7 @@ class OpenAIAnswerEngineAdapter:
 
         latency_ms = int((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
-            error_code, retryable = classify_provider_status(
-                response.status_code
-            )
+            error_code, retryable = classify_provider_status(response.status_code)
             retry_after = parse_retry_after(response.headers.get("retry-after"))
             # Never log the response body verbatim (could echo the request),
             # only the status and a short reason token.

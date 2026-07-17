@@ -116,9 +116,7 @@ class ProviderRoute(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     # False marks a retired route (e.g. a legacy openrouter route the v2
     # migration deactivated) so read clients skip it without deleting history.
-    active: Mapped[bool] = mapped_column(
-        Boolean, default=True, server_default="true"
-    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Non-empty marker naming why an active route was retired. "" otherwise.
     deactivation_reason: Mapped[str] = mapped_column(
         String(64), default="", server_default=""

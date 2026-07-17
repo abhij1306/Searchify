@@ -5,6 +5,7 @@ zero-credit (distinct outcome, weight stays in the denominator), single
 rounding, config-weighted overall, dimensions with no applicable rules excluded
 (not zero), and aggregation ignoring missing/error URLs. Pure, offline.
 """
+
 from __future__ import annotations
 
 from app.analysis.site_health.scoring import (
@@ -93,22 +94,16 @@ def test_single_rounding_to_one_decimal():
 
 def test_overall_is_config_weighted_mean():
     # 50/50 weights -> mean of 80 and 60 = 70.0
-    assert overall_score(
-        {DIMENSION_TECHNICAL: 80.0, DIMENSION_AEO: 60.0}
-    ) == 70.0
+    assert overall_score({DIMENSION_TECHNICAL: 80.0, DIMENSION_AEO: 60.0}) == 70.0
 
 
 def test_overall_excludes_none_dimension():
     # AEO None -> overall is just technical (not dragged to zero/halved).
-    assert overall_score(
-        {DIMENSION_TECHNICAL: 90.0, DIMENSION_AEO: None}
-    ) == 90.0
+    assert overall_score({DIMENSION_TECHNICAL: 90.0, DIMENSION_AEO: None}) == 90.0
 
 
 def test_overall_all_none_is_none():
-    assert overall_score(
-        {DIMENSION_TECHNICAL: None, DIMENSION_AEO: None}
-    ) is None
+    assert overall_score({DIMENSION_TECHNICAL: None, DIMENSION_AEO: None}) is None
 
 
 def test_score_analysis_end_to_end():

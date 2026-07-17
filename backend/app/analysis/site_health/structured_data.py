@@ -132,9 +132,7 @@ def parse_jsonld_blocks(raw_blocks: list[str], *, max_blocks: int) -> list[dict]
     return facts
 
 
-def validate_microdata_types(
-    itemtypes: list[str], *, max_blocks: int
-) -> list[dict]:
+def validate_microdata_types(itemtypes: list[str], *, max_blocks: int) -> list[dict]:
     """Turn bounded microdata ``itemtype`` URLs into recognized-type facts.
 
     Microdata property extraction is intentionally shallow (the AEO rules only

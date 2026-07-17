@@ -1,8 +1,8 @@
 # Authentication + registration service.
 #
-# WORKSPACE-scoped auth model: registration and first login both ensure the account has a personal
-# workspace and a membership row (invariant 5 — access is via membership, not
-# a user-id shortcut).
+# WORKSPACE-scoped auth model: registration and first login both ensure the
+# account has a personal workspace and a membership row (invariant 5 — access
+# is via membership, not a user-id shortcut).
 from __future__ import annotations
 
 import logging

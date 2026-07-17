@@ -128,9 +128,7 @@ def _normalize(value: str) -> str:
     return str(value).strip().lower()
 
 
-def _transition(
-    table: dict[str, set[str]], current: str, target: str
-) -> str:
+def _transition(table: dict[str, set[str]], current: str, target: str) -> str:
     cur = _normalize(current)
     tgt = _normalize(target)
     if cur not in table:
@@ -138,9 +136,7 @@ def _transition(
     if cur == tgt:
         return tgt
     if tgt not in table[cur]:
-        raise InvalidSiteCrawlTransition(
-            f"invalid transition: {cur} -> {tgt}"
-        )
+        raise InvalidSiteCrawlTransition(f"invalid transition: {cur} -> {tgt}")
     return tgt
 
 
@@ -162,16 +158,12 @@ def apply_crawl_status(crawl: SiteCrawl, target: str) -> str:
 
 
 def apply_discovery_status(crawl: SiteCrawl, target: str) -> str:
-    crawl.discovery_status = transition_discovery_status(
-        crawl.discovery_status, target
-    )
+    crawl.discovery_status = transition_discovery_status(crawl.discovery_status, target)
     return crawl.discovery_status
 
 
 def apply_analysis_status(crawl: SiteCrawl, target: str) -> str:
-    crawl.analysis_status = transition_analysis_status(
-        crawl.analysis_status, target
-    )
+    crawl.analysis_status = transition_analysis_status(crawl.analysis_status, target)
     return crawl.analysis_status
 
 
@@ -190,9 +182,7 @@ def redact_event_payload(
     if count_disclosure:
         return dict(payload)
     return {
-        key: value
-        for key, value in payload.items()
-        if key not in _TOTAL_BEARING_KEYS
+        key: value for key, value in payload.items() if key not in _TOTAL_BEARING_KEYS
     }
 
 
@@ -215,9 +205,7 @@ def record_crawl_event(
         crawl_id=crawl_id,
         event_type=event_type,
         message=message,
-        payload=redact_event_payload(
-            payload, count_disclosure=count_disclosure
-        ),
+        payload=redact_event_payload(payload, count_disclosure=count_disclosure),
     )
     session.add(event)
     return event

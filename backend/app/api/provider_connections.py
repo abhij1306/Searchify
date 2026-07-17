@@ -53,9 +53,7 @@ _NOT_FOUND = "Provider connection not found"
 async def list_connections_endpoint(
     ctx: _WorkspaceDep, session: _SessionDep
 ) -> list[ProviderConnectionResponse]:
-    connections = await list_connections(
-        session, workspace_id=ctx.workspace_id
-    )
+    connections = await list_connections(session, workspace_id=ctx.workspace_id)
     return [connection_to_response(c) for c in connections]
 
 
@@ -80,9 +78,7 @@ async def create_connection_endpoint(
     return connection_to_response(connection)
 
 
-@router.patch(
-    "/{connection_id}", response_model=ProviderConnectionResponse
-)
+@router.patch("/{connection_id}", response_model=ProviderConnectionResponse)
 async def update_connection_endpoint(
     connection_id: uuid.UUID,
     payload: ProviderConnectionUpdate,
@@ -111,9 +107,7 @@ async def update_connection_endpoint(
     return connection_to_response(connection)
 
 
-@router.delete(
-    "/{connection_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connection_endpoint(
     connection_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> None:
@@ -169,9 +163,7 @@ async def get_provider_catalog() -> ProviderCatalogResponse:
         ProviderCatalogEngine(
             logical_engine=engine,
             routes=[
-                ProviderCatalogRoute(
-                    transport_provider=transport, default_model=model
-                )
+                ProviderCatalogRoute(transport_provider=transport, default_model=model)
                 for transport, model in routes.items()
             ],
         )

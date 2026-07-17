@@ -11,9 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PromptIntent = Literal[
-    "", "discovery", "comparison", "purchase", "service", "local"
-]
+PromptIntent = Literal["", "discovery", "comparison", "purchase", "service", "local"]
 
 
 # --------------------------------------------------------------------------

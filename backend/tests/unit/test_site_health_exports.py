@@ -6,6 +6,7 @@ ordering, RFC-4180 quoting of embedded delimiters/quotes/newlines, Markdown
 cell escaping (``|``, ``\\``, newline collapse), boolean/None cell rendering,
 and the always-valid empty table.
 """
+
 from __future__ import annotations
 
 import csv
@@ -117,9 +118,7 @@ def test_markdown_escapes_pipes_backslashes_and_collapses_newlines() -> None:
     ]
     md = rows_to_markdown("issues", items)
     # The data row must escape the pipe/backslash and collapse the newlines.
-    data_line = next(
-        ln for ln in md.splitlines() if "fix" in ln and ln.startswith("|")
-    )
+    data_line = next(ln for ln in md.splitlines() if "fix" in ln and ln.startswith("|"))
     assert "\\|" in data_line
     assert "\\\\" in data_line
     assert "\n" not in data_line.replace("|", "")
@@ -138,7 +137,7 @@ def test_csv_neutralizes_leading_spreadsheet_formula_triggers(
     to begin with a formula trigger must render as literal text in a spreadsheet
     rather than being evaluated.
     """
-    payload = f"{trigger}HYPERLINK(\"http://evil\")"
+    payload = f'{trigger}HYPERLINK("http://evil")'
     items = [
         {
             "id": "1",
@@ -199,7 +198,7 @@ def test_csv_neutralizes_whitespace_hidden_formula_triggers(
     neutralized: some spreadsheets still treat the cell as a formula once
     leading whitespace/control characters are stripped during paste.
     """
-    payload = f"{prefix}=HYPERLINK(\"http://evil\")"
+    payload = f'{prefix}=HYPERLINK("http://evil")'
     items = [
         {
             "id": "1",

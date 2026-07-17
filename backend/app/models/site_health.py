@@ -126,9 +126,7 @@ class SiteHealthProfile(Base):
 
     __tablename__ = "site_health_profiles"
     __table_args__ = (
-        UniqueConstraint(
-            "project_id", name="uq_site_health_profile_project"
-        ),
+        UniqueConstraint("project_id", name="uq_site_health_profile_project"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -269,9 +267,7 @@ class SiteUrl(Base):
 
     __tablename__ = "site_urls"
     __table_args__ = (
-        UniqueConstraint(
-            "project_id", "url_hash", name="uq_site_url_project_hash"
-        ),
+        UniqueConstraint("project_id", "url_hash", name="uq_site_url_project_hash"),
         # Backs the composite (workspace_id, project_id, site_url_id) foreign
         # key from ``SiteUrlObservation`` that pins an observation's URL to its
         # own workspace AND project (tenant-consistency guard). Including
@@ -350,9 +346,7 @@ class SiteUrlObservation(Base):
 
     __tablename__ = "site_url_observations"
     __table_args__ = (
-        UniqueConstraint(
-            "crawl_id", "site_url_id", name="uq_site_url_observation"
-        ),
+        UniqueConstraint("crawl_id", "site_url_id", name="uq_site_url_observation"),
         ForeignKeyConstraint(
             ["workspace_id", "project_id", "crawl_id"],
             [
@@ -430,9 +424,7 @@ class MonitoredSiteUrl(Base):
 
     __tablename__ = "monitored_site_urls"
     __table_args__ = (
-        UniqueConstraint(
-            "project_id", "site_url_id", name="uq_monitored_site_url"
-        ),
+        UniqueConstraint("project_id", "site_url_id", name="uq_monitored_site_url"),
         Index(
             "ix_monitored_site_urls_ws_active",
             "workspace_id",
@@ -468,9 +460,7 @@ class MonitoredSiteUrl(Base):
         String(16), default=SELECTION_SOURCE_USER
     )
     # The selection revision at which this row was added (nullable membership).
-    selecting_membership_id: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    selecting_membership_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     selected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -505,9 +495,7 @@ class SiteCrawlTask(Base):
 
     __tablename__ = "site_crawl_tasks"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_site_crawl_task_idempotency_key"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_site_crawl_task_idempotency_key"),
         UniqueConstraint(
             "crawl_id",
             "task_kind",
@@ -565,9 +553,7 @@ class SiteCrawlTask(Base):
     )
     depth: Mapped[int] = mapped_column(Integer, default=0)
     # Task/artifact identity generation (0 = initial; rerun allocates next).
-    generation: Mapped[int] = mapped_column(
-        Integer, default=INITIAL_TASK_GENERATION
-    )
+    generation: Mapped[int] = mapped_column(Integer, default=INITIAL_TASK_GENERATION)
     idempotency_key: Mapped[str] = mapped_column(String(160))
 
     # --- Queue + lease state (identical contract to AuditTask) -----------
@@ -609,9 +595,7 @@ class SiteCrawlTask(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    crawl: Mapped[SiteCrawl] = relationship(
-        "SiteCrawl", back_populates="tasks"
-    )
+    crawl: Mapped[SiteCrawl] = relationship("SiteCrawl", back_populates="tasks")
 
 
 class SiteFetchAttempt(Base):
@@ -676,9 +660,7 @@ class SiteFetchArtifact(Base):
     """
 
     __tablename__ = "site_fetch_artifacts"
-    __table_args__ = (
-        UniqueConstraint("task_id", name="uq_site_fetch_artifact_task"),
-    )
+    __table_args__ = (UniqueConstraint("task_id", name="uq_site_fetch_artifact_task"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -862,9 +844,7 @@ class SiteRuleEvaluation(Base):
 
     __tablename__ = "site_rule_evaluations"
     __table_args__ = (
-        UniqueConstraint(
-            "analysis_id", "rule_id", name="uq_site_rule_evaluation"
-        ),
+        UniqueConstraint("analysis_id", "rule_id", name="uq_site_rule_evaluation"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -1063,6 +1043,4 @@ class SiteCrawlEvent(Base):
         DateTime(timezone=True), default=_utcnow, index=True
     )
 
-    crawl: Mapped[SiteCrawl] = relationship(
-        "SiteCrawl", back_populates="events"
-    )
+    crawl: Mapped[SiteCrawl] = relationship("SiteCrawl", back_populates="events")

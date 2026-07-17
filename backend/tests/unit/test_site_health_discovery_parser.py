@@ -6,6 +6,7 @@ tests focus on the charset-handling hardening — a bogus declared charset must
 never raise ``LookupError`` at parser construction; it falls back to lxml
 auto-detection instead.
 """
+
 from __future__ import annotations
 
 from app.domain.site_health.discovery import (
@@ -38,9 +39,7 @@ def test_extract_discovery_links_bogus_charset_never_crashes():
         charset="totally-not-a-charset",
     )
     assert title == "Home"
-    assert any(
-        link.url == "https://acme.example.com/about" for link in links
-    )
+    assert any(link.url == "https://acme.example.com/about" for link in links)
 
 
 def test_extract_discovery_links_valid_charset_honored():

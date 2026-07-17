@@ -93,9 +93,7 @@ async def analyze_task(
     citations = list(task.citations or [])
     search_events = list(task.search_events or [])
     provider_metadata = task.provider_metadata or {}
-    query_text_available = bool(
-        provider_metadata.get("query_text_available", True)
-    )
+    query_text_available = bool(provider_metadata.get("query_text_available", True))
     score = score_execution(
         answer_text=task.answer_text or "",
         search_events=search_events,
@@ -194,9 +192,7 @@ async def _execution_dicts(
     analyses = list(
         (
             await session.scalars(
-                select(ResponseAnalysis).where(
-                    ResponseAnalysis.audit_id == audit_id
-                )
+                select(ResponseAnalysis).where(ResponseAnalysis.audit_id == audit_id)
             )
         ).all()
     )
@@ -210,15 +206,11 @@ async def _execution_dicts(
             )
         ).all()
     )
-    prompt_meta = {
-        snap.prompt_index: (snap.text, snap.theme) for snap in snapshots
-    }
+    prompt_meta = {snap.prompt_index: (snap.text, snap.theme) for snap in snapshots}
     # analysis_id -> classified citation dicts (reconstructed from persisted rows).
     citation_rows = list(
         (
-            await session.scalars(
-                select(Citation).where(Citation.audit_id == audit_id)
-            )
+            await session.scalars(select(Citation).where(Citation.audit_id == audit_id))
         ).all()
     )
     citations_by_analysis: dict[uuid.UUID, list[dict]] = {}
@@ -255,9 +247,7 @@ async def _execution_dicts(
             "prompt_theme_snapshot": theme,
             "citations": citations_by_analysis.get(analysis.id, []),
             "score": analysis.score or {},
-            "provider_metadata": provider_metadata_by_task.get(
-                analysis.task_id, {}
-            ),
+            "provider_metadata": provider_metadata_by_task.get(analysis.task_id, {}),
         }
         all_dicts.append(execution)
         per_engine.setdefault(analysis.logical_engine, []).append(execution)

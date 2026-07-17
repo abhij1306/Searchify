@@ -1,4 +1,3 @@
-/// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';

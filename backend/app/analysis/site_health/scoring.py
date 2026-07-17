@@ -229,14 +229,10 @@ def aggregate_scores(
             latest[analysis.url_key] = analysis
 
     technical = [
-        a.technical_score
-        for a in latest.values()
-        if a.technical_score is not None
+        a.technical_score for a in latest.values() if a.technical_score is not None
     ]
     aeo = [a.aeo_score for a in latest.values() if a.aeo_score is not None]
-    overall = [
-        a.overall_score for a in latest.values() if a.overall_score is not None
-    ]
+    overall = [a.overall_score for a in latest.values() if a.overall_score is not None]
     return AggregateScores(
         technical_score=_mean(technical),
         aeo_score=_mean(aeo),

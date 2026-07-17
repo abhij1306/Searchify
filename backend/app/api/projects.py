@@ -60,9 +60,7 @@ async def list_projects_endpoint(
     return [project_to_response(p) for p in projects]
 
 
-@router.post(
-    "", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project_endpoint(
     payload: ProjectCreate, ctx: _WorkspaceDep, session: _SessionDep
 ) -> ProjectResponse:
@@ -83,9 +81,7 @@ async def get_visibility_trends_endpoint(
     engine: Annotated[str | None, Query()] = None,
     from_at: Annotated[datetime | None, Query(alias="from")] = None,
     to_at: Annotated[datetime | None, Query(alias="to")] = None,
-    granularity: Annotated[
-        str, Query()
-    ] = VISIBILITY_TREND_DEFAULT_GRANULARITY,
+    granularity: Annotated[str, Query()] = VISIBILITY_TREND_DEFAULT_GRANULARITY,
 ) -> list[VisibilityTrendPoint]:
     """Cross-run Visibility trend projection for a project (invariant 7).
 
@@ -99,9 +95,7 @@ async def get_visibility_trends_endpoint(
     """
     # Authorize the project first (404 for a cross-workspace/missing project).
     try:
-        await get_project(
-            session, workspace_id=ctx.workspace_id, project_id=project_id
-        )
+        await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
@@ -156,9 +150,7 @@ async def get_visibility_evidence_endpoint(
     """
     # Authorize the project first (404 for a cross-workspace/missing project).
     try:
-        await get_project(
-            session, workspace_id=ctx.workspace_id, project_id=project_id
-        )
+        await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
@@ -217,9 +209,7 @@ async def get_visibility_endpoint(
     """
     # Authorize the project first (404 for a cross-workspace/missing project).
     try:
-        await get_project(
-            session, workspace_id=ctx.workspace_id, project_id=project_id
-        )
+        await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"

@@ -6,6 +6,7 @@ idempotency logic depends on: duplicate URL identity, duplicate task slot
 selection uniqueness, plus the capability-based entitlement resolver defaulting
 to Free. Requires a real Postgres (Postgres UUID + partial index semantics).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -101,9 +102,7 @@ async def test_task_slot_unique_but_generation_disambiguates(
 
     # Bumping the generation makes it a distinct slot — no collision.
     async with session_factory() as session:
-        session.add(
-            _task(seed, url_hash="h1", generation=1, key="k3")
-        )
+        session.add(_task(seed, url_hash="h1", generation=1, key="k3"))
         await session.commit()
 
 
@@ -182,9 +181,7 @@ async def test_set_entitlement_starter_then_free(
     async with session_factory() as session:
         seed = await seed_site_crawl(session)
     async with session_factory() as session:
-        starter = await set_entitlement(
-            session, seed.workspace_id, CAPABILITY_STARTER
-        )
+        starter = await set_entitlement(session, seed.workspace_id, CAPABILITY_STARTER)
         await session.commit()
         assert starter.plan_key == CAPABILITY_STARTER
         assert starter.monitored_url_limit == STARTER_MONITORED_URL_LIMIT
@@ -192,9 +189,7 @@ async def test_set_entitlement_starter_then_free(
         assert starter.capability_revision == 1
 
     async with session_factory() as session:
-        back = await set_entitlement(
-            session, seed.workspace_id, CAPABILITY_FREE
-        )
+        back = await set_entitlement(session, seed.workspace_id, CAPABILITY_FREE)
         await session.commit()
         assert back.plan_key == CAPABILITY_FREE
         assert back.monitored_url_limit == FREE_MONITORED_URL_LIMIT
@@ -228,6 +223,7 @@ async def test_resolve_entitlement_conflict_preserves_ambient_transaction(
     the conflict via an idempotent upsert and leave the ambient transaction
     (and any pending, un-flushed changes) intact.
     """
+    from sqlalchemy import func as _func
     from sqlalchemy import select as _select
 
     from app.models.site_health import WorkspaceSiteHealthEntitlement
@@ -261,19 +257,16 @@ async def test_resolve_entitlement_conflict_preserves_ambient_transaction(
         await loser.commit()
 
         # The pending SiteUrl was NOT lost to a rollback — it committed.
-        found = await loser.scalar(
-            _select(SiteUrl.id).where(SiteUrl.id == pending_id)
-        )
+        found = await loser.scalar(_select(SiteUrl.id).where(SiteUrl.id == pending_id))
         assert found == pending_id
 
         # Exactly one entitlement row exists for the workspace.
         count = await loser.scalar(
-            _select(WorkspaceSiteHealthEntitlement.id).where(
-                WorkspaceSiteHealthEntitlement.workspace_id
-                == seed.workspace_id
+            _select(_func.count()).where(
+                WorkspaceSiteHealthEntitlement.workspace_id == seed.workspace_id
             )
         )
-        assert count == winner_id
+        assert count == 1
 
 
 @pytest.mark.asyncio

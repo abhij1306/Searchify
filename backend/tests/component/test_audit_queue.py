@@ -4,6 +4,7 @@ Requires a real Postgres (the queue relies on ``FOR UPDATE SKIP LOCKED``, which
 SQLite cannot emulate). Two workers claiming concurrently must partition the
 tasks with no overlap; the sweeper must reclaim an expired lease.
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -282,9 +282,7 @@ class VisibilityExecutionEvidence(BaseModel):
     search_query_count: int = 0
     query_text_available: bool = False
     state: VisibilityFanoutState = VisibilityFanoutState.NO_SEARCH
-    search_events: list[VisibilityEvidenceSearchEvent] = Field(
-        default_factory=list
-    )
+    search_events: list[VisibilityEvidenceSearchEvent] = Field(default_factory=list)
     event_source: str = "none"  # "raw_artifact" | "audit_task" | "none"
 
     mentions: list[VisibilityMentionEvidence] = Field(default_factory=list)
