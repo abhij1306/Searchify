@@ -351,16 +351,9 @@ async def list_crawls(
         stmt = stmt.where(SiteCrawl.project_id == project_id)
 
     if cursor:
-        try:
-            created_raw, id_raw = decode_keyset_cursor(
-                cursor, scope=scope, filters=filters
-            )
-        except CursorScopeError as exc:
-            raise InvalidCursorError(str(exc)) from exc
-        except ValueError as exc:
-            raise InvalidCursorError(str(exc)) from exc
-        cur_created = datetime.fromisoformat(created_raw)
-        cur_id = uuid.UUID(id_raw)
+        cur_created, cur_id = _decode_created_id_keyset(
+            cursor, scope=scope, filters=filters
+        )
         # (created_at, id) DESC keyset: rows strictly "older" than the cursor.
         stmt = stmt.where(
             or_(
@@ -644,7 +637,13 @@ async def get_inventory(
         "monitored": (str(monitored) if monitored is not None else None),
     }
 
-    stmt = select(SiteUrl).where(SiteUrl.project_id == project_id)
+    # Scope to URLs THIS crawl admitted (observed), not the project's
+    # historical catalog: a later Free/downgraded crawl can only surface the
+    # URLs it actually admitted, never a prior Starter crawl's fuller set.
+    stmt = select(SiteUrl).where(
+        SiteUrl.project_id == project_id,
+        SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
+    )
     if query:
         pattern = f"%{query.strip().lower()}%"
         stmt = stmt.where(
@@ -673,9 +672,10 @@ async def get_inventory(
     # Over-fetch so a status filter (applied in Python from the derived
     # presentation status) can still return a full page.
     fetch = limit + 1
+    fetch_size = fetch if status is None else fetch * 4
     stmt = stmt.order_by(
         SiteUrl.normalized_url.asc(), SiteUrl.id.asc()
-    ).limit(fetch if status is None else fetch * 4)
+    ).limit(fetch_size)
     rows = list((await session.scalars(stmt)).all())
 
     site_ids = [r.id for r in rows]
@@ -690,8 +690,9 @@ async def get_inventory(
     )
 
     items: list[dict] = []
-    last_row: SiteUrl | None = None
+    last_scanned: SiteUrl | None = None
     for row in rows:
+        last_scanned = row
         analysis = analyses.get(row.id)
         pres_status, _code = presentation_status_for(
             analysis=analysis,
@@ -729,7 +730,6 @@ async def get_inventory(
                 ),
             }
         )
-        last_row = row
         if len(items) >= limit + 1:
             break
 
@@ -745,13 +745,19 @@ async def get_inventory(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif status is not None and last_row is not None and len(rows) > limit:
-        # A status filter can leave a partial page even though more rows exist;
-        # emit a cursor at the last scanned row so traversal continues.
+    elif (
+        status is not None
+        and last_scanned is not None
+        and len(rows) >= fetch_size
+    ):
+        # A sparse status filter can leave a partial (or even empty) page while
+        # more matching rows exist beyond the scanned window. We fetched a full
+        # window, so emit a cursor at the last SCANNED row (not the last matched
+        # one) to guarantee forward progress even when a window had no matches.
         next_cursor = encode_keyset_cursor(
             scope=scope,
             filters=filters,
-            sort_values=[last_row.normalized_url, str(last_row.id)],
+            sort_values=[last_scanned.normalized_url, str(last_scanned.id)],
         )
     return {"items": items, "next_cursor": next_cursor}
 
@@ -759,15 +765,32 @@ async def get_inventory(
 def _decode_url_keyset(
     cursor: str, *, scope: str, filters: dict
 ) -> tuple[str, uuid.UUID]:
+    # Any typed-cursor failure (scope/filter mismatch, tamper, or a malformed
+    # id payload) becomes an InvalidCursorError so the router returns 400.
     try:
         url_raw, id_raw = decode_keyset_cursor(
             cursor, scope=scope, filters=filters
         )
+        return url_raw, uuid.UUID(id_raw)
     except CursorScopeError as exc:
         raise InvalidCursorError(str(exc)) from exc
     except ValueError as exc:
         raise InvalidCursorError(str(exc)) from exc
-    return url_raw, uuid.UUID(id_raw)
+
+
+def _decode_created_id_keyset(
+    cursor: str, *, scope: str, filters: dict
+) -> tuple[datetime, uuid.UUID]:
+    """Decode a ``(created_at, id)`` keyset cursor (400 on any failure)."""
+    try:
+        created_raw, id_raw = decode_keyset_cursor(
+            cursor, scope=scope, filters=filters
+        )
+        return datetime.fromisoformat(created_raw), uuid.UUID(id_raw)
+    except CursorScopeError as exc:
+        raise InvalidCursorError(str(exc)) from exc
+    except ValueError as exc:
+        raise InvalidCursorError(str(exc)) from exc
 
 
 # =========================================================================
@@ -876,7 +899,12 @@ async def get_pages(
     monitored_ids = await _monitored_site_url_ids(
         session, project_id=project_id
     )
-    stmt = select(SiteUrl).where(SiteUrl.project_id == project_id)
+    # Scope to URLs admitted to THIS crawl (see `get_inventory`): a downgraded
+    # / different later crawl never exposes a prior crawl's fuller URL set.
+    stmt = select(SiteUrl).where(
+        SiteUrl.project_id == project_id,
+        SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
+    )
     if monitored is True:
         if not monitored_ids:
             return {"items": [], "next_cursor": None}
@@ -893,9 +921,10 @@ async def get_pages(
         )
 
     fetch = limit + 1
+    fetch_size = fetch if status is None else fetch * 4
     stmt = stmt.order_by(
         SiteUrl.normalized_url.asc(), SiteUrl.id.asc()
-    ).limit(fetch if status is None else fetch * 4)
+    ).limit(fetch_size)
     rows = list((await session.scalars(stmt)).all())
 
     site_ids = [r.id for r in rows]
@@ -910,7 +939,7 @@ async def get_pages(
     )
 
     items: list[dict] = []
-    last_row: SiteUrl | None = None
+    last_scanned: SiteUrl | None = None
     for row in rows:
         analysis = analyses.get(row.id)
         pres_status, error_code = presentation_status_for(
@@ -918,7 +947,7 @@ async def get_pages(
             monitored=row.id in monitored_ids,
             latest_analyze_task=tasks.get(row.id),
         )
-        last_row = row
+        last_scanned = row
         if not _matches_page_status(pres_status, status):
             continue
         items.append(
@@ -963,11 +992,18 @@ async def get_pages(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif status is not None and last_row is not None and len(rows) > limit:
+    elif (
+        status is not None
+        and last_scanned is not None
+        and len(rows) >= fetch_size
+    ):
+        # Sparse status filter: a full window yielded a partial/empty page while
+        # more matching rows may exist. Advance the cursor to the last SCANNED
+        # row so traversal keeps making progress across empty windows.
         next_cursor = encode_keyset_cursor(
             scope=scope,
             filters=filters,
-            sort_values=[last_row.normalized_url, str(last_row.id)],
+            sort_values=[last_scanned.normalized_url, str(last_scanned.id)],
         )
     return {"items": items, "next_cursor": next_cursor}
 
@@ -1030,6 +1066,43 @@ def _delivery_facts(facts: dict | None, *, html_bytes: int | None) -> dict:
     }
 
 
+# Bound the exact evidence/link projections so a pathological artifact can
+# never balloon a detail response (plan §Projection: bounded evidence/links).
+_MAX_EVALUATIONS = 200
+_MAX_LINK_REFERENCES = 200
+
+
+def _evaluation_row(evaluation: SiteRuleEvaluation) -> dict:
+    """Project one persisted rule evaluation with the CURRENT display label."""
+    return {
+        "id": evaluation.id,
+        "rule_id": evaluation.rule_id,
+        "title": display_label_for(evaluation.rule_id),
+        "dimension": evaluation.dimension,
+        "category": evaluation.category,
+        "severity": evaluation.severity,
+        "outcome": evaluation.outcome,
+        "weight": evaluation.weight,
+        "evidence": evaluation.evidence or {},
+        "analyzer_version": evaluation.analyzer_version,
+        "rule_version": evaluation.rule_version,
+        "created_at": _iso(evaluation.created_at),
+    }
+
+
+def _link_reference_row(link: SiteLinkReference) -> dict:
+    """Project one deduplicated link reference (target status where known)."""
+    return {
+        "id": link.id,
+        "kind": link.kind,
+        "target_url": link.target_url,
+        "is_internal": link.is_internal,
+        "rel": link.rel or "",
+        "anchor_text": link.anchor_text or "",
+        "target_artifact_id": link.target_artifact_id,
+    }
+
+
 def _issue_row(issue: SiteIssue, affected_count: int) -> dict:
     return {
         "id": issue.id,
@@ -1058,10 +1131,13 @@ async def get_page_detail(
     crawl = await _load_crawl(
         session, workspace_id=workspace_id, crawl_id=crawl_id
     )
+    # Only a URL admitted to THIS crawl has a detail here (404 otherwise), so a
+    # detail request can never surface a URL the crawl did not observe.
     site_url = await session.scalar(
         select(SiteUrl).where(
             SiteUrl.id == site_url_id,
             SiteUrl.project_id == crawl.project_id,
+            SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
         )
     )
     if site_url is None:
@@ -1094,6 +1170,8 @@ async def get_page_detail(
             html_bytes = artifact.decoded_bytes
 
     issues: list[dict] = []
+    evaluations: list[dict] = []
+    link_references: list[dict] = []
     if analysis is not None:
         issue_rows = await session.execute(
             select(SiteIssue)
@@ -1101,6 +1179,42 @@ async def get_page_detail(
             .order_by(SiteIssue.created_at.asc(), SiteIssue.id.asc())
         )
         issues = [_issue_row(i, 1) for i in issue_rows.scalars().all()]
+
+        # ALL persisted rule evaluations for this analysis, worst severity
+        # first (then rule_id) so the current/failing rules lead the list.
+        eval_rows = await session.execute(
+            select(SiteRuleEvaluation)
+            .where(SiteRuleEvaluation.analysis_id == analysis.id)
+            .limit(_MAX_EVALUATIONS)
+        )
+        evaluations = sorted(
+            (_evaluation_row(e) for e in eval_rows.scalars().all()),
+            key=lambda r: (
+                _SEVERITY_RANK.get(r["severity"], 99),
+                r["rule_id"],
+            ),
+        )
+
+        # Deduplicated link references for this analysis. Rows are already
+        # deduped at write time by (artifact, kind, target_hash, fingerprint);
+        # collapse defensively by (kind, target_hash) and order by target url.
+        link_rows = await session.execute(
+            select(SiteLinkReference)
+            .where(SiteLinkReference.source_analysis_id == analysis.id)
+            .order_by(
+                SiteLinkReference.target_url.asc(),
+                SiteLinkReference.id.asc(),
+            )
+        )
+        seen_links: set[tuple[str, str]] = set()
+        for link in link_rows.scalars().all():
+            key = (link.kind, link.target_hash)
+            if key in seen_links:
+                continue
+            seen_links.add(key)
+            link_references.append(_link_reference_row(link))
+            if len(link_references) >= _MAX_LINK_REFERENCES:
+                break
 
     return {
         "site_url_id": site_url.id,
@@ -1125,6 +1239,8 @@ async def get_page_detail(
         "facts": _page_facts(facts),
         "delivery": _delivery_facts(facts, html_bytes=html_bytes),
         "issues": issues,
+        "evaluations": evaluations,
+        "link_references": link_references,
         "artifact_id": artifact_id,
         "extractor_version": crawl.extractor_version,
         "analyzer_version": crawl.analyzer_version,
@@ -1206,12 +1322,17 @@ async def _load_issue_groups(
     groups: list[_IssueGroup] = []
     for row in rows.all():
         rule_id = row[0]
-        # Resolve the canonical id: the earliest issue row for this rule by
-        # (created_at, id). MIN(created_at) alone is not enough (ties), so pick
-        # the row explicitly.
+        # Resolve a STABLE canonical id: the earliest issue row for this
+        # (crawl_id, rule_id) by (created_at, id), computed UNFILTERED so the
+        # representative id never changes when a query/severity/URL filter is
+        # applied (issue rows are immutable). MIN(created_at) alone is not
+        # enough (ties), so pick the row explicitly.
         canonical = await session.scalar(
             select(SiteIssue)
-            .where(*clauses, SiteIssue.rule_id == rule_id)
+            .where(
+                SiteIssue.crawl_id == crawl_id,
+                SiteIssue.rule_id == rule_id,
+            )
             .order_by(SiteIssue.created_at.asc(), SiteIssue.id.asc())
             .limit(1)
         )
@@ -1333,11 +1454,11 @@ async def get_issues(
             rank_raw, rule_raw, id_raw = decode_keyset_cursor(
                 cursor, scope=scope, filters=filters
             )
+            cursor_key = (int(rank_raw), rule_raw, id_raw)
         except CursorScopeError as exc:
             raise InvalidCursorError(str(exc)) from exc
         except ValueError as exc:
             raise InvalidCursorError(str(exc)) from exc
-        cursor_key = (int(rank_raw), rule_raw, id_raw)
         for idx, g in enumerate(groups):
             gkey = (
                 _SEVERITY_RANK.get(g.severity, 99),
@@ -1404,19 +1525,39 @@ async def get_issue_detail(
     evidence/versions come from the persisted canonical row.
     """
     await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
-    canonical = await session.scalar(
+    row = await session.scalar(
         select(SiteIssue).where(
             SiteIssue.id == canonical_id,
             SiteIssue.crawl_id == crawl_id,
             SiteIssue.workspace_id == workspace_id,
         )
     )
-    if canonical is None:
+    if row is None:
         raise SiteHealthNotFoundError("Issue not found")
+
+    # Canonicalize to the stable representative row for the rule group (the
+    # earliest issue by (created_at, id)) so a non-representative member id
+    # resolves to the same group detail rather than a different projection.
+    canonical = await session.scalar(
+        select(SiteIssue)
+        .where(
+            SiteIssue.crawl_id == crawl_id,
+            SiteIssue.rule_id == row.rule_id,
+        )
+        .order_by(SiteIssue.created_at.asc(), SiteIssue.id.asc())
+        .limit(1)
+    )
+    if canonical is None:  # pragma: no cover - row proves at least one exists
+        canonical = row
 
     limit = _clamp_limit(limit)
     scope = "issue_detail"
-    filters = {"crawl_id": str(crawl_id), "canonical_id": str(canonical_id)}
+    # Fingerprint on the stable canonical id (not the requested member id) so a
+    # non-representative id and its canonical share the same page identity.
+    filters = {
+        "crawl_id": str(crawl_id),
+        "canonical_id": str(canonical.id),
+    }
 
     total = await session.scalar(
         select(func.count(func.distinct(SiteIssue.site_url_id))).where(
@@ -1501,16 +1642,19 @@ async def get_issue_history(
     """Per-URL issue history ordered ``(created_at DESC, id DESC)``.
 
     Uses the ``ix_site_issues_url_created`` index, bounded to the URL's project
-    (via the crawl) so it spans that project's crawl chronology, not just the
-    single crawl.
+    AND to crawls at or before the selected crawl in the project chronology, so
+    an older crawl's detail never shows issues from a later crawl.
     """
     crawl = await _load_crawl(
         session, workspace_id=workspace_id, crawl_id=crawl_id
     )
+    # The URL must be admitted to the selected crawl (404 otherwise), matching
+    # the page-detail scope; history then spans that crawl and prior ones.
     site_url = await session.scalar(
         select(SiteUrl).where(
             SiteUrl.id == site_url_id,
             SiteUrl.project_id == crawl.project_id,
+            SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
         )
     )
     if site_url is None:
@@ -1518,23 +1662,39 @@ async def get_issue_history(
 
     limit = _clamp_limit(limit)
     scope = "issue_history"
-    filters = {"site_url_id": str(site_url_id), "project_id": str(crawl.project_id)}
+    filters = {
+        "site_url_id": str(site_url_id),
+        "project_id": str(crawl.project_id),
+        "crawl_id": str(crawl_id),
+    }
 
+    # Bound history to crawls at or before the SELECTED crawl in the project's
+    # chronology (by (created_at, id)) so viewing an older crawl never shows
+    # issues from a later one. Issue rows are immutable, so the crawl's
+    # position is stable.
+    prior_or_same_crawls = (
+        select(SiteCrawl.id)
+        .where(
+            SiteCrawl.project_id == crawl.project_id,
+            or_(
+                SiteCrawl.created_at < crawl.created_at,
+                and_(
+                    SiteCrawl.created_at == crawl.created_at,
+                    SiteCrawl.id <= crawl.id,
+                ),
+            ),
+        )
+        .scalar_subquery()
+    )
     stmt = select(SiteIssue).where(
         SiteIssue.site_url_id == site_url_id,
         SiteIssue.project_id == crawl.project_id,
+        SiteIssue.crawl_id.in_(prior_or_same_crawls),
     )
     if cursor:
-        try:
-            created_raw, id_raw = decode_keyset_cursor(
-                cursor, scope=scope, filters=filters
-            )
-        except CursorScopeError as exc:
-            raise InvalidCursorError(str(exc)) from exc
-        except ValueError as exc:
-            raise InvalidCursorError(str(exc)) from exc
-        cur_created = datetime.fromisoformat(created_raw)
-        cur_id = uuid.UUID(id_raw)
+        cur_created, cur_id = _decode_created_id_keyset(
+            cursor, scope=scope, filters=filters
+        )
         stmt = stmt.where(
             or_(
                 SiteIssue.created_at < cur_created,

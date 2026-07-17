@@ -47,8 +47,12 @@ export type CreateCrawlInput = {
   project_id: string;
   include_globs?: string[];
   exclude_globs?: string[];
-  /** Optional deterministic 64-bit seed as a decimal string. */
-  random_seed?: string;
+  /**
+   * Optional deterministic 64-bit seed as a decimal string. The backend
+   * create contract names this `seed` (it aliases the model's `random_seed`),
+   * so the wire field must be `seed`.
+   */
+  seed?: string;
 };
 
 /** Keyset inventory query params. `limit<=200`, ordering is URL-only. */
@@ -61,7 +65,7 @@ export type InventoryParams = {
 };
 
 export type CrawlListParams = { project_id: string; limit?: number; cursor?: string };
-export type PagesParams = { cursor?: string; limit?: number; status?: string };
+export type PagesParams = { cursor?: string; limit?: number; status?: string; monitored?: boolean };
 export type IssuesParams = {
   cursor?: string;
   limit?: number;
@@ -220,6 +224,7 @@ export const siteHealthQueries = {
         cursor: params?.cursor ?? null,
         limit: params?.limit ?? null,
         status: params?.status ?? null,
+        monitored: params?.monitored ?? null,
       }),
       queryFn: ({ signal }) => siteHealthApi.getPages(crawlId, params, { signal }),
     }),

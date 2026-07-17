@@ -238,6 +238,34 @@ class SiteIssue(_Model):
     created_at: str
 
 
+RuleOutcome = Literal["pass", "fail", "not_applicable", "error"]
+
+
+class RuleEvaluation(_Model):
+    id: uuid.UUID
+    rule_id: str
+    title: str
+    dimension: IssueDimension
+    category: str
+    severity: IssueSeverity
+    outcome: RuleOutcome
+    weight: float
+    evidence: dict[str, object]
+    analyzer_version: str
+    rule_version: str
+    created_at: str
+
+
+class LinkReference(_Model):
+    id: uuid.UUID
+    kind: str
+    target_url: str
+    is_internal: bool
+    rel: str
+    anchor_text: str
+    target_artifact_id: uuid.UUID | None
+
+
 class PageDetail(_Model):
     site_url_id: uuid.UUID
     crawl_id: uuid.UUID
@@ -255,6 +283,8 @@ class PageDetail(_Model):
     facts: PageFacts
     delivery: DeliveryFacts
     issues: list[SiteIssue]
+    evaluations: list[RuleEvaluation]
+    link_references: list[LinkReference]
     artifact_id: uuid.UUID | None
     extractor_version: str
     analyzer_version: str

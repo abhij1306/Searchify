@@ -741,6 +741,37 @@ export const pageSummarySchema = z
 
 export const pagesPageSchema = cursorPageSchema(pageSummarySchema);
 
+// One persisted rule evaluation on a page (all outcomes, current label).
+export const ruleEvaluationSchema = z
+  .object({
+    id: uuid(),
+    rule_id: z.string(),
+    title: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    outcome: z.enum(['pass', 'fail', 'not_applicable', 'error']),
+    weight: z.number(),
+    evidence: z.record(z.string(), z.unknown()),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// One deduplicated link/asset reference discovered on a page.
+export const linkReferenceSchema = z
+  .object({
+    id: uuid(),
+    kind: z.string(),
+    target_url: z.string(),
+    is_internal: z.boolean(),
+    rel: z.string(),
+    anchor_text: z.string(),
+    target_artifact_id: uuid().nullable(),
+  })
+  .strict();
+
 // Full analyzed-page detail (persisted facts/delivery/scores/issues/provenance).
 export const pageDetailSchema = z
   .object({
@@ -760,6 +791,8 @@ export const pageDetailSchema = z
     facts: pageFactsSchema,
     delivery: deliveryFactsSchema,
     issues: z.array(siteIssueSchema),
+    evaluations: z.array(ruleEvaluationSchema),
+    link_references: z.array(linkReferenceSchema),
     artifact_id: uuid().nullable(),
     extractor_version: z.string(),
     analyzer_version: z.string(),

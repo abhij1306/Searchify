@@ -4,10 +4,13 @@
 # layer produces for the inventory / pages / issues views). They never re-score,
 # never fetch, and never read a raw body — the router hands them the same
 # workspace-scoped projections the JSON API returns, so an export can never leak
-# more than the API. CSV escaping is delegated to the stdlib ``csv`` writer;
-# Markdown cell content is escaped so a URL/title containing ``|`` or a newline
-# can never break the table. Empty result sets still render a valid header row
-# / empty table, and ``None`` renders as an empty cell.
+# more than the API. CSV quoting/escaping is delegated to the stdlib ``csv``
+# writer; a cell beginning with a spreadsheet-formula trigger (``=``/``+``/``-``
+# /``@``) is additionally prefixed with ``'`` to neutralize CSV/formula
+# injection. Markdown cell content is escaped (and formula-neutralized) so a
+# URL/title containing ``|`` or a newline can never break the table. Empty
+# result sets still render a valid header row / empty table, and ``None``
+# renders as an empty cell.
 from __future__ import annotations
 
 import csv
@@ -77,6 +80,27 @@ def _cell(value: Any) -> str:
     return str(value)
 
 
+# Leading characters a spreadsheet treats as the start of a formula. A cell
+# that begins with one is dangerous (CSV/formula injection), so it is prefixed
+# with a single quote to neutralize evaluation while preserving the visible
+# text (the widely-used OWASP mitigation).
+_FORMULA_TRIGGERS = ("=", "+", "-", "@")
+
+
+def _csv_cell(value: Any) -> str:
+    """CSV cell with spreadsheet-formula neutralization.
+
+    A cell whose text begins with ``=``, ``+``, ``-``, or ``@`` is prefixed
+    with a ``'`` so a spreadsheet renders it as literal text instead of
+    evaluating it as a formula. The stdlib ``csv`` writer still handles
+    quoting/escaping of commas/quotes/newlines on top of this.
+    """
+    text = _cell(value)
+    if text and text[0] in _FORMULA_TRIGGERS:
+        return "'" + text
+    return text
+
+
 def rows_to_csv(view: str, items: list[dict]) -> str:
     """Render projected ``items`` for ``view`` as CSV (RFC-4180 via stdlib).
 
@@ -90,7 +114,7 @@ def rows_to_csv(view: str, items: list[dict]) -> str:
     )
     writer.writeheader()
     for item in items:
-        writer.writerow({col: _cell(item.get(col)) for col in columns})
+        writer.writerow({col: _csv_cell(item.get(col)) for col in columns})
     return buffer.getvalue()
 
 
@@ -101,6 +125,10 @@ def _md_cell(value: Any) -> str:
     URL containing ``|`` cannot break the table row.
     """
     text = _cell(value)
+    if text and text[0] in _FORMULA_TRIGGERS:
+        # Neutralize a leading formula trigger for the same reason as CSV: the
+        # exported table may be pasted into a spreadsheet.
+        text = "'" + text
     return (
         text.replace("\\", "\\\\")
         .replace("|", "\\|")
