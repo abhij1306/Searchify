@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+
+import { PagesTable } from './pages-table';
+import type { PageSummary } from '@/lib/api/types';
+
+const UUID = '11111111-1111-4111-8111-111111111111';
+const CRAWL = '22222222-2222-4222-8222-222222222222';
+
+function page(overrides: Partial<PageSummary> = {}): PageSummary {
+  return {
+    site_url_id: UUID,
+    crawl_id: CRAWL,
+    normalized_url: 'https://acme.com/',
+    display_url: 'https://acme.com/',
+    title: 'Homepage',
+    monitored: true,
+    analysis_status: 'completed',
+    error_code: '',
+    issue_count: 3,
+    technical_score: 46,
+    aeo_score: 64,
+    overall_score: 55,
+    last_audited: '2026-07-16T00:00:00Z',
+    ...overrides,
+  };
+}
+
+describe('PagesTable', () => {
+  it('renders scores for a completed page', () => {
+    render(<PagesTable pages={[page()]} />);
+    expect(screen.getByText('Homepage')).toBeInTheDocument();
+    expect(screen.getByText('46')).toBeInTheDocument();
+    expect(screen.getByText('64')).toBeInTheDocument();
+  });
+
+  it('renders the "—" placeholder for a blocked page — never a fabricated zero', () => {
+    render(
+      <PagesTable
+        pages={[
+          page({
+            site_url_id: '33333333-3333-4333-8333-333333333333',
+            title: 'Admin Panel',
+            analysis_status: 'blocked',
+            issue_count: null,
+            technical_score: null,
+            aeo_score: null,
+            overall_score: null,
+            last_audited: null,
+          }),
+        ]}
+      />,
+    );
+    // No zeroes rendered for the missing scores.
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+    // Blocked status badge is shown.
+    expect(screen.getByText('Blocked')).toBeInTheDocument();
+    // Placeholder appears for the missing score/issue cells.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('keeps View disabled until Slice 8', () => {
+    render(<PagesTable pages={[page()]} />);
+    const view = screen.getByText('View');
+    expect(view).toHaveAttribute('aria-disabled', 'true');
+    expect(view.closest('a')).toBeNull();
+  });
+});

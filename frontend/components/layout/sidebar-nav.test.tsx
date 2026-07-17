@@ -53,7 +53,7 @@ describe('SidebarNav', () => {
     expect(disabled).toHaveTextContent(/soon/i);
   });
 
-  it('renders exactly the five MVP-live items as links', () => {
+  it('renders exactly the six MVP-live items as links', () => {
     renderNav();
     const liveLabels = NAV_GROUPS.flatMap((group) =>
       group.items.filter((item) => item.live).map((item) => item.label),
@@ -64,6 +64,7 @@ describe('SidebarNav', () => {
       'Runs',
       'Providers',
       'Setup',
+      'Site Health',
     ]);
     for (const label of liveLabels) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toBeInTheDocument();

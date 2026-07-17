@@ -239,6 +239,8 @@ describe('pageDetailSchema (field_cwv_available literal false)', () => {
       blocking_resource_count: 1,
     },
     issues: [],
+    evaluations: [],
+    link_references: [],
     artifact_id: UUID,
     extractor_version: 'x1',
     analyzer_version: 'a1',
