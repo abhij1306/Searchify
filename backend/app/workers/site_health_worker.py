@@ -104,6 +104,9 @@ from app.core.config.task_queue import (
 from app.core.database import SessionLocal
 from app.core.telemetry import configure_logging
 from app.domain.site_health.discovery import (
+    _enqueue_task as _enqueue_discovery_task,
+)
+from app.domain.site_health.discovery import (
     admit_candidates,
     build_frontier_candidates,
     extract_discovery_links,
@@ -291,7 +294,9 @@ class SiteHealthWorker:
         together — claiming a kind we do not route would force-fail it, and
         routing a kind we do not claim would leave it queued forever.
         """
-        await self._queue.release_expired()
+        await self._queue.release_expired(
+            batch_size=site_health_settings.lease_reclaim_batch_size
+        )
         tasks = await self._queue.claim(
             owner=self.owner,
             # Execution is serial, so claiming a batch would leave every task
@@ -410,6 +415,20 @@ class SiteHealthWorker:
         while heartbeating the lease, and hands the bounded result to the
         persistence step, which re-checks ownership under a row lock.
         """
+        # Discover evidence (artifact + observation + admission) commits before
+        # ``_queue.succeed()``. If that out-of-transaction acknowledgement
+        # fails, a reclaimed task must acknowledge the durable result instead
+        # of refetching and colliding with the existing unique
+        # ``(task_id, fetch_purpose)`` artifact row (mirrors the analyze flow).
+        persisted_artifact_id = await self._persisted_discover_artifact_id(task_id)
+        if persisted_artifact_id is not None:
+            await self._queue.succeed(
+                task_id=task_id,
+                owner=self.owner,
+                result_artifact_id=persisted_artifact_id,
+            )
+            return
+
         async with self._session_factory() as session:
             task = await session.get(SiteCrawlTask, task_id)
             crawl = await session.get(SiteCrawl, crawl_id)
@@ -516,6 +535,7 @@ class SiteHealthWorker:
             root_registrable_domain=root_registrable_domain,
             include_globs=include_globs,
             exclude_globs=exclude_globs,
+            charset=result.charset,
         )
         output = DiscoveryOutput(
             requested_url=result.requested_url,
@@ -689,9 +709,29 @@ class SiteHealthWorker:
     ) -> list[FrontierCandidate]:
         # The discover task's own position is its randomized_position; children
         # inherit deterministic order via (parent_position, link_ordinal, hash).
-        return build_frontier_candidates(
+        candidates = build_frontier_candidates(
             output, parent_position=0, depth=depth
         )
+        if depth == 0:
+            # The root/fetched identity itself must also go through admission
+            # (not just its extracted child links): a Free crawl's sample
+            # allowance is filled from admitted identities, and the root's
+            # SiteUrl identity is created lazily on its first fetch (it has no
+            # pre-existing inventory row), so skipping it here would leave
+            # Free crawls with no or an undersized sample and would exclude
+            # the root from ``free_sample`` monitoring/auto-analysis.
+            root_url_hash = canonical_identity(output.requested_url)[1]
+            candidates.append(
+                FrontierCandidate(
+                    url=output.requested_url,
+                    url_hash=root_url_hash,
+                    depth=depth,
+                    source_kind=OBSERVATION_SOURCE_ROOT,
+                    parent_position=-1,
+                    link_ordinal=-1,
+                )
+            )
+        return candidates
 
     async def _write_artifact(
         self,
@@ -769,6 +809,7 @@ class SiteHealthWorker:
             pg_insert(SiteUrlObservation)
             .values(
                 workspace_id=crawl.workspace_id,
+                project_id=crawl.project_id,
                 crawl_id=crawl.id,
                 site_url_id=site_url_id,
                 source_kind=(
@@ -1002,6 +1043,20 @@ class SiteHealthWorker:
             outcome=outcome,
         )
 
+    async def _persisted_discover_artifact_id(
+        self, task_id: uuid.UUID
+    ) -> uuid.UUID | None:
+        """Return durable discover evidence for an idempotently reclaimed task."""
+        async with self._session_factory() as session:
+            return await session.scalar(
+                select(SiteFetchArtifact.id)
+                .where(
+                    SiteFetchArtifact.task_id == task_id,
+                    SiteFetchArtifact.fetch_purpose == FETCH_PURPOSE_DISCOVER,
+                )
+                .limit(1)
+            )
+
     async def _persisted_analysis_artifact_id(
         self, task_id: uuid.UUID
     ) -> uuid.UUID | None:
@@ -1020,6 +1075,24 @@ class SiteHealthWorker:
                 )
                 .limit(1)
             )
+
+    async def _persisted_link_check_done(
+        self, task_id: uuid.UUID
+    ) -> bool:
+        """Return True if this link-check task already persisted references.
+
+        The presence of any ``SiteLinkReference`` row tagged with this task's
+        ``target_task_id`` is the durable evidence that the task committed its
+        probe results before the (possibly lost) queue acknowledgement — so a
+        reclaimed run can ack the durable result instead of re-probing links.
+        """
+        async with self._session_factory() as session:
+            existing = await session.scalar(
+                select(SiteLinkReference.id)
+                .where(SiteLinkReference.target_task_id == task_id)
+                .limit(1)
+            )
+            return existing is not None
 
     async def _evaluate_analyze_guard(
         self,
@@ -1162,6 +1235,7 @@ class SiteHealthWorker:
             result.body,
             final_url=result.final_url or requested_url,
             content_type=result.content_type,
+            charset=result.charset,
             status_code=status,
             redacted_headers=result.redacted_headers,
             http_version=result.http_version,
@@ -1218,6 +1292,24 @@ class SiteHealthWorker:
                     crawl.analyzed_url_count += 1
                     task.result_artifact_id = artifact_id
                     succeeded_artifact_id = artifact_id
+                    # Automatically enqueue the link-check task for this URL in
+                    # the same transaction as the completed analysis, so the
+                    # worker's own ``TASK_KIND_LINK_CHECK`` handling is ever
+                    # reached for a normal crawl. Conflict-safe (``ON CONFLICT
+                    # DO NOTHING`` on the unique
+                    # ``(crawl_id, task_kind, url_hash, generation)`` slot) so
+                    # a reclaimed/retried analyze task never double-enqueues.
+                    await _enqueue_discovery_task(
+                        session,
+                        crawl=crawl,
+                        site_url_id=task.site_url_id,
+                        url=requested_url,
+                        url_hash_value=task.url_hash,
+                        task_kind=TASK_KIND_LINK_CHECK,
+                        depth=task.depth,
+                        generation=task.generation,
+                        parent_site_url_id=task.parent_site_url_id,
+                    )
                     record_crawl_event(
                         session,
                         crawl_id=crawl_id,
@@ -1380,6 +1472,18 @@ class SiteHealthWorker:
         test), and writes deduped ``SiteLinkReference`` rows. Independent of the
         discovery fast path. The queue row is always finalized.
         """
+        # Durable-ack recovery (mirrors discover/analyze). Link references are
+        # committed BEFORE the out-of-transaction ``_queue.succeed()``. If that
+        # acknowledgement is lost (crash/restart between commit and ack) the
+        # lease is reclaimed and this task re-runs. Without a durable check a
+        # reclaimed run would re-probe every referenced link over the network —
+        # wasteful and observable to third-party sites. If this task already
+        # persisted its link references, acknowledge the durable result and
+        # return before any network I/O instead of re-probing.
+        if await self._persisted_link_check_done(task_id):
+            await self._queue.succeed(task_id=task_id, owner=self.owner)
+            return
+
         async with self._session_factory() as session:
             task = await session.get(SiteCrawlTask, task_id)
             crawl = await session.get(SiteCrawl, crawl_id)
@@ -1921,6 +2025,7 @@ class SiteHealthWorker:
             "aeo_score": aggregate.aeo_score,
             "overall_score": aggregate.overall_score,
             "analyzed_url_count": aggregate.analyzed_url_count,
+            "selected_count": selected_url_count,
             "issue_count": issue_total,
             "scoring_version": aggregate.scoring_version,
         }

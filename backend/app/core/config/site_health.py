@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.config.task_queue import (
@@ -331,6 +332,8 @@ ERROR_UNSUPPORTED_CONTENT_TYPE: Final = "unsupported_content_type"
 ERROR_TIMEOUT: Final = "timeout"
 ERROR_HTTP_4XX: Final = "http_4xx"
 ERROR_HTTP_5XX: Final = "http_5xx"
+ERROR_CONNECTION_FAILED: Final = "connection_failed"
+ERROR_MALFORMED_RESPONSE: Final = "malformed_response"
 SITE_FETCH_ERROR_TOKENS: Final[frozenset[str]] = frozenset(
     {
         ERROR_ROBOTS_DENIED,
@@ -342,6 +345,8 @@ SITE_FETCH_ERROR_TOKENS: Final[frozenset[str]] = frozenset(
         ERROR_TIMEOUT,
         ERROR_HTTP_4XX,
         ERROR_HTTP_5XX,
+        ERROR_CONNECTION_FAILED,
+        ERROR_MALFORMED_RESPONSE,
     }
 )
 
@@ -710,14 +715,47 @@ class SiteHealthSettings(BaseSettings):
     retry_jitter_seconds: float = 1.5
     worker_concurrency: int = 8
     poll_interval_seconds: float = 1.0
+    # Deterministic bound on how many expired leases the sweeper reclaims in
+    # ONE transaction. A mass expiry across a large frontier (e.g. 50,000
+    # URLs) would otherwise lock and update every expired row in a single
+    # long-running transaction and stall live claims; the sweeper instead
+    # drains the remainder across subsequent polls.
+    lease_reclaim_batch_size: int = 500
 
     # --- Link checking ---
     max_link_checks_per_page: int = 200
     link_check_timeout_seconds: float = 10.0
 
+    # --- Export ---
+    # Bounds how many rows ``_export_items`` materializes into memory for a
+    # single CSV/Markdown export before it truncates, so a very large Starter
+    # inventory can never exhaust memory on one request.
+    max_export_items: int = 20_000
+
     # --- SSE / events ---
     sse_poll_interval_seconds: float = 2.0
     sse_max_duration_seconds: float = 300.0
+
+    @model_validator(mode="after")
+    def _validate_lease_and_heartbeat(self) -> SiteHealthSettings:
+        """Enforce positive lease/heartbeat values and heartbeat < lease TTL.
+
+        A heartbeat interval that is not strictly less than the lease TTL
+        would let the sweeper reclaim a still-live task before it ever gets a
+        chance to send its first heartbeat.
+        """
+        if self.lease_ttl_seconds <= 0:
+            raise ValueError("lease_ttl_seconds must be positive")
+        if self.heartbeat_interval_seconds <= 0:
+            raise ValueError("heartbeat_interval_seconds must be positive")
+        if self.heartbeat_interval_seconds >= self.lease_ttl_seconds:
+            raise ValueError(
+                "heartbeat_interval_seconds must be strictly less than "
+                "lease_ttl_seconds"
+            )
+        if self.lease_reclaim_batch_size <= 0:
+            raise ValueError("lease_reclaim_batch_size must be positive")
+        return self
 
     def retry_delay(
         self, attempt: int, retry_after_seconds: float | None = None

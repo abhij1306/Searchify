@@ -125,4 +125,73 @@ describe('IssuesCatalog', () => {
     const link = await screen.findByRole('link', { name: /Homepage/ });
     expect(link).toHaveAttribute('href', `/site-health/crawls/${CRAWL}/pages/${URL_A}`);
   });
+
+  it('pages affected URLs with a cursor-aware Next/Previous control', async () => {
+    const seenCursors: (string | null)[] = [];
+    mswServer.use(
+      http.get(`/api/v1/site-crawls/${CRAWL}/issues`, () =>
+        HttpResponse.json({ items: [issue()], next_cursor: null, summary }),
+      ),
+      http.get(`/api/v1/site-crawls/${CRAWL}/issues/${ISSUE_A}`, ({ request }) => {
+        const url = new URL(request.url);
+        const cursor = url.searchParams.get('cursor');
+        seenCursors.push(cursor);
+        const onFirstPage = cursor === null;
+        return HttpResponse.json({
+          id: ISSUE_A,
+          crawl_id: CRAWL,
+          rule_id: 'aeo.website_schema',
+          dimension: 'aeo',
+          category: 'schema',
+          severity: 'high',
+          title: 'WebSite schema is missing',
+          remediation: 'Add a JSON-LD WebSite schema.',
+          evidence: {},
+          affected_urls: [
+            {
+              site_url_id: onFirstPage ? URL_A : 'cccccccc-2222-4111-8111-111111111111',
+              normalized_url: onFirstPage ? 'https://acme.com/' : 'https://acme.com/page-2',
+              display_url: onFirstPage ? 'https://acme.com/' : 'https://acme.com/page-2',
+              title: onFirstPage ? 'Homepage' : 'Page Two',
+            },
+          ],
+          affected_url_count: 2,
+          analyzer_version: 'a1',
+          rule_version: 'r1',
+          created_at: '2026-07-15T00:00:00Z',
+          next_cursor: onFirstPage ? 'cursor-page-2' : null,
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<IssuesCatalog crawlId={CRAWL} />);
+    await screen.findByText('WebSite schema is missing');
+
+    await user.click(screen.getByRole('button', { name: 'View affected URLs' }));
+    await screen.findByRole('link', { name: /Homepage/ });
+
+    // Two Previous/Next pairs exist on screen: the issue-list pager (outer)
+    // and the affected-URLs pager (inner, inside the expanded card). The
+    // inner one renders first in DOM order since it's inside the card.
+    const [innerPrev] = screen.getAllByRole('button', { name: 'Previous' });
+    const [innerNext] = screen.getAllByRole('button', { name: 'Next' });
+    expect(innerPrev).toBeDisabled();
+    expect(innerNext).not.toBeDisabled();
+
+    await user.click(innerNext);
+    await screen.findByRole('link', { name: /Page Two/ });
+    expect(seenCursors).toEqual([null, 'cursor-page-2']);
+    const [innerPrevAfterNext] = screen.getAllByRole('button', { name: 'Previous' });
+    const [innerNextAfterNext] = screen.getAllByRole('button', { name: 'Next' });
+    expect(innerPrevAfterNext).not.toBeDisabled();
+    expect(innerNextAfterNext).toBeDisabled();
+
+    await user.click(innerPrevAfterNext);
+    await screen.findByRole('link', { name: /Homepage/ });
+    // Going back to cursor=null is served from the TanStack Query cache
+    // (already fetched above), so no new request is issued — seenCursors
+    // stays at the two requests already made.
+    expect(seenCursors).toEqual([null, 'cursor-page-2']);
+  });
 });

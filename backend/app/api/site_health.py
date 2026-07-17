@@ -48,6 +48,7 @@ from app.domain.site_health.api_schemas import (
     PageDetail,
     PagesPage,
     ReplaceMonitoredRequest,
+    RerunPageResponse,
     SiteIssueDetail,
     SiteIssuesPage,
 )
@@ -58,10 +59,12 @@ from app.domain.site_health.planner import (
 )
 from app.domain.site_health.selection import (
     QuotaExceededError,
+    RerunNotAllowedError,
     SelectionValidationError,
     StaleSelectionVersionError,
     StarterRequiredError,
     replace_monitored_set,
+    rerun_page,
 )
 from app.domain.site_health.service import (
     InvalidCursorError,
@@ -353,6 +356,80 @@ async def get_page_detail_endpoint(
     return PageDetail.model_validate(detail)
 
 
+@router.post(
+    "/site-crawls/{crawl_id}/pages/{site_url_id}/rerun",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=RerunPageResponse,
+)
+async def rerun_page_endpoint(
+    crawl_id: uuid.UUID,
+    site_url_id: uuid.UUID,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> RerunPageResponse:
+    """Enqueue an explicit rerun of one page's analysis (202).
+
+    Workspace-authorized via the same page-detail lookup as the GET route (a
+    foreign/missing crawl or URL is a 404, never a coded selection error), so
+    the rerun can never target another workspace's evidence.
+
+    "Re-audit this page" is normally invoked from a COMPLETED (terminal) crawl.
+    Because enqueuing into a terminal crawl would be cancelled by the worker,
+    the domain layer mints a fresh single-page rerun crawl in that case. The
+    202 body therefore carries the (possibly new) crawl identity + analysis
+    status so the client polls the fresh run rather than the terminal source
+    crawl: ``{crawl_id, site_url_id, task_id, created_new_crawl,
+    analysis_status}``.
+    """
+    try:
+        await service.get_page_detail(
+            session,
+            workspace_id=ctx.workspace_id,
+            crawl_id=crawl_id,
+            site_url_id=site_url_id,
+        )
+        crawl_summary = await service.get_crawl_summary(
+            session, workspace_id=ctx.workspace_id, crawl_id=crawl_id
+        )
+    except SiteHealthNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+
+    try:
+        result = await rerun_page(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=crawl_summary["project_id"],
+            site_url_id=site_url_id,
+        )
+        await session.commit()
+    except StarterRequiredError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    except RerunNotAllowedError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+    except SelectionValidationError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
+
+    return RerunPageResponse(
+        crawl_id=result.crawl_id,
+        site_url_id=result.site_url_id,
+        task_id=result.task_id,
+        created_new_crawl=result.created_new_crawl,
+        analysis_status=result.analysis_status,
+    )
+
+
 @router.get(
     "/site-crawls/{crawl_id}/pages/{site_url_id}/issue-history",
     response_model=IssueHistoryPage,
@@ -601,10 +678,17 @@ async def _export_items(
     workspace_id: uuid.UUID,
     crawl_id: uuid.UUID,
     view: str,
-) -> list[dict]:
-    """Collect ALL projected rows for an export view (workspace-scoped)."""
+) -> tuple[list[dict], bool]:
+    """Collect projected rows for an export view (workspace-scoped).
+
+    Bounded by ``max_export_items`` (config-owned): once the cap is reached
+    the loop stops paging and reports truncation, so a very large inventory
+    can never be materialized entirely into memory for one export request.
+    """
     items: list[dict] = []
     cursor: str | None = None
+    limit = site_health_settings.max_export_items
+    truncated = False
     while True:
         if view == "inventory":
             page = await service.get_inventory(
@@ -631,10 +715,14 @@ async def _export_items(
                 cursor=cursor,
             )
         items.extend(page["items"])
+        if len(items) >= limit:
+            items = items[:limit]
+            truncated = bool(page.get("next_cursor"))
+            break
         cursor = page.get("next_cursor")
         if not cursor:
             break
-    return items
+    return items, truncated
 
 
 def _validate_view(view: str) -> str:
@@ -655,20 +743,23 @@ async def export_csv_endpoint(
 ) -> Response:
     view = _validate_view(view)
     try:
-        items = await _export_items(
+        items, truncated = await _export_items(
             session, workspace_id=ctx.workspace_id, crawl_id=crawl_id, view=view
         )
     except SiteHealthNotFoundError as exc:
         raise _not_found(str(exc)) from exc
     body = rows_to_csv(view, items)
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="site-health-{crawl_id}-{view}.csv"'
+        )
+    }
+    if truncated:
+        headers["X-Export-Truncated"] = "true"
     return Response(
         content=body,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename="site-health-{crawl_id}-{view}.csv"'
-            )
-        },
+        headers=headers,
     )
 
 
@@ -681,18 +772,21 @@ async def export_markdown_endpoint(
 ) -> PlainTextResponse:
     view = _validate_view(view)
     try:
-        items = await _export_items(
+        items, truncated = await _export_items(
             session, workspace_id=ctx.workspace_id, crawl_id=crawl_id, view=view
         )
     except SiteHealthNotFoundError as exc:
         raise _not_found(str(exc)) from exc
     body = rows_to_markdown(view, items)
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="site-health-{crawl_id}-{view}.md"'
+        )
+    }
+    if truncated:
+        headers["X-Export-Truncated"] = "true"
     return PlainTextResponse(
         content=body,
         media_type="text/markdown",
-        headers={
-            "Content-Disposition": (
-                f'attachment; filename="site-health-{crawl_id}-{view}.md"'
-            )
-        },
+        headers=headers,
     )

@@ -46,6 +46,7 @@ from app.core.config.site_health import (
     CRAWL_STATUS_QUEUED,
     CRAWL_STATUS_VALIDATING,
     DISCOVERY_MODE_SAMPLE,
+    DISCOVERY_STATUS_COMPLETED,
     DISCOVERY_STATUS_RUNNING,
     EVENT_CRAWL_CREATED,
     EVENT_CRAWL_QUEUED,
@@ -53,6 +54,7 @@ from app.core.config.site_health import (
     OBSERVATION_SOURCE_ROOT,
     RULE_CATALOG_VERSION,
     SCORING_VERSION,
+    TASK_KIND_ANALYZE,
     TASK_KIND_DISCOVER,
     capability_profile,
     site_health_settings,
@@ -74,6 +76,8 @@ from app.models.site_health import (
     SiteCrawl,
     SiteCrawlTask,
     SiteHealthProfile,
+    SiteUrl,
+    SiteUrlObservation,
 )
 
 # Bound the number of include/exclude narrowing globs accepted at creation so a
@@ -148,14 +152,19 @@ def _normalize_globs(globs: list[str] | None, *, label: str) -> list[str]:
 
 
 async def _load_project(
-    session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    lock: bool = False,
 ) -> Project:
-    project = await session.scalar(
-        select(Project).where(
-            Project.id == project_id,
-            Project.workspace_id == workspace_id,
-        )
+    stmt = select(Project).where(
+        Project.id == project_id,
+        Project.workspace_id == workspace_id,
     )
+    if lock:
+        stmt = stmt.with_for_update()
+    project = await session.scalar(stmt)
     if project is None:
         raise CrawlPlanError("Project not found", code="project_not_found")
     return project
@@ -291,8 +300,11 @@ async def create_crawl(
     the worker can claim the root. Rejects a second active crawl for the same
     project (409). Caller owns nothing else — this commits.
     """
+    # Lock the project row before checking active state so two concurrent
+    # requests for the same project serialize instead of racing past
+    # ``_has_active_crawl()`` and both creating a crawl.
     project = await _load_project(
-        session, workspace_id=workspace_id, project_id=project_id
+        session, workspace_id=workspace_id, project_id=project_id, lock=True
     )
 
     if await _has_active_crawl(session, project_id=project_id):
@@ -323,6 +335,24 @@ async def create_crawl(
     includes = _normalize_globs(include_globs, label="include")
     excludes = _normalize_globs(exclude_globs, label="exclude")
 
+    # Resolve (seed if missing) the entitlement BEFORE mutating the profile.
+    # ``replace_monitored_set()`` locks entitlement before profile, so this
+    # path must match that lock order to avoid a deadlock cycle. For a Free
+    # capability, LOCK the entitlement row so the workspace-wide sample
+    # allowance is serialized at creation time against any concurrent crawl
+    # in another project.
+    entitlement = await resolve_entitlement(session, workspace_id)
+    capability = entitlement.plan_key
+    capability_prof = capability_profile(capability)
+    sample_mode = _is_sample_mode(capability_prof)
+    if sample_mode:
+        entitlement = await lock_entitlement(session, workspace_id)
+        capability = entitlement.plan_key
+        # Re-derive sample_mode from the LOCKED row: the entitlement may have
+        # changed between the unlocked read above and acquiring the lock.
+        capability_prof = capability_profile(capability)
+        sample_mode = _is_sample_mode(capability_prof)
+
     profile = await _upsert_profile(
         session,
         workspace_id=workspace_id,
@@ -333,17 +363,6 @@ async def create_crawl(
         include_globs=includes,
         exclude_globs=excludes,
     )
-
-    # Resolve (seed if missing) the entitlement. For a Free capability, LOCK the
-    # entitlement row so the workspace-wide sample allowance is serialized at
-    # creation time against any concurrent crawl in another project.
-    entitlement = await resolve_entitlement(session, workspace_id)
-    capability = entitlement.plan_key
-    capability_prof = capability_profile(capability)
-    sample_mode = _is_sample_mode(capability_prof)
-    if sample_mode:
-        entitlement = await lock_entitlement(session, workspace_id)
-        capability = entitlement.plan_key
 
     seed = _normalize_seed(random_seed)
     configuration = _frozen_configuration(
@@ -423,6 +442,151 @@ async def create_crawl(
     return await get_crawl(
         session, workspace_id=workspace_id, crawl_id=crawl.id
     )
+
+
+async def create_page_rerun_crawl(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    profile: SiteHealthProfile,
+    site_url: SiteUrl,
+    entitlement,
+    random_seed: str | None = None,
+) -> SiteCrawl:
+    """Create a fresh, single-page rerun crawl for one already-known URL.
+
+    A "Re-audit this page" action must work even when the project's most
+    recent crawl is TERMINAL (completed/partial/failed): enqueuing an analyze
+    task into a terminal crawl is cooperatively cancelled by the worker, so it
+    would never run. Instead this mints a NEW active crawl whose ONLY work is a
+    single ``analyze`` task for ``site_url`` — no ``discover`` root task, so it
+    never re-crawls the whole site.
+
+    The fresh crawl:
+
+    - reuses the project's frozen ``SiteHealthProfile`` (root/scope/versions)
+      and the current capability snapshot, so scope/version provenance matches
+      a normal crawl;
+    - records the target's ``SiteUrlObservation`` up front (source_kind
+      ``root``) so the page-detail projection — which scopes URLs to a crawl's
+      admitted/observed set — resolves the URL on the new crawl immediately;
+    - starts with ``discovery_status=completed`` and ``discovered_url_count=1``
+      so the shared worker reconciliation terminalizes on the single analyze
+      task alone (it is never mis-classified as a fully-failed discovery);
+    - is left QUEUED with one QUEUED ``analyze`` task (generation 0 — a fresh
+      crawl owns a fresh slot namespace) for the worker to claim.
+
+    The caller owns the transaction boundary (flush, no commit), mirroring
+    ``rerun_page``. Returns the new ``SiteCrawl`` (unrefreshed).
+    """
+    capability = entitlement.plan_key
+    capability_prof = capability_profile(capability)
+    sample_mode = _is_sample_mode(capability_prof)
+    configuration = _frozen_configuration(
+        capability=capability,
+        root_registrable_domain=profile.registrable_domain or "",
+        include_globs=list(profile.include_globs or []),
+        exclude_globs=list(profile.exclude_globs or []),
+        entitlement=entitlement,
+    )
+    seed = _normalize_seed(random_seed)
+
+    crawl = SiteCrawl(
+        workspace_id=workspace_id,
+        project_id=project_id,
+        profile_id=profile.id,
+        status=CRAWL_STATUS_DRAFT,
+        root_url=profile.root_url or site_url.normalized_url,
+        random_seed=seed,
+        configuration=configuration,
+        sample_mode=sample_mode,
+        extractor_version=EXTRACTOR_VERSION,
+        analyzer_version=ANALYZER_VERSION,
+        rule_catalog_version=RULE_CATALOG_VERSION,
+        scoring_version=SCORING_VERSION,
+        # A single-page rerun performs no discovery: pin the discovery
+        # sub-state complete with one observed URL so reconciliation never
+        # treats the empty discover plan as a fully-failed crawl.
+        discovery_status=DISCOVERY_STATUS_COMPLETED,
+        discovered_url_count=1,
+        admitted_url_count=1,
+        inventory_complete=True,
+    )
+    session.add(crawl)
+    await session.flush()  # assign crawl.id
+
+    # Record the target URL's observation so the page-detail projection (which
+    # scopes URLs to a crawl's observed set) resolves it on this fresh crawl.
+    from sqlalchemy.dialects.postgresql import insert as _pg_insert
+
+    await session.execute(
+        _pg_insert(SiteUrlObservation)
+        .values(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            crawl_id=crawl.id,
+            site_url_id=site_url.id,
+            source_kind=OBSERVATION_SOURCE_ROOT,
+            parent_site_url_id=None,
+            source_artifact_id=None,
+            depth=0,
+            observed_url=site_url.normalized_url,
+            final_url=site_url.normalized_url,
+            status_code=None,
+            content_type="",
+            title=site_url.latest_title or "",
+        )
+        .on_conflict_do_nothing(index_elements=["crawl_id", "site_url_id"])
+    )
+
+    # Seed exactly ONE analyze task (generation 0) for the target URL.
+    analyze_task = SiteCrawlTask(
+        crawl_id=crawl.id,
+        workspace_id=workspace_id,
+        site_url_id=site_url.id,
+        task_kind=TASK_KIND_ANALYZE,
+        requested_url=site_url.normalized_url,
+        url_hash=site_url.url_hash,
+        depth=0,
+        generation=0,
+        idempotency_key=(
+            f"{crawl.id}:{TASK_KIND_ANALYZE}:{site_url.url_hash}:0"
+        ),
+        status=TASK_STATUS_QUEUED,
+        randomized_position=0,
+    )
+    session.add(analyze_task)
+
+    # Drive the lifecycle through the guarded state machine to QUEUED so the
+    # worker can claim the analyze task (invariant 9). Analysis stays PENDING
+    # until the worker moves it RUNNING on first claim.
+    apply_crawl_status(crawl, CRAWL_STATUS_VALIDATING)
+    apply_crawl_status(crawl, CRAWL_STATUS_QUEUED)
+
+    count_disclosure = bool(configuration.get("count_disclosure", False))
+    record_crawl_event(
+        session,
+        crawl_id=crawl.id,
+        event_type=EVENT_CRAWL_CREATED,
+        message="page rerun crawl created",
+        payload={
+            "root_url": crawl.root_url,
+            "sample_mode": sample_mode,
+            "source_kind": OBSERVATION_SOURCE_ROOT,
+            "rerun_site_url_id": str(site_url.id),
+        },
+        count_disclosure=count_disclosure,
+    )
+    record_crawl_event(
+        session,
+        crawl_id=crawl.id,
+        event_type=EVENT_CRAWL_QUEUED,
+        message="crawl queued",
+        count_disclosure=count_disclosure,
+    )
+    await session.flush()
+    return crawl
 
 
 async def get_crawl(

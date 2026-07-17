@@ -83,20 +83,41 @@ def _cell(value: Any) -> str:
 # Leading characters a spreadsheet treats as the start of a formula. A cell
 # that begins with one is dangerous (CSV/formula injection), so it is prefixed
 # with a single quote to neutralize evaluation while preserving the visible
-# text (the widely-used OWASP mitigation).
-_FORMULA_TRIGGERS = ("=", "+", "-", "@")
+# text (the widely-used OWASP mitigation). Whitespace/control characters
+# (space, tab, CR, LF) hidden before a trigger do not stop a spreadsheet from
+# evaluating the formula, so they are stripped before the check — and treated
+# as dangerous themselves if leading, since tab/CR/LF can also delimit a
+# formula for some importers.
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r", "\n")
+_LEADING_WHITESPACE = " \t\r\n\x0b\x0c"
+
+
+def _has_formula_trigger(text: str) -> bool:
+    """True if ``text``, after stripping leading whitespace, starts a formula.
+
+    Inspects the first non-whitespace character (not just ``text[0]``) so a
+    value like ``"\\t=HYPERLINK(...)"`` or a newline-prefixed formula is still
+    caught; CSV quoting alone does not stop a spreadsheet from evaluating it.
+    """
+    if not text:
+        return False
+    if text[0] in ("\t", "\r", "\n"):
+        return True
+    stripped = text.lstrip(_LEADING_WHITESPACE)
+    return bool(stripped) and stripped[0] in _FORMULA_TRIGGERS
 
 
 def _csv_cell(value: Any) -> str:
     """CSV cell with spreadsheet-formula neutralization.
 
-    A cell whose text begins with ``=``, ``+``, ``-``, or ``@`` is prefixed
-    with a ``'`` so a spreadsheet renders it as literal text instead of
-    evaluating it as a formula. The stdlib ``csv`` writer still handles
-    quoting/escaping of commas/quotes/newlines on top of this.
+    A cell whose first non-whitespace character is ``=``, ``+``, ``-``, or
+    ``@`` (or that begins with a tab/CR/LF) is prefixed with a ``'`` so a
+    spreadsheet renders it as literal text instead of evaluating it as a
+    formula. The stdlib ``csv`` writer still handles quoting/escaping of
+    commas/quotes/newlines on top of this.
     """
     text = _cell(value)
-    if text and text[0] in _FORMULA_TRIGGERS:
+    if _has_formula_trigger(text):
         return "'" + text
     return text
 
@@ -125,7 +146,7 @@ def _md_cell(value: Any) -> str:
     URL containing ``|`` cannot break the table row.
     """
     text = _cell(value)
-    if text and text[0] in _FORMULA_TRIGGERS:
+    if _has_formula_trigger(text):
         # Neutralize a leading formula trigger for the same reason as CSV: the
         # exported table may be pasted into a spreadsheet.
         text = "'" + text

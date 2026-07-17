@@ -39,6 +39,8 @@ from app.connectors.web_evidence.url_policy import (
     resolve_target,
 )
 from app.core.config.site_health import (
+    ERROR_CONNECTION_FAILED,
+    ERROR_MALFORMED_RESPONSE,
     ERROR_REDIRECT_LIMIT,
     ERROR_RESPONSE_TOO_LARGE,
     ERROR_SSRF_BLOCKED,
@@ -71,8 +73,30 @@ def _content_type(headers: httpx.Headers) -> str:
     return str(raw).split(";", 1)[0].strip().lower()
 
 
+def _charset(headers: httpx.Headers) -> str:
+    """Return the lowercased ``charset`` parameter of Content-Type, if any.
+
+    Preserved separately from ``_content_type()`` (which intentionally strips
+    parameters) so downstream HTML parsing can honor a non-UTF-8 charset
+    instead of hard-coding UTF-8.
+    """
+    raw = str(headers.get("content-type", ""))
+    for part in raw.split(";")[1:]:
+        key, _, value = part.strip().partition("=")
+        if key.strip().lower() == "charset":
+            return value.strip().strip('"').strip("'").lower()
+    return ""
+
+
 def _incremental_decoder(content_encoding: str):
-    """Return a callable(chunk)->bytes decompressor for the wire encoding.
+    """Return ``(decode_chunk, decompressor)`` for the wire encoding.
+
+    ``decode_chunk`` is a ``callable(chunk)->bytes`` that feeds a chunk into the
+    decompressor. ``decompressor`` is the underlying ``zlib`` object (``None``
+    for identity/unknown encodings) so the caller can, after the stream ends,
+    flush any buffered tail and inspect ``.eof`` — a gzip/deflate stream that
+    was cut off mid-way never sets ``eof``, which is how a truncated response is
+    detected (a truncated stream does not necessarily raise ``zlib.error``).
 
     Supports gzip and deflate (the encodings a compression bomb would use);
     ``identity``/unknown pass bytes through unchanged. brotli is not a
@@ -82,11 +106,11 @@ def _incremental_decoder(content_encoding: str):
     enc = str(content_encoding or "").strip().lower()
     if enc == "gzip":
         obj = zlib.decompressobj(16 + zlib.MAX_WBITS)
-        return lambda chunk: obj.decompress(chunk)
+        return (lambda chunk: obj.decompress(chunk)), obj
     if enc == "deflate":
         obj = zlib.decompressobj()
-        return lambda chunk: obj.decompress(chunk)
-    return lambda chunk: chunk
+        return (lambda chunk: obj.decompress(chunk)), obj
+    return (lambda chunk: chunk), None
 
 
 class SecureFetcher:
@@ -327,6 +351,7 @@ class SecureFetcher:
             ttfb_ms=latency,
             latency_ms=latency,
             redirect_chain=tuple(redirect_chain),
+            charset=_charset(response.headers),
         )
 
     async def _read_body(
@@ -352,7 +377,7 @@ class SecureFetcher:
                 error_code=ERROR_UNSUPPORTED_CONTENT_TYPE,
             )
 
-        decode = _incremental_decoder(
+        decode, decompressor = _incremental_decoder(
             response.headers.get("content-encoding", "")
         )
         wire_total = 0
@@ -368,9 +393,14 @@ class SecureFetcher:
                     )
                 try:
                     out = decode(raw)
-                except zlib.error:
-                    # Malformed compression -> treat bytes as opaque wire data.
-                    out = raw
+                except zlib.error as exc:
+                    # Malformed gzip/deflate: never mix raw wire bytes into a
+                    # partially-decoded body (that would silently corrupt
+                    # ``FetchResult.body``). Fail the fetch instead.
+                    raise FetchError(
+                        "malformed compressed response body",
+                        error_code=ERROR_MALFORMED_RESPONSE,
+                    ) from exc
                 if out:
                     decoded_total += len(out)
                     if decoded_total > max_decoded:
@@ -380,6 +410,50 @@ class SecureFetcher:
                             error_code=ERROR_RESPONSE_TOO_LARGE,
                         )
                     decoded_chunks.append(out)
+            if decompressor is not None:
+                # Flush any tail buffered inside the decompressor, then confirm
+                # the stream actually ended. A truncated gzip/deflate body
+                # (connection cut before the final block) yields fewer bytes
+                # WITHOUT raising ``zlib.error`` and leaves ``eof`` False; if
+                # we accepted it we would silently persist a partial page as if
+                # it were complete. The flushed tail is still subject to the
+                # decoded cap so a bomb cannot smuggle bytes past the loop.
+                try:
+                    tail = decompressor.flush()
+                except zlib.error as exc:
+                    raise FetchError(
+                        "malformed compressed response body",
+                        error_code=ERROR_MALFORMED_RESPONSE,
+                    ) from exc
+                if tail:
+                    decoded_total += len(tail)
+                    if decoded_total > max_decoded:
+                        raise FetchError(
+                            "response exceeded decoded byte cap "
+                            "(compression bomb)",
+                            error_code=ERROR_RESPONSE_TOO_LARGE,
+                        )
+                    decoded_chunks.append(tail)
+                if not decompressor.eof:
+                    raise FetchError(
+                        "truncated compressed response body",
+                        error_code=ERROR_MALFORMED_RESPONSE,
+                        retryable=True,
+                    )
+        except httpx.TimeoutException as exc:
+            raise FetchError(
+                "request timed out", error_code=ERROR_TIMEOUT,
+                retryable=True,
+            ) from exc
+        except httpx.HTTPError as exc:
+            # A stream-read failure (e.g. connection reset mid-body) after
+            # ``send()`` succeeded: classify it the same way as the request
+            # phase instead of letting it propagate as an unclassified error.
+            raise FetchError(
+                f"connection error: {type(exc).__name__}",
+                error_code=ERROR_CONNECTION_FAILED,
+                retryable=True,
+            ) from exc
         finally:
             await response.aclose()
 
@@ -397,4 +471,5 @@ class SecureFetcher:
             ttfb_ms=ttfb,
             latency_ms=latency,
             redirect_chain=tuple(redirect_chain),
+            charset=_charset(response.headers),
         )

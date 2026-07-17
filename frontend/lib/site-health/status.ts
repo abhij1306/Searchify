@@ -78,11 +78,14 @@ export function isAnalysisTerminal(status: CrawlAnalysisStatus): boolean {
 
 /**
  * True while discovery counts are provisional (still running). A `sample_mode`
- * crawl is never "provisional" in the count sense — its counts are always
- * sample-scoped and total-free — so callers should branch on `isSampleMode`
- * first for Free copy.
+ * crawl is NEVER provisional — it never implies continued full-site scanning,
+ * so it must never be checked into shared background-scanning copy without
+ * this shared helper enforcing the rule itself (not left to each caller).
  */
-export function isDiscoveryProvisional(crawl: Pick<SiteCrawl, 'discovery_status' | 'inventory_complete'>): boolean {
+export function isDiscoveryProvisional(
+  crawl: Pick<SiteCrawl, 'sample_mode' | 'discovery_status' | 'inventory_complete'>,
+): boolean {
+  if (crawl.sample_mode) return false;
   return !crawl.inventory_complete && !TERMINAL_DISCOVERY.has(crawl.discovery_status);
 }
 
@@ -141,6 +144,7 @@ export function pageStatusBadgeValue(status: PageAnalysisStatus): StatusValue {
     case 'partially_completed':
       return 'warning';
     case 'failed':
+    case 'error':
     case 'blocked':
     case 'cancelled':
       return 'danger';
@@ -152,7 +156,9 @@ export function pageStatusBadgeValue(status: PageAnalysisStatus): StatusValue {
 
 /** True when a page row is an explicit error/blocked state (not a zero score). */
 export function isErrorRow(status: PageAnalysisStatus): boolean {
-  return status === 'failed' || status === 'blocked' || status === 'cancelled';
+  return (
+    status === 'failed' || status === 'error' || status === 'blocked' || status === 'cancelled'
+  );
 }
 
 /** Human-readable label for any snake_case lifecycle token. */

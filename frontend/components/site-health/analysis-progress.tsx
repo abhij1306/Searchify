@@ -17,6 +17,12 @@ import { crawlBadgeValue, formatScore, statusLabel } from '@/lib/site-health/sta
  * queued → running → completed/error/blocked (driven by the parent's polling +
  * SSE invalidation, no reload). A Cancel control is offered while active.
  * Scores render `—` when not yet produced (never a fabricated zero).
+ *
+ * `pages` MUST be the monitored (selected) subset for this crawl, not an
+ * unfiltered first cursor page: the monitored set is capped by the
+ * entitlement's `monitored_url_limit` (currently <= 50) so a single bounded
+ * page always contains every selected row, never a truncated slice that could
+ * omit selected rows or admit `not_selected` ones into these crawl-wide counts.
  */
 export function AnalysisProgress({
   crawl,
@@ -33,16 +39,15 @@ export function AnalysisProgress({
   const selected = summary?.selected_count ?? 0;
   const analyzed = summary?.analyzed_count ?? crawl.analyzed_count;
 
-  // Per-status page counts drive the queued / running / completed cards.
+  // Per-status page counts drive the running / queued cards. `completed` uses
+  // the server-aggregated `analyzed_count` (authoritative crawl-wide count)
+  // rather than counting terminal statuses in `pages`, so it can never exceed
+  // `selected` or drift from the scores above.
   const running = pages.filter((p) => p.analysis_status === 'running').length;
   const queued = pages.filter(
     (p) => p.analysis_status === 'pending' || p.analysis_status === 'not_selected',
   ).length;
-  const completed = pages.filter((p) =>
-    ['completed', 'partially_completed', 'failed', 'error', 'blocked', 'cancelled'].includes(
-      p.analysis_status,
-    ),
-  ).length;
+  const completed = analyzed;
 
   return (
     <div className="grid gap-6">

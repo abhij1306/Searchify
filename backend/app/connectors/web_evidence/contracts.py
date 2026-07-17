@@ -88,6 +88,7 @@ class FetchResult:
     ttfb_ms: int | None
     latency_ms: int | None
     redirect_chain: tuple[RedirectHop, ...] = ()
+    charset: str = ""
 
 
 class FetchError(Exception):

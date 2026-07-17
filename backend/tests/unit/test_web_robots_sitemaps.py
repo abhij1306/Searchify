@@ -68,6 +68,27 @@ def test_robots_crawl_delay_default_when_absent():
     assert policy.crawl_delay() == site_health_settings.default_crawl_delay_seconds
 
 
+def test_robots_malformed_parser_fails_open(monkeypatch):
+    """A robots body that makes the underlying parser raise fails open.
+
+    ``Protego.parse`` throwing on some pathological input must not crash
+    discovery: the resulting policy allows every URL, exactly like an
+    empty/unfetchable robots.txt.
+    """
+
+    def _raise(_text: str):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(
+        "app.connectors.web_evidence.robots.Protego.parse", staticmethod(_raise)
+    )
+    policy = RobotsPolicy.parse(
+        "User-agent: *\nDisallow: /private/\n", user_agent=_UA
+    )
+    assert policy.can_fetch("https://example.com/private/x")
+    assert policy.can_fetch("https://example.com/anything")
+
+
 def test_robots_declares_sitemaps():
     body = (
         "User-agent: *\nDisallow:\n"

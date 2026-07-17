@@ -63,6 +63,7 @@ import type {
   pageFactsSchema,
   pageSummarySchema,
   pagesPageSchema,
+  rerunPageResponseSchema,
   siteCrawlEventSchema,
   siteCrawlListPageSchema,
   siteCrawlSchema,
@@ -140,6 +141,7 @@ export type IssueHistoryPage = z.infer<typeof issueHistoryPageSchema>;
 export type PageSummary = z.infer<typeof pageSummarySchema>;
 export type PagesPage = z.infer<typeof pagesPageSchema>;
 export type PageDetail = z.infer<typeof pageDetailSchema>;
+export type RerunPageResponse = z.infer<typeof rerunPageResponseSchema>;
 export type SiteCrawlEvent = z.infer<typeof siteCrawlEventSchema>;
 export type SiteHealthDashboard = z.infer<typeof siteHealthDashboardSchema>;
 export type SiteHealthErrorCode = z.infer<typeof siteHealthErrorCodeSchema>;

@@ -290,7 +290,11 @@ async def test_stale_monitored_selection_conflict_409(
         f"/api/v1/projects/{scn.project_id}/monitored-urls", headers=headers
     )
     assert after.status_code == 200
-    assert after.json()["selection_version"] == 1
+    after_body = after.json()
+    assert after_body["selection_version"] == 1
+    assert {
+        row["site_url_id"] for row in after_body["monitored_urls"]
+    } == set(url_ids[:2])
 
 
 async def test_partial_error_crawl_surfaces_failed_pages(
@@ -339,6 +343,7 @@ async def test_partial_error_crawl_surfaces_failed_pages(
         session.add(
             SiteUrlObservation(
                 workspace_id=scn.workspace_id,
+                project_id=scn.project_id,
                 crawl_id=crawl.id,
                 site_url_id=url.id,
                 source_kind="root",

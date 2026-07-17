@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
@@ -13,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/typography';
 import { queryKeys } from '@/lib/api/query-keys';
 import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
-import type { DeliveryFacts, PageDetail, SiteIssue } from '@/lib/api/types';
+import type { DeliveryFacts, PageDetail, RerunPageResponse, SiteIssue } from '@/lib/api/types';
 import {
   dimensionLabel,
   issueTitle,
@@ -30,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const HISTORY_LIMIT = 25;
+const RERUN_POLL_INTERVAL_MS = 3_000;
 
 /**
  * Per-URL Site Health detail (Slice 8, mockup 711).
@@ -40,12 +42,66 @@ const HISTORY_LIMIT = 25;
  * action re-queues analysis (persisted server-side). Missing scores render `—`,
  * never a fabricated zero.
  */
+/**
+ * Search param the rerun flow appends when it navigates to the canonical
+ * detail route of a *freshly minted* rerun crawl (`created_new_crawl`). On the
+ * fresh mount it seeds `rerunPolling = true` so polling begins immediately
+ * against the new crawl identity rather than waiting for a manual reload.
+ */
+const RERUN_SEARCH_PARAM = 'rerun';
+
 export function UrlDetail({
   crawlId,
   siteUrlId,
 }: Readonly<{ crawlId: string; siteUrlId: string }>) {
-  const detailQuery = useQuery(siteHealthQueries.page(crawlId, siteUrlId));
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  // A rerun that minted a NEW crawl navigates here with `?rerun=1`; start
+  // polling on mount so the fresh run's queued/running progress is observed
+  // without a manual reload.
+  const [rerunPolling, setRerunPolling] = useState(
+    () => searchParams.get(RERUN_SEARCH_PARAM) === '1',
+  );
+  // Guards against the immediately-post-mutation snapshot: right after the
+  // rerun mutation resolves, the page-detail query cache still holds the
+  // *previous* run's terminal `analysis_status` (e.g. `'completed'`) until a
+  // refetch lands. Without this, the terminal-status effect below would see
+  // that stale terminal snapshot and turn polling off before ever observing
+  // the freshly-enqueued task's `'pending'`/`'running'` state. We only allow
+  // polling to stop once we've actually observed a non-terminal snapshot
+  // since the rerun was requested.
+  const [hasObservedActiveRerun, setHasObservedActiveRerun] = useState(false);
+  const detailQuery = useQuery({
+    ...siteHealthQueries.page(crawlId, siteUrlId),
+    // Poll while a rerun is in flight so the snapshot advances past the
+    // queued/running state without a manual reload; stop once the analysis
+    // reaches a terminal presentation status.
+    refetchInterval: (query) => {
+      if (!rerunPolling) return false;
+      const status = query.state.data?.analysis_status;
+      if (status === 'pending' || status === 'running' || status === undefined) {
+        return RERUN_POLL_INTERVAL_MS;
+      }
+      return false;
+    },
+  });
   const detail = detailQuery.data ?? null;
+
+  useEffect(() => {
+    if (!rerunPolling || !detail) return;
+    if (detail.analysis_status === 'pending' || detail.analysis_status === 'running') {
+      if (!hasObservedActiveRerun) setHasObservedActiveRerun(true);
+      return;
+    }
+    // Terminal status observed. Only stop polling once we've actually seen
+    // the rerun take effect (a pending/running snapshot); otherwise this is
+    // just the stale pre-rerun cache and we must keep polling for it to
+    // update.
+    if (hasObservedActiveRerun) {
+      setRerunPolling(false);
+    }
+  }, [rerunPolling, detail, hasObservedActiveRerun]);
 
   if (detailQuery.isLoading) {
     return (
@@ -72,7 +128,38 @@ export function UrlDetail({
         <span className="text-secondary">{detail.title ?? detail.display_url}</span>
       </nav>
 
-      <HeaderCard detail={detail} crawlId={crawlId} siteUrlId={siteUrlId} />
+      <HeaderCard
+        key={`header:${crawlId}:${siteUrlId}`}
+        detail={detail}
+        crawlId={crawlId}
+        siteUrlId={siteUrlId}
+        onRerunComplete={(result) => {
+          // The backend may run the rerun in the SAME active crawl or mint a
+          // fresh single-page crawl (when the source crawl was terminal). Poll
+          // the identity the response points at — never the terminal source.
+          if (result.crawl_id === crawlId && result.site_url_id === siteUrlId) {
+            // Same crawl: poll in place. Reset the guard so the terminal-check
+            // effect can't stop polling on the stale pre-rerun snapshot.
+            setHasObservedActiveRerun(false);
+            setRerunPolling(true);
+            return;
+          }
+          // Fresh crawl: seed the new page's cache with the returned
+          // non-terminal baseline so polling starts from a known state, then
+          // navigate to the canonical detail route for the new identity with
+          // `?rerun=1` so the remounted component begins polling immediately.
+          queryClient.setQueryData<PageDetail>(
+            queryKeys.siteHealth.page(result.crawl_id, result.site_url_id),
+            (prev) =>
+              prev
+                ? { ...prev, crawl_id: result.crawl_id, analysis_status: result.analysis_status }
+                : prev,
+          );
+          router.push(
+            `/site-health/crawls/${result.crawl_id}/pages/${result.site_url_id}?${RERUN_SEARCH_PARAM}=1`,
+          );
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <ScoreTile label="Technical Health" value={detail.technical_score} />
@@ -84,7 +171,7 @@ export function UrlDetail({
 
       <IssuesList issues={detail.issues} />
 
-      <IssueHistory crawlId={crawlId} siteUrlId={siteUrlId} />
+      <IssueHistory key={`history:${crawlId}:${siteUrlId}`} crawlId={crawlId} siteUrlId={siteUrlId} />
     </div>
   );
 }
@@ -93,16 +180,29 @@ function HeaderCard({
   detail,
   crawlId,
   siteUrlId,
-}: Readonly<{ detail: PageDetail; crawlId: string; siteUrlId: string }>) {
+  onRerunComplete,
+}: Readonly<{
+  detail: PageDetail;
+  crawlId: string;
+  siteUrlId: string;
+  onRerunComplete: (result: RerunPageResponse) => void;
+}>) {
   const queryClient = useQueryClient();
   const [reaudited, setReaudited] = useState(false);
   const rerun = useMutation({
     ...siteHealthMutations.rerunPage(),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setReaudited(true);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.siteHealth.page(crawlId, siteUrlId),
-      });
+      // When the rerun stays in the SAME crawl, invalidate its page query so
+      // polling refetches the freshly-enqueued pending/running snapshot. When
+      // it minted a NEW crawl, the parent navigates to the new identity, so
+      // invalidating the source crawl's (now-terminal) query is unnecessary.
+      if (result.crawl_id === crawlId && result.site_url_id === siteUrlId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.siteHealth.page(crawlId, siteUrlId),
+        });
+      }
+      onRerunComplete(result);
     },
   });
 
@@ -176,7 +276,7 @@ function DeliveryMetrics({ delivery }: Readonly<{ delivery: DeliveryFacts }>) {
     { label: 'HTTP Status', value: delivery.status_code === null ? PLACEHOLDER : `${delivery.status_code}` },
     { label: 'Compression', value: delivery.compression ?? 'none' },
     { label: 'HTTP Version', value: delivery.http_version ?? PLACEHOLDER },
-    { label: 'Cache-Control', value: delivery.cache_control ?? 'no-cache' },
+    { label: 'Cache-Control', value: delivery.cache_control ?? PLACEHOLDER },
     {
       label: 'Blocking Resources',
       value:

@@ -6,6 +6,7 @@ import {
   inventoryRowSchema,
   monitoredUrlsResponseSchema,
   pageDetailSchema,
+  rerunPageResponseSchema,
   siteCrawlSchema,
   siteHealthEntitlementSchema,
   siteHealthErrorSchema,
@@ -265,6 +266,43 @@ describe('pageDetailSchema (field_cwv_available literal false)', () => {
   });
 });
 
+describe('rerunPageResponseSchema (rerun identity/status)', () => {
+  const base = {
+    crawl_id: UUID,
+    site_url_id: UUID2,
+    task_id: UUID,
+    created_new_crawl: true,
+    analysis_status: 'pending' as const,
+  };
+
+  it('accepts a fresh-crawl rerun response', () => {
+    const parsed = strictValidate(rerunPageResponseSchema, base, 'rerun');
+    expect(parsed.created_new_crawl).toBe(true);
+    expect(parsed.crawl_id).toBe(UUID);
+  });
+
+  it('accepts a same-active-crawl rerun response', () => {
+    const parsed = strictValidate(
+      rerunPageResponseSchema,
+      { ...base, created_new_crawl: false, analysis_status: 'running' },
+      'rerun',
+    );
+    expect(parsed.created_new_crawl).toBe(false);
+  });
+
+  it('rejects an unknown analysis_status', () => {
+    expect(() =>
+      strictValidate(rerunPageResponseSchema, { ...base, analysis_status: 'queued' }, 'rerun'),
+    ).toThrow();
+  });
+
+  it('rejects an extra field (strict)', () => {
+    expect(() =>
+      strictValidate(rerunPageResponseSchema, { ...base, new_crawl_id: UUID }, 'rerun'),
+    ).toThrow();
+  });
+});
+
 describe('siteIssueSchema + siteHealthErrorSchema', () => {
   it('accepts a valid issue row', () => {
     const issue = {
@@ -313,7 +351,17 @@ describe('siteIssueSchema + siteHealthErrorSchema', () => {
 
 describe('query key isolation (project / crawl / filter)', () => {
   it('isolates entitlements from everything else', () => {
-    expect(queryKeys.siteHealth.entitlements()).toEqual(['site-health', 'entitlements']);
+    expect(queryKeys.siteHealth.entitlements(null)).toEqual([
+      'site-health',
+      'entitlements',
+      'default',
+    ]);
+  });
+
+  it('isolates entitlements by workspace id', () => {
+    expect(queryKeys.siteHealth.entitlements('ws-1')).not.toEqual(
+      queryKeys.siteHealth.entitlements('ws-2'),
+    );
   });
 
   it('isolates inventory by crawl', () => {

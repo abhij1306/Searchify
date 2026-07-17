@@ -275,3 +275,30 @@ def test_microdata_validation():
     assert facts[0]["type"] == "Product"
     assert facts[0]["syntax"] == "microdata"
     assert facts[0]["valid"] is False
+
+
+# --- charset handling (handoff finding 5) ---------------------------------
+
+
+def test_bogus_charset_falls_back_and_never_crashes():
+    # An arbitrary/unknown declared charset must NOT crash extraction: it is
+    # validated away (codecs.lookup fails) and lxml auto-detects instead. The
+    # parser still returns the page facts.
+    facts = _facts(_FULL_PAGE, charset="totally-not-a-real-charset")
+    assert facts["title"] == "Acme Widgets"
+    assert facts["extractor_version"] == EXTRACTOR_VERSION
+
+
+def test_empty_charset_auto_detects():
+    facts = _facts(_FULL_PAGE, charset="")
+    assert facts["title"] == "Acme Widgets"
+
+
+def test_valid_declared_charset_is_honored():
+    # A Latin-1 page whose non-ASCII byte must be decoded with the declared
+    # charset (not UTF-8) to yield the correct title character.
+    body = (
+        "<html><head><title>Caf\u00e9</title></head><body>x</body></html>"
+    ).encode("latin-1")
+    facts = _facts(body, charset="ISO-8859-1")
+    assert facts["title"] == "Caf\u00e9"

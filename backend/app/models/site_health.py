@@ -29,6 +29,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -168,6 +169,19 @@ class SiteCrawl(Base):
     """
 
     __tablename__ = "site_crawls"
+    __table_args__ = (
+        # Backs the composite (workspace_id, project_id, crawl_id) foreign key
+        # from ``SiteUrlObservation`` that pins an observation's crawl to its
+        # own workspace AND project (tenant-consistency guard). Including
+        # ``workspace_id`` makes the observation's own ``workspace_id`` unable
+        # to drift away from the crawl's workspace.
+        UniqueConstraint(
+            "id",
+            "project_id",
+            "workspace_id",
+            name="uq_site_crawls_id_project",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -258,6 +272,17 @@ class SiteUrl(Base):
         UniqueConstraint(
             "project_id", "url_hash", name="uq_site_url_project_hash"
         ),
+        # Backs the composite (workspace_id, project_id, site_url_id) foreign
+        # key from ``SiteUrlObservation`` that pins an observation's URL to its
+        # own workspace AND project (tenant-consistency guard). Including
+        # ``workspace_id`` makes the observation's own ``workspace_id`` unable
+        # to drift away from the URL's workspace.
+        UniqueConstraint(
+            "id",
+            "project_id",
+            "workspace_id",
+            name="uq_site_urls_id_project",
+        ),
         Index(
             "ix_site_urls_project_keyset",
             "project_id",
@@ -313,12 +338,40 @@ class SiteUrlObservation(Base):
     recording exactly how the URL was discovered (root/link/sitemap/redirect),
     the parent URL, the source fetch artifact, the depth, and the observed
     URL/final URL/status/content-type/title at discovery time.
+
+    ``workspace_id``/``project_id`` are carried explicitly (not just derivable
+    through the crawl or the URL) so composite foreign keys can pin the crawl
+    AND the URL to the SAME workspace AND project: without binding
+    ``workspace_id`` into those composite keys, an observation's own
+    ``workspace_id`` could drift to a different workspace than its crawl/URL,
+    which would undermine workspace isolation for the source-of-truth of crawl
+    admission.
     """
 
     __tablename__ = "site_url_observations"
     __table_args__ = (
         UniqueConstraint(
             "crawl_id", "site_url_id", name="uq_site_url_observation"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id", "crawl_id"],
+            [
+                "site_crawls.workspace_id",
+                "site_crawls.project_id",
+                "site_crawls.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_site_url_observation_crawl_scoped",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id", "site_url_id"],
+            [
+                "site_urls.workspace_id",
+                "site_urls.project_id",
+                "site_urls.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_site_url_observation_site_url_scoped",
         ),
     )
 
@@ -330,14 +383,16 @@ class SiteUrlObservation(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"),
         index=True,
     )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        index=True,
+    )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
         index=True,
     )
     site_url_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="CASCADE"),
         index=True,
     )
     source_kind: Mapped[str] = mapped_column(String(16))

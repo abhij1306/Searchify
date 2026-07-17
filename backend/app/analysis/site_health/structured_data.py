@@ -117,8 +117,11 @@ def parse_jsonld_blocks(raw_blocks: list[str], *, max_blocks: int) -> list[dict]
             continue
         try:
             parsed = json.loads(text)
-        except (ValueError, TypeError):
-            # Malformed JSON-LD: skip this block, keep the rest (partial facts).
+        except (ValueError, TypeError, RecursionError):
+            # Malformed/pathologically-nested JSON-LD: skip this block, keep
+            # the rest (partial facts). A deeply nested block can raise
+            # RecursionError inside json.loads() itself, before
+            # _iter_jsonld_objects()'s own depth cap ever runs.
             continue
         for obj in _iter_jsonld_objects(parsed):
             if len(facts) >= max_blocks:
@@ -144,21 +147,27 @@ def validate_microdata_types(
     for raw in itemtypes:
         if len(facts) >= max_blocks:
             break
-        schema_type = _clean_type(raw)
-        if (
-            not schema_type
-            or schema_type not in STRUCTURED_DATA_REQUIRED_PROPERTIES
-        ):
-            continue
-        required = STRUCTURED_DATA_REQUIRED_PROPERTIES[schema_type]
-        facts.append(
-            {
-                "type": schema_type,
-                "syntax": "microdata",
-                "required": list(required),
-                "present": [],
-                "missing": list(required),
-                "valid": False,
-            }
-        )
+        # A valid `itemtype` attribute may list multiple space-separated
+        # schema.org URLs; passing the whole attribute to `_clean_type()`
+        # would discard every recognized type in a multi-value attribute.
+        for candidate in str(raw or "").split():
+            if len(facts) >= max_blocks:
+                break
+            schema_type = _clean_type(candidate)
+            if (
+                not schema_type
+                or schema_type not in STRUCTURED_DATA_REQUIRED_PROPERTIES
+            ):
+                continue
+            required = STRUCTURED_DATA_REQUIRED_PROPERTIES[schema_type]
+            facts.append(
+                {
+                    "type": schema_type,
+                    "syntax": "microdata",
+                    "required": list(required),
+                    "present": [],
+                    "missing": list(required),
+                    "valid": False,
+                }
+            )
     return facts

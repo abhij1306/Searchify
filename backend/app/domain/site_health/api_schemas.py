@@ -55,6 +55,23 @@ class ReplaceMonitoredRequest(_Model):
     expected_selection_version: int
 
 
+class RerunPageResponse(_Model):
+    """Identity/status returned by the per-page rerun (202) so the frontend can
+
+    poll the FRESH rerun. When ``created_new_crawl`` is ``True`` the rerun runs
+    in a NEW crawl (the source crawl was terminal) and the client should poll
+    ``crawl_id`` (not the crawl it came from). ``analysis_status`` is the fresh
+    crawl's analysis sub-state at enqueue time (``pending`` for a new crawl) so
+    polling starts from a known non-terminal baseline.
+    """
+
+    crawl_id: uuid.UUID
+    site_url_id: uuid.UUID
+    task_id: uuid.UUID
+    created_new_crawl: bool
+    analysis_status: str
+
+
 # =========================================================================
 # Entitlement
 # =========================================================================

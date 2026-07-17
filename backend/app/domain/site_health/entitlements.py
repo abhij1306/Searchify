@@ -20,6 +20,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.site_health import (
@@ -73,11 +74,49 @@ async def resolve_entitlement(
     if existing is not None:
         return existing
 
-    row = WorkspaceSiteHealthEntitlement(workspace_id=workspace_id)
-    _apply_profile(row, normalize_capability(default_capability))
-    session.add(row)
-    await session.flush()
-    return row
+    # Seed the Free row with a PostgreSQL upsert instead of a plain ORM
+    # INSERT+flush. A concurrent first-use request in another project of the
+    # same workspace can race to insert the unique ``workspace_id`` row; a
+    # plain INSERT would raise ``IntegrityError`` and force a
+    # ``session.rollback()``. Rolling back the whole session here is a
+    # correctness bug: this call runs inside the crawl-creation transaction
+    # that has already taken the project ``FOR UPDATE`` lock used to serialize
+    # active crawls, so a rollback would silently release that lock and defeat
+    # the serialization. ``ON CONFLICT DO NOTHING`` never errors, so the
+    # ambient transaction (and its locks) survives the race untouched. On a
+    # real conflict nothing is returned and we reload the winning row.
+    profile = capability_profile(normalize_capability(default_capability))
+    stmt = (
+        pg_insert(WorkspaceSiteHealthEntitlement)
+        .values(
+            workspace_id=workspace_id,
+            plan_key=profile.capability,
+            discovery_mode=profile.discovery_mode,
+            discovery_url_cap=profile.discovery_url_cap,
+            sample_url_limit=profile.sample_url_limit,
+            monitored_url_limit=profile.monitored_url_limit,
+            count_disclosure=profile.count_disclosure,
+        )
+        .on_conflict_do_nothing(index_elements=["workspace_id"])
+        .returning(WorkspaceSiteHealthEntitlement.id)
+    )
+    inserted_id = await session.scalar(stmt)
+    if inserted_id is None:
+        # Lost the race: the concurrent inserter committed/flushed the row
+        # first. Reload it without touching the ambient transaction.
+        winner = await _load_entitlement(session, workspace_id)
+        if winner is None:  # pragma: no cover - unreachable under a real conflict
+            raise RuntimeError(
+                "entitlement upsert conflicted but no existing row was found"
+            )
+        return winner
+
+    # We inserted the row. Load the managed ORM instance so callers get a
+    # tracked object (the upsert used Core, not the ORM identity map).
+    seeded = await _load_entitlement(session, workspace_id)
+    if seeded is None:  # pragma: no cover - unreachable right after insert
+        raise RuntimeError("entitlement was inserted but could not be reloaded")
+    return seeded
 
 
 async def set_entitlement(

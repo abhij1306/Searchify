@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
@@ -80,7 +80,11 @@ export function InventorySelection({
   );
 
   // Initialize the staging session once the committed set is known. The homepage
-  // is staged by default ONLY when there is no committed set yet.
+  // is staged by default ONLY when there is no committed set yet. Once computed,
+  // the result is persisted into `selection` state (not just memoized) so that
+  // navigating away from the page containing the root URL never drops the
+  // default homepage selection — the staged set thereafter only changes via
+  // explicit user edits, never an implicit re-derivation from the visible page.
   const committed = monitoredQuery.data ? committedFromResponse(monitoredQuery.data) : null;
   const effectiveSelection = useMemo(() => {
     if (selection) return selection;
@@ -92,6 +96,15 @@ export function InventorySelection({
     }
     return null;
   }, [selection, committed, inventoryQuery.data, crawl.root_url]);
+
+  useEffect(() => {
+    if (!selection && effectiveSelection) {
+      setSelection(effectiveSelection);
+    }
+    // Only run when the derived initial selection first becomes available;
+    // `selection` itself is excluded so this effect does not re-fire once set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveSelection]);
 
   const rows = inventoryQuery.data?.items ?? [];
   const nextCursor = inventoryQuery.data?.next_cursor ?? null;

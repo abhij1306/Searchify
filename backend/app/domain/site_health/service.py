@@ -494,10 +494,10 @@ def presentation_status_for(
 
     task = latest_analyze_task
     if task is not None:
-        if task.status in (TASK_STATUS_FAILED, TASK_STATUS_CANCELLED):
+        if task.status == TASK_STATUS_CANCELLED:
+            return "cancelled", task.error_code or ""
+        if task.status == TASK_STATUS_FAILED:
             code = task.error_code or ""
-            if task.status == TASK_STATUS_CANCELLED and not code:
-                return "cancelled", ""
             if code in POLICY_BLOCKING_ERROR_CODES:
                 return "blocked", code
             return "error", code

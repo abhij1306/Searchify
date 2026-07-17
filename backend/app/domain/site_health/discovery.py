@@ -26,6 +26,7 @@
 #      or persisted — the pipeline simply terminalizes at the cap.
 from __future__ import annotations
 
+import codecs
 import uuid
 from datetime import UTC, datetime
 
@@ -65,6 +66,26 @@ from app.models.site_health import (
 )
 
 
+def _safe_parser_encoding(charset: str) -> str | None:
+    """Return a codec-valid encoding name, or ``None`` to auto-detect.
+
+    A response's declared charset is arbitrary attacker-influenced input. Handed
+    straight to ``lxml``'s ``HTMLParser(encoding=...)`` an unknown value raises
+    ``LookupError`` at parser-construction time — outside the ``try`` guarding
+    the actual parse — which would crash discovery instead of degrading. Validate
+    with ``codecs.lookup``; on an empty/unknown value return ``None`` so lxml
+    auto-detects rather than raising.
+    """
+    normalized = str(charset or "").strip()
+    if not normalized:
+        return None
+    try:
+        codecs.lookup(normalized)
+    except LookupError:
+        return None
+    return normalized.lower()
+
+
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -77,6 +98,7 @@ def extract_discovery_links(
     include_globs: list[str] | None = None,
     exclude_globs: list[str] | None = None,
     max_links: int | None = None,
+    charset: str = "",
 ) -> tuple[str, list[DiscoveredLink]]:
     """Parse HTML into (title, in-scope canonical links) — discovery mode only.
 
@@ -91,8 +113,14 @@ def extract_discovery_links(
     if not body:
         return title, links
 
+    # Honor the response's declared charset when present; otherwise let lxml
+    # auto-detect rather than hard-coding UTF-8 (a mismatched hard-coded
+    # charset can mangle a non-UTF-8 page's anchors/title). A bogus/unknown
+    # charset is validated away to None (auto-detect) so parser construction
+    # never raises LookupError.
+    declared_charset = _safe_parser_encoding(charset)
     parser = lxml_html.HTMLParser(
-        recover=True, encoding="utf-8", no_network=True
+        recover=True, encoding=declared_charset, no_network=True
     )
     try:
         root = lxml_html.document_fromstring(body, parser=parser)
@@ -294,15 +322,36 @@ async def _add_free_sample(
     url: str,
     url_hash_value: str,
     depth: int,
-) -> None:
-    """Add a system-managed sample monitored row + auto-enqueue its analysis.
+) -> bool:
+    """Add/reactivate a system-managed sample monitored row + auto-enqueue.
 
     Conflict-safe on ``(project_id, site_url_id)`` so re-admission never
-    duplicates the membership. The analyze task is what deep-analyzes the Free
-    sample automatically, subject to the locked workspace allowance.
+    duplicates the membership. Three cases on conflict:
+
+    - No existing row: a fresh ``INSERT`` creates a new active membership.
+    - An existing row that is currently INACTIVE (e.g. deactivated by a
+      selection replacement, or deselected then rediscovered): it is
+      reactivated in place (``active=True``, ``selected_at`` refreshed,
+      ``deselected_at`` cleared) rather than silently doing nothing, so a
+      recrawl can genuinely bring a previously-sampled URL back into the
+      monitored set.
+    - An existing row that is ALREADY active: the conflict update's ``WHERE``
+      guard means nothing changes and the statement is a no-op (equivalent to
+      ``DO NOTHING``), so re-observing an already-sampled URL never appears
+      to "activate" it again.
+
+    The analyze task is what deep-analyzes the Free sample automatically,
+    subject to the locked workspace allowance.
+
+    Returns ``True`` only when this call newly activated the membership
+    (inserted a brand-new row or reactivated an inactive one) — i.e. exactly
+    when the caller should decrement the remaining workspace-wide sample
+    allowance. Returns ``False`` when the membership was already active
+    (re-observing an existing, already-counted sample must not consume a
+    second unit of the allowance).
     """
     now = _utcnow()
-    await session.execute(
+    activated_id = await session.scalar(
         pg_insert(MonitoredSiteUrl)
         .values(
             workspace_id=crawl.workspace_id,
@@ -313,10 +362,19 @@ async def _add_free_sample(
             selection_source=SELECTION_SOURCE_FREE_SAMPLE,
             selected_at=now,
         )
-        .on_conflict_do_nothing(
-            index_elements=["project_id", "site_url_id"]
+        .on_conflict_do_update(
+            index_elements=["project_id", "site_url_id"],
+            set_={
+                "active": True,
+                "selection_source": SELECTION_SOURCE_FREE_SAMPLE,
+                "selected_at": now,
+                "deselected_at": None,
+            },
+            where=(MonitoredSiteUrl.active.is_(False)),
         )
+        .returning(MonitoredSiteUrl.id)
     )
+    newly_activated = activated_id is not None
     await _enqueue_task(
         session,
         crawl=crawl,
@@ -327,6 +385,7 @@ async def _add_free_sample(
         depth=depth,
         priority=1,
     )
+    return newly_activated
 
 
 async def admit_candidates(
@@ -405,12 +464,20 @@ async def admit_candidates(
         if site_url_id is None:
             continue
         site_url_ids[candidate.url_hash] = str(site_url_id)
-        if not created:
-            continue
-        admitted += 1
+        if created:
+            admitted += 1
 
+        # Per-crawl admission must not be limited to newly-created child
+        # identities: a complete recrawl re-observes URLs that already have a
+        # SiteUrl identity from an earlier crawl, and a Free crawl's sample
+        # allowance must keep filling from EXISTING identities too (otherwise
+        # a recrawl of an already-discovered site can admit nothing and Free
+        # sites end up with an undersized sample). Both branches below run
+        # for every candidate whose identity resolved, not just new ones; the
+        # task/membership inserts are themselves conflict-safe so a
+        # re-observation of an already-scheduled URL is a safe no-op.
         if crawl.sample_mode:
-            await _add_free_sample(
+            newly_activated = await _add_free_sample(
                 session,
                 crawl=crawl,
                 site_url_id=site_url_id,
@@ -418,7 +485,7 @@ async def admit_candidates(
                 url_hash_value=candidate.url_hash,
                 depth=candidate.depth,
             )
-            if remaining is not None:
+            if newly_activated and remaining is not None:
                 remaining -= 1
         elif enqueue_children:
             await _enqueue_task(

@@ -64,16 +64,20 @@ export function committedFromResponse(response: MonitoredUrlsResponse): Committe
 
 /**
  * Initialize a staging session. The staged set starts as a copy of the
- * committed set; when there is NO committed set yet and a `homepageId` is
- * given, the homepage is staged by default (first-use convenience). A committed
- * set (even one that omits the homepage) is never overridden.
+ * committed set; when this is the FIRST commit ever (`version === 0` — the
+ * server-side `selection_version` starts at 0 and is bumped on every replace,
+ * even one that commits an empty set) and a `homepageId` is given, the
+ * homepage is staged by default (first-use convenience). Once the user has
+ * committed at least once — including an intentional empty set — the
+ * `version` has advanced past 0, so an empty committed set on reload is never
+ * mistaken for "never used" and re-staged.
  */
 export function initStagedSelection(
   committed: CommittedSelection,
   homepageId?: string | null,
 ): StagedSelection {
   const staged = new Set(committed.siteUrlIds);
-  if (committed.siteUrlIds.size === 0 && homepageId) {
+  if (committed.version === 0 && homepageId) {
     staged.add(homepageId);
   }
   return { committed, staged };

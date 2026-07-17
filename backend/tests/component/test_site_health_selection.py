@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config.site_health import (
     CAPABILITY_FREE,
     CAPABILITY_STARTER,
+    CRAWL_ACTIVE_STATUSES,
     CRAWL_STATUS_RUNNING,
     INITIAL_TASK_GENERATION,
     SELECTION_SOURCE_FREE_SAMPLE,
@@ -38,6 +39,10 @@ from app.domain.site_health.entitlements import (
     resolve_entitlement,
     set_entitlement,
 )
+from app.domain.site_health.planner import (
+    CrawlAlreadyActiveError,
+    create_crawl,
+)
 from app.domain.site_health.selection import (
     QuotaExceededError,
     SelectionValidationError,
@@ -48,6 +53,7 @@ from app.domain.site_health.selection import (
     lease_is_owned,
     monitored_is_active,
     replace_monitored_set,
+    rerun_page,
     seed_monitored_targets,
 )
 from app.models.project import Project
@@ -811,3 +817,220 @@ async def test_seed_monitored_targets_is_idempotent(
             )
         ).scalar_one()
     assert count == 2
+
+
+# =========================================================================
+# Concurrency: full crawl vs terminal-page rerun cannot both go active
+# =========================================================================
+@pytest.mark.asyncio
+async def test_full_crawl_and_page_rerun_cannot_both_create_active_crawl(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A concurrent full crawl and a terminal-page rerun serialize.
+
+    ``create_crawl`` locks the project row before its active-crawl check, and
+    ``rerun_page`` now takes the SAME project lock before deciding whether to
+    mint a fresh single-page rerun crawl. So one of two outcomes must hold, but
+    never "two active crawls":
+
+    - full crawl wins the lock -> it creates the active crawl; the rerun then
+      sees that active crawl and enqueues into it (mints nothing); OR
+    - rerun wins the lock -> it mints the single-page rerun crawl; the full
+      crawl then sees an active crawl and raises ``CrawlAlreadyActiveError``.
+
+    Either way exactly ONE active crawl exists at the end.
+    """
+    # Starter project with NO active crawl and one active monitored URL, plus a
+    # crawlable website_url so ``create_crawl`` can build a full crawl.
+    async with session_factory() as session:
+        seed = await _seed_workspace(
+            session,
+            projects=[{"name": "a", "url_count": 1}],
+        )
+        proj = seed.projects[0]
+        session.add(
+            MonitoredSiteUrl(
+                workspace_id=seed.workspace_id,
+                project_id=proj.project_id,
+                profile_id=proj.profile_id,
+                site_url_id=proj.site_url_ids[0],
+                active=True,
+                selection_source=SELECTION_SOURCE_USER,
+            )
+        )
+        await session.commit()
+
+    async def _full_crawl() -> str:
+        async with session_factory() as session:
+            try:
+                await create_crawl(
+                    session,
+                    workspace_id=seed.workspace_id,
+                    project_id=proj.project_id,
+                )
+                return "created"
+            except CrawlAlreadyActiveError:
+                await session.rollback()
+                return "already_active"
+
+    async def _rerun() -> str:
+        async with session_factory() as session:
+            try:
+                result = await rerun_page(
+                    session,
+                    workspace_id=seed.workspace_id,
+                    project_id=proj.project_id,
+                    site_url_id=proj.site_url_ids[0],
+                )
+                await session.commit()
+                return (
+                    "minted" if result.created_new_crawl else "reused_active"
+                )
+            except CrawlAlreadyActiveError:
+                await session.rollback()
+                return "already_active"
+
+    results = await asyncio.gather(_full_crawl(), _rerun())
+
+    # Exactly one active crawl regardless of who won the project lock.
+    async with session_factory() as session:
+        active = (
+            await session.execute(
+                select(func.count())
+                .select_from(SiteCrawl)
+                .where(
+                    SiteCrawl.project_id == proj.project_id,
+                    SiteCrawl.status.in_(list(CRAWL_ACTIVE_STATUSES)),
+                )
+            )
+        ).scalar_one()
+    assert active == 1, results
+
+    # And the pair of outcomes is one of the two serialized possibilities —
+    # never (created, minted), which would be two active crawls.
+    full_result, rerun_result = results
+    assert (full_result, rerun_result) in {
+        ("created", "reused_active"),
+        ("already_active", "minted"),
+    }, results
+
+
+@pytest.mark.asyncio
+async def test_page_rerun_before_full_crawl_blocks_second_active_crawl(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Deterministic "rerun wins the lock" ordering.
+
+    When a terminal-page rerun commits its fresh single-page crawl first, a
+    subsequent full ``create_crawl`` sees the active crawl (under the project
+    lock the rerun released on commit) and refuses to create a second one.
+    """
+    async with session_factory() as session:
+        seed = await _seed_workspace(
+            session, projects=[{"name": "a", "url_count": 1}]
+        )
+        proj = seed.projects[0]
+        session.add(
+            MonitoredSiteUrl(
+                workspace_id=seed.workspace_id,
+                project_id=proj.project_id,
+                profile_id=proj.profile_id,
+                site_url_id=proj.site_url_ids[0],
+                active=True,
+                selection_source=SELECTION_SOURCE_USER,
+            )
+        )
+        await session.commit()
+
+    # Rerun first: no active crawl yet -> mints a fresh single-page crawl.
+    async with session_factory() as session:
+        result = await rerun_page(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+            site_url_id=proj.site_url_ids[0],
+        )
+        await session.commit()
+    assert result.created_new_crawl is True
+
+    # Full crawl now sees the active crawl and refuses.
+    async with session_factory() as session:
+        with pytest.raises(CrawlAlreadyActiveError):
+            await create_crawl(
+                session,
+                workspace_id=seed.workspace_id,
+                project_id=proj.project_id,
+            )
+        await session.rollback()
+
+    async with session_factory() as session:
+        active = (
+            await session.execute(
+                select(func.count())
+                .select_from(SiteCrawl)
+                .where(
+                    SiteCrawl.project_id == proj.project_id,
+                    SiteCrawl.status.in_(list(CRAWL_ACTIVE_STATUSES)),
+                )
+            )
+        ).scalar_one()
+    assert active == 1
+
+
+@pytest.mark.asyncio
+async def test_full_crawl_before_page_rerun_reuses_active_crawl(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Deterministic "full crawl wins the lock" ordering.
+
+    When a full crawl commits first, a subsequent terminal-page rerun sees the
+    active crawl and enqueues into it instead of minting a second crawl.
+    """
+    async with session_factory() as session:
+        seed = await _seed_workspace(
+            session, projects=[{"name": "a", "url_count": 1}]
+        )
+        proj = seed.projects[0]
+        session.add(
+            MonitoredSiteUrl(
+                workspace_id=seed.workspace_id,
+                project_id=proj.project_id,
+                profile_id=proj.profile_id,
+                site_url_id=proj.site_url_ids[0],
+                active=True,
+                selection_source=SELECTION_SOURCE_USER,
+            )
+        )
+        await session.commit()
+
+    # Full crawl first (commits an active crawl).
+    async with session_factory() as session:
+        await create_crawl(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+        )
+
+    # Rerun now sees the active crawl and reuses it (mints nothing).
+    async with session_factory() as session:
+        result = await rerun_page(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+            site_url_id=proj.site_url_ids[0],
+        )
+        await session.commit()
+    assert result.created_new_crawl is False
+
+    async with session_factory() as session:
+        active = (
+            await session.execute(
+                select(func.count())
+                .select_from(SiteCrawl)
+                .where(
+                    SiteCrawl.project_id == proj.project_id,
+                    SiteCrawl.status.in_(list(CRAWL_ACTIVE_STATUSES)),
+                )
+            )
+        ).scalar_one()
+    assert active == 1

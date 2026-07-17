@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 
@@ -23,14 +24,22 @@ class TaskQueue[T](Protocol):
     held open across a provider/HTTP call (invariant 8).
     """
 
-    async def claim(self, *, owner: str, limit: int = 1) -> list[T]:
+    async def claim(
+        self,
+        *,
+        owner: str,
+        limit: int = 1,
+        kinds: Sequence[str] | None = None,
+    ) -> list[T]:
         """Atomically claim up to ``limit`` eligible tasks for ``owner``.
 
         Selects claimable rows (``queued``/``retry_wait`` whose ``available_at``
-        has passed) in the spec's deterministic order, locks them with
-        ``FOR UPDATE SKIP LOCKED`` so two workers never grab the same row, marks
-        them ``leased`` with a fresh ``lease_owner`` + ``lease_expires_at``, and
-        commits. Returns the claimed tasks (detached from the claim txn).
+        has passed) in the spec's deterministic order, optionally restricted to
+        ``kinds`` (e.g. a worker that only handles a subset of task kinds),
+        locks them with ``FOR UPDATE SKIP LOCKED`` so two workers never grab
+        the same row, marks them ``leased`` with a fresh ``lease_owner`` +
+        ``lease_expires_at``, and commits. Returns the claimed tasks (detached
+        from the claim txn).
         """
         ...
 
@@ -83,11 +92,13 @@ class TaskQueue[T](Protocol):
         """Mark a non-terminal task ``cancelled`` (cooperative cancel)."""
         ...
 
-    async def release_expired(self) -> int:
+    async def release_expired(self, *, batch_size: int = 500) -> int:
         """Sweeper: reclaim tasks whose lease expired.
 
         Returns each expired leased/running task to ``retry_wait`` (or ``failed``
-        once ``attempt_count`` reaches ``max_attempts``). Returns the count of
-        tasks acted on.
+        once ``attempt_count`` reaches ``max_attempts``). Bounded to
+        ``batch_size`` rows per call in a deterministic order so a mass expiry
+        never holds one long-running transaction; repeated polling drains the
+        remainder. Returns the count of tasks acted on.
         """
         ...

@@ -70,8 +70,8 @@ describe('committedFromResponse', () => {
 });
 
 describe('initStagedSelection (homepage-only first-use rule)', () => {
-  it('stages the homepage when there is no committed set', () => {
-    const s = initStagedSelection(committed([]), HOME);
+  it('stages the homepage when this is the first-ever commit (version 0)', () => {
+    const s = initStagedSelection(committed([], 0), HOME);
     expect(isStaged(s, HOME)).toBe(true);
   });
 
@@ -81,8 +81,16 @@ describe('initStagedSelection (homepage-only first-use rule)', () => {
     expect(isStaged(s, A)).toBe(true);
   });
 
+  it('does NOT stage the homepage for an intentional empty set (version advanced past 0)', () => {
+    // The user committed an empty set (version bumped to 3) — an empty
+    // committed set is never, by itself, evidence of "never used".
+    const s = initStagedSelection(committed([], 3), HOME);
+    expect(isStaged(s, HOME)).toBe(false);
+    expect(s.staged.size).toBe(0);
+  });
+
   it('does not stage a homepage when none is provided', () => {
-    const s = initStagedSelection(committed([]), null);
+    const s = initStagedSelection(committed([], 0), null);
     expect(s.staged.size).toBe(0);
   });
 

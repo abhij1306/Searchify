@@ -13,6 +13,11 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.connectors.web_evidence.url_policy import (
+    canonicalize,
+    registrable_domain,
+    split_host_port,
+)
 from app.core.config.site_health import (
     CRAWL_STATUS_RUNNING,
     INITIAL_TASK_GENERATION,
@@ -52,6 +57,16 @@ async def seed_site_crawl(
     """Seed a workspace/project/profile/crawl and ``task_count`` queued tasks."""
     email = email or f"user-{uuid.uuid4().hex[:8]}@example.com"
 
+    # Derive the canonical root + registrable host through the production
+    # URL-policy utilities (never hard-coded) so a custom-host root actually
+    # produces a matching profile, and a root without a trailing slash still
+    # joins task URLs safely (no "https://host page-0" malformed URL).
+    canonical_root = canonicalize(root_url)
+    root_host, _root_port = split_host_port(canonical_root)
+    root_base = canonical_root if canonical_root.endswith("/") else (
+        canonical_root + "/"
+    )
+
     workspace = Workspace(name="Site WS")
     session.add(workspace)
     await session.flush()
@@ -73,7 +88,7 @@ async def seed_site_crawl(
         language_code="en-AU",
         benchmark_mode="consumer_like",
         default_repetitions=1,
-        website_url=root_url,
+        website_url=canonical_root,
     )
     session.add(project)
     await session.flush()
@@ -81,9 +96,9 @@ async def seed_site_crawl(
     profile = SiteHealthProfile(
         workspace_id=workspace.id,
         project_id=project.id,
-        root_url=root_url,
-        root_host="example.com",
-        registrable_domain="example.com",
+        root_url=canonical_root,
+        root_host=root_host,
+        registrable_domain=registrable_domain(root_host),
     )
     session.add(profile)
     await session.flush()
@@ -93,7 +108,7 @@ async def seed_site_crawl(
         project_id=project.id,
         profile_id=profile.id,
         status=CRAWL_STATUS_RUNNING,
-        root_url=root_url,
+        root_url=canonical_root,
         random_seed="1",
     )
     session.add(crawl)
@@ -101,7 +116,7 @@ async def seed_site_crawl(
 
     tasks: list[SiteCrawlTask] = []
     for i in range(task_count):
-        url = f"{root_url}page-{i}"
+        url = f"{root_base}page-{i}"
         task = SiteCrawlTask(
             crawl_id=crawl.id,
             workspace_id=workspace.id,

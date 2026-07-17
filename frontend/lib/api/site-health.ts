@@ -13,7 +13,7 @@
  */
 import { queryOptions, mutationOptions } from '@tanstack/react-query';
 
-import { API_BASE_URL, apiClient, type ApiRequestOptions } from './client';
+import { API_BASE_URL, apiClient, getActiveWorkspaceId, type ApiRequestOptions } from './client';
 import { queryKeys } from './query-keys';
 import {
   inventoryPageSchema,
@@ -21,6 +21,7 @@ import {
   monitoredUrlsResponseSchema,
   pageDetailSchema,
   pagesPageSchema,
+  rerunPageResponseSchema,
   siteCrawlListPageSchema,
   siteCrawlSchema,
   siteHealthDashboardSchema,
@@ -36,6 +37,7 @@ import type {
   MonitoredUrlsResponse,
   PageDetail,
   PagesPage,
+  RerunPageResponse,
   SiteCrawl,
   SiteCrawlListPage,
   SiteHealthDashboard,
@@ -150,8 +152,14 @@ export const siteHealthApi = {
     return strictValidate(pageDetailSchema, res, 'siteHealth.getPage');
   },
   rerunPage: async (crawlId: string, siteUrlId: string, options?: ApiRequestOptions) => {
-    // 202 Accepted with an empty body; nothing to validate.
-    await apiClient.post<void>(`/site-crawls/${crawlId}/pages/${siteUrlId}/rerun`, undefined, options);
+    // 202 Accepted carrying the (possibly fresh) rerun identity + status so
+    // the client polls the new run — not the terminal source crawl.
+    const res = await apiClient.post<RerunPageResponse>(
+      `/site-crawls/${crawlId}/pages/${siteUrlId}/rerun`,
+      undefined,
+      options,
+    );
+    return strictValidate(rerunPageResponseSchema, res, 'siteHealth.rerunPage');
   },
   getIssues: async (crawlId: string, params?: IssuesParams, options?: ApiRequestOptions) => {
     const path = withQuery(`/site-crawls/${crawlId}/issues`, definedQuery(params));
@@ -206,7 +214,7 @@ export const siteHealthApi = {
 export const siteHealthQueries = {
   entitlements: () =>
     queryOptions({
-      queryKey: queryKeys.siteHealth.entitlements(),
+      queryKey: queryKeys.siteHealth.entitlements(getActiveWorkspaceId()),
       queryFn: ({ signal }) => siteHealthApi.getEntitlements({ signal }),
     }),
   dashboard: (projectId: string, crawlId?: string) =>
@@ -274,7 +282,10 @@ export const siteHealthQueries = {
     }),
   issue: (crawlId: string, issueId: string, params?: IssueDetailParams) =>
     queryOptions({
-      queryKey: queryKeys.siteHealth.issue(crawlId, issueId),
+      queryKey: queryKeys.siteHealth.issue(crawlId, issueId, {
+        cursor: params?.cursor ?? null,
+        limit: params?.limit ?? null,
+      }),
       queryFn: ({ signal }) => siteHealthApi.getIssue(crawlId, issueId, params, { signal }),
     }),
   issueHistory: (crawlId: string, siteUrlId: string, params?: IssueHistoryParams) =>

@@ -13,6 +13,7 @@
 # external-entity attack surface; defusedxml is used for any raw XML parse.
 from __future__ import annotations
 
+import codecs
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -49,6 +50,27 @@ _SECURITY_HEADERS = (
     "x-frame-options",
     "referrer-policy",
 )
+
+
+def _safe_parser_encoding(charset: str) -> str | None:
+    """Return a codec-valid encoding name, or ``None`` to auto-detect.
+
+    A response's declared charset is arbitrary attacker-influenced input. Handed
+    straight to ``lxml``'s ``HTMLParser(encoding=...)`` an unknown value raises
+    ``LookupError`` at parser-construction time — outside the ``try`` guarding
+    the actual parse — which would crash extraction instead of degrading to
+    partial facts. Validate the name with ``codecs.lookup`` up front; if it is
+    empty or unknown, return ``None`` so lxml falls back to auto-detection
+    rather than raising.
+    """
+    normalized = str(charset or "").strip()
+    if not normalized:
+        return None
+    try:
+        codecs.lookup(normalized)
+    except LookupError:
+        return None
+    return normalized.lower()
 
 
 def _text(node: Any) -> str:
@@ -434,6 +456,7 @@ def extract_page_facts(
     *,
     final_url: str,
     content_type: str = "",
+    charset: str = "",
     status_code: int | None = None,
     redacted_headers: dict[str, str] | None = None,
     http_version: str = "",
@@ -470,10 +493,13 @@ def extract_page_facts(
         return facts
 
     # Bound the bytes handed to the parser (defence against an oversize body
-    # that slipped past the fetch cap).
+    # that slipped past the fetch cap). Use the response's declared charset
+    # when present; otherwise let lxml auto-detect rather than hard-coding
+    # UTF-8 (a mismatched hard-coded charset can mangle non-UTF-8 pages).
     bounded = body[: settings.max_html_bytes]
+    declared_charset = _safe_parser_encoding(charset)
     parser = lxml_html.HTMLParser(
-        recover=True, encoding="utf-8", no_network=True
+        recover=True, encoding=declared_charset, no_network=True
     )
     try:
         root = lxml_html.document_fromstring(bounded, parser=parser)

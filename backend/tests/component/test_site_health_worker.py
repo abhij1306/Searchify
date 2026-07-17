@@ -452,15 +452,18 @@ async def test_free_sample_stops_at_ten_across_two_projects(
         session.add(_root_task(seed_a.crawl_id))
         await session.commit()
 
-    # Each root page links to 8 in-scope children -> 16 candidates total, but
-    # the workspace-wide Free budget is 10.
-    links_a = [f"https://example.com/a{i}" for i in range(8)]
+    # Each root page links to in-scope children. The workspace-wide Free
+    # budget is 10, and the root/fetched identity itself now also consumes
+    # one slot of that budget (it goes through admission too, not just its
+    # child links), so project A's root + 6 children (7) plus project B's
+    # root (1) leave exactly 2 slots for project B's children.
+    links_a = [f"https://example.com/a{i}" for i in range(6)]
     links_b = [f"https://example.com/b{i}" for i in range(8)]
     pages = {"/": _html(links_a)}
-    for i in range(8):
+    for i in range(6):
         pages[f"/a{i}"] = _html([])
 
-    # Run crawl A's worker first: it admits up to 8 /a* URLs (under the cap).
+    # Run crawl A's worker first: it admits the root + all 6 /a* URLs.
     worker_a = _worker(session_factory, pages, owner="site-a")
     processed_a = await worker_a.run_until_idle()
     assert processed_a > 0
@@ -509,7 +512,7 @@ async def test_free_sample_stops_at_ten_across_two_projects(
                 )
             )
         ).scalars().all()
-        assert any("/b" in u for u in monitored_urls)
+        assert any(u in set(links_b) for u in monitored_urls)
 
         # Auto-enqueued analyze tasks (priority=1 by the Free sample path) are
         # now claimable and EXECUTED by the worker (Task 5): the workspace-wide
@@ -1051,10 +1054,17 @@ async def test_reclaimed_analyze_acknowledges_already_persisted_analysis(
                 SitePageAnalysis.crawl_id == seed.crawl_id
             )
         )
-        assert requests == []
         assert task.status == TASK_STATUS_SUCCEEDED
         assert artifacts == 1
         assert analyses == 1
+        # The reclaimed analyze task itself must never refetch its own
+        # target: only its automatically-enqueued ``link_check`` task (a
+        # legitimate, separate task) may generate requests, and even those
+        # target link probes, never a GET of the analyze target itself.
+        assert not any(
+            req.method == "GET" and req.url.path == "/rich"
+            for req in requests
+        )
 
 
 @pytest.mark.asyncio
@@ -1514,28 +1524,19 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
     )
     await worker.run_until_idle()
 
-    # Now enqueue a link_check task for the same URL and run it.
+    # The analyze task's completion auto-enqueues this URL's ``link_check``
+    # task (idempotent, same crawl/generation/url_hash slot); re-open the
+    # crawl so the worker can run it (it terminalized after analyze).
     async with session_factory() as session:
-        _canonical, url_hash = canonical_identity(source_url)
-        link_task = SiteCrawlTask(
-            crawl_id=seed.crawl_id,
-            workspace_id=seed.workspace_id,
-            site_url_id=site_url_id,
-            task_kind=TASK_KIND_LINK_CHECK,
-            requested_url=source_url,
-            url_hash=url_hash,
-            generation=0,
-            idempotency_key=(
-                f"{seed.crawl_id}:{TASK_KIND_LINK_CHECK}:{url_hash}:0"
-            ),
-            status=TASK_STATUS_QUEUED,
-            randomized_position=0,
+        link_task = await session.scalar(
+            select(SiteCrawlTask).where(
+                SiteCrawlTask.crawl_id == seed.crawl_id,
+                SiteCrawlTask.task_kind == TASK_KIND_LINK_CHECK,
+                SiteCrawlTask.site_url_id == site_url_id,
+            )
         )
-        session.add(link_task)
-        await session.flush()
+        assert link_task is not None
         link_task_id = link_task.id
-        # Re-open the crawl so the worker can run (it terminalized after
-        # analyze); reset to running with analysis pending-safe status.
         crawl = await session.get(SiteCrawl, seed.crawl_id)
         crawl.status = CRAWL_STATUS_RUNNING
         await session.commit()
@@ -1584,3 +1585,349 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
     )
     assert ("HEAD", "/base/missing") in requests
     assert ("GET", "/base/missing") not in requests
+
+
+@pytest.mark.asyncio
+async def test_reclaimed_link_check_does_not_reprobe(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A reclaimed link-check task acks its durable references, no re-probe.
+
+    Handoff finding 7: the link-check path commits ``SiteLinkReference`` rows
+    BEFORE the out-of-transaction ``_queue.succeed()``. If that ack is lost the
+    lease is reclaimed and the task re-runs. Without durable-ack recovery the
+    reclaimed run would re-HEAD/GET every referenced link over the network. The
+    reclaimed run must instead acknowledge the persisted references and never
+    probe again.
+    """
+    from app.core.config.site_health import TASK_KIND_LINK_CHECK
+    from app.models.site_health import SiteLinkReference
+
+    source_url = "https://example.com/base/page"
+    seed, site_url_id, _task_id = await _seed_analyze_ready(
+        session_factory, root=source_url
+    )
+    source_html = (
+        b"<html><head><title>Links</title></head><body>"
+        b'<a href="/ok">ok</a>'
+        b"</body></html>"
+    )
+    probe_paths: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        method_path = (request.method, request.url.path)
+        if method_path == ("GET", "/base/page"):
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                stream=_ByteStream(source_html),
+            )
+        # Any request to /ok is a link PROBE (HEAD/GET); record it.
+        if request.url.path == "/ok":
+            probe_paths.append(method_path)
+            return httpx.Response(200, stream=_ByteStream(b""))
+        return httpx.Response(404, stream=_ByteStream(b""))
+
+    transport = httpx.MockTransport(handler)
+
+    # Run analyze + link_check normally with one worker: the link_check task
+    # is auto-enqueued and executed, probing /ok and committing its
+    # ``SiteLinkReference`` row before acknowledging the queue.
+    first = SiteHealthWorker(
+        session_factory=session_factory,
+        owner="link-first",
+        resolver=_FakeResolver(),
+        transport=transport,
+    )
+    await first.run_until_idle()
+
+    async with session_factory() as session:
+        link_task = await session.scalar(
+            select(SiteCrawlTask).where(
+                SiteCrawlTask.crawl_id == seed.crawl_id,
+                SiteCrawlTask.task_kind == TASK_KIND_LINK_CHECK,
+                SiteCrawlTask.site_url_id == site_url_id,
+            )
+        )
+        assert link_task is not None
+        link_task_id = link_task.id
+        # The first run genuinely probed the link and committed one reference.
+        assert probe_paths, "first run should have probed the link"
+        probes_after_first = len(probe_paths)
+        refs_after_first = await session.scalar(
+            select(func.count()).select_from(SiteLinkReference).where(
+                SiteLinkReference.target_task_id == link_task_id
+            )
+        )
+        assert refs_after_first == 1
+        # Simulate a lost queue ack: the task committed its references but the
+        # worker crashed/restarted before the out-of-transaction
+        # ``_queue.succeed`` durably marked it done, so the lease is reclaimed
+        # and the task is re-queued.
+        await session.execute(
+            update(SiteCrawlTask)
+            .where(SiteCrawlTask.id == link_task_id)
+            .values(
+                status=TASK_STATUS_QUEUED,
+                lease_owner=None,
+                lease_expires_at=None,
+            )
+        )
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        crawl.status = CRAWL_STATUS_RUNNING
+        await session.commit()
+
+    # Reclaimed run: must ack the durable references and NOT re-probe.
+    reclaimed = SiteHealthWorker(
+        session_factory=session_factory,
+        owner="link-reclaimed",
+        resolver=_FakeResolver(),
+        transport=transport,
+    )
+    await reclaimed.run_until_idle()
+
+    async with session_factory() as session:
+        link_task = await session.get(SiteCrawlTask, link_task_id)
+        refs_after_reclaim = await session.scalar(
+            select(func.count()).select_from(SiteLinkReference).where(
+                SiteLinkReference.target_task_id == link_task_id
+            )
+        )
+        assert link_task.status == TASK_STATUS_SUCCEEDED
+        assert refs_after_reclaim == 1
+    # No additional probes happened on the reclaimed run.
+    assert len(probe_paths) == probes_after_first
+
+
+@pytest.mark.asyncio
+async def test_rerun_from_completed_crawl_worker_analyzes_only_reran_url(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Handoff finding 1: a rerun from a COMPLETED crawl runs on a new crawl.
+
+    The domain mints a fresh single-page rerun crawl (no discover root task);
+    the worker must analyze ONLY the reran URL and must never re-crawl the site
+    (no discover fetch of the root).
+    """
+    from app.core.config.site_health import (
+        CRAWL_STATUS_COMPLETED,
+        TASK_KIND_ANALYZE,
+        TASK_KIND_DISCOVER,
+    )
+    from app.domain.site_health.selection import rerun_page
+
+    source_url = "https://example.com/rich"
+    seed, site_url_id, analyze_task_id = await _seed_analyze_ready(
+        session_factory, root=source_url
+    )
+
+    # Drive the source crawl to a terminal (COMPLETED) state with the URL
+    # already analyzed, mirroring the "re-audit from a completed crawl" case.
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        crawl.status = CRAWL_STATUS_COMPLETED
+        crawl.analysis_status = ANALYSIS_STATUS_COMPLETED
+        # The seeded analyze task is already accounted for by the source crawl.
+        await session.execute(
+            update(SiteCrawlTask)
+            .where(SiteCrawlTask.id == analyze_task_id)
+            .values(status=TASK_STATUS_SUCCEEDED)
+        )
+        await session.commit()
+
+    # Invoke the domain rerun (what the API endpoint calls). Because there is
+    # no active crawl, it mints a fresh rerun crawl.
+    async with session_factory() as session:
+        from app.domain.site_health.entitlements import resolve_entitlement
+
+        entitlement = await resolve_entitlement(session, seed.workspace_id)
+        assert entitlement.plan_key == CAPABILITY_STARTER
+        result = await rerun_page(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=seed.project_id,
+            site_url_id=site_url_id,
+        )
+        await session.commit()
+
+    assert result.created_new_crawl is True
+    new_crawl_id = result.crawl_id
+    assert new_crawl_id != seed.crawl_id
+
+    requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, request.url.path))
+        if request.url.path == "/rich":
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                stream=_ByteStream(_rich_html()),
+            )
+        return httpx.Response(404, stream=_ByteStream(b""))
+
+    worker = SiteHealthWorker(
+        session_factory=session_factory,
+        owner="rerun-worker",
+        resolver=_FakeResolver(),
+        transport=httpx.MockTransport(handler),
+    )
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        # The new crawl's analyze task ran and produced a completed analysis
+        # for the reran URL.
+        tasks = (
+            await session.execute(
+                select(SiteCrawlTask).where(
+                    SiteCrawlTask.crawl_id == new_crawl_id
+                )
+            )
+        ).scalars().all()
+        analyze_tasks = [
+            t for t in tasks if t.task_kind == TASK_KIND_ANALYZE
+        ]
+        discover_tasks = [
+            t for t in tasks if t.task_kind == TASK_KIND_DISCOVER
+        ]
+        # No discover task at all -> the site is never re-crawled.
+        assert discover_tasks == []
+        assert len(analyze_tasks) == 1
+        assert analyze_tasks[0].status == TASK_STATUS_SUCCEEDED
+        assert analyze_tasks[0].site_url_id == site_url_id
+
+        analyses = (
+            await session.execute(
+                select(SitePageAnalysis).where(
+                    SitePageAnalysis.crawl_id == new_crawl_id
+                )
+            )
+        ).scalars().all()
+        assert len(analyses) == 1
+        assert analyses[0].site_url_id == site_url_id
+        assert analyses[0].status == ANALYSIS_STATUS_COMPLETED
+
+        new_crawl = await session.get(SiteCrawl, new_crawl_id)
+        # The rerun crawl terminalizes cleanly.
+        assert new_crawl.status in (
+            CRAWL_STATUS_COMPLETED,
+            CRAWL_STATUS_RUNNING,
+        )
+
+    # The worker performed exactly one GET — the analyze fetch of the reran
+    # URL. It never re-crawled the site (no discover of the root and no other
+    # GET). The only other requests are the analyze task's auto-enqueued
+    # link-check HEAD probes of the page's referenced links, which are
+    # legitimate and target external link URLs, not a site re-crawl.
+    gets = [path for method, path in requests if method == "GET"]
+    assert gets == ["/rich"]
+
+
+@pytest.mark.asyncio
+async def test_free_recrawl_allowance_only_decrements_on_new_activation(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Handoff finding 2: a recrawl must not consume allowance for a membership
+    that is already active, and must reactivate an inactive one.
+
+    - Re-observing an ALREADY-active free_sample URL is a no-op (no new
+      membership, no allowance consumed).
+    - Re-observing a DEACTIVATED free_sample URL reactivates it in place and
+      consumes exactly one allowance unit.
+    """
+    from app.domain.site_health.discovery import admit_candidates
+    from app.domain.site_health.schemas import FrontierCandidate
+
+    async def _sample_count(session, workspace_id) -> int:
+        return await session.scalar(
+            select(func.count()).select_from(MonitoredSiteUrl).where(
+                MonitoredSiteUrl.workspace_id == workspace_id,
+                MonitoredSiteUrl.active.is_(True),
+                MonitoredSiteUrl.selection_source
+                == SELECTION_SOURCE_FREE_SAMPLE,
+            )
+        )
+
+    root = "https://example.com/"
+    async with session_factory() as session:
+        seed = await seed_site_crawl(session, task_count=0, root_url=root)
+        await set_entitlement(session, seed.workspace_id, CAPABILITY_FREE)
+        await session.commit()
+        await _configure_crawl(
+            session,
+            crawl_id=seed.crawl_id,
+            sample_mode=True,
+            count_disclosure=False,
+        )
+
+    url = "https://example.com/page"
+    canonical, url_hash = canonical_identity(url)
+    candidate = FrontierCandidate(
+        url=canonical,
+        url_hash=url_hash,
+        depth=1,
+        source_kind="link",
+        parent_position=0,
+        link_ordinal=0,
+    )
+
+    # First admission: a brand-new free_sample membership is activated and the
+    # allowance is consumed (one active sample row).
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        await admit_candidates(
+            session, crawl=crawl, candidates=[candidate]
+        )
+        await session.commit()
+        assert await _sample_count(session, seed.workspace_id) == 1
+
+    # Second admission of the SAME, still-active URL: no new membership, count
+    # unchanged (the WHERE-guarded upsert is a no-op, no decrement).
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        await admit_candidates(
+            session, crawl=crawl, candidates=[candidate]
+        )
+        await session.commit()
+        assert await _sample_count(session, seed.workspace_id) == 1
+        total_rows = await session.scalar(
+            select(func.count()).select_from(MonitoredSiteUrl).where(
+                MonitoredSiteUrl.workspace_id == seed.workspace_id
+            )
+        )
+        assert total_rows == 1
+
+    # Deactivate the membership (as a selection replacement / deselect would).
+    async with session_factory() as session:
+        await session.execute(
+            update(MonitoredSiteUrl)
+            .where(MonitoredSiteUrl.workspace_id == seed.workspace_id)
+            .values(active=False, deselected_at=datetime.now(UTC))
+        )
+        await session.commit()
+        assert await _sample_count(session, seed.workspace_id) == 0
+
+    # Re-admission of the now-INACTIVE URL: reactivate in place (same row) and
+    # consume one allowance unit again.
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        await admit_candidates(
+            session, crawl=crawl, candidates=[candidate]
+        )
+        await session.commit()
+        assert await _sample_count(session, seed.workspace_id) == 1
+        membership = await session.scalar(
+            select(MonitoredSiteUrl).where(
+                MonitoredSiteUrl.workspace_id == seed.workspace_id
+            )
+        )
+        assert membership.active is True
+        assert membership.deselected_at is None
+        assert membership.selection_source == SELECTION_SOURCE_FREE_SAMPLE
+        # Still exactly one row: reactivation happened IN PLACE, never a dup.
+        total_rows = await session.scalar(
+            select(func.count()).select_from(MonitoredSiteUrl).where(
+                MonitoredSiteUrl.workspace_id == seed.workspace_id
+            )
+        )
+        assert total_rows == 1

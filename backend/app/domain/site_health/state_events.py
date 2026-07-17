@@ -60,6 +60,7 @@ _TOTAL_BEARING_KEYS: frozenset[str] = frozenset(
         "estimated_total",
         "sitemap_url_count",
         "discovered_url_count",
+        "discovered_total",
     }
 )
 

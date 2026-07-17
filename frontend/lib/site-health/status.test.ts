@@ -59,6 +59,13 @@ describe('discovery provisional / sample-mode copy', () => {
     expect(isDiscoveryProvisional({ ...base, inventory_complete: true })).toBe(false);
   });
 
+  it('is NEVER provisional for a sample-mode crawl, even mid-discovery', () => {
+    // Free sample discovery must never imply continued full-site scanning —
+    // the shared helper enforces this directly rather than leaving it to
+    // every caller to remember to check `sample_mode` first.
+    expect(isDiscoveryProvisional({ ...base, sample_mode: true })).toBe(false);
+  });
+
   it('renders "discovered so far" while provisional (Starter)', () => {
     expect(discoveryProgressLabel(base)).toBe('42 pages discovered so far');
   });
@@ -133,6 +140,7 @@ describe('badge mapping', () => {
     expect(pageStatusBadgeValue('completed')).toBe('success');
     expect(pageStatusBadgeValue('partially_completed')).toBe('warning');
     expect(pageStatusBadgeValue('failed')).toBe('danger');
+    expect(pageStatusBadgeValue('error')).toBe('danger');
     expect(pageStatusBadgeValue('blocked')).toBe('danger');
     expect(pageStatusBadgeValue('pending')).toBe('info');
     expect(pageStatusBadgeValue('not_selected')).toBe('info');
@@ -140,6 +148,7 @@ describe('badge mapping', () => {
 
   it('classifies error/blocked rows explicitly (not zero scores)', () => {
     expect(isErrorRow('failed')).toBe(true);
+    expect(isErrorRow('error')).toBe(true);
     expect(isErrorRow('blocked')).toBe(true);
     expect(isErrorRow('cancelled')).toBe(true);
     expect(isErrorRow('completed')).toBe(false);

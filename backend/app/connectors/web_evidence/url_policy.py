@@ -27,10 +27,10 @@ from __future__ import annotations
 
 import fnmatch
 import ipaddress
+import re
 from urllib.parse import (
     parse_qsl,
     quote,
-    unquote,
     urlencode,
     urlsplit,
     urlunsplit,
@@ -108,12 +108,48 @@ def _normalize_query(query: str) -> str:
     return urlencode(pairs, doseq=True)
 
 
+# RFC 3986 unreserved characters: safe to decode from a percent-escape without
+# changing the URL's meaning. Everything else (including reserved bytes like
+# ``%2F`` -> ``/`` or ``%25`` -> ``%``) MUST stay percent-encoded, or two
+# server-distinct URLs (e.g. a path segment containing a literal ``/``) would
+# canonicalize to the same identity.
+_UNRESERVED = (
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+)
+_PERCENT_ESCAPE_RE = re.compile(r"%([0-9A-Fa-f]{2})")
+
+
+def _decode_unreserved_escapes(path: str) -> str:
+    """Decode only percent-escapes of unreserved bytes; normalize the rest.
+
+    A reserved-byte escape (e.g. ``%2F``, ``%25``) is preserved but its hex
+    digits are uppercased for a stable canonical form. An escape with invalid
+    hex digits is left as-is (the surrounding ``quote()`` will re-encode the
+    literal ``%``).
+    """
+
+    def _sub(match: re.Match[str]) -> str:
+        hex_digits = match.group(1)
+        byte = int(hex_digits, 16)
+        char = chr(byte)
+        if char in _UNRESERVED:
+            return char
+        return "%" + hex_digits.upper()
+
+    return _PERCENT_ESCAPE_RE.sub(_sub, path)
+
+
 def _normalize_path(path: str) -> str:
-    """Percent-encode consistently and collapse an empty path to '/'."""
+    """Percent-encode consistently and collapse an empty path to '/'.
+
+    Only unreserved-byte escapes are decoded before re-quoting; reserved
+    escapes such as ``%2F``/``%25`` are preserved so decoding never conflates
+    two server-distinct URLs (invariant: canonicalization is identity-safe).
+    """
     if not path:
         return "/"
-    # Re-encode to a canonical form: decode then re-quote reserved-safe.
-    return quote(unquote(path), safe="/%:@!$&'()*+,;=~-._")
+    decoded = _decode_unreserved_escapes(path)
+    return quote(decoded, safe="/%:@!$&'()*+,;=~-._")
 
 
 def canonicalize(url: str, *, base_url: str | None = None) -> str:
@@ -147,7 +183,10 @@ def canonicalize(url: str, *, base_url: str | None = None) -> str:
     if not host:
         raise UrlPolicyError("missing host")
 
-    port = parts.port
+    try:
+        port = parts.port
+    except ValueError as exc:
+        raise UrlPolicyError("invalid port") from exc
     if port is None:
         port = _DEFAULT_PORTS.get(scheme)
     if port is None or int(port) not in ALLOWED_URL_PORTS:

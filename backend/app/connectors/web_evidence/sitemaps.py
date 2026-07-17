@@ -121,7 +121,7 @@ def parse_sitemap_document(
             refs.append(loc_text)
         else:
             urls.append(loc_text)
-        if len(urls) >= max_urls:
+        if len(urls) >= max_urls or len(refs) >= max_urls:
             break
 
     return SitemapDocument(urls=urls, sitemap_refs=refs, is_index=is_index)

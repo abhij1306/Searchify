@@ -190,6 +190,37 @@ def test_markdown_neutralizes_leading_spreadsheet_formula_triggers(
     assert f"'{payload}" in data_line
 
 
+@pytest.mark.parametrize("prefix", ["\t", "\r", "\n", "  \t"])
+def test_csv_neutralizes_whitespace_hidden_formula_triggers(
+    prefix: str,
+) -> None:
+    """A leading tab/CR/LF (or run of whitespace) hiding a trigger is also
+
+    neutralized: some spreadsheets still treat the cell as a formula once
+    leading whitespace/control characters are stripped during paste.
+    """
+    payload = f"{prefix}=HYPERLINK(\"http://evil\")"
+    items = [
+        {
+            "id": "1",
+            "rule_id": "r",
+            "title": payload,
+            "dimension": "technical",
+            "category": "meta",
+            "severity": "info",
+            "affected_url_count": 1,
+            "remediation": payload,
+            "analyzer_version": "v1",
+            "rule_version": "v1",
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    rows = _parse_csv(rows_to_csv("issues", items))
+    data = dict(zip(rows[0], rows[1], strict=True))
+    assert data["title"].startswith("'")
+    assert data["remediation"].startswith("'")
+
+
 def test_csv_does_not_prefix_safe_leading_characters() -> None:
     """A normal https URL / plain text is emitted verbatim (no false positive)."""
     items = [

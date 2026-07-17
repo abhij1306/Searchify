@@ -301,3 +301,138 @@ async def test_fetch_decoded_byte_cap_gzip_bomb_aborts():
                 )
             )
     assert exc.value.error_code == "response_too_large"
+
+
+# --- truncated / malformed compressed bodies (handoff finding 6) ----------
+
+
+async def test_fetch_truncated_gzip_body_raises_malformed():
+    # A well-formed gzip stream that is cut off before its final block: the
+    # incremental decompressor never reaches ``eof``, so the fetcher must
+    # treat it as truncated rather than silently accepting a partial body.
+    full = gzip.compress(b"<html><body>" + b"Z" * 5000 + b"</body></html>")
+    truncated = full[: len(full) - 20]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(body=truncated, content_encoding="gzip")
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        with pytest.raises(FetchError) as exc:
+            await fetcher.fetch(
+                FetchRequest(
+                    url="https://example.com/",
+                    purpose="discover",
+                    allowed_content_types=frozenset({"text/html"}),
+                    max_wire_bytes=1_000_000,
+                    max_decoded_bytes=1_000_000,
+                )
+            )
+    assert exc.value.error_code == "malformed_response"
+    assert exc.value.retryable is True
+
+
+async def test_fetch_truncated_deflate_body_raises_malformed():
+    import zlib
+
+    full = zlib.compress(b"<html><body>" + b"Q" * 4000 + b"</body></html>")
+    truncated = full[: len(full) - 15]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(body=truncated, content_encoding="deflate")
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        with pytest.raises(FetchError) as exc:
+            await fetcher.fetch(
+                FetchRequest(
+                    url="https://example.com/",
+                    purpose="discover",
+                    allowed_content_types=frozenset({"text/html"}),
+                    max_wire_bytes=1_000_000,
+                    max_decoded_bytes=1_000_000,
+                )
+            )
+    assert exc.value.error_code == "malformed_response"
+
+
+async def test_fetch_complete_gzip_body_succeeds():
+    # A complete gzip stream reaches ``eof`` and decodes fully.
+    payload = gzip.compress(b"<html><body>ok</body></html>")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(body=payload, content_encoding="gzip")
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        result = await fetcher.fetch(
+            FetchRequest(
+                url="https://example.com/",
+                purpose="discover",
+                allowed_content_types=frozenset({"text/html"}),
+            )
+        )
+    assert result.body == b"<html><body>ok</body></html>"
+
+
+async def test_fetch_flushed_tail_still_enforces_decoded_cap():
+    # A body whose decoded size only crosses the cap once the decompressor's
+    # buffered tail is flushed must still abort as too-large (the cap is
+    # enforced on flushed output, not only on per-chunk output).
+    payload = gzip.compress(b"B" * 50_000)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(body=payload, content_encoding="gzip")
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        with pytest.raises(FetchError) as exc:
+            await fetcher.fetch(
+                FetchRequest(
+                    url="https://example.com/",
+                    purpose="discover",
+                    allowed_content_types=frozenset({"text/html"}),
+                    max_wire_bytes=1_000_000,
+                    max_decoded_bytes=1000,
+                )
+            )
+    assert exc.value.error_code == "response_too_large"
+
+
+# --- charset extraction (handoff finding 5 support) -----------------------
+
+
+async def test_fetch_extracts_declared_charset():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(
+            content_type="text/html; charset=ISO-8859-1"
+        )
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        result = await fetcher.fetch(
+            FetchRequest(
+                url="https://example.com/",
+                purpose="discover",
+                allowed_content_types=frozenset({"text/html"}),
+            )
+        )
+    assert result.charset == "iso-8859-1"
+    # ``content_type`` still strips parameters.
+    assert result.content_type == "text/html"
+
+
+async def test_fetch_missing_charset_is_empty():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(content_type="text/html")
+
+    resolver = _FakeResolver({})
+    async with _fetcher(handler, resolver) as fetcher:
+        result = await fetcher.fetch(
+            FetchRequest(
+                url="https://example.com/",
+                purpose="discover",
+                allowed_content_types=frozenset({"text/html"}),
+            )
+        )
+    assert result.charset == ""

@@ -253,13 +253,19 @@ class PostgresTaskQueue[T]:
             await session.commit()
             return True
 
-    async def release_expired(self) -> int:
+    async def release_expired(self, *, batch_size: int = 500) -> int:
         """Reclaim leases whose ``lease_expires_at`` has passed.
 
         Expired leased/running tasks with attempts remaining return to
         ``retry_wait`` (available immediately); those that have exhausted
         ``max_attempts`` are marked ``failed``. Uses ``SKIP LOCKED`` so it never
         contends with a live worker still holding its row.
+
+        Bounded to ``batch_size`` rows per transaction, in a deterministic
+        order (oldest-expired-first, then id), so a mass expiry across a
+        large frontier never holds one long-running transaction or stalls
+        live claims; a caller polling this repeatedly drains the remainder
+        across subsequent calls.
         """
         model = self._model
         now = _utcnow()
@@ -274,6 +280,8 @@ class PostgresTaskQueue[T]:
                 )
                 .where(model.lease_expires_at.is_not(None))
                 .where(model.lease_expires_at < now)
+                .order_by(model.lease_expires_at.asc(), model.id.asc())
+                .limit(batch_size)
                 .with_for_update(skip_locked=True)
             )
             tasks = list((await session.scalars(stmt)).all())

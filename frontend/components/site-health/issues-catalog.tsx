@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const ISSUE_LIMIT = 25;
+const AFFECTED_URL_LIMIT = 25;
 
 /** Filter chips (mockup 710): All + severity tiers + technical/AEO dimension. */
 type FilterKey = 'all' | 'high' | 'medium' | 'low' | 'technical' | 'aeo';
@@ -216,12 +217,24 @@ function SummaryTiles({
 function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: string }>) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const cursor = cursorStack.at(-1);
 
   const detailQuery = useQuery({
-    ...siteHealthQueries.issue(crawlId, issue.id, { limit: 25 }),
+    ...siteHealthQueries.issue(crawlId, issue.id, { cursor, limit: AFFECTED_URL_LIMIT }),
     enabled: expanded,
   });
   const affected = detailQuery.data?.affected_urls ?? [];
+  const nextCursor = detailQuery.data?.next_cursor ?? null;
+  const canPrevAffected = cursorStack.length > 0;
+
+  const toggleExpanded = () => {
+    setExpanded((prev) => !prev);
+  };
+  const goNextAffected = () => {
+    if (nextCursor) setCursorStack((prev) => [...prev, nextCursor]);
+  };
+  const goPrevAffected = () => setCursorStack((prev) => prev.slice(0, -1));
 
   const copyPrompt = async () => {
     const prompt = buildFixPrompt(issue);
@@ -263,7 +276,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={toggleExpanded}
             aria-expanded={expanded}
           >
             {expanded ? 'Hide affected URLs' : 'View affected URLs'}
@@ -303,6 +316,21 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
                 ))}
               </ul>
             )}
+            {affected.length > 0 || canPrevAffected ? (
+              <div className="flex items-center justify-end gap-2 border-t border-border-subtle p-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={goPrevAffected}
+                  disabled={!canPrevAffected}
+                >
+                  Previous
+                </Button>
+                <Button variant="secondary" size="sm" onClick={goNextAffected} disabled={!nextCursor}>
+                  Next
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </CardContent>

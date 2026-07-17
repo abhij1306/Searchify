@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,14 +20,16 @@ import type { SiteCrawl } from '@/lib/api/types';
 import { downloadCrawlExport } from '@/lib/site-health/download';
 import { useCrawlEvents } from '@/lib/site-health/use-crawl-events';
 import {
+  crawlBadgeValue,
   isDiscoveryTerminal,
   shouldPollCrawl,
+  statusLabel,
 } from '@/lib/site-health/status';
 
 const POLL_INTERVAL_MS = 4_000;
 
 /** Which phase of the Site Health flow to render for the active crawl. */
-type Phase = 'empty' | 'discovering' | 'selection' | 'analyzing' | 'dashboard';
+type Phase = 'empty' | 'discovering' | 'selection' | 'analyzing' | 'dashboard' | 'terminal';
 
 function resolvePhase(crawl: SiteCrawl | null, plan: 'free' | 'starter'): Phase {
   if (!crawl) return 'empty';
@@ -38,6 +41,11 @@ function resolvePhase(crawl: SiteCrawl | null, plan: 'free' | 'starter'): Phase 
     }
     return 'dashboard';
   }
+  // Terminal failure/cancellation WITHOUT any score data: without this check
+  // these fall through to 'selection' or 'analyzing', which would render an
+  // active-looking progress view (and another Cancel button) for a crawl that
+  // has already stopped. Render an explicit terminal phase instead.
+  if (crawl.status === 'failed' || crawl.status === 'cancelled') return 'terminal';
   // Discovery still running.
   if (!isDiscoveryTerminal(crawl.discovery_status)) return 'discovering';
   // Discovery done. Free auto-analyzes its sample (no manual selection); Starter
@@ -82,9 +90,13 @@ export function SiteHealthScreen() {
   // SSE invalidation accelerator (polling stays the baseline).
   useCrawlEvents(crawl?.id, projectId, active);
 
-  // Poll pages while active so per-page rows advance without a reload.
+  // Poll pages while active so per-page rows advance without a reload. Scoped
+  // to `monitored: true` so the analysis-progress breakdown (queued/running/
+  // completed) never counts `not_selected` rows or omits a selected row that
+  // fell outside an unfiltered page — the monitored set is capped by the
+  // entitlement's `monitored_url_limit` (<= 50), well within this page size.
   const pagesQuery = useQuery({
-    ...siteHealthQueries.pages(crawl?.id ?? '', { limit: 200 }),
+    ...siteHealthQueries.pages(crawl?.id ?? '', { limit: 200, monitored: true }),
     enabled: Boolean(crawl?.id),
     refetchInterval: active ? POLL_INTERVAL_MS : false,
   });
@@ -164,17 +176,23 @@ export function SiteHealthScreen() {
     <div className="grid gap-6">
       <Header
         actions={
-          crawl && phase === 'dashboard' ? (
+          crawl && (phase === 'dashboard' || phase === 'terminal') ? (
             <div className="flex items-center gap-2">
+              {phase === 'dashboard' ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => runExport('csv', 'pages')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting…' : 'Export'}
+                </Button>
+              ) : null}
               <Button
-                variant="secondary"
                 size="sm"
-                onClick={() => runExport('csv', 'pages')}
-                disabled={exporting}
+                onClick={startCrawl}
+                disabled={createMutation.isPending || active}
               >
-                {exporting ? 'Exporting…' : 'Export'}
-              </Button>
-              <Button size="sm" onClick={startCrawl} disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Starting…' : 'Re-crawl now'}
               </Button>
             </div>
@@ -223,6 +241,28 @@ export function SiteHealthScreen() {
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />
+      ) : null}
+
+      {phase === 'terminal' && crawl ? (
+        <Card>
+          <CardContent className="grid gap-3 py-8 text-center">
+            <div className="flex justify-center">
+              <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
+                {statusLabel(crawl.status)}
+              </Badge>
+            </div>
+            <p className="text-sm text-secondary">
+              {crawl.status === 'cancelled'
+                ? 'This crawl was cancelled before it produced results.'
+                : (crawl.error_message || 'This crawl failed before it produced results.')}
+            </p>
+            <div className="flex justify-center">
+              <Button onClick={startCrawl} disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Starting…' : 'Start a new crawl'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {phase === 'dashboard' && crawl && dashboardQuery.data ? (
