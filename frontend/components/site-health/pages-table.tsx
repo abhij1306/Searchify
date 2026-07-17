@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -27,15 +29,18 @@ import {
  * badge (queued/running/completed/error/blocked), issue count, Technical / AEO
  * scores, last audited, and a View action. Missing / not-yet-analysed scores
  * render the `—` placeholder — never a fabricated zero (an error/blocked row
- * shows `—`, not 0). The View action is DISABLED until Slice 8 lands the
- * per-URL detail route (keeps the Slice 7 commit free of a broken route).
+ * shows `—`, not 0). The View action links to the Slice 8 per-URL detail route
+ * (`/site-health/crawls/[crawlId]/pages/[siteUrlId]`).
  */
 function scoreClass(score: number | null): string {
   if (score === null) return 'text-muted';
   return scoreBandText[scoreBand(score)];
 }
 
-export function PagesTable({ pages }: Readonly<{ pages: PageSummary[] }>) {
+export function PagesTable({
+  pages,
+  crawlId,
+}: Readonly<{ pages: PageSummary[]; crawlId: string }>) {
   return (
     <Table>
       <TableHeader>
@@ -82,14 +87,12 @@ export function PagesTable({ pages }: Readonly<{ pages: PageSummary[] }>) {
               {formatAudited(page.last_audited)}
             </TableCell>
             <TableCell>
-              {/* View is disabled until the Slice 8 per-URL detail route exists. */}
-              <span
-                aria-disabled="true"
-                title="Available soon"
-                className="cursor-not-allowed text-xs font-medium text-subtle"
+              <Link
+                href={`/site-health/crawls/${crawlId}/pages/${page.site_url_id}`}
+                className="text-xs font-medium text-accent-text hover:underline"
               >
                 View
-              </span>
+              </Link>
             </TableCell>
           </TableRow>
         ))}

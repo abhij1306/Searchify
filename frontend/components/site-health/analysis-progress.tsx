@@ -79,7 +79,7 @@ export function AnalysisProgress({
 
       <Card>
         <CardContent className="p-0">
-          <PagesTable pages={pages} />
+          <PagesTable pages={pages} crawlId={crawl.id} />
         </CardContent>
       </Card>
     </div>

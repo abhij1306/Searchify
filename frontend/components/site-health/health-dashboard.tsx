@@ -119,7 +119,7 @@ export function HealthDashboard({
               No pages in this view.
             </p>
           ) : (
-            <PagesTable pages={rows} />
+            <PagesTable pages={rows} crawlId={crawl.id} />
           )}
 
           <div className="flex items-center justify-end gap-2 border-t border-border-subtle px-[var(--card-padding)] py-3">

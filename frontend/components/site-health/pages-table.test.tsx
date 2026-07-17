@@ -28,7 +28,7 @@ function page(overrides: Partial<PageSummary> = {}): PageSummary {
 
 describe('PagesTable', () => {
   it('renders scores for a completed page', () => {
-    render(<PagesTable pages={[page()]} />);
+    render(<PagesTable pages={[page()]} crawlId={CRAWL} />);
     expect(screen.getByText('Homepage')).toBeInTheDocument();
     expect(screen.getByText('46')).toBeInTheDocument();
     expect(screen.getByText('64')).toBeInTheDocument();
@@ -37,6 +37,7 @@ describe('PagesTable', () => {
   it('renders the "—" placeholder for a blocked page — never a fabricated zero', () => {
     render(
       <PagesTable
+        crawlId={CRAWL}
         pages={[
           page({
             site_url_id: '33333333-3333-4333-8333-333333333333',
@@ -59,10 +60,14 @@ describe('PagesTable', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
-  it('keeps View disabled until Slice 8', () => {
-    render(<PagesTable pages={[page()]} />);
+  it('links View to the per-URL detail route', () => {
+    render(<PagesTable pages={[page()]} crawlId={CRAWL} />);
     const view = screen.getByText('View');
-    expect(view).toHaveAttribute('aria-disabled', 'true');
-    expect(view.closest('a')).toBeNull();
+    const anchor = view.closest('a');
+    expect(anchor).not.toBeNull();
+    expect(anchor).toHaveAttribute(
+      'href',
+      `/site-health/crawls/${CRAWL}/pages/${UUID}`,
+    );
   });
 });

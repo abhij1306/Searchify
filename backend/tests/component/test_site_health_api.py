@@ -42,6 +42,7 @@ from app.models.site_health import (
     SitePageAnalysis,
     SiteRuleEvaluation,
     SiteUrl,
+    SiteUrlObservation,
 )
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
@@ -146,6 +147,27 @@ async def _seed_scenario(
         urls.append(su)
     await session.flush()
     url_a, url_b, url_c = urls
+
+    # Admit all three URLs to the crawl. Endpoint reads (page-detail, pages,
+    # issues, history, exports) are scoped to URLs with a SiteUrlObservation
+    # row for the crawl — exactly what the discover worker writes in production
+    # — so the seed must record admission provenance or those reads 404.
+    for depth, su in enumerate(urls):
+        session.add(
+            SiteUrlObservation(
+                workspace_id=workspace.id,
+                crawl_id=crawl.id,
+                site_url_id=su.id,
+                source_kind="root" if depth == 0 else "link",
+                depth=depth,
+                observed_url=su.normalized_url,
+                final_url=su.normalized_url,
+                status_code=200,
+                content_type="text/html",
+                title=su.latest_title or "",
+            )
+        )
+    await session.flush()
 
     # Monitor url_a.
     session.add(

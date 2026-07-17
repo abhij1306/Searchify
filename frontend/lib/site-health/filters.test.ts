@@ -122,9 +122,15 @@ describe('issue filter serialization', () => {
       severity: 'low',
       category: undefined,
       dimension: undefined,
-      rule_id: undefined,
+      rule: undefined,
       site_url_id: undefined,
     });
+  });
+
+  it('maps the rule_id filter onto the wire `rule` param', () => {
+    const params = toIssueParams({ ...emptyIssueFilters, rule_id: 'meta.title' });
+    expect(params.rule).toBe('meta.title');
+    expect('rule_id' in params).toBe(false);
   });
 
   it('changeIssueFilters drops the cursor and issueFiltersEqual compares', () => {

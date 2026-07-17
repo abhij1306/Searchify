@@ -128,7 +128,9 @@ export function toIssueParams(
     severity: filters.severity || undefined,
     category: filters.category || undefined,
     dimension: filters.dimension || undefined,
-    rule_id: filters.rule_id || undefined,
+    // The backend issues endpoint names the rule filter `rule` (not `rule_id`);
+    // the `IssueFilters` model keeps `rule_id` as its internal URL-state key.
+    rule: filters.rule_id || undefined,
     site_url_id: filters.site_url_id || undefined,
   };
 }

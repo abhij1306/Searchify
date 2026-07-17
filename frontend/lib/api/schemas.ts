@@ -695,14 +695,25 @@ export const siteIssueSchema = z
   })
   .strict();
 
-// Full issue detail — evidence + provenance + affected URLs.
+// Grouped-issue catalog summary (occurrence + severity + affected-page counts).
+// `severity_counts` keys are the severity vocabulary; values are group counts.
+export const issuesSummarySchema = z
+  .object({
+    issue_count: z.number().int(),
+    severity_counts: z.record(z.string(), z.number().int()),
+    affected_url_count: z.number().int(),
+    monitored_affected_url_count: z.number().int(),
+  })
+  .strict();
+
+// Full grouped-issue detail — remediation + evidence + keyset-paginated
+// affected URLs. `id` is the stable canonical (representative) issue id for the
+// rule group; `affected_url_count` is the full deduplicated total and
+// `next_cursor` walks the affected-URL page.
 export const siteIssueDetailSchema = z
   .object({
     id: uuid(),
     crawl_id: uuid(),
-    site_url_id: uuid(),
-    evaluation_id: uuid(),
-    source_artifact_id: uuid().nullable(),
     rule_id: z.string(),
     dimension: issueDimensionSchema,
     category: z.string(),
@@ -711,13 +722,18 @@ export const siteIssueDetailSchema = z
     remediation: z.string(),
     evidence: z.record(z.string(), z.unknown()),
     affected_urls: z.array(affectedUrlSchema),
+    affected_url_count: z.number().int(),
     analyzer_version: z.string(),
     rule_version: z.string(),
     created_at: z.string(),
+    next_cursor: z.string().nullable().optional(),
   })
   .strict();
 
-export const siteIssuesPageSchema = cursorPageSchema(siteIssueSchema);
+// Grouped-issue catalog page — cursor page + API-owned summary (mockup 710).
+export const siteIssuesPageSchema = cursorPageSchema(siteIssueSchema).extend({
+  summary: issuesSummarySchema,
+});
 
 // Analyzed-page summary row (`/pages` list). Scores/issue-count are null when
 // analysis has not completed; `error_code` is '' when there is no error.
@@ -800,6 +816,27 @@ export const pageDetailSchema = z
     scoring_version: z.string(),
   })
   .strict();
+
+// One per-URL issue-history row — an issue occurrence from the selected crawl
+// or a prior crawl in the project chronology (immutable failure projection).
+export const issueHistoryRowSchema = z
+  .object({
+    id: uuid(),
+    crawl_id: uuid(),
+    rule_id: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    title: z.string(),
+    remediation: z.string(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// Per-URL issue history page (crawl-bounded, newest-first, cursor-paginated).
+export const issueHistoryPageSchema = cursorPageSchema(issueHistoryRowSchema);
 
 // Append-only safe crawl event. Free payloads never carry total/frontier/
 // overflow data; `event_type` is an open string (backend owns the catalogue).

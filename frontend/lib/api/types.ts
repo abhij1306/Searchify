@@ -43,7 +43,10 @@ import type {
   inventoryPageSchema,
   inventoryRowSchema,
   issueDimensionSchema,
+  issueHistoryPageSchema,
+  issueHistoryRowSchema,
   issueSeveritySchema,
+  issuesSummarySchema,
   monitoredQuotaSchema,
   monitoredUrlSchema,
   monitoredUrlsResponseSchema,
@@ -123,6 +126,9 @@ export type AffectedUrl = z.infer<typeof affectedUrlSchema>;
 export type SiteIssue = z.infer<typeof siteIssueSchema>;
 export type SiteIssueDetail = z.infer<typeof siteIssueDetailSchema>;
 export type SiteIssuesPage = z.infer<typeof siteIssuesPageSchema>;
+export type IssuesSummary = z.infer<typeof issuesSummarySchema>;
+export type IssueHistoryRow = z.infer<typeof issueHistoryRowSchema>;
+export type IssueHistoryPage = z.infer<typeof issueHistoryPageSchema>;
 export type PageSummary = z.infer<typeof pageSummarySchema>;
 export type PagesPage = z.infer<typeof pagesPageSchema>;
 export type PageDetail = z.infer<typeof pageDetailSchema>;

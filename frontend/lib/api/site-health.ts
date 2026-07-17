@@ -17,6 +17,7 @@ import { API_BASE_URL, apiClient, type ApiRequestOptions } from './client';
 import { queryKeys } from './query-keys';
 import {
   inventoryPageSchema,
+  issueHistoryPageSchema,
   monitoredUrlsResponseSchema,
   pageDetailSchema,
   pagesPageSchema,
@@ -31,6 +32,7 @@ import {
 import { definedQuery, withQuery } from './shared';
 import type {
   InventoryPage,
+  IssueHistoryPage,
   MonitoredUrlsResponse,
   PageDetail,
   PagesPage,
@@ -69,12 +71,19 @@ export type PagesParams = { cursor?: string; limit?: number; status?: string; mo
 export type IssuesParams = {
   cursor?: string;
   limit?: number;
+  query?: string;
   severity?: string;
   category?: string;
   dimension?: string;
-  rule_id?: string;
+  rule?: string;
   site_url_id?: string;
 };
+
+/** Keyset params for a grouped issue's affected-URL page. */
+export type IssueDetailParams = { cursor?: string; limit?: number };
+
+/** Keyset params for a URL's crawl-bounded issue history. */
+export type IssueHistoryParams = { cursor?: string; limit?: number };
 
 /** `PUT /projects/{id}/monitored-urls` body — atomic full-set replacement. */
 export type ReplaceMonitoredInput = {
@@ -149,12 +158,28 @@ export const siteHealthApi = {
     const res = await apiClient.get<SiteIssuesPage>(path, options);
     return strictValidate(siteIssuesPageSchema, res, 'siteHealth.getIssues');
   },
-  getIssue: async (crawlId: string, issueId: string, options?: ApiRequestOptions) => {
-    const res = await apiClient.get<SiteIssueDetail>(
-      `/site-crawls/${crawlId}/issues/${issueId}`,
-      options,
-    );
+  getIssue: async (
+    crawlId: string,
+    issueId: string,
+    params?: IssueDetailParams,
+    options?: ApiRequestOptions,
+  ) => {
+    const path = withQuery(`/site-crawls/${crawlId}/issues/${issueId}`, definedQuery(params));
+    const res = await apiClient.get<SiteIssueDetail>(path, options);
     return strictValidate(siteIssueDetailSchema, res, 'siteHealth.getIssue');
+  },
+  getIssueHistory: async (
+    crawlId: string,
+    siteUrlId: string,
+    params?: IssueHistoryParams,
+    options?: ApiRequestOptions,
+  ) => {
+    const path = withQuery(
+      `/site-crawls/${crawlId}/pages/${siteUrlId}/issue-history`,
+      definedQuery(params),
+    );
+    const res = await apiClient.get<IssueHistoryPage>(path, options);
+    return strictValidate(issueHistoryPageSchema, res, 'siteHealth.getIssueHistory');
   },
   getDashboard: async (projectId: string, crawlId?: string, options?: ApiRequestOptions) => {
     const path = withQuery(
@@ -238,18 +263,27 @@ export const siteHealthQueries = {
       queryKey: queryKeys.siteHealth.issues(crawlId, {
         cursor: params?.cursor ?? null,
         limit: params?.limit ?? null,
+        query: params?.query ?? null,
         severity: params?.severity ?? null,
         category: params?.category ?? null,
         dimension: params?.dimension ?? null,
-        rule_id: params?.rule_id ?? null,
+        rule: params?.rule ?? null,
         site_url_id: params?.site_url_id ?? null,
       }),
       queryFn: ({ signal }) => siteHealthApi.getIssues(crawlId, params, { signal }),
     }),
-  issue: (crawlId: string, issueId: string) =>
+  issue: (crawlId: string, issueId: string, params?: IssueDetailParams) =>
     queryOptions({
       queryKey: queryKeys.siteHealth.issue(crawlId, issueId),
-      queryFn: ({ signal }) => siteHealthApi.getIssue(crawlId, issueId, { signal }),
+      queryFn: ({ signal }) => siteHealthApi.getIssue(crawlId, issueId, params, { signal }),
+    }),
+  issueHistory: (crawlId: string, siteUrlId: string, params?: IssueHistoryParams) =>
+    queryOptions({
+      queryKey: queryKeys.siteHealth.issueHistory(crawlId, siteUrlId, {
+        cursor: params?.cursor ?? null,
+        limit: params?.limit ?? null,
+      }),
+      queryFn: ({ signal }) => siteHealthApi.getIssueHistory(crawlId, siteUrlId, params, { signal }),
     }),
 };
 

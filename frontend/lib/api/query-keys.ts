@@ -62,6 +62,8 @@ export const queryKeys = {
       ['site-health', 'pages', crawlId, filters] as const,
     page: (crawlId: string, siteUrlId: string) =>
       ['site-health', 'page', crawlId, siteUrlId] as const,
+    issueHistory: (crawlId: string, siteUrlId: string, filters: ListFilters = {}) =>
+      ['site-health', 'issue-history', crawlId, siteUrlId, filters] as const,
     issues: (crawlId: string, filters: ListFilters = {}) =>
       ['site-health', 'issues', crawlId, filters] as const,
     issue: (crawlId: string, issueId: string) =>
