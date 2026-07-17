@@ -38,8 +38,7 @@ for the per-surface MVP/roadmap marker.
   (never an active/approved/write route). ChatGPT runs through the **direct OpenAI Responses
   API** (`backend/app/connectors/answer_engines/openai.py`); the OpenRouter adapter/parser
   were deleted. See `backend/app/core/config/provider_catalog.py`
-  (`ACTIVE_TRANSPORTS` / `HISTORICAL_TRANSPORTS` / `APPROVED_ROUTES`) and migration
-  `migrations/versions/0008_direct_openai_retirement.py` (marker `openrouter_retired_v2`).
+  (`ACTIVE_TRANSPORTS` / `HISTORICAL_TRANSPORTS` / `APPROVED_ROUTES`).
 - `benchmark_mode`: `consumer_like | controlled_localized | forced_grounded`.
 - Prompt `intent`: `discovery | comparison | purchase | service | local`.
 - Browser → backend is **same-origin** via Next.js `rewrites()` (`/api/:path*` → server-only
@@ -108,23 +107,21 @@ in-progress work that breaks the global build).
 
 ```bash
 # Backend — focused tests + lint (from backend/)
+# Tests need only a running local Postgres (creds come from the repo .env
+# DATABASE_URL) — no env vars, no Docker. The suite creates and drops a
+# throwaway searchify_tests_<runid> database automatically.
 uv run pytest tests/unit/test_<area>.py tests/component/test_<area>.py -q
 uv run ruff check .
 
-# Migrations — must apply cleanly on an empty DB
+# Migrations — single squashed bootstrap revision (0001_initial, built from
+# Base.metadata). GREENFIELD POLICY: until production, schema changes are made
+# by editing the models and recreating the DB — do NOT add new revision files.
 uv run alembic upgrade head
 
 # Frontend — focused (from frontend/)
 pnpm test -- <file>          # Vitest
 pnpm build                   # next build
 pnpm lint
-
-# Docker compose — boots ONLY via the shell-env workaround (see invariant 11).
-# This machine exports POSTGRES_* + DATABASE_URL into every shell and Compose
-# resolves ${VAR} from the shell before .env, so you MUST unset them:
-env -u POSTGRES_PASSWORD -u POSTGRES_USER -u POSTGRES_DB -u DATABASE_URL \
-  POSTGRES_PASSWORD=<repo-.env-value> \
-  docker compose -f infra/docker/docker-compose.yml up -d --force-recreate
 ```
 
 Web preview / same-origin proxying has its own gotcha — the browser must hit `/api/*`

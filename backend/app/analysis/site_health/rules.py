@@ -173,7 +173,7 @@ def evaluate_rule(rule: SiteHealthRule, facts: dict) -> RuleEvaluation:
     scoring). A check that raises yields ERROR (preserved, zero credit). Never
     raises.
     """
-    base = dict(
+    base: dict[str, Any] = dict(
         rule_id=rule.rule_id,
         rule_version=rule.rule_version,
         dimension=rule.dimension,

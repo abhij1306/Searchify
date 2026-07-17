@@ -134,23 +134,18 @@ The following independent final verification remains optional before merging or 
 
 These are verification tasks, not known missing Site Health implementation slices.
 
-## Known issue unrelated to Site Health
-
-A full `uv run ruff check .` reports one pre-existing E501 line-length violation in `backend/app/domain/auth/service.py:3`. The Site Health and merge work did not modify that file. All other backend Ruff checks pass.
-
 ## Useful commands
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-export TEST_DATABASE_URL="postgresql+asyncpg://postgres:searchify_dev_password@localhost:55432/test_db"
 
-cd infra/docker
-docker compose up -d db
-
-cd ../../backend
+# Backend tests need only a running local Postgres (creds come from the repo
+# .env DATABASE_URL). The suite creates and drops a throwaway
+# searchify_tests_<runid> database automatically — no env vars, no Docker.
+cd backend
 uv sync --extra dev --frozen
 uv run pytest -q
-uv run ruff check . --exclude app/domain/auth/service.py
+uv run ruff check .
 uv run alembic heads
 
 cd ../frontend
@@ -168,4 +163,4 @@ pnpm build
 - Keep SSE as an invalidation accelerator; polling must continue if the stream drops.
 - Do not change shared Postgres queue claim ordering without proving safety for both audit and Site Health workers.
 - Do not store raw fetched HTML or expose secret-bearing headers/evidence.
-- Extend the migration graph from `0009_merge_site_health_openai`; do not create another revision directly from either `0008` parent.
+- Migration history was later squashed to a single bootstrap revision `0001_initial` (greenfield policy — see `docs/DEVELOPMENT.md`); do not add new revision files until production.

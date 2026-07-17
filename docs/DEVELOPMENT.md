@@ -68,23 +68,15 @@ worker). See `infra/docker/README.md` for details.
 
 ### Backend
 
-Backend tests use a real Postgres (each test runs against an isolated schema). Point
-`TEST_DATABASE_URL` at a reachable Postgres:
+Backend tests use a real Postgres (each test runs against an isolated schema). No
+configuration is needed: the suite derives server credentials from the repo `.env`
+`DATABASE_URL`, creates a throwaway `searchify_tests_<runid>` database for the run, and
+drops it on teardown — nothing persists and the dev database is never touched.
 
 ```bash
 cd backend
-export TEST_DATABASE_URL="postgresql+asyncpg://postgres:<password>@localhost:5432/test_db"
 uv run pytest -q
 uv run ruff check .
-```
-
-A quick disposable Postgres for tests:
-
-```bash
-docker run -d --name searchify_pg -p 55432:5432 \
-  -e POSTGRES_PASSWORD=searchify_dev_password -e POSTGRES_DB=test_db \
-  postgres:16
-export TEST_DATABASE_URL="postgresql+asyncpg://postgres:searchify_dev_password@localhost:55432/test_db"
 ```
 
 ### Frontend
@@ -98,30 +90,26 @@ pnpm build            # next build
 pnpm test:e2e         # Playwright (needs a browser + a running stack)
 ```
 
-## Migrations (hand-written)
+## Migrations (single bootstrap revision)
 
-**Alembic autogenerate is disabled in this repo.** The `script_location` layout makes the
-mako template path "relative outside root", so autogenerate fails. Write every migration by
-hand, keep it in the numbered chain, and verify:
+**GREENFIELD POLICY:** the project is pre-production, so the migration history is a single
+squashed bootstrap revision, `0001_initial`, which creates the full schema directly from
+`Base.metadata` (the same mechanism the test suite uses — it always matches the current ORM
+models). Until there is a production database to preserve:
+
+- Make schema changes by **editing the models**, not by adding revision files.
+- Recreate the database to pick up model changes:
 
 ```bash
 cd backend
-uv run alembic upgrade head          # applies cleanly on a fresh DB
-uv run alembic downgrade -1          # roll back one revision
-uv run alembic check                 # must report "No new upgrade operations detected"
+uv run alembic downgrade base   # drops all tables (CASCADE)
+uv run alembic upgrade head     # recreates the current schema
 ```
 
-> `alembic check` may print one `SAWarning` about the intentional
-> `audit_tasks` / `raw_response_artifacts` FK cycle (which now also lists the
-> `site_crawl_tasks` / `site_fetch_artifacts` cycle) — that is expected, not an error.
-
-Migration chain (as of the MVP):
-`0001_initial_empty → 0002_auth_workspace → 0003_projects_prompts → 0004_provider_settings →
-0005_audit_queue → 0006_analysis_metrics → 0007_snapshot_provenance`, then the parallel
-`0008_site_health` and `0008_direct_openai_retirement` revisions, joined by
-`0009_merge_site_health_openai`.
-
-Keep new `alembic_version` revision ids short — the column is `varchar(32)`.
+**Alembic autogenerate is disabled in this repo.** The `script_location` layout makes the
+mako template path "relative outside root", so autogenerate fails. When production arrives
+and real migrations are needed, they must be written by hand from `0001_initial`; keep
+`alembic_version` revision ids short — the column is `varchar(32)`.
 
 ---
 
@@ -177,9 +165,8 @@ env -u POSTGRES_PASSWORD -u POSTGRES_USER -u POSTGRES_DB -u DATABASE_URL \
 Unset the four inherited vars for the Compose invocation and re-supply the repo `.env` value
 explicitly. `docker-compose.yml` carries this note as a baked-in comment.
 
-There is also **no local Postgres listening** on this machine by default — the exported
-`DATABASE_URL`/`POSTGRES_*` point at `localhost:5432` but nothing listens there. Use a Docker
-Postgres container for all migration/integration work.
+(This gotcha only applies when running the optional Docker Compose stack. Local dev and
+tests use the native Postgres on `localhost:5432` per the repo `.env` `DATABASE_URL`.)
 
 ### Gotcha 2 — tunnel double CORS header → same-origin rewrites
 

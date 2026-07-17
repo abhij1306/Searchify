@@ -342,7 +342,7 @@ async def create_audit(
     # Freeze engine snapshots (provenance triple + connection, invariant 10).
     engine_snapshots: dict[str, AuditEngineSnapshot] = {}
     for engine, (route, connection) in routes.items():
-        snapshot = AuditEngineSnapshot(
+        engine_snapshot = AuditEngineSnapshot(
             audit_id=audit.id,
             logical_engine=engine,
             transport_provider=route.transport_provider,
@@ -350,8 +350,8 @@ async def create_audit(
             connection_id=connection.id,
             base_url=connection.base_url or "",
         )
-        session.add(snapshot)
-        engine_snapshots[engine] = snapshot
+        session.add(engine_snapshot)
+        engine_snapshots[engine] = engine_snapshot
     await session.flush()  # assign snapshot ids
 
     # Build every (prompt_index, engine, repetition) slot, then shuffle it

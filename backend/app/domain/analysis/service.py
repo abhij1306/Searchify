@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import overload
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -412,18 +413,18 @@ async def load_export_bundle(
 # preserved, and query text / call ids / counts are never invented.
 
 
-async def _mentions_by_analysis(
+async def _mentions_by_analysis[M: (BrandMention, CompetitorMention)](
     session: AsyncSession,
     *,
-    model: type,
+    model: type[M],
     analysis_ids: list[uuid.UUID],
     kind: str,
 ) -> dict[uuid.UUID, list[VisibilityMentionEvidence]]:
     """Batch-load persisted mention rows grouped by analysis id."""
     if not analysis_ids:
         return {}
-    name_attr = model.brand_name if kind == "brand" else model.competitor_name
-    rows = list(
+    name_field = "brand_name" if kind == "brand" else "competitor_name"
+    rows: list[M] = list(
         (
             await session.scalars(
                 select(model)
@@ -437,7 +438,7 @@ async def _mentions_by_analysis(
         grouped.setdefault(row.analysis_id, []).append(
             VisibilityMentionEvidence(
                 kind=kind,
-                name=getattr(row, name_attr.key) or "",
+                name=getattr(row, name_field) or "",
                 first_offset=getattr(row, "first_offset", None),
                 artifact_id=row.artifact_id,
                 analyzer_version=row.analyzer_version or "",
@@ -803,6 +804,14 @@ def _require_aware(label: str, value: datetime | None) -> None:
         raise TrendQueryError(f"'{label}' must be a timezone-aware timestamp")
 
 
+@overload
+def _to_utc(value: datetime) -> datetime: ...
+
+
+@overload
+def _to_utc(value: None) -> None: ...
+
+
 def _to_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
@@ -844,7 +853,7 @@ async def _load_trend_rows(
         stmt = stmt.where(Audit.completed_at <= to_at)
     stmt = stmt.order_by(Audit.completed_at.asc(), Audit.created_at.asc())
     result = await session.execute(stmt)
-    return list(result.all())
+    return list(result.tuples().all())
 
 
 def _trend_source(
@@ -859,6 +868,13 @@ def _trend_source(
     emits no point (invariant 10).
     """
     metrics = snapshot.metrics or {}
+    completed_at = audit.completed_at
+    if completed_at is None:
+        # Unreachable via the loader (it filters completed_at IS NOT NULL);
+        # defensive skip so a malformed row never emits a point.
+        return None
+    engine_metrics: dict | None
+    visibility_score: float | None
     if logical_engine is None:
         engine_metrics = metrics
         visibility_score = snapshot.visibility_score
@@ -872,7 +888,7 @@ def _trend_source(
     return _TrendSource(
         snapshot_id=snapshot.id,
         audit_id=snapshot.audit_id,
-        completed_at=_to_utc(audit.completed_at),
+        completed_at=_to_utc(completed_at),
         logical_engine=logical_engine,
         analyzer_version=snapshot.analyzer_version,
         scoring_rule_version=snapshot.scoring_rule_version,

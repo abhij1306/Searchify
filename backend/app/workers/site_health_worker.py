@@ -33,11 +33,12 @@ import hashlib
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
-from sqlalchemy import func, select
+from sqlalchemy import Row, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -1157,6 +1158,8 @@ class SiteHealthWorker:
         if not decision.ok:
             still_owned = lease_is_owned(task, owner=self.owner)
             return None, still_owned
+        if task is None or crawl is None:  # unreachable: guard checked both
+            return None, False
         return (task, crawl), False
 
     async def _fetch_analyze(
@@ -1434,9 +1437,16 @@ class SiteHealthWorker:
         if resolved is not None:
             return resolved
         # Last resort: create/lookup by hash directly (depth 0).
-        return await self._resolve_site_url_id(
+        fallback = await self._resolve_site_url_id(
             session, crawl=crawl, url=task.requested_url, depth=0
         )
+        if fallback is None:
+            # Only reachable when the URL cannot be canonicalized at all —
+            # admission already canonicalized it, so treat as a hard bug.
+            raise RuntimeError(
+                f"could not resolve SiteUrl identity for {task.requested_url!r}"
+            )
+        return fallback
 
     # --- link-check flow ---------------------------------------------------
 
@@ -1916,7 +1926,7 @@ class SiteHealthWorker:
         category_counts: dict[str, int] = {}
         issue_total = 0
         evaluation_ids: list[uuid.UUID] = []
-        issue_rows = []
+        issue_rows: Sequence[Row[tuple[str, str, uuid.UUID]]] = []
         if analysis_ids:
             issue_rows = (
                 await session.execute(

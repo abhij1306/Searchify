@@ -129,9 +129,13 @@ def extract_discovery_links(
     if root is None:
         return title, links
 
-    title_nodes = root.xpath("//title")
-    if title_nodes:
-        title = (title_nodes[0].text_content() or "").strip()[:1024]
+    title_node = next(root.iter("title"), None)
+    if title_node is not None:
+        title_text = "".join(
+            t if isinstance(t, str) else t.decode("utf-8", "replace")
+            for t in title_node.itertext()
+        )
+        title = title_text.strip()[:1024]
 
     seen: set[str] = set()
     ordinal = 0
@@ -248,6 +252,10 @@ async def _upsert_site_url(
             SiteUrl.url_hash == candidate.url_hash,
         )
     )
+    if existing is None:
+        # Unreachable barring a concurrent hard-delete between the conflicting
+        # insert and this read — surface loudly rather than return a bogus id.
+        raise RuntimeError(f"SiteUrl row vanished for url_hash={candidate.url_hash!r}")
     return existing, False
 
 

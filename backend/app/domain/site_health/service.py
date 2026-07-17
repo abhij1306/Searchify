@@ -27,7 +27,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import and_, func, or_, select, tuple_
+from sqlalchemy import and_, func, or_, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.site_health import (
@@ -420,7 +420,7 @@ async def cancel_crawl(
     # Cancel every non-terminal task for this crawl (queued/leased/running/
     # retry). Succeeded/failed/cancelled tasks keep their immutable evidence.
     await session.execute(
-        SiteCrawlTask.__table__.update()
+        update(SiteCrawlTask)
         .where(
             SiteCrawlTask.crawl_id == crawl_id,
             SiteCrawlTask.status.notin_(

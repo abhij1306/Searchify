@@ -45,7 +45,7 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
       aria-label="Getting started progress"
     >
       <div className="flex items-center justify-between">
-        <p className="text-2xs font-semibold uppercase tracking-wide text-muted">Getting Started</p>
+        <span className="text-2xs font-semibold uppercase tracking-wide text-muted">Getting Started</span>
         <span className="text-2xs font-semibold text-secondary">
           {completed} of {total}
         </span>

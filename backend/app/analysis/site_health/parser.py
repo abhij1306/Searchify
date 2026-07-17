@@ -500,9 +500,9 @@ def extract_page_facts(
     facts["has_html"] = True
 
     try:
-        title_nodes = root.xpath("//title")
-        if title_nodes:
-            facts["title"] = (_text(title_nodes[0]))[:_MAX_TITLE_CHARS]
+        title_node = next(root.iter("title"), None)
+        if title_node is not None:
+            facts["title"] = (_text(title_node))[:_MAX_TITLE_CHARS]
     except Exception:
         pass
 

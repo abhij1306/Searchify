@@ -28,7 +28,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <aside className="flex w-60 shrink-0 flex-col gap-4 border-r border-border bg-sidebar p-4">
           <ProjectSwitcher />
           <GettingStartedCard />
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto">
             <SidebarNav />
           </div>
           <div className="border-t border-border-subtle pt-2">

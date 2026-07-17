@@ -34,7 +34,14 @@ def coerce_int(value: object, default: int = 0) -> int:
     malformed provider usage payloads degrade gracefully instead of crashing
     the worker path.
     """
-    if value is None:
+    # ``bool`` is an ``int`` subclass; reject it explicitly so a stray boolean
+    # (e.g. ``True`` in a usage field) falls back to the default rather than
+    # silently coercing to 1/0.
+    if (
+        value is None
+        or isinstance(value, bool)
+        or not isinstance(value, (int, float, str))
+    ):
         return default
     try:
         # int(float("inf"))/int("nan") raise OverflowError/ValueError; treat any

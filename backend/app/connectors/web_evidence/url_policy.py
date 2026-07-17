@@ -51,6 +51,10 @@ from app.core.config.site_health import (
     TRACKING_QUERY_PARAMS,
 )
 
+# The concrete address classes carry the ``is_loopback``/``is_private``/… flags
+# (``_BaseAddress`` does not), so SSRF checks are typed over this union.
+IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
+
 # Offline Public Suffix List extractor: ``suffix_list_urls=()`` forces
 # tldextract to use its bundled snapshot and NEVER fetch the PSL at runtime
 # (subplan: offline PSL, no runtime network access). ``cache_dir=None`` keeps
@@ -297,7 +301,7 @@ def is_admissible(
     return narrow(url, include_globs=include_globs, exclude_globs=exclude_globs)
 
 
-def _is_unsafe_ip(ip: ipaddress._BaseAddress) -> bool:
+def _is_unsafe_ip(ip: IPAddress) -> bool:
     """True when an address is in any class the crawler must never connect to.
 
     Covers loopback, private, link-local, multicast, reserved, unspecified,
@@ -327,7 +331,7 @@ def _is_unsafe_ip(ip: ipaddress._BaseAddress) -> bool:
     return False
 
 
-def validate_address(ip_text: str) -> ipaddress._BaseAddress:
+def validate_address(ip_text: str) -> IPAddress:
     """Parse + SSRF-validate a single IP literal. Raises ``FetchError``.
 
     Raises ``FetchError(ssrf_blocked)`` for an unparseable literal or any

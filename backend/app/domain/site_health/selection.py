@@ -25,6 +25,7 @@ import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TypeGuard
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -474,8 +475,8 @@ async def replace_monitored_set(
     # Converting a ``free_sample`` row to ``user`` is the first-Starter
     # reconciliation done in this same locked transaction.
     for rid in requested:
-        membership = by_url_id.get(rid)
-        if membership is None:
+        existing = by_url_id.get(rid)
+        if existing is None:
             site_url = site_urls[rid]
             membership = MonitoredSiteUrl(
                 workspace_id=workspace_id,
@@ -491,13 +492,13 @@ async def replace_monitored_set(
             by_url_id[rid] = membership
             added_ids.append(rid)
         else:
-            was_active = membership.active
-            membership.active = True
-            membership.selection_source = SELECTION_SOURCE_USER
-            membership.deselected_at = None
+            was_active = existing.active
+            existing.active = True
+            existing.selection_source = SELECTION_SOURCE_USER
+            existing.deselected_at = None
             if not was_active:
-                membership.selected_at = now
-                membership.selecting_membership_id = new_version
+                existing.selected_at = now
+                existing.selecting_membership_id = new_version
                 added_ids.append(rid)
 
     profile.selection_version = new_version
@@ -698,7 +699,7 @@ async def rerun_page(
         site_url=site_url,
         entitlement=entitlement,
     )
-    task = await session.scalar(
+    existing_task = await session.scalar(
         select(SiteCrawlTask).where(
             SiteCrawlTask.crawl_id == new_crawl.id,
             SiteCrawlTask.task_kind == TASK_KIND_ANALYZE,
@@ -709,7 +710,7 @@ async def rerun_page(
     return RerunResult(
         crawl_id=new_crawl.id,
         site_url_id=site_url_id,
-        task_id=task.id if task is not None else new_crawl.id,
+        task_id=existing_task.id if existing_task is not None else new_crawl.id,
         created_new_crawl=True,
         analysis_status=new_crawl.analysis_status,
     )
@@ -789,7 +790,7 @@ class GuardDecision:
     reason: str = ""
 
 
-def crawl_is_active(crawl: SiteCrawl | None) -> bool:
+def crawl_is_active(crawl: SiteCrawl | None) -> TypeGuard[SiteCrawl]:
     """True only when the crawl still exists and is in an active status.
 
     A cancelled/terminal crawl means the worker must abandon the task without
@@ -798,7 +799,9 @@ def crawl_is_active(crawl: SiteCrawl | None) -> bool:
     return crawl is not None and crawl.status in CRAWL_ACTIVE_STATUSES
 
 
-def lease_is_owned(task: SiteCrawlTask | None, *, owner: str) -> bool:
+def lease_is_owned(
+    task: SiteCrawlTask | None, *, owner: str
+) -> TypeGuard[SiteCrawlTask]:
     """True only when THIS worker still holds the task's lease and is working.
 
     Guards the double-claim / lost-lease case: between the network call and the
@@ -812,7 +815,9 @@ def lease_is_owned(task: SiteCrawlTask | None, *, owner: str) -> bool:
     )
 
 
-def monitored_is_active(monitored: MonitoredSiteUrl | None) -> bool:
+def monitored_is_active(
+    monitored: MonitoredSiteUrl | None,
+) -> TypeGuard[MonitoredSiteUrl]:
     """True only when the URL is still an ACTIVE monitored membership.
 
     A URL removed mid-fetch (its membership deactivated) must not have its

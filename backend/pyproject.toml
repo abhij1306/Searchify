@@ -25,9 +25,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "lxml-stubs>=0.5.1,<1",
+  "mypy>=1.14.0,<2",
   "pytest>=8.4.2,<10",
   "pytest-asyncio>=1.1.0,<2",
   "ruff>=0.6.0,<1",
+  "types-defusedxml>=0.7.0,<1",
 ]
 
 [build-system]
@@ -49,3 +52,10 @@ select = ["E", "F", "I", "UP", "B", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true

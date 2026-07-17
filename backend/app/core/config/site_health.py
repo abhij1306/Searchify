@@ -15,7 +15,7 @@
 # in-flight run (matches the audit determinism contract, invariant 9).
 from __future__ import annotations
 
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,6 +24,10 @@ from app.core.config.task_queue import (
     ERROR_MAX_ATTEMPTS,
     PostgresQueueSpec,
 )
+
+if TYPE_CHECKING:
+    # Type-only: config never imports a model at runtime (circular import).
+    from app.models.site_health import SiteCrawlTask
 
 # =========================================================================
 # Entitlement capabilities (keyed by CAPABILITY, not plan display name)
@@ -773,7 +777,7 @@ class SiteHealthSettings(BaseSettings):
 site_health_settings = SiteHealthSettings()
 
 
-def _site_crawl_task_model() -> type:
+def _site_crawl_task_model() -> type[SiteCrawlTask]:
     # Lazy import: this config module must never import a model at import time
     # (would create a config <-> models circular import).
     from app.models.site_health import SiteCrawlTask
@@ -781,7 +785,7 @@ def _site_crawl_task_model() -> type:
     return SiteCrawlTask
 
 
-def _site_task_claim_order(model: type) -> tuple:
+def _site_task_claim_order(model: type[SiteCrawlTask]) -> tuple:
     # Deterministic claim order: priority, then FIFO by availability, then the
     # frozen randomized frontier position, then a stable id tiebreak.
     return (
@@ -795,7 +799,7 @@ def _site_task_claim_order(model: type) -> tuple:
 # The Site Health queue spec: parameterizes the generic ``PostgresTaskQueue``
 # over ``SiteCrawlTask`` with the Site Health lease TTL + claim order. Reuses
 # the identical FOR UPDATE SKIP LOCKED implementation as the audit queue.
-SITE_CRAWL_QUEUE_SPEC: Final[PostgresQueueSpec] = PostgresQueueSpec(
+SITE_CRAWL_QUEUE_SPEC: Final[PostgresQueueSpec[SiteCrawlTask]] = PostgresQueueSpec(
     model_ref=_site_crawl_task_model,
     lease_ttl=lambda: site_health_settings.lease_ttl_seconds,
     claim_order=_site_task_claim_order,

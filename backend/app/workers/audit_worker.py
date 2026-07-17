@@ -566,8 +566,8 @@ class AuditWorker:
         base = task.attempt_count
         for offset, attempt in enumerate(attempts, start=1):
             attempt_number = base + offset
-            if attempt.succeeded:
-                response = attempt.response
+            response = attempt.response
+            if response is not None:
                 session.add(
                     ProviderAttempt(
                         task_id=task.id,

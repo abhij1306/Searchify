@@ -16,6 +16,7 @@ import binascii
 import hashlib
 import json
 import uuid
+from collections.abc import Mapping
 
 from app.connectors.web_evidence.url_policy import canonicalize
 
@@ -69,7 +70,7 @@ class CursorScopeError(ValueError):
     """A cursor's endpoint/filter fingerprint does not match the request."""
 
 
-def filter_fingerprint(scope: str, filters: dict[str, object]) -> str:
+def filter_fingerprint(scope: str, filters: Mapping[str, object]) -> str:
     """Deterministic short fingerprint of an endpoint scope + its filters.
 
     Normalizes ``filters`` to a stable JSON encoding (sorted keys, empty/None
@@ -93,7 +94,7 @@ def filter_fingerprint(scope: str, filters: dict[str, object]) -> str:
 def encode_keyset_cursor(
     *,
     scope: str,
-    filters: dict[str, object],
+    filters: Mapping[str, object],
     sort_values: list[object],
 ) -> str:
     """Encode a typed keyset cursor bound to an endpoint scope + filters.
@@ -113,7 +114,7 @@ def encode_keyset_cursor(
 
 
 def decode_keyset_cursor(
-    cursor: str, *, scope: str, filters: dict[str, object]
+    cursor: str, *, scope: str, filters: Mapping[str, object]
 ) -> list[str]:
     """Decode + verify a typed keyset cursor; return the sort-value tuple.
 

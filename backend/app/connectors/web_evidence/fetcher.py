@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import time
 import zlib
+from collections.abc import Iterable
 from urllib.parse import urlsplit
 
 import httpx
@@ -60,7 +61,9 @@ def redact_headers(headers: httpx.Headers | dict) -> dict[str, str]:
     sensitive header is ever persisted or logged.
     """
     out: dict[str, str] = {}
-    items = headers.items() if hasattr(headers, "items") else []
+    items: Iterable[tuple[str, str]] = (
+        headers.items() if hasattr(headers, "items") else []
+    )
     for key, value in items:
         lk = str(key).lower()
         if lk in PERSISTED_RESPONSE_HEADERS:

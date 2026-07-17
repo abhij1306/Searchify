@@ -1,46 +1,77 @@
 """Shared test fixtures for the Searchify backend.
 
 Uses an async Postgres database with a fresh, isolated schema per test (no
-SQLite: the models use Postgres UUID columns). Point ``TEST_DATABASE_URL`` at
-a running Postgres — e.g. the Docker container used for migration verification:
-
-    postgresql+asyncpg://postgres:<pw>@localhost:55432/test_db
+SQLite: the models use Postgres UUID columns). No configuration is needed:
+the suite derives server credentials from the app settings (repo ``.env``
+``DATABASE_URL``), creates a throwaway ``searchify_tests_<runid>`` database
+for the session, and drops it on teardown — nothing persists between runs.
 """
 
 from __future__ import annotations
 
+import asyncio
 import itertools
-import os
 import re
 import sys
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
+import asyncpg
 import httpx
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
+from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
 from app.main import app  # noqa: E402
 
 _COUNTER = itertools.count()
 _TEST_RUN_ID = uuid.uuid4().hex[:12]
 
-TEST_DATABASE_URL = os.environ.get(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:searchify_dev_password@localhost:55432/test_db",
-)
+
+@pytest.fixture(scope="session")
+def test_database_url() -> Iterator[str]:
+    """Create a throwaway session database on the dev Postgres server.
+
+    Reuses the server (host/port/credentials) from ``settings.database_url``
+    but never touches the dev database itself: a dedicated
+    ``searchify_tests_<runid>`` database is created up front and force-dropped
+    on teardown, so test state can never persist between runs.
+    """
+    base = make_url(settings.database_url)
+    db_name = f"searchify_tests_{_TEST_RUN_ID}"
+    admin_dsn = base.set(drivername="postgresql", database="postgres").render_as_string(
+        hide_password=False
+    )
+
+    async def _admin_execute(statement: str) -> None:
+        conn = await asyncpg.connect(dsn=admin_dsn)
+        try:
+            await conn.execute(statement)
+        finally:
+            await conn.close()
+
+    asyncio.run(_admin_execute(f'CREATE DATABASE "{db_name}"'))
+    try:
+        yield base.set(database=db_name).render_as_string(hide_password=False)
+    finally:
+        # FORCE (PG13+) disconnects any lingering sessions before the drop.
+        asyncio.run(_admin_execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)'))
 
 
 @pytest_asyncio.fixture
-async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+async def session_factory(
+    test_database_url: str,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Create an isolated Postgres schema per test and yield a session factory.
 
     The schema is dropped on teardown so tests never leak state into each other.
@@ -48,7 +79,7 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     suffix = re.sub(r"[^a-zA-Z0-9_]", "_", f"{_TEST_RUN_ID}_{next(_COUNTER)}")
     schema_name = f"test_{suffix}"
     quoted = f'"{schema_name}"'
-    engine = create_async_engine(TEST_DATABASE_URL, future=True, echo=False)
+    engine = create_async_engine(test_database_url, future=True, echo=False)
     scoped_engine = engine.execution_options(schema_translate_map={None: schema_name})
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {quoted}"))

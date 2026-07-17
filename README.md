@@ -1,26 +1,18 @@
 # Searchify
 
-<p align="center">
-  <strong>Own how your brand appears in AI answers — and strengthen the pages those answers rely on.</strong>
-</p>
+<strong>Own how your brand appears in AI answers — and strengthen the pages those answers rely on.</strong>
 
-<p align="center">
-  Searchify is an open-source AI visibility and site intelligence platform for measuring brand presence across answer engines, inspecting the evidence behind every result, and improving on-page AEO readiness.
-</p>
+Searchify is an open-source AI visibility and site intelligence platform for measuring brand presence across answer engines, inspecting the evidence behind every result, and improving on-page AEO readiness.
 
-<p align="center">
-  <a href="https://github.com/abhij1306/Searchify/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/abhij1306/Searchify?style=flat-square"></a>
-  <a href="https://github.com/abhij1306/Searchify/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/abhij1306/Searchify?style=flat-square"></a>
-  <a href="https://github.com/abhij1306/Searchify/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/abhij1306/Searchify?style=flat-square"></a>
-  <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square">
-  <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white&style=flat-square">
-  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql&logoColor=white&style=flat-square">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white&style=flat-square">
-</p>
+<a href="https://github.com/abhij1306/Searchify/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/abhij1306/Searchify?style=flat-square"></a>
+<a href="https://github.com/abhij1306/Searchify/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/abhij1306/Searchify?style=flat-square"></a>
+<a href="https://github.com/abhij1306/Searchify/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/abhij1306/Searchify?style=flat-square"></a>
+<img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square">
+<img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white&style=flat-square">
+<img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql&logoColor=white&style=flat-square">
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white&style=flat-square">
 
-<p align="center">
-  <code>AEO</code> · <code>GEO</code> · <code>AI Visibility</code> · <code>Brand Monitoring</code> · <code>Site Health</code> · <code>Technical SEO</code> · <code>Open Source</code>
-</p>
+<code>AEO</code> · <code>GEO</code> · <code>AI Visibility</code> · <code>Brand Monitoring</code> · <code>Site Health</code> · <code>Technical SEO</code> · <code>Open Source</code>
 
 ---
 
@@ -139,7 +131,7 @@ Searchify/
 ├── frontend/                 # Next.js App Router app
 │   ├── app/                  # Routes (auth, app shell, screens)
 │   └── lib/api/             # Typed API-contract layer (zod schemas)
-├── migrations/               # Alembic migrations (hand-written; see gotcha)
+├── migrations/               # Alembic (single squashed bootstrap revision; see gotcha)
 ├── infra/docker/             # docker-compose.yml + env template
 └── docs/                     # Architecture, invariants, design, plans
     ├── DEVELOPMENT.md        # Environment setup + full gotchas runbook
@@ -228,19 +220,22 @@ Migrations live in `migrations/` and are applied with Alembic:
 
 ```bash
 cd backend
-uv run alembic upgrade head          # apply
-uv run alembic downgrade -1          # roll back one
-uv run alembic check                 # should report "No new upgrade operations detected"
+uv run alembic upgrade head          # create the full schema
+uv run alembic downgrade base        # drop everything
 ```
 
-> **Migrations are hand-written.** Alembic autogenerate is disabled in this repo (the
-> `script_location` layout breaks the mako template path). Write the migration by hand and
-> verify with `alembic check`. See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+> **Single bootstrap revision (greenfield policy).** The history is squashed to one
+> revision, `0001_initial`, which builds the schema directly from `Base.metadata`. Until
+> production, schema changes are made by editing the models and recreating the DB — no new
+> revision files. Alembic autogenerate is disabled in this repo (the `script_location`
+> layout breaks the mako template path). See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ## Testing
 
 ```bash
-# Backend (from backend/) — needs a Postgres reachable via TEST_DATABASE_URL
+# Backend (from backend/) — needs only a running local Postgres; server creds
+# come from the repo .env DATABASE_URL. The suite creates and drops a
+# throwaway searchify_tests_<runid> database automatically.
 cd backend
 uv run pytest -q
 uv run ruff check .

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from app.core.config.site_health import (
     DIMENSION_AEO,
@@ -37,6 +38,20 @@ from app.core.config.site_health import (
     SCORE_ROUNDING_DECIMALS,
     SCORING_VERSION,
 )
+
+
+class _ScoredLike(Protocol):
+    """Structural view of anything scoring can read: the ``_Scored`` value
+    type, ``rules.RuleEvaluation``, or a persisted ``SiteRuleEvaluation`` row —
+    anything exposing these three attributes.
+    """
+
+    @property
+    def dimension(self) -> str: ...
+    @property
+    def outcome(self) -> str: ...
+    @property
+    def weight(self) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -81,7 +96,7 @@ def _round(value: float) -> float:
 
 
 def score_dimension(
-    evaluations: Iterable[_Scored], *, dimension: str
+    evaluations: Iterable[_ScoredLike], *, dimension: str
 ) -> DimensionScore:
     """Score a single dimension, filtering ``evaluations`` to it first.
 
@@ -151,7 +166,7 @@ def overall_score(dimension_scores: dict[str, float | None]) -> float | None:
     return _round(weighted_sum / weight_total)
 
 
-def score_analysis(evaluations: Iterable[_Scored]) -> AnalysisScores:
+def score_analysis(evaluations: Iterable[_ScoredLike]) -> AnalysisScores:
     """Score a whole page analysis: per-dimension scores + the overall score.
 
     ``evaluations`` is the full set for one analysis (both dimensions). Returns

@@ -9,9 +9,13 @@
 # ``config/ai_visibility.py`` guardrail knobs.
 from __future__ import annotations
 
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    # Type-only: config never imports a model at runtime (circular import).
+    from app.models.audit import AuditTask
 
 from app.core.config.projects import (
     BENCHMARK_MODE_CONSUMER_LIKE,
@@ -206,7 +210,7 @@ class AuditSettings(BaseSettings):
 audit_settings = AuditSettings()
 
 
-def _audit_model() -> type:
+def _audit_model() -> type[AuditTask]:
     # Imported lazily so this config module never imports a model at import
     # time (would create a config <-> models circular import).
     from app.models.audit import AuditTask
@@ -214,7 +218,7 @@ def _audit_model() -> type:
     return AuditTask
 
 
-def _audit_claim_order(model: type) -> tuple:
+def _audit_claim_order(model: type[AuditTask]) -> tuple:
     # Deterministic claim order: priority, then FIFO by availability, then the
     # frozen randomized slot position. Preserves the exact original audit
     # ordering (see the pre-genericization ``PostgresTaskQueue.claim``).
@@ -228,7 +232,7 @@ def _audit_claim_order(model: type) -> tuple:
 # The audit queue spec: parameterizes the generic ``PostgresTaskQueue`` over
 # ``AuditTask`` with the audit lease TTL + claim order, preserving current
 # audit queue semantics exactly.
-AUDIT_QUEUE_SPEC: Final[PostgresQueueSpec] = PostgresQueueSpec(
+AUDIT_QUEUE_SPEC: Final[PostgresQueueSpec[AuditTask]] = PostgresQueueSpec(
     model_ref=_audit_model,
     lease_ttl=lambda: audit_settings.lease_ttl_seconds,
     claim_order=_audit_claim_order,

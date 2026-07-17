@@ -6,7 +6,7 @@ import sys
 from collections.abc import MutableMapping
 from contextvars import ContextVar, Token
 from functools import lru_cache
-from typing import Any, cast
+from typing import Any
 from uuid import uuid4
 
 structlog: Any | None = None
@@ -52,15 +52,12 @@ def configure_logging() -> None:
         )
         return
 
-    shared_processors = cast(
-        "list[Any]",
-        [
-            structlog.stdlib.add_logger_name,
-            structlog.stdlib.add_log_level,
-            _add_correlation_id,
-            structlog.processors.TimeStamper(fmt="iso", utc=True),
-        ],
-    )
+    shared_processors: list[Any] = [
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        _add_correlation_id,
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
+    ]
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
         processors=[

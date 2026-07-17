@@ -72,6 +72,12 @@ def _output_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in output if isinstance(item, dict)]
 
 
+def _action_of(item: dict[str, Any]) -> dict[str, Any]:
+    """The item's ``action`` dict, or ``{}`` when absent/non-dict."""
+    action = item.get("action")
+    return action if isinstance(action, dict) else {}
+
+
 def _action_queries(action: dict[str, Any]) -> list[str]:
     """Ordered, non-blank query strings from a web_search_call action.
 
@@ -205,8 +211,7 @@ def _sanitize_metadata(
             continue
         common = {"type": item_type, "id": item.get("id")}
         if item_type == "web_search_call":
-            action = item.get("action")
-            action = action if isinstance(action, dict) else {}
+            action = _action_of(item)
             evidence_items.append(
                 {
                     **common,
@@ -239,10 +244,7 @@ def _sanitize_metadata(
         "usage": _normalized_usage(payload),
         "native_search_requested": True,
         "query_text_available": any(
-            _item_type(item) == "web_search_call"
-            and _action_queries(
-                item.get("action") if isinstance(item.get("action"), dict) else {}
-            )
+            _item_type(item) == "web_search_call" and _action_queries(_action_of(item))
             for item in items
         ),
         "item_types": item_types,

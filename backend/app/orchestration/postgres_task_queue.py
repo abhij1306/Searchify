@@ -19,6 +19,7 @@ import logging
 import uuid
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -34,6 +35,12 @@ from app.core.config.task_queue import (
     PostgresQueueSpec,
 )
 
+if TYPE_CHECKING:
+    # Type-only: the queue is generic over the concrete queue-row models (the
+    # ``PostgresQueueSpec`` constraint); nothing here imports them at runtime.
+    from app.models.audit import AuditTask
+    from app.models.site_health import SiteCrawlTask
+
 logger = logging.getLogger("app.orchestration.postgres_task_queue")
 
 
@@ -41,7 +48,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class PostgresTaskQueue[T]:
+class PostgresTaskQueue[T: ("AuditTask", "SiteCrawlTask")]:
     """``TaskQueue[T]`` backed by Postgres ``FOR UPDATE SKIP LOCKED``.
 
     Constructed with a session factory (``async_sessionmaker``) and a
@@ -56,7 +63,7 @@ class PostgresTaskQueue[T]:
         spec: PostgresQueueSpec[T],
     ) -> None:
         self._session_factory = session_factory
-        self._spec = spec
+        self._spec: PostgresQueueSpec[T] = spec
 
     @property
     def _model(self) -> type[T]:
@@ -92,7 +99,12 @@ class PostgresTaskQueue[T]:
                 .where(model.available_at <= now)
             )
             if kinds is not None:
-                stmt = stmt.where(model.task_kind.in_(list(kinds)))
+                # Only queue-row models with a ``task_kind`` column (SiteCrawlTask)
+                # accept a kind filter; audit rows have no such column, and the
+                # audit worker never passes ``kinds``.
+                task_kind = getattr(model, "task_kind", None)
+                if task_kind is not None:
+                    stmt = stmt.where(task_kind.in_(list(kinds)))
             stmt = (
                 stmt.order_by(*self._spec.claim_order(model))
                 .limit(limit)
