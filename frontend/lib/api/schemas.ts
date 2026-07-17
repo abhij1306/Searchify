@@ -428,6 +428,501 @@ export const visibilitySchema = z
   .strict();
 
 // ---------------------------------------------------------------------------
+// Site Health — entitlement, crawl + substates, inventory, monitored set,
+// pages, issues, scores, events, and coded errors.
+//
+// Contract source: docs plan `/.plans/v1-site-health.md` (§API contract,
+// §Persistence lifecycle states) + subplan `site-health-crawler.md`. Every
+// object is `.strict()` so an unexpected key (e.g. a leaked full-site total on
+// a Free projection, invariant: no Free count side channels) fails loud. All
+// count-bearing fields the backend redacts for Free are `null`/absent, never a
+// number — the frontend never invents a total.
+// ---------------------------------------------------------------------------
+
+// Workspace Site Health plan. Free and Starter only; billing is out of scope.
+export const siteHealthPlanSchema = z.enum(['free', 'starter']);
+
+// Capability access mode: Free gets a server-selected `sample`; Starter gets
+// user `selection` of a persistent monitored set.
+export const siteHealthAccessModeSchema = z.enum(['sample', 'selection']);
+
+// `GET /entitlements` — current workspace Site Health capabilities + revision.
+// `monitored_url_limit` is the ONLY authority for the selection quota — the
+// frontend must read it here and never hard-code 50. `sample_url_limit` is the
+// Free automatic sample size (10). `can_view_discovered_total` gates every
+// discovered-count disclosure (false for Free).
+export const siteHealthEntitlementSchema = z
+  .object({
+    workspace_id: uuid(),
+    plan_key: siteHealthPlanSchema,
+    access_mode: siteHealthAccessModeSchema,
+    sample_url_limit: z.number().int(),
+    monitored_url_limit: z.number().int(),
+    can_view_discovered_total: z.boolean(),
+    capability_revision: z.number().int(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+// Independent crawl lifecycle sub-states (plan §Persistence lifecycle states).
+export const crawlOverallStatusSchema = z.enum([
+  'draft',
+  'validating',
+  'queued',
+  'running',
+  'completed',
+  'partially_completed',
+  'failed',
+  'cancelled',
+]);
+export const crawlDiscoveryStatusSchema = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'sample_completed',
+  'failed',
+  'cancelled',
+]);
+export const crawlAnalysisStatusSchema = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'partially_completed',
+  'failed',
+  'cancelled',
+]);
+// Queue-neutral task status shared with the audit queue contract.
+export const siteCrawlTaskStatusSchema = z.enum([
+  'queued',
+  'leased',
+  'running',
+  'succeeded',
+  'retry_wait',
+  'failed',
+  'cancelled',
+]);
+
+// How a discovered URL was first observed (immutable provenance).
+export const siteUrlSourceSchema = z.enum(['root', 'link', 'sitemap', 'redirect']);
+
+// Per-URL analysis presentation state. `error`/`blocked` are explicit states
+// (never a fabricated zero score); `not_selected` covers unanalysed rows.
+export const pageAnalysisStatusSchema = z.enum([
+  'not_selected',
+  'pending',
+  'running',
+  'completed',
+  'partially_completed',
+  'failed',
+  // Presentation-only terminal states. `blocked` = the latest analyze task
+  // ended under a config-owned policy denial (robots/SSRF); `error` = any other
+  // terminal-unsuccessful analysis. `failed` stays an internal persistence
+  // state (the API never surfaces it as page copy).
+  'error',
+  'blocked',
+  'cancelled',
+]);
+
+// Crawl score/coverage summary (nullable scores until analysis produces them).
+export const siteScoreSummarySchema = z
+  .object({
+    overall_score: z.number().nullable(),
+    technical_score: z.number().nullable(),
+    aeo_score: z.number().nullable(),
+    selected_count: z.number().int(),
+    analyzed_count: z.number().int(),
+    issue_count: z.number().int(),
+    scoring_version: z.string(),
+  })
+  .strict();
+
+// A crawl projection. `total_url_count` is null while full discovery runs and
+// ALWAYS null for a Free sample crawl; `has_more_site_urls`/`discovered_count`
+// are absent (optional) or null under Free redaction — never a leaked total.
+export const siteCrawlSchema = z
+  .object({
+    id: uuid(),
+    workspace_id: uuid(),
+    project_id: uuid(),
+    profile_id: uuid(),
+    status: crawlOverallStatusSchema,
+    discovery_status: crawlDiscoveryStatusSchema,
+    analysis_status: crawlAnalysisStatusSchema,
+    root_url: z.string(),
+    sample_mode: z.boolean(),
+    seed: z.string(),
+    inventory_complete: z.boolean(),
+    visible_url_count: z.number().int(),
+    analyzed_count: z.number().int(),
+    failed_count: z.number().int(),
+    // Redactable count fields (Free → null / absent, never a number).
+    discovered_count: z.number().int().nullable().optional(),
+    total_url_count: z.number().int().nullable(),
+    has_more_site_urls: z.boolean().nullable().optional(),
+    score_summary: siteScoreSummarySchema.nullable(),
+    extractor_version: z.string(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    scoring_version: z.string(),
+    error_message: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    started_at: z.string().nullable(),
+    completed_at: z.string().nullable(),
+  })
+  .strict();
+
+// Opaque, filter-bound keyset cursor page envelope. `next_cursor` is null on
+// the last page. There is no offset / page total field (invariant: no Free
+// count side channel; stable cursors while discovery appends rows).
+export const cursorPageSchema = <T extends z.ZodTypeAny>(item: T) =>
+  z
+    .object({
+      items: z.array(item),
+      next_cursor: z.string().nullable(),
+    })
+    .strict();
+
+// One lightweight inventory row. Ordering is URL-only. The analysis summary
+// fields (`issue_count`, `technical_score`, `aeo_score`, `overall_score`,
+// `last_audited`) are null until analysis completes for that URL.
+export const inventoryRowSchema = z
+  .object({
+    site_url_id: uuid(),
+    normalized_url: z.string(),
+    display_url: z.string(),
+    title: z.string().nullable(),
+    content_type: z.string().nullable(),
+    source: siteUrlSourceSchema.nullable(),
+    depth: z.number().int().nullable(),
+    monitored: z.boolean(),
+    first_seen_at: z.string().nullable(),
+    last_seen_at: z.string().nullable(),
+    // Nullable analysis summaries (null before analysis completes).
+    issue_count: z.number().int().nullable(),
+    technical_score: z.number().nullable(),
+    aeo_score: z.number().nullable(),
+    overall_score: z.number().nullable(),
+    last_audited: z.string().nullable(),
+  })
+  .strict();
+
+export const inventoryPageSchema = cursorPageSchema(inventoryRowSchema);
+export const siteCrawlListPageSchema = cursorPageSchema(siteCrawlSchema);
+
+// Workspace-wide monitored quota usage (counts every active monitored row).
+export const monitoredQuotaSchema = z
+  .object({
+    used: z.number().int(),
+    limit: z.number().int(),
+  })
+  .strict();
+
+// One persistent monitored-set row.
+export const monitoredUrlSchema = z
+  .object({
+    site_url_id: uuid(),
+    normalized_url: z.string(),
+    display_url: z.string(),
+    title: z.string().nullable(),
+    active: z.boolean(),
+    selection_source: z.enum(['user', 'free_sample']),
+    selected_at: z.string().nullable(),
+    deselected_at: z.string().nullable(),
+  })
+  .strict();
+
+// `GET /projects/{id}/monitored-urls` — persistent set + revision + quota.
+export const monitoredUrlsResponseSchema = z
+  .object({
+    project_id: uuid(),
+    selection_version: z.number().int(),
+    monitored_urls: z.array(monitoredUrlSchema),
+    quota: monitoredQuotaSchema,
+  })
+  .strict();
+
+// Deterministic HTTP delivery facts. `field_cwv_available` is a literal false —
+// the HTTP-first crawler never fabricates field Core Web Vitals (no LCP/CLS/INP).
+export const deliveryFactsSchema = z
+  .object({
+    field_cwv_available: z.literal(false),
+    status_code: z.number().int().nullable(),
+    ttfb_ms: z.number().nullable(),
+    wire_bytes: z.number().int().nullable(),
+    decoded_bytes: z.number().int().nullable(),
+    html_bytes: z.number().int().nullable(),
+    http_version: z.string().nullable(),
+    compression: z.string().nullable(),
+    cache_control: z.string().nullable(),
+    blocking_resource_count: z.number().int().nullable(),
+  })
+  .strict();
+
+// Bounded normalized page facts (deterministic; extractor-versioned).
+export const pageFactsSchema = z
+  .object({
+    title: z.string().nullable(),
+    meta_description: z.string().nullable(),
+    canonical_url: z.string().nullable(),
+    robots_directives: z.array(z.string()),
+    h1_count: z.number().int(),
+    heading_count: z.number().int(),
+    image_count: z.number().int(),
+    image_missing_alt_count: z.number().int(),
+    word_count: z.number().int(),
+    internal_link_count: z.number().int(),
+    external_link_count: z.number().int(),
+    structured_data_types: z.array(z.string()),
+  })
+  .strict();
+
+// Issue severity + dimension enums (config-owned rule catalog).
+export const issueSeveritySchema = z.enum(['critical', 'high', 'medium', 'low', 'info']);
+export const issueDimensionSchema = z.enum(['technical', 'aeo']);
+
+// A single affected-URL summary on an issue projection.
+export const affectedUrlSchema = z
+  .object({
+    site_url_id: uuid(),
+    normalized_url: z.string(),
+    display_url: z.string(),
+    title: z.string().nullable(),
+  })
+  .strict();
+
+// One issue catalog row (failure projection with remediation snapshot).
+export const siteIssueSchema = z
+  .object({
+    id: uuid(),
+    crawl_id: uuid(),
+    rule_id: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    title: z.string(),
+    remediation: z.string(),
+    affected_url_count: z.number().int(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// Grouped-issue catalog summary (occurrence + severity + affected-page counts).
+// `severity_counts` keys are the severity vocabulary; values are group counts.
+export const issuesSummarySchema = z
+  .object({
+    issue_count: z.number().int(),
+    severity_counts: z.record(z.string(), z.number().int()),
+    affected_url_count: z.number().int(),
+    monitored_affected_url_count: z.number().int(),
+  })
+  .strict();
+
+// Full grouped-issue detail — remediation + evidence + keyset-paginated
+// affected URLs. `id` is the stable canonical (representative) issue id for the
+// rule group; `affected_url_count` is the full deduplicated total and
+// `next_cursor` walks the affected-URL page.
+export const siteIssueDetailSchema = z
+  .object({
+    id: uuid(),
+    crawl_id: uuid(),
+    rule_id: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    title: z.string(),
+    remediation: z.string(),
+    evidence: z.record(z.string(), z.unknown()),
+    affected_urls: z.array(affectedUrlSchema),
+    affected_url_count: z.number().int(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+    next_cursor: z.string().nullable().optional(),
+  })
+  .strict();
+
+// Grouped-issue catalog page — cursor page + API-owned summary (mockup 710).
+export const siteIssuesPageSchema = cursorPageSchema(siteIssueSchema).extend({
+  summary: issuesSummarySchema,
+});
+
+// Analyzed-page summary row (`/pages` list). Scores/issue-count are null when
+// analysis has not completed; `error_code` is '' when there is no error.
+export const pageSummarySchema = z
+  .object({
+    site_url_id: uuid(),
+    crawl_id: uuid(),
+    normalized_url: z.string(),
+    display_url: z.string(),
+    title: z.string().nullable(),
+    monitored: z.boolean(),
+    analysis_status: pageAnalysisStatusSchema,
+    error_code: z.string(),
+    issue_count: z.number().int().nullable(),
+    technical_score: z.number().nullable(),
+    aeo_score: z.number().nullable(),
+    overall_score: z.number().nullable(),
+    last_audited: z.string().nullable(),
+  })
+  .strict();
+
+export const pagesPageSchema = cursorPageSchema(pageSummarySchema);
+
+// One persisted rule evaluation on a page (all outcomes, current label).
+export const ruleEvaluationSchema = z
+  .object({
+    id: uuid(),
+    rule_id: z.string(),
+    title: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    outcome: z.enum(['pass', 'fail', 'not_applicable', 'error']),
+    weight: z.number(),
+    evidence: z.record(z.string(), z.unknown()),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// One deduplicated link/asset reference discovered on a page.
+export const linkReferenceSchema = z
+  .object({
+    id: uuid(),
+    kind: z.string(),
+    target_url: z.string(),
+    is_internal: z.boolean(),
+    rel: z.string(),
+    anchor_text: z.string(),
+    target_artifact_id: uuid().nullable(),
+  })
+  .strict();
+
+// Full analyzed-page detail (persisted facts/delivery/scores/issues/provenance).
+export const pageDetailSchema = z
+  .object({
+    site_url_id: uuid(),
+    crawl_id: uuid(),
+    normalized_url: z.string(),
+    display_url: z.string(),
+    title: z.string().nullable(),
+    analysis_status: pageAnalysisStatusSchema,
+    error_code: z.string(),
+    field_cwv_available: z.literal(false),
+    technical_score: z.number().nullable(),
+    aeo_score: z.number().nullable(),
+    overall_score: z.number().nullable(),
+    issue_count: z.number().int().nullable(),
+    last_audited: z.string().nullable(),
+    facts: pageFactsSchema,
+    delivery: deliveryFactsSchema,
+    issues: z.array(siteIssueSchema),
+    evaluations: z.array(ruleEvaluationSchema),
+    link_references: z.array(linkReferenceSchema),
+    artifact_id: uuid().nullable(),
+    extractor_version: z.string(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    scoring_version: z.string(),
+  })
+  .strict();
+
+// Identity/status returned by the per-page rerun (202). "Re-audit this page"
+// is normally invoked from a COMPLETED (terminal) source crawl; the backend
+// mints a fresh single-page rerun crawl in that case (`created_new_crawl`),
+// so the client must poll the returned `crawl_id`/`site_url_id` (the fresh
+// run) rather than the terminal source crawl it was invoked from.
+export const rerunPageResponseSchema = z
+  .object({
+    crawl_id: uuid(),
+    site_url_id: uuid(),
+    task_id: uuid(),
+    created_new_crawl: z.boolean(),
+    analysis_status: pageAnalysisStatusSchema,
+  })
+  .strict();
+
+// One per-URL issue-history row — an issue occurrence from the selected crawl
+// or a prior crawl in the project chronology (immutable failure projection).
+export const issueHistoryRowSchema = z
+  .object({
+    id: uuid(),
+    crawl_id: uuid(),
+    rule_id: z.string(),
+    dimension: issueDimensionSchema,
+    category: z.string(),
+    severity: issueSeveritySchema,
+    title: z.string(),
+    remediation: z.string(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// Per-URL issue history page (crawl-bounded, newest-first, cursor-paginated).
+export const issueHistoryPageSchema = cursorPageSchema(issueHistoryRowSchema);
+
+// Append-only safe crawl event. Free payloads never carry total/frontier/
+// overflow data; `event_type` is an open string (backend owns the catalogue).
+export const siteCrawlEventSchema = z
+  .object({
+    id: uuid(),
+    crawl_id: uuid(),
+    event_type: z.string(),
+    message: z.string(),
+    payload: z.record(z.string(), z.unknown()),
+    created_at: z.string(),
+  })
+  .strict();
+
+// Latest / selected crawl dashboard projection (`/projects/{id}/site-health`).
+export const siteHealthDashboardSchema = z
+  .object({
+    project_id: uuid(),
+    crawl: siteCrawlSchema.nullable(),
+    score_summary: siteScoreSummarySchema.nullable(),
+    quota: monitoredQuotaSchema,
+  })
+  .strict();
+
+// Stable coded failures (plan §API contract). The frontend keys UX (upgrade
+// prompt, quota feedback, stale-revision refetch, retry copy) off these codes.
+export const siteHealthErrorCodeSchema = z.enum([
+  'starter_required',
+  'site_health_quota_exceeded',
+  'stale_selection_version',
+  'crawl_already_active',
+  'ssrf_blocked',
+  'robots_denied',
+  'redirect_limit',
+  'response_too_large',
+  'unsupported_content_type',
+  'timeout',
+  'dns_resolution_failed',
+  'http_4xx',
+  'http_5xx',
+]);
+
+// Coded error body. Quota errors carry `limit`/`currently_used`; a stale
+// selection carries the expected/current versions. Extra keys fail loud.
+export const siteHealthErrorSchema = z
+  .object({
+    code: siteHealthErrorCodeSchema,
+    message: z.string(),
+    limit: z.number().int().optional(),
+    currently_used: z.number().int().optional(),
+    expected_selection_version: z.number().int().optional(),
+    current_selection_version: z.number().int().optional(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
 // Cross-run Visibility trend history (projection over persisted snapshots)
 // ---------------------------------------------------------------------------
 

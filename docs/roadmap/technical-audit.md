@@ -1,7 +1,9 @@
 # Roadmap — Technical Audit (Site Health) crawler
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
-> an engineer (or agent) can start building without re-deriving the architecture. It follows
+> **Status: implemented.** This was the original design spec; the feature is now built. The
+> reconciled, as-shipped reference (entitlements, statuses, endpoints, exports, routes) lives
+> in [`../site-health.md`](../site-health.md) — read that for the current contract. This spec is
+> retained for the deeper crawler/analysis rationale. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
 > [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule

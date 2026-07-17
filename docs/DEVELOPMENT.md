@@ -112,13 +112,41 @@ uv run alembic check                 # must report "No new upgrade operations de
 ```
 
 > `alembic check` may print one `SAWarning` about the intentional
-> `audit_tasks` / `raw_response_artifacts` FK cycle — that is expected, not an error.
+> `audit_tasks` / `raw_response_artifacts` FK cycle (which now also lists the
+> `site_crawl_tasks` / `site_fetch_artifacts` cycle) — that is expected, not an error.
 
 Migration chain (as of the MVP):
 `0001_initial_empty → 0002_auth_workspace → 0003_projects_prompts → 0004_provider_settings →
-0005_audit_queue → 0006_analysis_metrics → 0007_snapshot_provenance`.
+0005_audit_queue → 0006_analysis_metrics → 0007_snapshot_provenance`, then the parallel
+`0008_site_health` and `0008_direct_openai_retirement` revisions, joined by
+`0009_merge_site_health_openai`.
 
 Keep new `alembic_version` revision ids short — the column is `varchar(32)`.
+
+---
+
+## Site Health entitlements (development)
+
+Site Health entitlements are **capability-based** (`free` / `starter`), stored one row
+per workspace in `workspace_site_health_entitlements`. There is no billing-provider
+integration in this codebase — production billing may call the same domain service
+(`app.domain.site_health.entitlements.set_entitlement`) later.
+
+A workspace with no explicit entitlement resolves to **Free** (fail-closed to the most
+restrictive capability). To grant a workspace the **Starter** capability locally (or reset
+it to Free), use the operator/dev command, run from `backend/` with `DATABASE_URL` pointing
+at the target database:
+
+```bash
+cd backend
+uv run python -m scripts.set_site_health_entitlement <workspace_uuid> starter
+uv run python -m scripts.set_site_health_entitlement <workspace_uuid> free
+```
+
+The command freezes the resolved capability profile (discovery mode, discovery/sample
+caps, monitored-URL limit, count-disclosure flag) onto the row, bumps
+`capability_revision`, and emits a single audit-safe log line recording the change (no
+secrets).
 
 ---
 

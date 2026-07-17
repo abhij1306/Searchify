@@ -1,24 +1,29 @@
-# Postgres task queue (invariant 8): FOR UPDATE SKIP LOCKED claim + leasing.
+# Generic Postgres task queue (invariant 8): FOR UPDATE SKIP LOCKED claim +
+# leasing, parameterized over the queue-row model via ``PostgresQueueSpec``.
 #
-# The MVP ``TaskQueue`` implementation. Postgres is both durable state and the
-# queue (no Redis at MVP). The claim runs in one short transaction that locks
-# eligible rows with ``FOR UPDATE SKIP LOCKED`` and commits BEFORE the worker
-# does any provider I/O, so a DB transaction is never held across a network
-# call. ``SKIP LOCKED`` plus the unique ``idempotency_key`` and slot constraint
+# The MVP ``TaskQueue[T]`` implementation. Postgres is both durable state and
+# the queue (no Redis at MVP). The claim runs in one short transaction that
+# locks eligible rows with ``FOR UPDATE SKIP LOCKED`` and commits BEFORE the
+# worker does any I/O, so a DB transaction is never held across a network call.
+# ``SKIP LOCKED`` plus each model's unique idempotency key and slot constraint
 # guarantee no double-claim. ``release_expired`` is the sweeper that reclaims
 # leases from a crashed worker.
+#
+# One implementation serves every task type (``AuditTask`` / ``SiteCrawlTask``
+# / future ones): the concrete model + lease TTL + deterministic claim order +
+# max-attempts error token come from the injected ``PostgresQueueSpec``, so the
+# claim/lease/heartbeat/expiry/retry semantics are identical for all of them.
 from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.config.audits import (
-    ERROR_MAX_ATTEMPTS,
+from app.core.config.task_queue import (
     TASK_STATUS_CANCELLED,
     TASK_STATUS_FAILED,
     TASK_STATUS_LEASED,
@@ -26,9 +31,8 @@ from app.core.config.audits import (
     TASK_STATUS_RETRY_WAIT,
     TASK_STATUS_RUNNING,
     TASK_STATUS_SUCCEEDED,
-    audit_settings,
+    PostgresQueueSpec,
 )
-from app.models.audit import AuditTask
 
 logger = logging.getLogger("app.orchestration.postgres_task_queue")
 
@@ -37,42 +41,64 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class PostgresTaskQueue:
-    """``TaskQueue`` backed by Postgres ``FOR UPDATE SKIP LOCKED``.
+class PostgresTaskQueue[T]:
+    """``TaskQueue[T]`` backed by Postgres ``FOR UPDATE SKIP LOCKED``.
 
-    Constructed with a session factory (``async_sessionmaker``) so each queue
-    operation runs in its own short-lived transaction — never one held open
-    across a provider call.
+    Constructed with a session factory (``async_sessionmaker``) and a
+    ``PostgresQueueSpec[T]`` supplying the concrete model, lease TTL, claim
+    order, and max-attempts token. Each queue operation runs in its own
+    short-lived transaction — never one held open across a network call.
     """
 
     def __init__(
-        self, session_factory: async_sessionmaker[AsyncSession]
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        spec: PostgresQueueSpec[T],
     ) -> None:
         self._session_factory = session_factory
+        self._spec = spec
+
+    @property
+    def _model(self) -> type[T]:
+        return self._spec.model
+
+    def _lease_expiry(self, now: datetime) -> datetime:
+        return now + timedelta(seconds=self._spec.lease_ttl())
 
     async def claim(
-        self, *, owner: str, limit: int = 1
-    ) -> list[AuditTask]:
+        self,
+        *,
+        owner: str,
+        limit: int = 1,
+        kinds: Sequence[str] | None = None,
+    ) -> list[T]:
+        """Claim up to ``limit`` eligible rows for ``owner``.
+
+        ``kinds`` optionally restricts the claim to specific ``task_kind``
+        values (e.g. a discover-only worker leaves reserved ``analyze`` rows
+        untouched in the queue rather than force-failing them). ``None`` (the
+        default) claims every kind, so callers without a ``task_kind`` column
+        (e.g. the audit queue) are unaffected.
+        """
+        model = self._model
         now = _utcnow()
-        lease_expires = now + timedelta(
-            seconds=audit_settings.lease_ttl_seconds
-        )
+        lease_expires = self._lease_expiry(now)
         async with self._session_factory() as session:
             # Lock eligible rows and skip any another worker already holds. The
-            # ORDER BY makes claim order deterministic (priority, then FIFO).
+            # ORDER BY (spec-supplied) makes claim order deterministic.
             stmt = (
-                select(AuditTask)
+                select(model)
                 .where(
-                    AuditTask.status.in_(
+                    model.status.in_(
                         [TASK_STATUS_QUEUED, TASK_STATUS_RETRY_WAIT]
                     )
                 )
-                .where(AuditTask.available_at <= now)
-                .order_by(
-                    AuditTask.priority.desc(),
-                    AuditTask.available_at.asc(),
-                    AuditTask.randomized_position.asc(),
-                )
+                .where(model.available_at <= now)
+            )
+            if kinds is not None:
+                stmt = stmt.where(model.task_kind.in_(list(kinds)))
+            stmt = (
+                stmt.order_by(*self._spec.claim_order(model))
                 .limit(limit)
                 .with_for_update(skip_locked=True)
             )
@@ -93,8 +119,8 @@ class PostgresTaskQueue:
 
     async def _owned_task(
         self, session: AsyncSession, task_id: uuid.UUID, owner: str | None
-    ) -> AuditTask | None:
-        task = await session.get(AuditTask, task_id, with_for_update=True)
+    ) -> T | None:
+        task = await session.get(self._model, task_id, with_for_update=True)
         if task is None:
             return None
         if owner is not None and task.lease_owner != owner:
@@ -113,9 +139,7 @@ class PostgresTaskQueue:
                 await session.commit()
                 return False
             task.heartbeat_at = now
-            task.lease_expires_at = now + timedelta(
-                seconds=audit_settings.lease_ttl_seconds
-            )
+            task.lease_expires_at = self._lease_expiry(now)
             await session.commit()
             return True
 
@@ -154,7 +178,7 @@ class PostgresTaskQueue:
         error_code: str = "",
         error_detail: str = "",
     ) -> bool:
-        def _set(task: AuditTask) -> None:
+        def _set(task: T) -> None:
             task.error_code = error_code
             task.error_detail = error_detail[:2000]
 
@@ -168,7 +192,7 @@ class PostgresTaskQueue:
         task_id: uuid.UUID,
         owner: str,
         status: str,
-        mutate: Callable[[AuditTask], None] | None = None,
+        mutate: Callable[[T], None] | None = None,
     ) -> bool:
         now = _utcnow()
         async with self._session_factory() as session:
@@ -229,26 +253,35 @@ class PostgresTaskQueue:
             await session.commit()
             return True
 
-    async def release_expired(self) -> int:
+    async def release_expired(self, *, batch_size: int = 500) -> int:
         """Reclaim leases whose ``lease_expires_at`` has passed.
 
         Expired leased/running tasks with attempts remaining return to
         ``retry_wait`` (available immediately); those that have exhausted
         ``max_attempts`` are marked ``failed``. Uses ``SKIP LOCKED`` so it never
         contends with a live worker still holding its row.
+
+        Bounded to ``batch_size`` rows per transaction, in a deterministic
+        order (oldest-expired-first, then id), so a mass expiry across a
+        large frontier never holds one long-running transaction or stalls
+        live claims; a caller polling this repeatedly drains the remainder
+        across subsequent calls.
         """
+        model = self._model
         now = _utcnow()
         reclaimed = 0
         async with self._session_factory() as session:
             stmt = (
-                select(AuditTask)
+                select(model)
                 .where(
-                    AuditTask.status.in_(
+                    model.status.in_(
                         [TASK_STATUS_LEASED, TASK_STATUS_RUNNING]
                     )
                 )
-                .where(AuditTask.lease_expires_at.is_not(None))
-                .where(AuditTask.lease_expires_at < now)
+                .where(model.lease_expires_at.is_not(None))
+                .where(model.lease_expires_at < now)
+                .order_by(model.lease_expires_at.asc(), model.id.asc())
+                .limit(batch_size)
                 .with_for_update(skip_locked=True)
             )
             tasks = list((await session.scalars(stmt)).all())
@@ -259,7 +292,7 @@ class PostgresTaskQueue:
                     task.status = TASK_STATUS_FAILED
                     task.completed_at = now
                     if not task.error_code:
-                        task.error_code = ERROR_MAX_ATTEMPTS
+                        task.error_code = self._spec.max_attempts_error
                         task.error_detail = (
                             "lease expired after max attempts exhausted"
                         )

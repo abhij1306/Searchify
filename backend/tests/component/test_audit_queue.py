@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config.audits import (
+    AUDIT_QUEUE_SPEC,
     TASK_STATUS_FAILED,
     TASK_STATUS_LEASED,
     TASK_STATUS_RETRY_WAIT,
@@ -47,7 +48,7 @@ async def test_concurrent_claims_never_double_claim(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     await _make_queued_audit(session_factory, prompts=6, reps=2)  # 12
-    queue = PostgresTaskQueue(session_factory)
+    queue = PostgresTaskQueue(session_factory, AUDIT_QUEUE_SPEC)
 
     # Two workers claim the whole queue concurrently. SKIP LOCKED must partition
     # the rows so no task is handed to both.
@@ -69,7 +70,7 @@ async def test_sweeper_reclaims_expired_lease(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     await _make_queued_audit(session_factory, prompts=1, reps=1)  # 1
-    queue = PostgresTaskQueue(session_factory)
+    queue = PostgresTaskQueue(session_factory, AUDIT_QUEUE_SPEC)
 
     claimed = await queue.claim(owner="dead-worker", limit=1)
     assert len(claimed) == 1
@@ -101,7 +102,7 @@ async def test_sweeper_fails_task_when_attempts_exhausted(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     await _make_queued_audit(session_factory, prompts=1, reps=1)
-    queue = PostgresTaskQueue(session_factory)
+    queue = PostgresTaskQueue(session_factory, AUDIT_QUEUE_SPEC)
 
     claimed = await queue.claim(owner="dead-worker", limit=1)
     task_id = claimed[0].id
@@ -126,7 +127,7 @@ async def test_succeed_and_retry_lifecycle(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     audit = await _make_queued_audit(session_factory, prompts=2, reps=1)  # 2
-    queue = PostgresTaskQueue(session_factory)
+    queue = PostgresTaskQueue(session_factory, AUDIT_QUEUE_SPEC)
 
     claimed = await queue.claim(owner="w1", limit=2)
     assert len(claimed) == 2

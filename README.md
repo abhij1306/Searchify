@@ -1,31 +1,83 @@
 # Searchify
 
-> **AEO / AI-visibility SaaS** — measure how your brand appears inside answer-engine
-> responses (ChatGPT, Gemini, Claude), score every response deterministically, and see the
-> result in a Visibility dashboard with a full run/executions evidence trail.
+<p align="center">
+  <strong>Own how your brand appears in AI answers — and strengthen the pages those answers rely on.</strong>
+</p>
 
-Searchify lets a workspace define a **brand + competitors + prompts**, run a one-time
-**audit** (prompt × engine × repetition executions across bring-your-own-key answer
-engines), score each response **deterministically** (mentions, citations, share-of-voice),
-and surface the outcome in a **Visibility dashboard** and a **Run / Executions evidence
-explorer**.
+<p align="center">
+  Searchify is an open-source AI visibility and site intelligence platform for measuring brand presence across answer engines, inspecting the evidence behind every result, and improving on-page AEO readiness.
+</p>
 
-This repository is the **MVP visibility slice** built on the full target architecture from
-day one — workspaces, workspace-scoped auth, UUID primary keys everywhere, BYOK provider
-settings, a Postgres `FOR UPDATE SKIP LOCKED` task queue (no Redis), and a complete audit
-state machine. Every other AEO surface (LLM Analytics, Traffic, Content, Site Health,
-Topics, integrations, Agent, MCP) is documented as **roadmap** and not yet coded.
+<p align="center">
+  <a href="https://github.com/abhij1306/Searchify/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/abhij1306/Searchify?style=flat-square"></a>
+  <a href="https://github.com/abhij1306/Searchify/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/abhij1306/Searchify?style=flat-square"></a>
+  <a href="https://github.com/abhij1306/Searchify/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/abhij1306/Searchify?style=flat-square"></a>
+  <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white&style=flat-square">
+  <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white&style=flat-square">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql&logoColor=white&style=flat-square">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white&style=flat-square">
+</p>
+
+<p align="center">
+  <code>AEO</code> · <code>GEO</code> · <code>AI Visibility</code> · <code>Brand Monitoring</code> · <code>Site Health</code> · <code>Technical SEO</code> · <code>Open Source</code>
+</p>
+
+---
+
+## What Searchify does
+
+Searchify connects two workflows that are usually fragmented across separate tools:
+
+1. **Measure AI visibility.** Run repeatable audits across ChatGPT, Claude, and Gemini using your own provider keys. Compare your brand with competitors, track visibility and share of voice over time, and inspect persisted mention, citation, and query-fanout evidence.
+2. **Improve answer readiness.** Crawl your site with a first-party, security-bounded HTTP crawler. Choose the URLs that matter, score Technical and AEO health, investigate grouped issues, and drill into evidence and remediation for each page.
+
+Every report is built from persisted, versioned evidence. Searchify does not silently re-run providers, re-fetch pages, or invent missing metrics while rendering a dashboard.
+
+## Product highlights
+
+### Visibility Intelligence
+
+- **Multi-engine audits** across ChatGPT/OpenAI, Claude/Anthropic, and Gemini/Google.
+- **Bring your own keys** with encrypted provider credentials and explicit transport routes.
+- **Four-part visibility workspace** covering overview, trends, mentions and citations, and query-fanout evidence.
+- **Competitive benchmarking** for brand mentions, citation ownership, share of voice, and rankings.
+- **Cross-run trends** with engine, time-range, and granularity controls.
+- **Evidence-first exploration** from a headline metric down to the exact persisted execution and source.
+- **Deterministic headline scoring** with analyzer and scoring-rule versions attached to every projection.
+
+### Site Health & AEO Auditing
+
+- **Progressive URL discovery** through an in-house HTTP crawler with SSRF and resource-bound protections.
+- **Free sample and Starter monitoring modes** with privacy-aware count disclosure and quota-controlled URL selection.
+- **Technical, AEO, and combined scores** with transparent rule outcomes and no fabricated zeros.
+- **Live crawl and analysis progress** with resilient polling plus credentialed SSE invalidation.
+- **Grouped issue intelligence** with severity, dimension, remediation, and affected-page navigation.
+- **Per-URL diagnostics** including delivery facts, normalized page facts, evidence, links, and issue history.
+- **Authenticated CSV and Markdown exports** scoped to the active workspace.
+
+### Built for trustworthy operations
+
+- Strict workspace isolation with UUID identifiers throughout.
+- Immutable artifacts and provenance-carrying analyses.
+- PostgreSQL-backed durable queues using `FOR UPDATE SKIP LOCKED`, leases, retries, and idempotency.
+- Same-origin frontend API proxying so backend origins and credentials stay server-side.
+- Typed API contracts validated at runtime with Zod and Pydantic.
+- Light and dark themes, responsive application shell, and reusable design tokens.
+
+> Searchify currently ships Visibility Intelligence, audit evidence, provider management, Site Health, grouped Issues, and per-URL diagnostics. Additional content, traffic, topic, integration, agent, and MCP capabilities remain documented in the [roadmap](docs/roadmap/README.md).
 
 ---
 
 ## Table of contents
 
+- [What Searchify does](#what-searchify-does)
+- [Product highlights](#product-highlights)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Repository layout](#repository-layout)
 - [Prerequisites](#prerequisites)
-- [Quick start (Docker Compose)](#quick-start-docker-compose)
-- [Local development (without Docker)](#local-development-without-docker)
+- [Quick start](#quick-start-docker-compose)
+- [Local development](#local-development-without-docker)
 - [Configuration](#configuration)
 - [Database migrations](#database-migrations)
 - [Testing](#testing)
@@ -39,29 +91,22 @@ Topics, integrations, Agent, MCP) is documented as **roadmap** and not yet coded
 
 ## Architecture
 
-```
-Browser ──/api/:path*── Next.js (rewrites, same-origin proxy) ──> FastAPI backend ──> Postgres
-                                                                        │
-                                                        Postgres task queue (SKIP LOCKED)
-                                                                        │
-                                                                  Audit worker ──> Answer engines
-                                                                                   (BYOK: OpenAI,
-                                                                                    Anthropic, Google)
+```text
+Browser ── /api/* ──> Next.js same-origin proxy ──> FastAPI ──> PostgreSQL
+                                                        │             │
+                                                        │             ├─ durable tasks
+                                                        │             ├─ evidence
+                                                        │             └─ metrics
+                                                        │
+                                                        ├─ Audit worker ──> AI providers (BYOK)
+                                                        └─ Site Health worker ──> public website pages
 ```
 
-- **Same-origin proxying.** The browser only ever calls relative `/api/*`; Next.js
-  `rewrites()` forward to the server-only `BACKEND_ORIGIN`. The browser never sees a
-  cross-origin backend URL (see [gotcha 2](#known-gotchas)).
-- **Deterministic scoring.** Headline metrics (mentions, citations, share-of-voice) are
-  computed with deterministic alias/domain matching — **no LLM is used for headline
-  metrics**. Sentiment and average-position require contextual judgement and are therefore
-  **not computed at MVP** (present in the schema as nullable, rendered as `—`).
-- **Postgres-backed queue.** Audit tasks are claimed with `FOR UPDATE SKIP LOCKED`, leased
-  with heartbeats, and swept when leases expire. No Redis. Orchestration depends on a
-  `TaskQueue` protocol so a future Redis implementation needs no domain rewrite.
-- **Immutable, provenance-carrying data.** Raw response artifacts are written once; every
-  derived analysis/metric row references the artifact it was computed from plus the
-  analyzer/formula version. Reports are pure projections — they never re-call a provider.
+- **Same-origin proxying.** The browser calls relative `/api/*` routes. Next.js forwards them to the server-only `BACKEND_ORIGIN`, keeping backend topology out of the client bundle.
+- **Deterministic, versioned analysis.** Headline visibility metrics and Site Health scores come from explicit rules over persisted evidence. Metrics that are not supported remain nullable and render as `—`.
+- **PostgreSQL-backed orchestration.** Workers claim tasks with `FOR UPDATE SKIP LOCKED`, maintain leases and heartbeats, retry safely, and reconcile terminal state without a Redis dependency.
+- **Immutable evidence and provenance.** Provider responses and crawl artifacts are written once. Derived analyses reference their sources and formula versions; dashboard reads are projections, not hidden recomputation.
+- **Security boundaries by default.** Workspaces are resolved server-side, provider secrets are encrypted at rest, crawler requests are SSRF-bounded, and raw fetched HTML is never retained by Site Health.
 
 ## Tech stack
 
@@ -90,7 +135,7 @@ Searchify/
 │       ├── connectors/      # BYOK answer-engine adapters
 │       ├── orchestration/   # Audit state machine + task queue
 │       ├── analysis/        # Deterministic scoring, normalization, exports
-│       └── workers/         # Audit worker
+│       └── workers/         # Audit and Site Health workers
 ├── frontend/                 # Next.js App Router app
 │   ├── app/                  # Routes (auth, app shell, screens)
 │   └── lib/api/             # Typed API-contract layer (zod schemas)
@@ -138,7 +183,8 @@ pnpm dev            # http://localhost:3000
 ```
 
 Open <http://localhost:3000>, register a user (a workspace is created automatically), then
-set up a project, add prompts, connect a BYOK provider, and launch an audit.
+create a project. Connect a BYOK provider to run Visibility audits, or open Site Health to
+discover and analyze the project website.
 
 ## Local development (without Docker)
 
@@ -223,6 +269,11 @@ pnpm test:e2e         # Playwright (requires a browser + running stack)
 - **Prompt intents.** `discovery | comparison | purchase | service | local`.
 - **BYOK security.** Provider API keys are Fernet-encrypted at rest, resolved only at
   execution time, and never returned in a DTO, logged, or sent as part of a prompt.
+- **Site Health capabilities.** Site Health is capability-gated per workspace
+  (`free | starter`). Free runs a deterministic, read-only **sample** crawl and never
+  discloses the discovered/full-site total; Starter runs the full progressive inventory and
+  lets the user pick a monitored URL set (quota-limited) that is analyzed and dashboarded.
+  See [`docs/site-health.md`](docs/site-health.md).
 
 ## Documentation map
 
@@ -235,8 +286,9 @@ pnpm test:e2e         # Playwright (requires a browser + running stack)
 | [`docs/frontend-architecture.md`](docs/frontend-architecture.md) | Routes, API-contract layer, data flow |
 | [`docs/invariants.md`](docs/invariants.md) | The 12 hard rules (review-blocking) |
 | [`docs/design.md`](docs/design.md) | Design tokens, theme, per-screen layout |
-| [`docs/plans/`](docs/plans/) | Approved implementation plan + task graph |
-| [`docs/roadmap/`](docs/roadmap/) | Design specs for roadmap surfaces (e.g. the [Technical Audit crawler](docs/roadmap/technical-audit.md)) |
+| [`docs/site-health.md`](docs/site-health.md) | Site Health: entitlements, statuses, API endpoints, routes, exports |
+| [`docs/plans/`](docs/plans/) | Historical implementation plans and task graphs |
+| [`docs/roadmap/`](docs/roadmap/) | Shipped design records and specifications for future product surfaces |
 
 ## Known gotchas
 

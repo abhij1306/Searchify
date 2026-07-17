@@ -34,7 +34,7 @@
 | `/traffic` | Traffic | Roadmap |
 | `/content` | Content writer | Roadmap |
 | `/opportunities` | Opportunities | Roadmap |
-| `/site-health`, `/issues` | Site Health + Issues | Roadmap |
+| `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
 | `/topics` | Topics | Roadmap |
 | `/writing` (Tone/Style, Memory), Knowledge Base | Writing suite | Roadmap |

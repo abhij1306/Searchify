@@ -31,8 +31,8 @@ full-product surface is marked below.
 | Traffic | — | Roadmap |
 | Content (writer) | — | Roadmap |
 | Opportunities | — | Roadmap |
-| Site Health (HTTP/Screaming-Frog-style crawler, no browser) | — | Roadmap |
-| Issues catalog | — | Roadmap |
+| Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
+| Issues catalog | `site_health` | **Implemented** — grouped issues + per-URL detail |
 | Brand / Competitors / E-E-A-T rich profile | — | Roadmap |
 | Topics | — | Roadmap |
 | Tone/Writing Style, Memory, Knowledge Base | — | Roadmap |

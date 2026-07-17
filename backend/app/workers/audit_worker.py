@@ -42,6 +42,7 @@ from app.connectors.answer_engines.factory import build_adapter
 from app.core.config.audits import (
     ATTEMPT_STATUS_FAILED,
     ATTEMPT_STATUS_SUCCEEDED,
+    AUDIT_QUEUE_SPEC,
     AUDIT_STATUS_ANALYZING,
     AUDIT_STATUS_CANCELLED,
     AUDIT_STATUS_FAILED,
@@ -262,7 +263,7 @@ class AuditWorker:
         owner: str | None = None,
     ) -> None:
         self._session_factory = session_factory or SessionLocal
-        self._queue = PostgresTaskQueue(self._session_factory)
+        self._queue = PostgresTaskQueue(self._session_factory, AUDIT_QUEUE_SPEC)
         self.owner = owner or f"worker-{uuid.uuid4().hex[:12]}"
 
     async def run_once(self) -> int:

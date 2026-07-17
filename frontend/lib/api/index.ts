@@ -11,6 +11,7 @@ import { projectsApi } from './projects';
 import { promptsApi } from './prompts';
 import { providersApi } from './providers';
 import { runsApi } from './runs';
+import { siteHealthApi } from './site-health';
 import { visibilityApi } from './visibility';
 
 export const api = {
@@ -19,6 +20,7 @@ export const api = {
   ...promptsApi,
   ...providersApi,
   ...runsApi,
+  ...siteHealthApi,
   ...visibilityApi,
 };
 
@@ -27,6 +29,7 @@ export { projectsApi } from './projects';
 export { promptsApi } from './prompts';
 export { providersApi } from './providers';
 export { runsApi } from './runs';
+export { siteHealthApi, siteHealthQueries, siteHealthMutations } from './site-health';
 export { visibilityApi } from './visibility';
 
 export { queryKeys } from './query-keys';

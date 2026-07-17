@@ -17,6 +17,38 @@ from app.core.config.projects import (
     BENCHMARK_MODE_CONSUMER_LIKE,
     BENCHMARK_MODE_CONTROLLED_LOCALIZED,
 )
+from app.core.config.task_queue import (
+    ERROR_MAX_ATTEMPTS,
+    TASK_CLAIMABLE_STATUSES,
+    TASK_LEASED_STATUSES,
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_LEASED,
+    TASK_STATUS_QUEUED,
+    TASK_STATUS_RETRY_WAIT,
+    TASK_STATUS_RUNNING,
+    TASK_STATUS_SUCCEEDED,
+    TASK_TERMINAL_STATUSES,
+    PostgresQueueSpec,
+)
+
+# Queue-row statuses + the max-attempts token are queue-neutral: they are
+# owned by ``config/task_queue.py`` and re-exported here so existing audit
+# imports (``from app.core.config.audits import TASK_STATUS_*``) keep working
+# unchanged while the audit and Site Health queues share one vocabulary.
+__all_queue_reexports = (
+    ERROR_MAX_ATTEMPTS,
+    TASK_CLAIMABLE_STATUSES,
+    TASK_LEASED_STATUSES,
+    TASK_STATUS_CANCELLED,
+    TASK_STATUS_FAILED,
+    TASK_STATUS_LEASED,
+    TASK_STATUS_QUEUED,
+    TASK_STATUS_RETRY_WAIT,
+    TASK_STATUS_RUNNING,
+    TASK_STATUS_SUCCEEDED,
+    TASK_TERMINAL_STATUSES,
+)
 
 # --- Audit lifecycle statuses --------------------------------------------
 # The state machine (``app/orchestration/audit_state.py``) enforces the legal
@@ -55,25 +87,9 @@ AUDIT_ACTIVE_STATUSES: Final[frozenset[str]] = frozenset(
 )
 
 # --- Task (queue row) statuses -------------------------------------------
-TASK_STATUS_QUEUED: Final = "queued"
-TASK_STATUS_LEASED: Final = "leased"
-TASK_STATUS_RUNNING: Final = "running"
-TASK_STATUS_SUCCEEDED: Final = "succeeded"
-TASK_STATUS_RETRY_WAIT: Final = "retry_wait"
-TASK_STATUS_FAILED: Final = "failed"
-TASK_STATUS_CANCELLED: Final = "cancelled"
-
-TASK_TERMINAL_STATUSES: Final[frozenset[str]] = frozenset(
-    {TASK_STATUS_SUCCEEDED, TASK_STATUS_FAILED, TASK_STATUS_CANCELLED}
-)
-# Statuses a claim() may pick up (queued or ready-to-retry).
-TASK_CLAIMABLE_STATUSES: Final[frozenset[str]] = frozenset(
-    {TASK_STATUS_QUEUED, TASK_STATUS_RETRY_WAIT}
-)
-# Statuses a sweeper reclaims when their lease expires.
-TASK_LEASED_STATUSES: Final[frozenset[str]] = frozenset(
-    {TASK_STATUS_LEASED, TASK_STATUS_RUNNING}
-)
+# Owned by ``config/task_queue.py`` and re-exported at the top of this module
+# (``TASK_STATUS_*`` / ``TASK_TERMINAL_STATUSES`` / ``TASK_CLAIMABLE_STATUSES``
+# / ``TASK_LEASED_STATUSES``) so audit callers import them from here unchanged.
 
 # --- Attempt outcomes ----------------------------------------------------
 ATTEMPT_STATUS_SUCCEEDED: Final = "succeeded"
@@ -95,7 +111,7 @@ EVENT_AUDIT_COMPLETED: Final = "audit.completed"
 # worker); these two are orchestration-level (no provider call involved).
 ERROR_RUN_DEADLINE: Final = "run_deadline_exceeded"
 ERROR_CANCELLED: Final = "cancelled"
-ERROR_MAX_ATTEMPTS: Final = "max_attempts_exceeded"
+# ``ERROR_MAX_ATTEMPTS`` is queue-neutral (re-exported from task_queue above).
 ERROR_NO_CONNECTION: Final = "provider_connection_missing"
 
 # --- Deterministic system instructions per benchmark mode -----------------
@@ -188,3 +204,33 @@ class AuditSettings(BaseSettings):
 
 
 audit_settings = AuditSettings()
+
+
+def _audit_model() -> type:
+    # Imported lazily so this config module never imports a model at import
+    # time (would create a config <-> models circular import).
+    from app.models.audit import AuditTask
+
+    return AuditTask
+
+
+def _audit_claim_order(model: type) -> tuple:
+    # Deterministic claim order: priority, then FIFO by availability, then the
+    # frozen randomized slot position. Preserves the exact original audit
+    # ordering (see the pre-genericization ``PostgresTaskQueue.claim``).
+    return (
+        model.priority.desc(),
+        model.available_at.asc(),
+        model.randomized_position.asc(),
+    )
+
+
+# The audit queue spec: parameterizes the generic ``PostgresTaskQueue`` over
+# ``AuditTask`` with the audit lease TTL + claim order, preserving current
+# audit queue semantics exactly.
+AUDIT_QUEUE_SPEC: Final[PostgresQueueSpec] = PostgresQueueSpec(
+    model_ref=_audit_model,
+    lease_ttl=lambda: audit_settings.lease_ttl_seconds,
+    claim_order=_audit_claim_order,
+    max_attempts_error=ERROR_MAX_ATTEMPTS,
+)

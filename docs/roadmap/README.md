@@ -16,7 +16,7 @@ artifacts, provenance + version on every derived row, config-in-config-only, and
 
 | Surface | Detailed spec | Notes |
 |---------|---------------|-------|
-| **Technical Audit / Site Health** (HTTP-first, Screaming-Frog-style crawler) | [`technical-audit.md`](technical-audit.md) | Fast async-HTTP crawler + Issues catalog. Full design spec written. |
+| **Technical Audit / Site Health** (HTTP-first, Screaming-Frog-style crawler) | [`technical-audit.md`](technical-audit.md) | **Implemented** — fast async-HTTP crawler + Issues catalog. As-shipped reference: [`../site-health.md`](../site-health.md). |
 | LLM Analytics / AI referrals | [`llm-analytics.md`](llm-analytics.md) | Deterministic AI-referral classification + cross-engine analytics over time (feeds off the integrations). |
 | Traffic | [`traffic.md`](traffic.md) | Organic + AI-driven traffic from GSC/GA4; page-joined to the site crawl. |
 | Content (writer) | [`content-writer.md`](content-writer.md) | Gap-derived briefs + discovery-model drafts; distinct from measurement engines. |

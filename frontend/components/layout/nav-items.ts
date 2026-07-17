@@ -63,8 +63,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'On Page',
     items: [
       { label: 'Setup', href: '/setup', icon: Settings, live: true },
-      { label: 'Site Health', href: '/site-health', icon: ShieldCheck, live: false },
-      { label: 'Issues', href: '/issues', icon: Route, live: false },
+      { label: 'Site Health', href: '/site-health', icon: ShieldCheck, live: true },
+      { label: 'Issues', href: '/issues', icon: Route, live: true },
       { label: 'Knowledge Base', href: '/writing', icon: Layers, live: false },
     ],
   },
