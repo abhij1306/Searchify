@@ -10,10 +10,48 @@
  * control is a disabled "coming soon" affordance and does not affect the query.
  */
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
-import type { AuditStatus, LogicalEngine, RankingRow, Visibility, VisibilityEngine } from '@/lib/api/types';
+import type {
+  AuditStatus,
+  LogicalEngine,
+  RankingRow,
+  Visibility,
+  VisibilityEngine,
+  VisibilityExecutionEvidence,
+} from '@/lib/api/types';
 
 /** Audit statuses that carry a dashboard-ready metric snapshot (B6). */
 export const DASHBOARD_STATUSES: readonly AuditStatus[] = ['completed', 'partially_completed'];
+
+/**
+ * The four Visibility workspace tabs, in display order. Exactly these four —
+ * no Sources / Topics / Sentiment (plan §IA). `overview` is the default.
+ *   - overview:            selected-run score / SOV / provider comparison / rankings
+ *   - trends:              cross-run metrics + charts + ranking movement
+ *   - mentions-citations:  persisted mention/citation evidence
+ *   - query-fanout:        frozen prompts + generated search-query evidence
+ */
+export type VisibilityTab = 'overview' | 'trends' | 'mentions-citations' | 'query-fanout';
+
+/** The ordered tab definitions (id + human label) rendered by the tablist. */
+export const VISIBILITY_TABS: readonly { id: VisibilityTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'trends', label: 'Trends' },
+  { id: 'mentions-citations', label: 'Mentions & Citations' },
+  { id: 'query-fanout', label: 'Query Fanout' },
+] as const;
+
+/** The default (and invalid-value fallback) tab. */
+export const DEFAULT_TAB: VisibilityTab = 'overview';
+
+/** Narrow an arbitrary `?tab=` value to a known tab, else the default. */
+export function normalizeTab(value: string | null | undefined): VisibilityTab {
+  return VISIBILITY_TABS.some((tab) => tab.id === value) ? (value as VisibilityTab) : DEFAULT_TAB;
+}
+
+/** The two evidence tabs share one execution-evidence query + cache key. */
+export function isEvidenceTab(tab: VisibilityTab): boolean {
+  return tab === 'mentions-citations' || tab === 'query-fanout';
+}
 
 /**
  * Prompt-type filter options, kept for the disabled "coming soon" control. The
@@ -136,6 +174,38 @@ export function formatScore(score: number | null): string {
 
 /** The not-yet-computed placeholder for sentiment + avg-position (B-2). */
 export const PLACEHOLDER = '—';
+
+/**
+ * A prompt option for the Query Fanout evidence prompt selector. This is
+ * EVIDENCE filtering (restrict by `AuditPromptSnapshot.prompt_id`), NOT the
+ * Overview prompt-type taxonomy affordance — it never claims prompt-type
+ * semantics. A deleted source prompt has a null `prompt_id` and cannot be
+ * selected by a current id, so it is offered only under "All prompts".
+ */
+export type PromptOption = {
+  /** The source prompt id; only selectable options carry a non-null id. */
+  id: string;
+  /** The frozen prompt text (display label). */
+  label: string;
+};
+
+/**
+ * Derive the selectable prompt options from loaded evidence items: distinct
+ * source `prompt_id`s (deleted prompts with a null id are excluded — they stay
+ * under "All prompts"), labelled by their frozen prompt text, kept in a stable
+ * (first-seen, newest-first) order.
+ */
+export function toPromptOptions(
+  items: readonly VisibilityExecutionEvidence[],
+): PromptOption[] {
+  const seen = new Map<string, string>();
+  for (const item of items) {
+    if (item.prompt_id && !seen.has(item.prompt_id)) {
+      seen.set(item.prompt_id, item.prompt_text || item.prompt_id);
+    }
+  }
+  return [...seen.entries()].map(([id, label]) => ({ id, label }));
+}
 
 /** Rankings already arrive sorted by SOV desc from B6; keep that order stable. */
 export function sortedRankings(rankings: readonly RankingRow[]): RankingRow[] {

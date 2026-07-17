@@ -28,9 +28,9 @@
 | `/setup` | Brand/Project setup | **MVP** |
 | `/prompts` | Prompt library (manual + CSV import; AI-suggest = coming-soon) | **MVP** |
 | `/providers` | BYOK Provider Settings | **MVP** |
-| `/visibility` | Visibility dashboard (selected-run projection) | **MVP** |
+| `/visibility` | Visibility workspace (four tabs: Overview, Trends, Mentions & Citations, Query Fanout) | **MVP** |
 | `/runs`, `/runs/[runId]`, `/runs/[runId]/executions/[executionId]` | Run/Executions explorer | **MVP** |
-| `/analytics` (AEO Insights beyond single-run), trend history | LLM Analytics / trend | Roadmap |
+| `/analytics` (AEO Insights beyond the Visibility workspace) | LLM Analytics | Roadmap |
 | `/traffic` | Traffic | Roadmap |
 | `/content` | Content writer | Roadmap |
 | `/opportunities` | Opportunities | Roadmap |
@@ -49,9 +49,9 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Auth + workspace + project switch | ✅ | |
 | Brand/project setup (aliases, owned/unintended domains, competitors, benchmark_mode) | ✅ | rich Brand/E-E-A-T profile |
 | Prompts: manual entry + CSV import | ✅ | AI-suggested generation (`/generate` stub) |
-| BYOK providers + connection test | ✅ | direct OpenAI adapter |
+| BYOK providers + connection test (direct OpenAI/Anthropic/Google, one route per engine) | ✅ | |
 | Launch audit (multi-engine, repetitions) + cancel | ✅ | recurring schedules |
-| Visibility dashboard | selected-run projection (score + per-engine + rankings) | cross-run trend history |
+| Visibility workspace | four tabs — Overview (selected-run score + per-engine + rankings), Trends (cross-run), Mentions & Citations + Query Fanout (persisted evidence) | Sources / Topics / Sentiment tabs (**not built**) |
 | Sentiment + avg-position columns | render `—` placeholder | computed |
 | Run/Executions evidence + CSV/MD export | ✅ | HTML/JSON renderers |
 | Run progress | polling (SSE optional) | full SSE streaming UI |
@@ -64,8 +64,8 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | API contract layer | `lib/api/{client,errors,query-client,query-keys,schemas,types,index}.ts` + per-domain modules | Transport, zod contracts, retry policy |
 | Setup | `/setup` + `lib/api/projects.ts` | Brand/project create + edit |
 | Prompts | `/prompts` + `lib/api/prompts.ts` | Prompt CRUD, CSV import, AI-suggest coming-soon |
-| Providers | `/providers` + `lib/api/providers.ts` | BYOK cards, route toggle, connection test |
-| Visibility | `/visibility` + `lib/api/visibility.ts` | Selected-run dashboard projection |
+| Providers | `/providers` + `lib/api/providers.ts` | BYOK cards, connection test. One **direct** transport per engine (ChatGPT/OpenAI, Gemini/Google, Claude/Anthropic) — the old route toggle and the reserved "Direct OpenAI — coming soon" option are removed. |
+| Visibility | `/visibility` + `lib/api/visibility.ts` | Four-tab workspace with a shared filter bar (§7) |
 | Runs / executions | `/runs/*` + `lib/api/runs.ts` | Launch, progress, cancel, evidence, export |
 | UI + token policy | `components/ui/*`, `app/globals.css` | CVA primitives, bridged tokens only (no raw hex) |
 
@@ -83,7 +83,9 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   - Prompts → `/prompt-sets`, `/prompts/{id}`, `/prompt-sets/{id}/import` (CSV),
     `/prompt-sets/{id}/generate` (stub → coming-soon UI)
   - Providers → `/provider-connections`, `/provider-connections/{id}/test`, `/provider-catalog`
-  - Visibility → `GET /projects/{id}/visibility?audit_id=`
+  - Visibility → `GET /projects/{id}/visibility?audit_id=` (Overview),
+    `GET /projects/{id}/visibility/trends` (Trends),
+    `GET /projects/{id}/visibility/evidence` (Mentions & Citations + Query Fanout, shared)
   - Runs → `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`,
     `GET /audits/{id}/executions`, `GET /executions/{id}`, `GET /audits/{id}/export.{csv,md}`,
     `GET /audits/{id}/events` (SSE, optional)
@@ -95,6 +97,44 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   (requested/completed/failed + status). The backend SSE `/events` endpoint is MVP but the UI
   **consumes SSE optionally** — polling is the baseline so a dropped stream never blocks
   progress.
+
+### 5.1 Visibility workspace (four-tab IA)
+
+`/visibility` is ONE workspace shell (`components/visibility/visibility-dashboard.tsx`): a
+**shared filter bar** (`visibility-toolbar.tsx`) above an accessible tablist
+(`visibility-tabs.tsx`, WAI-ARIA `tablist`/`tab`/`tabpanel` with roving tabindex +
+Arrow/Home/End) with **exactly four** panels, in order:
+
+1. **Overview** (default) — selected-run score / share-of-voice / per-engine provider comparison
+   / brand-vs-competitor rankings, from `GET /projects/{id}/visibility?audit_id=`.
+2. **Trends** — cross-run metrics + charts, from `GET /projects/{id}/visibility/trends`.
+3. **Mentions & Citations** — persisted mention/citation evidence.
+4. **Query Fanout** — frozen prompts + generated queries with `queries_available | count_only |
+   no_search` states.
+
+Tabs 3 and 4 read the **same** shared persisted dataset,
+`GET /projects/{id}/visibility/evidence`. **Only one panel renders at a time**; the active tab
+is mirrored in `?tab=` (invalid values fall back to Overview) so refresh / back / forward
+preserve it. There are **no Sources / Topics / Sentiment tabs** and **no disabled /
+"coming soon" tabs**. Sentiment + avg-position stay null and render as an em-dash (`—`).
+
+**Shared filter ownership** (state lives in the container and persists across tab switches;
+hidden controls keep their state):
+
+| Filter | Affects |
+|---|---|
+| Selected run (`audit_id`) | Overview + both evidence tabs |
+| Logical engine | all four tabs |
+| Prompt | both evidence tabs |
+| Date range (`from`/`to`) | Trends + both evidence tabs |
+| Granularity (`run\|week\|month`) | Trends only |
+
+When an evidence request carries both `audit_id` and a date bound, the backend intersects them.
+
+**Per-tab query enablement**: only the active tab's query runs — the selected-run projection for
+Overview, the trend series for Trends, and a **single shared evidence query** (one identical
+cache key) for either evidence tab, so switching between Mentions & Citations and Query Fanout
+reuses the cached dataset rather than refetching.
 
 ## 6. Drift policy
 
@@ -123,8 +163,14 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   search_used,search_events[],citations[],score,provider_metadata,error_code,error_message,
   latency_ms}`
 - `citationSchema {ordinal,url,title,domain,cited_text,classification}` (`owned|competitor|third_party`)
-- `visibilitySchema` — selected-run: score + per-engine comparison + rankings rows;
-  `sentiment`/`avg_position` nullable.
+- `visibilitySchema` — Overview selected-run: score + per-engine comparison + rankings rows;
+  `sentiment`/`avg_position` nullable (render `—`).
+- `visibilityTrendPointSchema` / `visibilityTrendListSchema` — Trends: cross-run series.
+- `visibilityEvidenceResponseSchema {items,truncated}` (`visibilityExecutionEvidenceSchema` →
+  mentions/citations + `search_events[]` + fanout `state` of
+  `queries_available|count_only|no_search`) — the shared dataset for the two evidence tabs.
+- `transportProviderSchema = z.enum(['openai','anthropic','google'])` (active/wire) and
+  `historicalTransportProviderSchema` (adds `openrouter` for read-only legacy provenance).
 
 **Every `id` and `*_id` field is `z.string().uuid()`; no numeric ids; no `user_id`.** All
 responses pass through `strictValidate`.
@@ -146,8 +192,8 @@ responses pass through `strictValidate`.
 - **Retry policy** (`shouldRetryQuery`): retry 408/429/5xx/network up to 2×; `staleTime` 15s;
   `refetchOnWindowFocus:false`.
 - **`index.ts` is a compat facade** — it spreads the per-domain modules and owns no transport.
-- **`trend-chart` primitive is built but unused in MVP** — kept ready for the roadmap trend
-  view; not wired into any MVP screen (the MVP dashboard is single-run).
+- **`trend-chart` primitive powers the Trends tab** — the cross-run Visibility metrics + charts
+  render from `GET /projects/{id}/visibility/trends`.
 - **No raw hex in components** — only bridged Tailwind semantic tokens (see [`design.md`](design.md)).
 
 ## 10. Companion docs

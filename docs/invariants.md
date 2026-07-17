@@ -77,9 +77,15 @@ The audit queue is Postgres via `FOR UPDATE SKIP LOCKED`. Rules:
 
 ### 10. Logical vs transport identity
 Every route and every attempt records all three identities:
-`logical_engine` (chatgpt|gemini|claude) + `transport_provider` (anthropic|google|openrouter)
-+ `transport_model` (the exact model id). A result missing any of the three is invalid. This
-is what lets the dashboard compare engines and gives unambiguous provenance. Example:
+`logical_engine` (chatgpt|gemini|claude) + `transport_provider` + `transport_model` (the
+exact model id). A result missing any of the three is invalid. This is what lets the dashboard
+compare engines and gives unambiguous provenance. **Active** transports are exactly
+`openai | anthropic | google`, one approved route per engine
+(`chatgpt → openai → gpt-5.4`, `claude → anthropic → claude-sonnet-4-6`,
+`gemini → google → gemini-flash-latest`). `openrouter` is **retired** as an active transport
+and survives ONLY as a HISTORICAL token: read/guard comparisons still recognise it so legacy
+rows read safely, but it is NEVER an active/approved/write route. Reads must therefore stay
+tolerant of a historical value. Example of a legacy row that still renders:
 `logical_engine=gemini, transport_provider=openrouter, transport_model=google/<exact-id>`.
 
 ### 11. Gotcha 1 runbook — shell secrets override Docker Compose `${VAR}`

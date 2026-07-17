@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { Alert } from './alert';
@@ -253,7 +253,7 @@ describe('Donut', () => {
   });
 });
 
-describe('TrendChart (roadmap — built but unused in MVP UI)', () => {
+describe('TrendChart (cross-run Visibility trend)', () => {
   it('renders with an ARIA label describing the trend', () => {
     render(
       <TrendChart
@@ -270,5 +270,103 @@ describe('TrendChart (roadmap — built but unused in MVP UI)', () => {
     expect(chart).toBeInTheDocument();
     // Line stroke uses the accent token.
     expect(chart.querySelector('.stroke-accent')).not.toBeNull();
+  });
+
+  it('renders a single point without a misleading slope or area', () => {
+    render(<TrendChart label="Visibility trend" data={[{ label: 'Jul', value: 55 }]} />);
+    const chart = screen.getByRole('img', {
+      name: 'Visibility trend: Single point Jul (55)',
+    });
+    expect(chart).toBeInTheDocument();
+    // No connecting line and no area fill for a single point — just a dot.
+    expect(chart.querySelector('.stroke-accent')).toBeNull();
+    expect(chart.querySelector('.fill-accent-soft')).toBeNull();
+    expect(chart.querySelectorAll('circle.fill-accent')).toHaveLength(1);
+  });
+
+  it('renders an empty state with no data points', () => {
+    render(<TrendChart label="Visibility trend" data={[]} />);
+    expect(
+      screen.getByRole('img', { name: 'Visibility trend: No trend data' }),
+    ).toBeInTheDocument();
+  });
+
+  it('marks a version boundary with an accessible warning marker', () => {
+    render(
+      <TrendChart
+        label="Visibility trend"
+        data={[
+          { label: 'Jun', value: 40 },
+          { label: 'Jul', value: 70, versionChange: { note: 'Scoring rule scoring-v2 applied' } },
+        ]}
+      />,
+    );
+    const chart = screen.getByRole('img');
+    const marker = chart.querySelector('[data-version-marker]');
+    expect(marker).not.toBeNull();
+    // The change is announced via a <title>, not conveyed by color alone.
+    expect(within(chart as unknown as HTMLElement).getByText(/Scoring rule scoring-v2 applied/)).toBeInTheDocument();
+    // The dashed marker line uses the warning token (bridged), not raw hex.
+    expect(chart.querySelector('.stroke-warning')).not.toBeNull();
+  });
+
+  it('renders null values as gaps, announces them, and never draws a zero dot', () => {
+    render(
+      <TrendChart
+        label="Visibility trend"
+        data={[
+          { label: 'Jun', value: 40 },
+          { label: 'Jul', value: 50 },
+          { label: 'Aug', value: null },
+          { label: 'Sep', value: 60 },
+          { label: 'Oct', value: 70 },
+        ]}
+      />,
+    );
+    const chart = screen.getByRole('img');
+    // Endpoints announce the numeric value; the gap is announced explicitly.
+    expect(chart).toHaveAttribute(
+      'aria-label',
+      'Visibility trend: Trend from Jun (40) to Oct (70) Some points are unavailable and shown as gaps.',
+    );
+    // The null point produces NO dot: only the four available points have dots.
+    expect(chart.querySelectorAll('circle.fill-accent')).toHaveLength(4);
+    // The line splits across the gap into two separate multi-point sub-paths.
+    expect(chart.querySelectorAll('path.stroke-accent')).toHaveLength(2);
+  });
+
+  it('announces an unavailable endpoint value as "unavailable"', () => {
+    render(
+      <TrendChart
+        label="Visibility trend"
+        data={[
+          { label: 'Jun', value: null },
+          { label: 'Jul', value: 55 },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole('img', {
+        name: 'Visibility trend: Trend from Jun (unavailable) to Jul (55) Some points are unavailable and shown as gaps.',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a single available point among nulls as a lone dot (no slope)', () => {
+    render(
+      <TrendChart
+        label="Visibility trend"
+        data={[
+          { label: 'Jun', value: null },
+          { label: 'Jul', value: 55 },
+          { label: 'Aug', value: null },
+        ]}
+      />,
+    );
+    const chart = screen.getByRole('img');
+    // One dot for the lone available point; no line/area (segment length 1).
+    expect(chart.querySelectorAll('circle.fill-accent')).toHaveLength(1);
+    expect(chart.querySelector('path.stroke-accent')).toBeNull();
+    expect(chart.querySelector('.fill-accent-soft')).toBeNull();
   });
 });

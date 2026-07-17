@@ -8,7 +8,40 @@ the domain form the adapters need so parsing has no cross-subsystem dependency.
 
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlsplit
+
+
+def annotation_offset(annotation: dict[str, Any], *keys: str) -> int | None:
+    """First integer-coercible offset among ``keys`` on a citation annotation.
+
+    Accepts both snake_case and camelCase offset keys (REST vs SDK casing).
+    Returns ``None`` when no key is present or the value is not int-coercible.
+    """
+    for key in keys:
+        if key in annotation and annotation[key] is not None:
+            try:
+                return int(annotation[key])
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def coerce_int(value: object, default: int = 0) -> int:
+    """Best-effort integer coercion that never raises.
+
+    Returns ``default`` when ``value`` is missing or not int-coercible, so
+    malformed provider usage payloads degrade gracefully instead of crashing
+    the worker path.
+    """
+    if value is None:
+        return default
+    try:
+        # int(float("inf"))/int("nan") raise OverflowError/ValueError; treat any
+        # non-int-coercible or non-finite value as the default.
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
 
 
 def normalize_domain(value: object) -> str:

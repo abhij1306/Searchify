@@ -146,25 +146,38 @@ export const projectSchema = z
 // Providers (BYOK) — secret never present
 // ---------------------------------------------------------------------------
 
-// MVP transports a BYOK connection may declare and that appear on the wire in
-// create/update/response DTOs. Backend `TransportProvider` (providers/schemas)
-// + `MVP_TRANSPORTS` (provider_catalog) exclude direct `openai` at MVP.
-export const transportProviderSchema = z.enum(['anthropic', 'google', 'openrouter']);
-// Wider UI-only transport space, including the reserved/disabled `openai`
-// route the F8 providers UI renders as "coming soon". Never used to validate an
-// API request/response DTO — only for the static reserved-route options.
-export const uiTransportProviderSchema = z.enum(['anthropic', 'google', 'openrouter', 'openai']);
+// Active BYOK transports a connection may declare on the create/write path and
+// that the provider catalog lists (v2 direct-provider retirement). Backend
+// `ActiveTransportProvider` (providers/schemas) + `ACTIVE_TRANSPORTS`
+// (provider_catalog): direct OpenAI / Anthropic / Google only. The retired
+// `openrouter` token is NOT accepted here, so no new OpenRouter connection or
+// route can be created.
+export const transportProviderSchema = z.enum(['openai', 'anthropic', 'google']);
+// Historical transport space including the retired `openrouter`. Read-only DTOs
+// (provider connections/routes) accept it so legacy OpenRouter rows still parse
+// under strict validation (invariant 10); it is never used for a write DTO.
+export const historicalTransportProviderSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google',
+  'openrouter',
+]);
 export const logicalEngineSchema = z.enum(['chatgpt', 'gemini', 'claude']);
 
 // A configured route on a connection: which logical engine this transport
-// serves and the concrete transport model to call.
+// serves and the concrete transport model to call. Reads accept the historical
+// transport space so a legacy `openrouter` route still parses; `active` is
+// false for retired routes so read clients can identify (and skip) them without
+// seeing the internal deactivation marker.
 export const providerRouteSchema = z
   .object({
     id: uuid(),
     logical_engine: logicalEngineSchema,
-    transport_provider: transportProviderSchema,
+    transport_provider: historicalTransportProviderSchema,
     transport_model: z.string(),
     is_default: z.boolean(),
+    // Backend defaults to true; legacy openrouter routes are returned false.
+    active: z.boolean().optional(),
   })
   .strict();
 
@@ -175,7 +188,9 @@ export const providerConnectionSchema = z
     // Optional so the pre-B4 minimal shape (used in the schema test) still
     // validates; the live B4 DTO always sends these.
     label: z.string().nullable().optional(),
-    transport_provider: transportProviderSchema,
+    // Reads accept the historical transport space so a legacy `openrouter`
+    // connection still parses under strict validation (invariant 10).
+    transport_provider: historicalTransportProviderSchema,
     base_url: z.string().nullable(),
     active: z.boolean(),
     // Presence flag only — the key value itself is NEVER on the wire.
@@ -889,6 +904,153 @@ export const siteHealthErrorSchema = z
     currently_used: z.number().int().optional(),
     expected_selection_version: z.number().int().optional(),
     current_selection_version: z.number().int().optional(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
+// Cross-run Visibility trend history (projection over persisted snapshots)
+// ---------------------------------------------------------------------------
+
+// Both Share-of-Voice definitions for one trend point (B backend
+// `VisibilityTrendSov`). `response` is the response-level SOV (brand
+// response-presence share vs competitors); `mention` is the mention-level SOV
+// derived from the persisted `share_of_voice.mention_counts`. Both are
+// deterministic reprojections of persisted metrics (invariant 7) and are
+// nullable when the source metric is absent.
+export const visibilityTrendSovSchema = z
+  .object({
+    response: z.number().nullable(),
+    mention: z.number().nullable(),
+  })
+  .strict();
+
+// One brand-vs-competitor ranking-history row within a trend point (backend
+// `VisibilityTrendRankingRow`). `sentiment` / `avg_position` are present but
+// null until an LLM stage is added (decision B-2 / invariant 9).
+export const visibilityTrendRankingRowSchema = z
+  .object({
+    name: z.string(),
+    is_brand: z.boolean(),
+    mention_rate: z.number().nullable(),
+    citation_rate: z.number().nullable(),
+    share_of_voice: z.number().nullable(),
+    mention_count: z.number().int(),
+    sentiment: z.string().nullable(),
+    avg_position: z.number().nullable(),
+  })
+  .strict();
+
+// One point in the cross-run Visibility trend (backend `VisibilityTrendPoint`).
+// A raw per-run point carries a set `audit_id`; a week/month bucket folds many
+// snapshots (`audit_id` is null) and carries the full provenance list. Version
+// metadata lists every distinct analyzer/scoring version the point folds, with
+// `spans_version_boundary` set when a bucket mixes versions. `sentiment` /
+// `avg_position` stay null (decision B-2 / invariant 9).
+export const visibilityTrendPointSchema = z
+  .object({
+    audit_id: uuid().nullable(),
+    completed_at: z.string(),
+    logical_engine: z.string().nullable(),
+    visibility_score: z.number().nullable(),
+    brand_mention_rate: z.number().nullable(),
+    owned_citation_rate: z.number().nullable(),
+    sov: visibilityTrendSovSchema,
+    rankings: z.array(visibilityTrendRankingRowSchema),
+    sentiment: z.string().nullable(),
+    avg_position: z.number().nullable(),
+    // Provenance (invariant 4): every source snapshot this point folds.
+    source_snapshot_ids: z.array(uuid()),
+    // Distinct versions across the folded snapshots (invariant 4).
+    analyzer_versions: z.array(z.string()),
+    scoring_rule_versions: z.array(z.string()),
+    spans_version_boundary: z.boolean(),
+  })
+  .strict();
+
+// The trends endpoint returns a chronological list of points (never wrapped).
+export const visibilityTrendListSchema = z.array(visibilityTrendPointSchema);
+
+// ---------------------------------------------------------------------------
+// Execution-evidence projection (Mentions & Citations + Query Fanout tabs)
+// `GET /projects/{id}/visibility/evidence`. A pure read projection over already
+// persisted mention/citation/task/artifact rows — nothing is inferred or
+// backfilled at read time (invariant 7). Transport/model stay plain strings so
+// a legacy (e.g. `openrouter`) row still parses under strict validation.
+// ---------------------------------------------------------------------------
+
+// Three-state query-fanout availability for one execution (backend
+// `VisibilityFanoutState`): `queries_available` (≥1 stored event has non-blank
+// query text), `count_only` (search used / count positive but no query text —
+// e.g. a legacy count-only row), `no_search` (neither signal present).
+export const visibilityFanoutStateSchema = z.enum([
+  'queries_available',
+  'count_only',
+  'no_search',
+]);
+
+// One normalized stored search event (backend `VisibilityEvidenceSearchEvent`).
+// Empty query strings are preserved verbatim (a count-only event); query text
+// is never invented.
+export const visibilityEvidenceSearchEventSchema = z
+  .object({
+    sequence: z.number().int(),
+    query: z.string(),
+    call_id: z.string(),
+    call_sequence: z.number().int(),
+    query_sequence: z.number().int(),
+  })
+  .strict();
+
+// One persisted brand/competitor mention row (backend
+// `VisibilityMentionEvidence`). Projected directly from `BrandMention` /
+// `CompetitorMention`; never inferred from answer text at read time.
+export const visibilityMentionEvidenceSchema = z
+  .object({
+    kind: z.enum(['brand', 'competitor']),
+    name: z.string(),
+    first_offset: z.number().int().nullable(),
+    artifact_id: uuid().nullable(),
+    analyzer_version: z.string(),
+  })
+  .strict();
+
+// One execution's persisted mention/citation + query-fanout evidence (backend
+// `VisibilityExecutionEvidence`). `prompt_id` is nullable so a deleted source
+// prompt stays readable via its frozen `prompt_text`; `completed_at` is
+// nullable for an incomplete/legacy row.
+export const visibilityExecutionEvidenceSchema = z
+  .object({
+    audit_id: uuid(),
+    task_id: uuid(),
+    analysis_id: uuid(),
+    artifact_id: uuid().nullable(),
+    prompt_snapshot_id: uuid(),
+    prompt_id: uuid().nullable(),
+    prompt_index: z.number().int(),
+    prompt_text: z.string(),
+    repetition: z.number().int(),
+    completed_at: z.string().nullable(),
+    logical_engine: z.string(),
+    transport_provider: z.string(),
+    transport_model: z.string(),
+    search_used: z.boolean(),
+    search_query_count: z.number().int(),
+    query_text_available: z.boolean(),
+    state: visibilityFanoutStateSchema,
+    search_events: z.array(visibilityEvidenceSearchEventSchema),
+    event_source: z.enum(['raw_artifact', 'audit_task', 'none']),
+    mentions: z.array(visibilityMentionEvidenceSchema),
+    citations: z.array(citationSchema),
+  })
+  .strict();
+
+// The shared evidence dataset for the two evidence tabs (backend
+// `VisibilityEvidenceResponse`). `items` is newest-first; `truncated` is set
+// when more than `limit` matches exist (no offset/cursor/total).
+export const visibilityEvidenceResponseSchema = z
+  .object({
+    items: z.array(visibilityExecutionEvidenceSchema),
+    truncated: z.boolean(),
   })
   .strict();
 

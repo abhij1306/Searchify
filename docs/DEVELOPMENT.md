@@ -117,7 +117,9 @@ uv run alembic check                 # must report "No new upgrade operations de
 
 Migration chain (as of the MVP):
 `0001_initial_empty → 0002_auth_workspace → 0003_projects_prompts → 0004_provider_settings →
-0005_audit_queue → 0006_analysis_metrics → 0007_snapshot_provenance → 0008_site_health`.
+0005_audit_queue → 0006_analysis_metrics → 0007_snapshot_provenance`, then the parallel
+`0008_site_health` and `0008_direct_openai_retirement` revisions, joined by
+`0009_merge_site_health_openai`.
 
 Keep new `alembic_version` revision ids short — the column is `varchar(32)`.
 

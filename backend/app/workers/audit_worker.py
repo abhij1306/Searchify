@@ -61,9 +61,11 @@ from app.core.config.audits import (
     audit_settings,
 )
 from app.core.config.provider_catalog import (
+    ERROR_INVALID_SURFACE,
     ERROR_PARSE,
     ERROR_TIMEOUT,
     RETRYABLE_ERRORS,
+    is_active_transport,
 )
 from app.core.database import SessionLocal
 from app.core.security import decrypt_secret
@@ -411,6 +413,22 @@ class AuditWorker:
             transport_model = task.transport_model
             prompt_text = task.prompt_text or ""
             base_url = snapshot.base_url if snapshot is not None else ""
+
+        # A frozen task on a retired transport (e.g. a legacy OpenRouter task
+        # persisted before the v2 retirement) fails terminally BEFORE the
+        # connection-activity check, key decryption, or any network I/O — no
+        # provider attempt, no external call, no raw artifact (invariant 6/10).
+        if not is_active_transport(transport_provider):
+            await self._fail_terminal(
+                task_id=task_id,
+                audit_id=audit_id,
+                logical_engine=logical_engine,
+                transport_provider=transport_provider,
+                transport_model=transport_model,
+                error_code=ERROR_INVALID_SURFACE,
+                error_detail="transport provider is retired and not executable",
+            )
+            return
 
         # A missing/inactive connection is a terminal misconfiguration.
         if connection is None or not connection.active:

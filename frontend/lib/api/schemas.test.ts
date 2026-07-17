@@ -7,10 +7,15 @@ import {
   citationSchema,
   executionEvidenceSchema,
   executionSchema,
+  historicalTransportProviderSchema,
   projectSchema,
+  providerCatalogSchema,
   providerConnectionSchema,
+  providerRouteSchema,
   sessionUserSchema,
   strictValidate,
+  transportProviderSchema,
+  visibilityEvidenceResponseSchema,
   visibilitySchema,
   workspaceSchema,
 } from './schemas';
@@ -123,6 +128,84 @@ describe('contract schemas', () => {
     expect(strictValidate(providerConnectionSchema, base, 'conn').active).toBe(true);
     expect(() =>
       strictValidate(providerConnectionSchema, { ...base, api_key: 'sk-secret' }, 'conn'),
+    ).toThrow();
+  });
+
+  it('splits active-write and historical-read transport spaces (v2 retirement)', () => {
+    // Write/catalog surface: only the three direct transports.
+    for (const t of ['openai', 'anthropic', 'google']) {
+      expect(transportProviderSchema.parse(t)).toBe(t);
+    }
+    expect(() => transportProviderSchema.parse('openrouter')).toThrow();
+    // Read surface: historical space still accepts the retired openrouter token.
+    for (const t of ['openai', 'anthropic', 'google', 'openrouter']) {
+      expect(historicalTransportProviderSchema.parse(t)).toBe(t);
+    }
+  });
+
+  it('reads a legacy openrouter connection + inactive route under strict validation', () => {
+    const legacy = {
+      id: UUID,
+      workspace_id: UUID2,
+      label: 'legacy',
+      transport_provider: 'openrouter',
+      base_url: null,
+      active: false,
+      api_key_set: true,
+      routes: [
+        {
+          id: UUID2,
+          logical_engine: 'chatgpt',
+          transport_provider: 'openrouter',
+          transport_model: 'openai/gpt-5.4',
+          is_default: true,
+          active: false,
+        },
+      ],
+      created_at: '2026-07-15T00:00:00Z',
+      updated_at: '2026-07-15T00:00:00Z',
+    };
+    const parsed = strictValidate(providerConnectionSchema, legacy, 'legacy');
+    expect(parsed.transport_provider).toBe('openrouter');
+    expect(parsed.active).toBe(false);
+    expect(parsed.routes?.[0]?.active).toBe(false);
+  });
+
+  it('defaults route.active to true when omitted and rejects a create-only openai catalog gap', () => {
+    const route = {
+      id: UUID,
+      logical_engine: 'chatgpt',
+      transport_provider: 'openai',
+      transport_model: 'gpt-5.4',
+      is_default: true,
+    };
+    // `active` is optional on the wire; a route without it parses.
+    expect(strictValidate(providerRouteSchema, route, 'route').transport_provider).toBe('openai');
+  });
+
+  it('validates a direct-only provider catalog and rejects an openrouter catalog transport', () => {
+    const catalog = {
+      transports: ['openai', 'anthropic', 'google'],
+      engines: [
+        { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }] },
+        {
+          logical_engine: 'gemini',
+          routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],
+        },
+        {
+          logical_engine: 'claude',
+          routes: [{ transport_provider: 'anthropic', default_model: 'claude-sonnet-4-6' }],
+        },
+      ],
+    };
+    expect(strictValidate(providerCatalogSchema, catalog, 'catalog').transports).toHaveLength(3);
+    // The catalog must never advertise the retired openrouter transport.
+    expect(() =>
+      strictValidate(
+        providerCatalogSchema,
+        { ...catalog, transports: ['openai', 'openrouter'] },
+        'catalog',
+      ),
     ).toThrow();
   });
 
@@ -286,5 +369,127 @@ describe('contract schemas', () => {
     const parsed = strictValidate(visibilitySchema, visibility, 'visibility');
     expect(parsed.rankings[0]?.sentiment).toBeNull();
     expect(parsed.rankings[0]?.avg_position).toBeNull();
+  });
+});
+
+describe('visibility evidence contract', () => {
+  function makeCitation() {
+    return {
+      ordinal: 1,
+      url: 'https://acme.com/a',
+      title: 'Acme',
+      domain: 'acme.com',
+      classification: 'owned',
+      is_owned: true,
+      is_unintended: false,
+      matched_competitor: null,
+    };
+  }
+
+  function makeItem(overrides: Record<string, unknown> = {}) {
+    return {
+      audit_id: UUID,
+      task_id: UUID2,
+      analysis_id: UUID,
+      artifact_id: UUID2,
+      prompt_snapshot_id: UUID,
+      prompt_id: UUID2,
+      prompt_index: 3,
+      prompt_text: 'Best affordable clothing stores?',
+      repetition: 1,
+      completed_at: '2026-07-15T14:32:00Z',
+      logical_engine: 'chatgpt',
+      transport_provider: 'openai',
+      transport_model: 'gpt-5.4',
+      search_used: true,
+      search_query_count: 2,
+      query_text_available: true,
+      state: 'queries_available',
+      search_events: [
+        { sequence: 0, query: 'affordable clothing Australia', call_id: 'c1', call_sequence: 0, query_sequence: 0 },
+        { sequence: 1, query: 'budget family shops', call_id: 'c1', call_sequence: 0, query_sequence: 1 },
+      ],
+      event_source: 'raw_artifact',
+      mentions: [
+        { kind: 'brand', name: 'Acme', first_offset: 12, artifact_id: UUID2, analyzer_version: 'v1' },
+        { kind: 'competitor', name: 'Globex', first_offset: null, artifact_id: null, analyzer_version: 'v1' },
+      ],
+      citations: [makeCitation()],
+      ...overrides,
+    };
+  }
+
+  it('parses a full evidence response with items and truncated flag', () => {
+    const parsed = strictValidate(
+      visibilityEvidenceResponseSchema,
+      { items: [makeItem()], truncated: true },
+      'evidence',
+    );
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.items[0]?.mentions[0]?.kind).toBe('brand');
+    expect(parsed.items[0]?.search_events).toHaveLength(2);
+  });
+
+  it('accepts nullable prompt_id / artifact_id / completed_at and count-only / no-search states', () => {
+    const countOnly = makeItem({
+      state: 'count_only',
+      query_text_available: false,
+      prompt_id: null,
+      artifact_id: null,
+      completed_at: null,
+      event_source: 'audit_task',
+      search_events: [],
+      mentions: [],
+      citations: [],
+    });
+    const noSearch = makeItem({
+      analysis_id: UUID2,
+      state: 'no_search',
+      search_used: false,
+      search_query_count: 0,
+      query_text_available: false,
+      event_source: 'none',
+      search_events: [],
+    });
+    const parsed = strictValidate(
+      visibilityEvidenceResponseSchema,
+      { items: [countOnly, noSearch], truncated: false },
+      'evidence',
+    );
+    expect(parsed.items[0]?.state).toBe('count_only');
+    expect(parsed.items[0]?.prompt_id).toBeNull();
+    expect(parsed.items[0]?.completed_at).toBeNull();
+    expect(parsed.items[1]?.state).toBe('no_search');
+  });
+
+  it('rejects an unknown fanout state and unknown extra keys (strict)', () => {
+    expect(() =>
+      strictValidate(
+        visibilityEvidenceResponseSchema,
+        { items: [makeItem({ state: 'partial' })], truncated: false },
+        'evidence',
+      ),
+    ).toThrow();
+    expect(() =>
+      strictValidate(
+        visibilityEvidenceResponseSchema,
+        { items: [makeItem({ unexpected: true })], truncated: false },
+        'evidence',
+      ),
+    ).toThrow();
+  });
+
+  it('preserves an empty query string in a search event (never invented)', () => {
+    const item = makeItem({
+      state: 'count_only',
+      search_events: [{ sequence: 0, query: '', call_id: 'c1', call_sequence: 0, query_sequence: 0 }],
+    });
+    const parsed = strictValidate(
+      visibilityEvidenceResponseSchema,
+      { items: [item], truncated: false },
+      'evidence',
+    );
+    expect(parsed.items[0]?.search_events[0]?.query).toBe('');
   });
 });

@@ -27,6 +27,7 @@ from app.core.config.provider_catalog import (
     TEST_STATUS_OK,
     default_model,
     default_probe_engine,
+    is_active_transport,
     is_route_approved,
     provider_catalog_settings,
 )
@@ -51,6 +52,15 @@ class ProviderConnectionNotFoundError(LookupError):
 
 class InvalidRouteError(ValueError):
     """Raised when a requested (engine, transport) route is not approved."""
+
+
+class LegacyConnectionReadOnlyError(RuntimeError):
+    """Raised when a mutation/test targets a retired (legacy) transport.
+
+    Legacy OpenRouter connections survive read-only for historical provenance
+    (invariant 10). Updating or testing one is refused BEFORE any key
+    decryption, mutation, or network call. The message is credential-free.
+    """
 
 
 def _connection_query():
@@ -177,6 +187,12 @@ async def update_connection(
     connection = await get_connection(
         session, workspace_id=workspace_id, connection_id=connection_id
     )
+    # Reject legacy (retired-transport) connections before any mutation.
+    if not is_active_transport(connection.transport_provider):
+        raise LegacyConnectionReadOnlyError(
+            "This connection uses a retired transport and is historical and "
+            "read-only; create a new direct connection instead."
+        )
     if payload.label is not None:
         connection.label = payload.label
     if payload.base_url is not None:
@@ -228,6 +244,13 @@ async def run_connection_test(
         session, workspace_id=workspace_id, connection_id=connection_id
     )
     transport = connection.transport_provider
+    # Refuse to test a retired-transport connection before decrypting the key
+    # or issuing any network call (invariant 6 + 10).
+    if not is_active_transport(transport):
+        raise LegacyConnectionReadOnlyError(
+            "This connection uses a retired transport and is historical and "
+            "read-only; create a new direct connection instead."
+        )
     # Prefer a configured route's engine/model; else fall back to a catalog
     # default engine for the transport.
     logical_engine = default_probe_engine(transport)

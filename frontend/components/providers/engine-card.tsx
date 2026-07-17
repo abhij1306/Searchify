@@ -11,16 +11,14 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { providersApi } from '@/lib/api/providers';
 import { queryKeys } from '@/lib/api/query-keys';
-import type { ProviderConnection, TransportProvider } from '@/lib/api/types';
+import type { ProviderConnection } from '@/lib/api/types';
 import {
   connectionForTransport,
   isConfigured,
-  isMvpTransport,
   mergeRoutePayload,
   TRANSPORT_LABELS,
   type EngineCardModel,
 } from '@/lib/providers/catalog';
-import { RouteToggle } from './route-toggle';
 
 type TestState = { status: 'ok' | 'failed'; message: string } | null;
 
@@ -30,14 +28,14 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Per-engine provider card (F8, design.md §9.5).
+ * Per-engine provider card (F8, v2 direct-provider retirement).
  *
- * Owns the local UI state for one logical engine: the selected transport route
- * (segmented toggle for Gemini/Claude; fixed OpenRouter for ChatGPT), a
+ * Owns the local UI state for one logical engine served by a single fixed
+ * direct transport (ChatGPT/OpenAI, Gemini/Google, Claude/Anthropic): a
  * write-only API-key input (never pre-filled — the stored secret is never on
  * the wire), a "Test connection" action, and a `configured` status badge driven
  * by the connection's `api_key_set` flag. Saving creates or rotates the BYOK
- * connection for the selected transport and records the engine's route.
+ * connection for the engine's direct transport and records the engine's route.
  */
 export function EngineCard({
   model,
@@ -45,18 +43,11 @@ export function EngineCard({
 }: Readonly<{ model: EngineCardModel; connections: ProviderConnection[] }>) {
   const queryClient = useQueryClient();
 
-  // Enabled options are always MVP transports (the reserved `openai` route is
-  // disabled), so the selectable state is the narrow API transport type.
-  const enabledOptions = model.options.filter((o) => !o.disabled);
-  const firstEnabled = enabledOptions[0]?.transport_provider;
-  const defaultTransport: TransportProvider | null =
-    firstEnabled && isMvpTransport(firstEnabled) ? firstEnabled : null;
-
-  const [transport, setTransport] = useState<TransportProvider | null>(defaultTransport);
+  const route = model.route;
+  const transport = route?.transport_provider ?? null;
   const [apiKey, setApiKey] = useState('');
   const [testResult, setTestResult] = useState<TestState>(null);
 
-  const selectedOption = model.options.find((o) => o.transport_provider === transport);
   const connection = transport ? connectionForTransport(connections, transport) : undefined;
   const configured = isConfigured(connection);
 
@@ -65,8 +56,8 @@ export function EngineCard({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!transport || !selectedOption) throw new Error('Select a route first.');
-      const routes = mergeRoutePayload(connection, model.logical_engine, selectedOption.default_model);
+      if (!transport || !route) throw new Error('No route available.');
+      const routes = mergeRoutePayload(connection, model.logical_engine, route.default_model);
       if (connection) {
         return providersApi.updateConnection(connection.id, {
           api_key: apiKey || undefined,
@@ -125,22 +116,12 @@ export function EngineCard({
       </CardHeader>
 
       <CardContent className="grid gap-4">
-        {model.options.length > 0 ? (
+        {route ? (
           <div className="grid gap-1.5">
             <span className="text-xs font-medium text-secondary">Route</span>
-            {/* ChatGPT: OpenRouter-only + a disabled "coming soon" option.
-                Gemini/Claude: a real direct/OpenRouter toggle. */}
-            <RouteToggle
-              options={model.options}
-              value={transport}
-              onChange={(next) => {
-                setTransport(next);
-                setTestResult(null);
-              }}
-              idBase={`route-${model.logical_engine}`}
-            />
-            {selectedOption?.default_model ? (
-              <span className="text-2xs text-muted">Model: {selectedOption.default_model}</span>
+            <span className="text-sm text-foreground">{route.label}</span>
+            {route.default_model ? (
+              <span className="text-2xs text-muted">Model: {route.default_model}</span>
             ) : null}
           </div>
         ) : null}

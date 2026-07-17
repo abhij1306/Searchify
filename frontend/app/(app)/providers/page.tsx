@@ -14,15 +14,14 @@ import { queryKeys } from '@/lib/api/query-keys';
 import { buildEngineCards } from '@/lib/providers/catalog';
 
 /**
- * BYOK Provider Settings screen (F8, design.md §9.5).
+ * BYOK Provider Settings screen (F8, v2 direct-provider retirement).
  *
- * Renders one card per logical engine (ChatGPT / Gemini / Claude). Gemini and
- * Claude offer a direct/OpenRouter route toggle; ChatGPT is OpenRouter-only at
- * MVP with a disabled "Direct OpenAI — coming soon" option (decision B-3). Each
- * card takes a write-only API key (the stored secret is never displayed), runs
- * a connection test, and shows a `configured` badge from `api_key_set`. Below,
- * a plumbing-only discovery/analysis model selector. Available transports and
- * models are driven entirely by `/provider-catalog`.
+ * Renders one card per logical engine (ChatGPT / Gemini / Claude), each served
+ * by a single fixed direct transport (ChatGPT/OpenAI, Gemini/Google,
+ * Claude/Anthropic). Each card takes a write-only API key (the stored secret is
+ * never displayed), runs a connection test, and shows a `configured` badge from
+ * `api_key_set`. Below, a plumbing-only discovery/analysis model selector.
+ * Available transports and models are driven entirely by `/provider-catalog`.
  */
 export default function ProvidersPage() {
   const catalogQuery = useQuery({

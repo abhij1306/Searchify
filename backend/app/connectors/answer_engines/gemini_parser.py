@@ -43,7 +43,10 @@ from app.connectors.answer_engines.contracts import (
     CitationResult,
     SearchEventResult,
 )
-from app.connectors.answer_engines.normalization import normalize_domain
+from app.connectors.answer_engines.normalization import (
+    annotation_offset,
+    normalize_domain,
+)
 
 _DROP_STEP_TYPES = frozenset({"thought"})
 
@@ -59,8 +62,13 @@ def _extract_queries(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if _step_type(step) != "google_search_call":
             continue
         args = step.get("arguments") or step.get("args") or {}
+        if not isinstance(args, dict):
+            args = {}
         call_id = str(step.get("id") or step.get("call_id") or "")
-        for query_sequence, raw in enumerate(args.get("queries") or []):
+        raw_queries = args.get("queries")
+        if not isinstance(raw_queries, (list, tuple)):
+            raw_queries = []
+        for query_sequence, raw in enumerate(raw_queries):
             text = str(raw or "").strip()
             if text:
                 queries.append(
@@ -88,16 +96,6 @@ def _text_blocks(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return blocks
 
 
-def _offset(annotation: dict[str, Any], *keys: str) -> int | None:
-    for key in keys:
-        if key in annotation and annotation[key] is not None:
-            try:
-                return int(annotation[key])
-            except (TypeError, ValueError):
-                return None
-    return None
-
-
 def _extract_citations(blocks: list[dict[str, Any]]) -> list[CitationResult]:
     citations: list[CitationResult] = []
     ordinal = 0
@@ -112,8 +110,8 @@ def _extract_citations(blocks: list[dict[str, Any]]) -> list[CitationResult]:
             title = str(annotation.get("title") or "").strip()
             if not url and not title:
                 continue
-            start = _offset(annotation, "start_index", "startIndex")
-            end = _offset(annotation, "end_index", "endIndex")
+            start = annotation_offset(annotation, "start_index", "startIndex")
+            end = annotation_offset(annotation, "end_index", "endIndex")
             # Derive cited text from the answer where offsets are valid, rather
             # than trusting a possibly-stale provider-duplicated field.
             cited_text = ""
@@ -164,10 +162,14 @@ def sanitize_metadata(payload: dict[str, Any]) -> dict[str, Any]:
         }
         if step_type == "google_search_call":
             arguments = step.get("arguments") or step.get("args") or {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            raw_queries = arguments.get("queries")
+            queries = raw_queries if isinstance(raw_queries, list) else []
             evidence_steps.append(
                 {
                     **common,
-                    "arguments": {"queries": arguments.get("queries") or []},
+                    "arguments": {"queries": queries},
                 }
             )
         elif step_type == "google_search_result":

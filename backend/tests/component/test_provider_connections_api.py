@@ -1,12 +1,15 @@
-"""Component tests for the BYOK provider-connections API (B4).
+"""Component tests for the BYOK provider-connections API (v2 direct-only).
 
-Covers the B4 acceptance:
+Covers the v2 acceptance:
   - connection CRUD is workspace-scoped (invariant 5);
   - the BYOK secret is encrypted at rest and NEVER present in any response DTO
     or log line (explicit redaction assertion, invariant 6);
+  - the active surface is exactly the three direct transports
+    ``{openai, anthropic, google}`` — a new OpenRouter connection is impossible;
+  - a legacy OpenRouter connection reads safely but update/test are refused with
+    409 before any decryption/network call (historical, read-only);
   - ``POST /{id}/test`` returns a status (transport mocked, no real spend);
-  - ``GET /provider-catalog`` lists approved transports/routes;
-  - cross-workspace access is denied.
+  - ``GET /provider-catalog`` lists the direct transports/routes only.
 """
 
 from __future__ import annotations
@@ -31,12 +34,11 @@ async def _register(client: httpx.AsyncClient, email: str) -> None:
 
 def _connection_payload(**overrides: object) -> dict:
     payload = {
-        "label": "Prod OpenRouter",
-        "transport_provider": "openrouter",
+        "label": "Prod OpenAI",
+        "transport_provider": "openai",
         "api_key": _SECRET,
         "routes": [
             {"logical_engine": "chatgpt", "is_default": True},
-            {"logical_engine": "claude"},
         ],
     }
     payload.update(overrides)
@@ -56,6 +58,52 @@ def _assert_no_secret(blob: object) -> None:
     assert '"api_key"' not in text and "'api_key'" not in text
 
 
+async def _resolve_workspace_id(db_session) -> object:
+    from sqlalchemy import select
+
+    from app.models.workspace import Workspace
+
+    return (
+        await db_session.execute(select(Workspace))
+    ).scalars().first().id
+
+
+async def _seed_legacy_openrouter(db_session):
+    """Insert a historical OpenRouter connection + route directly via the ORM.
+
+    Mirrors what migration 0008 leaves behind: an inactive legacy connection
+    with an inactive route. Returns the connection id.
+    """
+    from app.core.security import encrypt_secret
+    from app.models.provider import ProviderConnection, ProviderRoute
+
+    workspace_id = await _resolve_workspace_id(db_session)
+    connection = ProviderConnection(
+        workspace_id=workspace_id,
+        label="Legacy OpenRouter",
+        transport_provider="openrouter",
+        api_key_encrypted=encrypt_secret(_SECRET),
+        active=False,
+        deactivation_reason="openrouter_retired_v2",
+    )
+    db_session.add(connection)
+    await db_session.flush()
+    db_session.add(
+        ProviderRoute(
+            workspace_id=workspace_id,
+            connection_id=connection.id,
+            logical_engine="chatgpt",
+            transport_provider="openrouter",
+            transport_model="openai/gpt-5.4",
+            is_default=True,
+            active=False,
+            deactivation_reason="openrouter_retired_v2",
+        )
+    )
+    await db_session.commit()
+    return connection.id
+
+
 @pytest.mark.asyncio
 async def test_create_connection_redacts_secret_in_response(
     client: httpx.AsyncClient,
@@ -67,15 +115,34 @@ async def test_create_connection_redacts_secret_in_response(
     assert resp.status_code == 201
     body = resp.json()
     assert "-" in body["id"] and "-" in body["workspace_id"]
-    assert body["transport_provider"] == "openrouter"
+    assert body["transport_provider"] == "openai"
     assert body["api_key_set"] is True
     # Invariant 6: the secret and any key field are absent from the DTO.
     _assert_no_secret(body)
     # Provenance recorded on routes (invariant 10).
     engines = {r["logical_engine"]: r for r in body["routes"]}
-    assert engines["chatgpt"]["transport_provider"] == "openrouter"
-    assert engines["chatgpt"]["transport_model"] == "openai/gpt-5.4"
+    assert engines["chatgpt"]["transport_provider"] == "openai"
+    assert engines["chatgpt"]["transport_model"] == "gpt-5.4"
     assert engines["chatgpt"]["is_default"] is True
+    # New routes are active.
+    assert engines["chatgpt"]["active"] is True
+
+
+@pytest.mark.asyncio
+async def test_create_openrouter_connection_rejected(
+    client: httpx.AsyncClient,
+) -> None:
+    await _register(client, "prov-no-or@example.com")
+    # openrouter is not an active transport → request validation (422).
+    resp = await client.post(
+        "/api/v1/provider-connections",
+        json={
+            "transport_provider": "openrouter",
+            "api_key": _SECRET,
+            "routes": [{"logical_engine": "chatgpt"}],
+        },
+    )
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -184,7 +251,8 @@ async def test_delete_connection(client: httpx.AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_invalid_route_rejected(client: httpx.AsyncClient) -> None:
     await _register(client, "prov7@example.com")
-    # chatgpt is OpenRouter-only at MVP; chatgpt over anthropic is not approved.
+    # chatgpt is served ONLY via openai now; chatgpt over anthropic is not
+    # an approved route.
     resp = await client.post(
         "/api/v1/provider-connections",
         json={
@@ -207,21 +275,24 @@ async def test_test_endpoint_returns_status_success(
     conn_id = created.json()["id"]
 
     # Mock the transport so no real API call is made.
-    from app.connectors.answer_engines import openrouter as openrouter_mod
+    from app.connectors.answer_engines import openai as openai_mod
 
-    _real_client = openrouter_mod.httpx.AsyncClient
+    _real_client = openai_mod.httpx.AsyncClient
 
     def _fake_client(*args, **kwargs):  # noqa: ANN002, ANN003
         payload = {
-            "id": "gen-x",
-            "model": "openai/gpt-5.4",
-            "choices": [
+            "id": "resp-x",
+            "object": "response",
+            "status": "completed",
+            "model": "gpt-5.4",
+            "output": [
                 {
-                    "finish_reason": "stop",
-                    "message": {"role": "assistant", "content": "ok"},
+                    "type": "message",
+                    "id": "m",
+                    "content": [{"type": "output_text", "text": "ok"}],
                 }
             ],
-            "usage": {"total_tokens": 2},
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
         }
 
         def handler(_request: httpx.Request) -> httpx.Response:
@@ -230,7 +301,7 @@ async def test_test_endpoint_returns_status_success(
         kwargs["transport"] = httpx.MockTransport(handler)
         return _real_client(*args, **kwargs)
 
-    monkeypatch.setattr(openrouter_mod.httpx, "AsyncClient", _fake_client)
+    monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _fake_client)
 
     resp = await client.post(
         f"/api/v1/provider-connections/{conn_id}/test"
@@ -240,7 +311,7 @@ async def test_test_endpoint_returns_status_success(
     assert body["status"] == "ok"
     assert body["connection_id"] == conn_id
     # Provenance of the probe is recorded (invariant 10).
-    assert body["transport_provider"] == "openrouter"
+    assert body["transport_provider"] == "openai"
     assert body["logical_engine"] == "chatgpt"
     _assert_no_secret(body)
 
@@ -255,9 +326,9 @@ async def test_test_endpoint_reports_failure_and_redacts_logs(
     )
     conn_id = created.json()["id"]
 
-    from app.connectors.answer_engines import openrouter as openrouter_mod
+    from app.connectors.answer_engines import openai as openai_mod
 
-    _real_client = openrouter_mod.httpx.AsyncClient
+    _real_client = openai_mod.httpx.AsyncClient
 
     def _fake_client(*args, **kwargs):  # noqa: ANN002, ANN003
         def handler(_request: httpx.Request) -> httpx.Response:
@@ -266,7 +337,7 @@ async def test_test_endpoint_reports_failure_and_redacts_logs(
         kwargs["transport"] = httpx.MockTransport(handler)
         return _real_client(*args, **kwargs)
 
-    monkeypatch.setattr(openrouter_mod.httpx, "AsyncClient", _fake_client)
+    monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _fake_client)
 
     with caplog.at_level(logging.DEBUG):
         resp = await client.post(
@@ -282,24 +353,68 @@ async def test_test_endpoint_reports_failure_and_redacts_logs(
 
 
 @pytest.mark.asyncio
-async def test_provider_catalog_lists_approved_routes(
+async def test_legacy_openrouter_reads_but_update_and_test_are_409(
+    client: httpx.AsyncClient, db_session, monkeypatch
+) -> None:
+    await _register(client, "prov-legacy@example.com")
+    conn_id = await _seed_legacy_openrouter(db_session)
+
+    # Read remains safe: the historical connection lists with its provenance.
+    listed = await client.get("/api/v1/provider-connections")
+    assert listed.status_code == 200
+    legacy = next(
+        c for c in listed.json() if c["transport_provider"] == "openrouter"
+    )
+    assert legacy["active"] is False
+    assert legacy["routes"][0]["active"] is False
+    # The internal deactivation marker is never exposed to read clients.
+    assert "openrouter_retired_v2" not in listed.text
+
+    # Update is refused with 409 (before any mutation).
+    patched = await client.patch(
+        f"/api/v1/provider-connections/{conn_id}",
+        json={"label": "reactivate", "active": True},
+    )
+    assert patched.status_code == 409
+
+    # Test would decrypt/hit the network — it must be refused first (no call).
+    from app.connectors.answer_engines import openai as openai_mod
+
+    def _boom(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("no network call must be made for a legacy test")
+
+    monkeypatch.setattr(openai_mod.httpx, "AsyncClient", _boom)
+
+    tested = await client.post(
+        f"/api/v1/provider-connections/{conn_id}/test"
+    )
+    assert tested.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_provider_catalog_lists_direct_routes_only(
     client: httpx.AsyncClient,
 ) -> None:
     resp = await client.get("/api/v1/provider-catalog")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body["transports"]) == {"anthropic", "google", "openrouter"}
+    # Active surface is exactly the three direct transports — no openrouter.
+    assert set(body["transports"]) == {"openai", "anthropic", "google"}
+    assert "openrouter" not in body["transports"]
     engines = {e["logical_engine"]: e for e in body["engines"]}
-    # chatgpt is OpenRouter-only at MVP (decision B-3): no direct openai.
+    # chatgpt is served ONLY via direct openai now.
     chatgpt_transports = {
         r["transport_provider"] for r in engines["chatgpt"]["routes"]
     }
-    assert chatgpt_transports == {"openrouter"}
-    assert "openai" not in chatgpt_transports
+    assert chatgpt_transports == {"openai"}
     gemini_transports = {
         r["transport_provider"] for r in engines["gemini"]["routes"]
     }
-    assert gemini_transports == {"google", "openrouter"}
+    assert gemini_transports == {"google"}
+    claude_transports = {
+        r["transport_provider"] for r in engines["claude"]["routes"]
+    }
+    assert claude_transports == {"anthropic"}
 
 
 @pytest.mark.asyncio

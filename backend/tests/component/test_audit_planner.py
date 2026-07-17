@@ -182,6 +182,58 @@ async def test_create_audit_rejects_engine_without_route(
 
 
 @pytest.mark.asyncio
+async def test_create_audit_ignores_inactive_legacy_route(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A retired (inactive) legacy route must not resolve for a new audit.
+
+    Even though the connection is active, an ``active=false`` OpenRouter route
+    is excluded by the planner, so the engine has no usable route.
+    """
+    from app.models.provider import ProviderConnection, ProviderRoute
+
+    async with session_factory() as session:
+        seed = await seed_audit_fixtures(
+            session, prompt_count=1, engines=["gemini"]
+        )
+
+    async with session_factory() as session:
+        connection = ProviderConnection(
+            workspace_id=seed.workspace_id,
+            label="Legacy OpenRouter",
+            transport_provider="openrouter",
+            api_key_encrypted="x",
+            active=True,
+        )
+        session.add(connection)
+        await session.flush()
+        session.add(
+            ProviderRoute(
+                workspace_id=seed.workspace_id,
+                connection_id=connection.id,
+                logical_engine="chatgpt",
+                transport_provider="openrouter",
+                transport_model="openai/gpt-5.4",
+                is_default=True,
+                active=False,
+                deactivation_reason="openrouter_retired_v2",
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        with pytest.raises(AuditValidationError):
+            await create_audit(
+                session,
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                engines=["chatgpt"],  # only a retired route exists
+                prompt_set_id=seed.prompt_set_id,
+                repetitions=1,
+            )
+
+
+@pytest.mark.asyncio
 async def test_create_audit_rejects_unknown_or_disabled_prompt_ids(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
