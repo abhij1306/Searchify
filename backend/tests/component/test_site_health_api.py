@@ -606,3 +606,520 @@ async def test_second_workspace_isolation(
             f"/api/v1/site-crawls/{scn.crawl_id}", headers=ok_headers
         )
     ).status_code == 200
+
+
+# =========================================================================
+# Slice 6 reconciliation coverage (handoff items 1, 4, 5, 6, 7)
+# =========================================================================
+async def _add_second_crawl(
+    session: AsyncSession,
+    scn: Scenario,
+    *,
+    admit_slugs: tuple[str, ...],
+) -> SiteCrawl:
+    """Seed a later crawl for the same project that admits only ``admit_slugs``.
+
+    Reuses the project's existing ``SiteUrl`` rows (a downgrade re-crawls the
+    same site) but records a ``SiteUrlObservation`` only for the requested
+    slugs, so the crawl's admitted set is a strict subset of the project's
+    historical catalog.
+    """
+    profile = await session.scalar(
+        select(SiteHealthProfile).where(
+            SiteHealthProfile.project_id == scn.project_id
+        )
+    )
+    assert profile is not None
+    crawl = SiteCrawl(
+        workspace_id=scn.workspace_id,
+        project_id=scn.project_id,
+        profile_id=profile.id,
+        status=CRAWL_STATUS_COMPLETED,
+        root_url=profile.root_url,
+        random_seed="2",
+        admitted_url_count=len(admit_slugs),
+        analyzed_url_count=0,
+        failed_url_count=0,
+        rule_catalog_version="v1",
+    )
+    session.add(crawl)
+    await session.flush()
+
+    for depth, slug in enumerate(admit_slugs):
+        normalized = f"{profile.root_url}{slug}"
+        su = await session.scalar(
+            select(SiteUrl).where(
+                SiteUrl.project_id == scn.project_id,
+                SiteUrl.normalized_url == normalized,
+            )
+        )
+        assert su is not None
+        session.add(
+            SiteUrlObservation(
+                workspace_id=scn.workspace_id,
+                crawl_id=crawl.id,
+                site_url_id=su.id,
+                source_kind="root" if depth == 0 else "link",
+                depth=depth,
+                observed_url=su.normalized_url,
+                final_url=su.normalized_url,
+                status_code=200,
+                content_type="text/html",
+                title=su.latest_title or "",
+            )
+        )
+    await session.commit()
+    return crawl
+
+
+async def _seed_issue_for_url(
+    session: AsyncSession,
+    scn: Scenario,
+    *,
+    crawl_id: uuid.UUID,
+    site_url_id: uuid.UUID,
+    rule_id: str,
+    dimension: str = "technical",
+    category: str = "meta",
+    severity: str = "critical",
+) -> uuid.UUID:
+    """Seed a full analyze task + artifact + analysis + evaluation + issue.
+
+    ``SiteIssue`` requires non-null ``analysis_id`` / ``evaluation_id`` /
+    ``source_artifact_id`` (and ``evaluation_id`` is unique), so an extra issue
+    cannot be a bare row — it needs its own supporting rows, exactly like the
+    base scenario. Returns the new issue id.
+    """
+    su = await session.get(SiteUrl, site_url_id)
+    assert su is not None
+    task = SiteCrawlTask(
+        crawl_id=crawl_id,
+        workspace_id=scn.workspace_id,
+        task_kind=TASK_KIND_ANALYZE,
+        requested_url=su.normalized_url,
+        url_hash=su.url_hash,
+        site_url_id=su.id,
+        generation=INITIAL_TASK_GENERATION,
+        idempotency_key=f"{crawl_id}:analyze:{su.id}:{rule_id}",
+        status=TASK_STATUS_SUCCEEDED,
+    )
+    session.add(task)
+    await session.flush()
+    artifact = SiteFetchArtifact(
+        task_id=task.id,
+        crawl_id=crawl_id,
+        workspace_id=scn.workspace_id,
+        fetch_purpose="analyze",
+        requested_url=su.normalized_url,
+        final_url=su.normalized_url,
+        status_code=200,
+        content_type="text/html",
+        decoded_bytes=1024,
+        normalized_facts={"has_html": True},
+    )
+    session.add(artifact)
+    await session.flush()
+    analysis = SitePageAnalysis(
+        workspace_id=scn.workspace_id,
+        project_id=scn.project_id,
+        crawl_id=crawl_id,
+        site_url_id=su.id,
+        artifact_id=artifact.id,
+        status=PAGE_ANALYSIS_STATUS_COMPLETED,
+        analyzer_version="v1",
+        scoring_version="v1",
+    )
+    session.add(analysis)
+    await session.flush()
+    evaluation = SiteRuleEvaluation(
+        workspace_id=scn.workspace_id,
+        analysis_id=analysis.id,
+        source_artifact_id=artifact.id,
+        rule_id=rule_id,
+        dimension=dimension,
+        category=category,
+        severity=severity,
+        weight=1.0,
+        outcome=RULE_OUTCOME_FAIL,
+        evidence={"observed": "missing"},
+        analyzer_version="v1",
+        rule_version="v1",
+    )
+    session.add(evaluation)
+    await session.flush()
+    issue = SiteIssue(
+        workspace_id=scn.workspace_id,
+        project_id=scn.project_id,
+        crawl_id=crawl_id,
+        site_url_id=su.id,
+        analysis_id=analysis.id,
+        evaluation_id=evaluation.id,
+        source_artifact_id=artifact.id,
+        rule_id=rule_id,
+        dimension=dimension,
+        category=category,
+        severity=severity,
+        evidence={"observed": "missing"},
+        remediation="Fix it.",
+        analyzer_version="v1",
+        rule_version="v1",
+    )
+    session.add(issue)
+    await session.flush()
+    return issue.id
+
+
+async def test_selected_crawl_scoping_no_downgrade_leakage(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 1: a later crawl only surfaces the URLs IT admitted.
+
+    The first crawl admits all 3 URLs (a/b/c). A later "downgraded" crawl of the
+    same project admits only the root (a). Inventory / pages / page-detail /
+    exports for the later crawl must never leak b/c from the project's fuller
+    historical catalog.
+    """
+    await _register(client, "scope@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="scope@example.com")
+        second = await _add_second_crawl(session, scn, admit_slugs=("a",))
+        second_id = second.id
+        # Resolve b's site_url_id (admitted to the first crawl, not the second).
+        url_b = await session.scalar(
+            select(SiteUrl).where(
+                SiteUrl.project_id == scn.project_id,
+                SiteUrl.normalized_url == "https://acme.test/b",
+            )
+        )
+        url_b_id = url_b.id
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # First crawl still admits all three.
+    first_inv = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/inventory", headers=headers
+    )
+    assert len(first_inv.json()["items"]) == 3
+
+    # Second crawl admitted only the root: inventory + pages scope to it.
+    inv = await client.get(
+        f"/api/v1/site-crawls/{second_id}/inventory", headers=headers
+    )
+    assert inv.status_code == 200
+    inv_urls = {row["normalized_url"] for row in inv.json()["items"]}
+    assert inv_urls == {"https://acme.test/a"}
+
+    pages = await client.get(
+        f"/api/v1/site-crawls/{second_id}/pages", headers=headers
+    )
+    assert {row["normalized_url"] for row in pages.json()["items"]} == {
+        "https://acme.test/a"
+    }
+
+    # A URL the first crawl admitted but the second did not is a 404 on the
+    # second crawl's page-detail (no cross-crawl catalog leak).
+    leaked = await client.get(
+        f"/api/v1/site-crawls/{second_id}/pages/{url_b_id}", headers=headers
+    )
+    assert leaked.status_code == 404
+
+    # Exports over the later crawl carry only its admitted URL.
+    csv_resp = await client.get(
+        f"/api/v1/site-crawls/{second_id}/export.csv?view=inventory",
+        headers=headers,
+    )
+    assert csv_resp.status_code == 200
+    assert "https://acme.test/a" in csv_resp.text
+    assert "https://acme.test/b" not in csv_resp.text
+    assert "https://acme.test/c" not in csv_resp.text
+
+
+async def test_issue_history_bounded_to_crawl_chronology(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 5: an earlier crawl's URL history never shows a later crawl's issues.
+
+    The seeded (earlier) crawl records an issue on url_b. A later crawl records
+    a second issue on the same URL. Requesting the URL's issue-history under the
+    EARLIER crawl must return only the earlier issue (chronology bound).
+    """
+    await _register(client, "history@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="history@example.com")
+        # Later crawl admitting url_b, with a NEW issue on url_b.
+        second = await _add_second_crawl(session, scn, admit_slugs=("a", "b"))
+        await _seed_issue_for_url(
+            session,
+            scn,
+            crawl_id=second.id,
+            site_url_id=scn.issue_url_id,
+            rule_id="aeo.answerable_question",
+            dimension="aeo",
+            category="content",
+            severity="high",
+        )
+        await session.commit()
+        second_id = second.id
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # Earlier crawl: only the earlier issue is in history.
+    earlier = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}"
+        "/issue-history",
+        headers=headers,
+    )
+    assert earlier.status_code == 200
+    earlier_rules = {i["rule_id"] for i in earlier.json()["items"]}
+    assert earlier_rules == {"technical.title_present"}
+
+    # Later crawl: history spans that crawl and prior ones (both issues).
+    later = await client.get(
+        f"/api/v1/site-crawls/{second_id}/pages/{scn.issue_url_id}"
+        "/issue-history",
+        headers=headers,
+    )
+    assert later.status_code == 200
+    later_rules = {i["rule_id"] for i in later.json()["items"]}
+    assert later_rules == {
+        "technical.title_present",
+        "aeo.answerable_question",
+    }
+
+
+async def test_issue_detail_canonicalizes_non_representative_member_id(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 4: a non-representative issue id resolves to the canonical group.
+
+    Two issues share a rule (title_present) on two URLs. The earliest by
+    (created_at, id) is canonical. Requesting the LATER member's id must return
+    the same canonical detail (same id, both affected URLs), not a distinct
+    projection.
+    """
+    await _register(client, "canon@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="canon@example.com")
+        # Add a second issue for the SAME rule on url_c (a later member).
+        url_c = await session.scalar(
+            select(SiteUrl).where(
+                SiteUrl.project_id == scn.project_id,
+                SiteUrl.normalized_url == "https://acme.test/c",
+            )
+        )
+        member_id = await _seed_issue_for_url(
+            session,
+            scn,
+            crawl_id=scn.crawl_id,
+            site_url_id=url_c.id,
+            rule_id="technical.title_present",
+        )
+        await session.commit()
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # Request the LATER member id: the detail canonicalizes to the earliest id.
+    detail = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues/{member_id}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["id"] == str(scn.canonical_issue_id)
+    assert body["id"] != str(member_id)
+    # The group now spans both affected URLs.
+    assert body["affected_url_count"] == 2
+
+
+async def test_grouped_issues_canonical_id_stable_under_filters(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 4: the grouped-issue canonical id does not move when filters apply.
+
+    Adding a same-rule issue on url_c must not change the group's canonical id
+    (earliest unfiltered (created_at, id)), whether unfiltered or filtered to a
+    single affected URL.
+    """
+    await _register(client, "stable@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="stable@example.com")
+        url_c = await session.scalar(
+            select(SiteUrl).where(
+                SiteUrl.project_id == scn.project_id,
+                SiteUrl.normalized_url == "https://acme.test/c",
+            )
+        )
+        url_c_id = url_c.id
+        await _seed_issue_for_url(
+            session,
+            scn,
+            crawl_id=scn.crawl_id,
+            site_url_id=url_c_id,
+            rule_id="technical.title_present",
+        )
+        await session.commit()
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    unfiltered = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues", headers=headers
+    )
+    groups = unfiltered.json()["items"]
+    assert len(groups) == 1
+    assert groups[0]["id"] == str(scn.canonical_issue_id)
+    assert groups[0]["affected_url_count"] == 2
+
+    # Filter to only url_c (which is NOT the canonical row's URL): the canonical
+    # id is unchanged (computed unfiltered), only the affected count narrows.
+    filtered = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues?site_url_id={url_c_id}",
+        headers=headers,
+    )
+    fgroups = filtered.json()["items"]
+    assert len(fgroups) == 1
+    assert fgroups[0]["id"] == str(scn.canonical_issue_id)
+    assert fgroups[0]["affected_url_count"] == 1
+
+
+async def test_tampered_cursor_returns_typed_400(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 6: a malformed/tampered cursor is a 400, never a 500."""
+    await _register(client, "cursor@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="cursor@example.com")
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # Garbage cursor on inventory (url keyset).
+    inv = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/inventory?cursor=not-a-cursor",
+        headers=headers,
+    )
+    assert inv.status_code == 400
+
+    # Garbage cursor on crawl list (created_at keyset) is also a typed 400.
+    crawls = await client.get(
+        f"/api/v1/site-crawls?project_id={scn.project_id}&cursor=%%%bad",
+        headers=headers,
+    )
+    assert crawls.status_code == 400
+
+    # A cursor valid for one filter set, replayed against a different filter, is
+    # rejected as a scope mismatch (400), not silently accepted.
+    first = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/inventory?limit=1", headers=headers
+    )
+    valid_cursor = first.json()["next_cursor"]
+    assert valid_cursor
+    replayed = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/inventory"
+        f"?limit=1&monitored=true&cursor={valid_cursor}",
+        headers=headers,
+    )
+    assert replayed.status_code == 400
+
+
+async def test_export_csv_neutralizes_formula_in_url(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 6: an admitted URL beginning with a formula trigger is neutralized.
+
+    A URL that begins with ``@``/``=``/``+``/``-`` must be prefixed with ``'``
+    in the exported CSV so a spreadsheet renders it as text.
+    """
+    await _register(client, "formula@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="formula@example.com")
+        # A pathological URL that begins with a formula trigger, admitted to
+        # the crawl so it appears in the inventory export.
+        danger = "@evil.example/=cmd"
+        su = SiteUrl(
+            workspace_id=scn.workspace_id,
+            project_id=scn.project_id,
+            normalized_url=danger,
+            url_hash=_hash(danger),
+            display_url=danger,
+            host="evil.example",
+            latest_title="danger",
+            latest_content_type="text/html",
+            last_seen_crawl_id=scn.crawl_id,
+        )
+        session.add(su)
+        await session.flush()
+        session.add(
+            SiteUrlObservation(
+                workspace_id=scn.workspace_id,
+                crawl_id=scn.crawl_id,
+                site_url_id=su.id,
+                source_kind="link",
+                depth=1,
+                observed_url=danger,
+                final_url=danger,
+                status_code=200,
+                content_type="text/html",
+                title="danger",
+            )
+        )
+        await session.commit()
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    csv_resp = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/export.csv?view=inventory",
+        headers=headers,
+    )
+    assert csv_resp.status_code == 200
+    # The neutralizing single-quote precedes the formula trigger in the cell.
+    assert "'@evil.example/=cmd" in csv_resp.text
+
+
+async def test_non_default_workspace_reads_and_exports_succeed(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Item 7: a selected NON-default workspace resolves reads + exports (200).
+
+    The isolation test proves a foreign workspace 404s. This proves the flip
+    side: when the seeded workspace is NOT the user's default, passing its
+    X-Workspace-Id header still resolves every read + export (the header is
+    honored, not just the default workspace).
+    """
+    await _register(client, "nondefault@example.com")
+    async with session_factory() as session:
+        # A first (default-candidate) workspace with no site-health data, plus
+        # the seeded workspace. Registration created the user's own default;
+        # the seeded Acme workspace is a second, non-default one.
+        scn = await _seed_scenario(session, email="nondefault@example.com")
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # Reads resolve in the non-default workspace.
+    assert (
+        await client.get(
+            f"/api/v1/site-crawls/{scn.crawl_id}", headers=headers
+        )
+    ).status_code == 200
+    assert (
+        await client.get(
+            f"/api/v1/projects/{scn.project_id}/site-health", headers=headers
+        )
+    ).status_code == 200
+    assert (
+        await client.get(
+            f"/api/v1/site-crawls/{scn.crawl_id}/issues", headers=headers
+        )
+    ).status_code == 200
+
+    # Exports resolve in the non-default workspace (X-Workspace-Id honored).
+    csv_resp = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/export.csv?view=pages",
+        headers=headers,
+    )
+    assert csv_resp.status_code == 200
+    assert "attachment" in csv_resp.headers["content-disposition"]
+
+    # Events (SSE backing store) resolve in the non-default workspace.
+    events = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/events", headers=headers
+    )
+    assert events.status_code == 200

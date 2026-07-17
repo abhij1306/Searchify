@@ -126,3 +126,88 @@ def test_markdown_escapes_pipes_backslashes_and_collapses_newlines() -> None:
     assert "\r" not in data_line
     # Newlines are collapsed to spaces; no raw line break leaks into the cell.
     assert "fix" in data_line and "now" in data_line
+
+
+@pytest.mark.parametrize("trigger", ["=", "+", "-", "@"])
+def test_csv_neutralizes_leading_spreadsheet_formula_triggers(
+    trigger: str,
+) -> None:
+    """A cell that begins with =/+/-/@ is prefixed with ``'`` (formula guard).
+
+    This is the OWASP CSV-injection mitigation: a URL/title/remediation crafted
+    to begin with a formula trigger must render as literal text in a spreadsheet
+    rather than being evaluated.
+    """
+    payload = f"{trigger}HYPERLINK(\"http://evil\")"
+    items = [
+        {
+            "id": "1",
+            "rule_id": "r",
+            "title": payload,
+            "dimension": "technical",
+            "category": "meta",
+            "severity": "info",
+            "affected_url_count": 1,
+            "remediation": payload,
+            "analyzer_version": "v1",
+            "rule_version": "v1",
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    rows = _parse_csv(rows_to_csv("issues", items))
+    data = dict(zip(rows[0], rows[1], strict=True))
+    # The neutralizing quote is prepended (and survives CSV round-trip).
+    assert data["title"] == "'" + payload
+    assert data["remediation"] == "'" + payload
+
+
+@pytest.mark.parametrize("trigger", ["=", "+", "-", "@"])
+def test_markdown_neutralizes_leading_spreadsheet_formula_triggers(
+    trigger: str,
+) -> None:
+    """Markdown cells are also formula-neutralized (tables get pasted to Excel)."""
+    payload = f"{trigger}1+1"
+    items = [
+        {
+            "id": "1",
+            "rule_id": "r",
+            "title": payload,
+            "dimension": "technical",
+            "category": "meta",
+            "severity": "info",
+            "affected_url_count": 1,
+            "remediation": "ok",
+            "analyzer_version": "v1",
+            "rule_version": "v1",
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    md = rows_to_markdown("issues", items)
+    data_line = next(
+        ln for ln in md.splitlines() if payload in ln and ln.startswith("|")
+    )
+    # The cell text is prefixed with a single quote before the trigger char.
+    assert f"'{payload}" in data_line
+
+
+def test_csv_does_not_prefix_safe_leading_characters() -> None:
+    """A normal https URL / plain text is emitted verbatim (no false positive)."""
+    items = [
+        {
+            "id": "1",
+            "rule_id": "technical.title_present",
+            "title": "Missing page title",
+            "dimension": "technical",
+            "category": "meta",
+            "severity": "critical",
+            "affected_url_count": 1,
+            "remediation": "https://example.test/fix",
+            "analyzer_version": "v1",
+            "rule_version": "v1",
+            "created_at": "2026-01-01T00:00:00Z",
+        }
+    ]
+    rows = _parse_csv(rows_to_csv("issues", items))
+    data = dict(zip(rows[0], rows[1], strict=True))
+    assert data["title"] == "Missing page title"
+    assert data["remediation"] == "https://example.test/fix"
