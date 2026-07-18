@@ -5,8 +5,8 @@ import { PagesTable } from './pages-table';
 import type { PageSummary } from '@/lib/api/types';
 
 // Stub next/navigation (unavailable in jsdom). `push` is asserted by the
-// clickable-row test.
-const push = vi.fn();
+// clickable-row test; vi.hoisted so the hoisted mock factory can reference it.
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }));

@@ -40,9 +40,16 @@ export function AnalysisProgress({
   // written when the crawl terminalizes, so derive the live view from the
   // monitored pages subset instead of rendering 0s (`pages` is the complete
   // bounded monitored set — see the docstring above).
-  const selected = summary?.selected_count || pages.length;
+  const selected = summary?.selected_count ?? pages.length;
   const analyzed = summary?.analyzed_count ?? crawl.analyzed_count;
-  const liveScores = summary ? null : computeLiveScores(pages);
+  // Live scores kick in per-field whenever a terminal score is missing —
+  // including a summary written with null metrics (e.g. mid-run projection).
+  const liveScores =
+    summary?.overall_score != null &&
+    summary.technical_score != null &&
+    summary.aeo_score != null
+      ? null
+      : computeLiveScores(pages);
   const overall = summary?.overall_score ?? liveScores?.overall ?? null;
   const technical = summary?.technical_score ?? liveScores?.technical ?? null;
   const aeo = summary?.aeo_score ?? liveScores?.aeo ?? null;

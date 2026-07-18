@@ -1345,7 +1345,11 @@ async def _issues_summary(
     )
     severity_counts = {name: 0 for name in _SEVERITY_ORDER}
     for name, count in sev_rows.all():
-        severity_counts[name] = int(count)
+        # Three-tier UI vocabulary (high/medium/low): ``critical`` folds into
+        # ``high`` so the High chip count matches the High filter's row set
+        # (which already matches high OR critical). ``critical`` stays 0.
+        key = SEVERITY_HIGH if name == SEVERITY_CRITICAL else name
+        severity_counts[key] = severity_counts.get(key, 0) + int(count)
     dim_rows = await session.execute(
         select(SiteIssue.dimension, func.count(func.distinct(SiteIssue.rule_id)))
         .where(*clauses)
