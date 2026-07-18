@@ -7,7 +7,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input, Textarea } from '@/components/ui/input';
+import { Input, Textarea, inputClasses } from '@/components/ui/input';
 import type { PromptInput } from '@/lib/api/prompts';
 import type { Prompt } from '@/lib/api/types';
 import {
@@ -19,7 +19,6 @@ import {
   promptToFormValues,
   type PromptFormValues,
 } from '@/lib/prompts/forms';
-import { inputClasses } from '@/components/ui/input';
 
 /**
  * Add / edit prompt dialog (F7). react-hook-form + zod; the same form serves

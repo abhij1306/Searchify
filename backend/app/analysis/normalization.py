@@ -17,18 +17,6 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _PUNCTUATION_RE = re.compile(r"[^\w\s]", flags=re.UNICODE)
 
 
-def normalize_text(value: object) -> str:
-    """NFKC + casefold + ``&``-> ``and`` + whitespace collapse.
-
-    Used to build the searchable form of an answer. Punctuation is preserved
-    (only collapsed whitespace) so that offsets remain meaningful for callers
-    that only need case/width-insensitive matching.
-    """
-    text = unicodedata.normalize("NFKC", str(value or "")).casefold()
-    text = text.replace("&", " and ")
-    return _WHITESPACE_RE.sub(" ", text).strip()
-
-
 def normalize_alias(value: object) -> str:
     """Aggressive normalization for alias matching: strip punctuation too.
 

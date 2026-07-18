@@ -1,6 +1,7 @@
 'use client';
 
 import type { UseQueryResult } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 
 import { Alert } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +34,25 @@ export function VisibilityOverview({
 }>) {
   const visibility = query.data;
 
+  // Precedence: data wins; otherwise a terminal error shows only the alert
+  // (no skeleton), and everything else is still loading.
+  let body: ReactNode;
+  if (visibility) {
+    body = (
+      <>
+        <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
+          <VisibilityScoreCard visibility={visibility} />
+          <RankingsTable visibility={visibility} />
+        </div>
+        <EngineComparison visibility={visibility} filter={engineFilter} />
+      </>
+    );
+  } else if (query.isError) {
+    body = null;
+  } else {
+    body = <OverviewSkeleton />;
+  }
+
   return (
     <div className="grid gap-6">
       {query.isError ? (
@@ -41,17 +61,7 @@ export function VisibilityOverview({
         </Alert>
       ) : null}
 
-      {query.isLoading || !visibility ? (
-        <OverviewSkeleton />
-      ) : (
-        <>
-          <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
-            <VisibilityScoreCard visibility={visibility} />
-            <RankingsTable visibility={visibility} />
-          </div>
-          <EngineComparison visibility={visibility} filter={engineFilter} />
-        </>
-      )}
+      {body}
     </div>
   );
 }

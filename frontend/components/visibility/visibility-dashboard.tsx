@@ -111,8 +111,12 @@ export function VisibilityDashboard() {
   const fromParam = useMemo(() => rangeToFrom(range), [range]);
 
   // Overview: the selected-run projection. Enabled only on the Overview tab.
+  // The projection is NOT engine-scoped server-side (the endpoint takes only
+  // `audit_id`); engine is applied client-side in `EngineComparison`. So engine
+  // is deliberately absent from the key — including it would force a refetch of
+  // identical data (and a skeleton flash) on every engine change.
   const visibilityQuery = useQuery({
-    queryKey: queryKeys.visibility.project(projectId ?? '', activeRunId ?? undefined, { engine }),
+    queryKey: queryKeys.visibility.project(projectId ?? '', activeRunId ?? undefined),
     queryFn: ({ signal }) =>
       visibilityApi.getProjectVisibility(
         projectId!,

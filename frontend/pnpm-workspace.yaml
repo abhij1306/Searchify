@@ -3,3 +3,8 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+
+# Force the transitive postcss (Next pulls 8.4.31) up to a patched line
+# (CVE-2026-41305). pnpm 10+ reads overrides here, not from package.json.
+overrides:
+  postcss: '>=8.5.10'

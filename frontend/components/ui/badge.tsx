@@ -47,9 +47,12 @@ function badgeClasses(props: BadgeProps): string {
 }
 
 export function Badge(props: Readonly<BadgeProps>) {
-  const { children, className } = props;
+  // Strip the styling discriminants (`variant`/`value`) so they never leak onto
+  // the DOM node; forward every other HTML attribute (id, style, aria-*,
+  // onClick, …) to the span.
+  const { children, className, variant: _variant, value: _value, ...rest } = props;
   return (
-    <span className={cn(badgeBase, badgeClasses(props), className)}>
+    <span className={cn(badgeBase, badgeClasses(props), className)} {...rest}>
       <span className="size-1 rounded-full bg-current" aria-hidden />
       {children}
     </span>

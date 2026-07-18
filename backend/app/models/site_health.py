@@ -57,6 +57,21 @@ from app.core.config.site_health import (
 from app.core.config.task_queue import TASK_STATUS_QUEUED
 from app.core.database import Base
 
+# FK target references + ondelete actions as named constants. A typo in a
+# ``table.column`` reference would otherwise silently bind the wrong parent;
+# naming them once also makes a future table rename a single-line change.
+_FK_WORKSPACE = "workspaces.id"
+_FK_PROJECT = "projects.id"
+_FK_SITE_HEALTH_PROFILE = "site_health_profiles.id"
+_FK_SITE_CRAWL = "site_crawls.id"
+_FK_SITE_CRAWL_TASK = "site_crawl_tasks.id"
+_FK_SITE_URL = "site_urls.id"
+_FK_SITE_FETCH_ARTIFACT = "site_fetch_artifacts.id"
+_FK_SITE_PAGE_ANALYSIS = "site_page_analyses.id"
+_FK_SITE_RULE_EVALUATION = "site_rule_evaluations.id"
+_ON_DELETE_CASCADE = "CASCADE"
+_ON_DELETE_SET_NULL = "SET NULL"
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -85,7 +100,7 @@ class WorkspaceSiteHealthEntitlement(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     # CAPABILITY key: "free" | "starter" (not a plan display name).
@@ -134,12 +149,12 @@ class SiteHealthProfile(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     root_url: Mapped[str] = mapped_column(String(2048), default="")
@@ -186,17 +201,17 @@ class SiteCrawl(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     profile_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_health_profiles.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_HEALTH_PROFILE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     status: Mapped[str] = mapped_column(
@@ -292,12 +307,12 @@ class SiteUrl(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     normalized_url: Mapped[str] = mapped_column(String(2048))
@@ -311,12 +326,12 @@ class SiteUrl(Base):
     latest_content_type: Mapped[str] = mapped_column(String(128), default="")
     first_seen_crawl_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     last_seen_crawl_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     first_seen_at: Mapped[datetime] = mapped_column(
@@ -352,9 +367,9 @@ class SiteUrlObservation(Base):
             [
                 "site_crawls.workspace_id",
                 "site_crawls.project_id",
-                "site_crawls.id",
+                _FK_SITE_CRAWL,
             ],
-            ondelete="CASCADE",
+            ondelete=_ON_DELETE_CASCADE,
             name="fk_site_url_observation_crawl_scoped",
         ),
         ForeignKeyConstraint(
@@ -362,9 +377,9 @@ class SiteUrlObservation(Base):
             [
                 "site_urls.workspace_id",
                 "site_urls.project_id",
-                "site_urls.id",
+                _FK_SITE_URL,
             ],
-            ondelete="CASCADE",
+            ondelete=_ON_DELETE_CASCADE,
             name="fk_site_url_observation_site_url_scoped",
         ),
     )
@@ -374,7 +389,7 @@ class SiteUrlObservation(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
@@ -392,12 +407,12 @@ class SiteUrlObservation(Base):
     source_kind: Mapped[str] = mapped_column(String(16))
     parent_site_url_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     source_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     depth: Mapped[int] = mapped_column(Integer, default=0)
@@ -437,22 +452,22 @@ class MonitoredSiteUrl(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     profile_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_health_profiles.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_HEALTH_PROFILE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     site_url_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -522,18 +537,18 @@ class SiteCrawlTask(Base):
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     # Nullable: a discover task may enqueue before a SiteUrl identity exists.
     site_url_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_CASCADE),
         nullable=True,
         index=True,
     )
@@ -543,12 +558,12 @@ class SiteCrawlTask(Base):
     # Discovery provenance for deterministic frontier ordering.
     parent_site_url_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     source_task_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawl_tasks.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_CRAWL_TASK, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     depth: Mapped[int] = mapped_column(Integer, default=0)
@@ -580,7 +595,7 @@ class SiteCrawlTask(Base):
     # --- Execution result (single-writer = claiming worker, invariant 3) --
     result_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     error_code: Mapped[str] = mapped_column(String(32), default="")
@@ -614,17 +629,17 @@ class SiteFetchAttempt(Base):
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawl_tasks.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL_TASK, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     attempt_number: Mapped[int] = mapped_column(Integer, default=1)
@@ -640,7 +655,7 @@ class SiteFetchAttempt(Base):
     # Set on the succeeding attempt (SET NULL if the artifact is later removed).
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -667,17 +682,17 @@ class SiteFetchArtifact(Base):
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawl_tasks.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL_TASK, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     fetch_purpose: Mapped[str] = mapped_column(String(16), default="")
@@ -724,27 +739,27 @@ class SitePageAnalysis(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     site_url_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     artifact_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     status: Mapped[str] = mapped_column(
@@ -796,17 +811,17 @@ class SiteLinkReference(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     source_analysis_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_page_analyses.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_PAGE_ANALYSIS, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     source_artifact_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     kind: Mapped[str] = mapped_column(String(16), default="")
@@ -818,12 +833,12 @@ class SiteLinkReference(Base):
     evidence_fingerprint: Mapped[str] = mapped_column(String(64), default="")
     target_task_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawl_tasks.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_CRAWL_TASK, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     target_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="SET NULL"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_SET_NULL),
         nullable=True,
     )
     analyzer_version: Mapped[str] = mapped_column(String(32), default="")
@@ -852,17 +867,17 @@ class SiteRuleEvaluation(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     analysis_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_page_analyses.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_PAGE_ANALYSIS, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     source_artifact_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     rule_id: Mapped[str] = mapped_column(String(64))
@@ -915,37 +930,37 @@ class SiteIssue(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     site_url_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_urls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_URL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     analysis_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_page_analyses.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_PAGE_ANALYSIS, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     evaluation_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_rule_evaluations.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_RULE_EVALUATION, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     source_artifact_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_fetch_artifacts.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_FETCH_ARTIFACT, ondelete=_ON_DELETE_CASCADE),
     )
     rule_id: Mapped[str] = mapped_column(String(64))
     dimension: Mapped[str] = mapped_column(String(16), default="")
@@ -979,17 +994,17 @@ class SiteHealthSnapshot(Base):
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        ForeignKey(_FK_PROJECT, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     selected_url_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -1032,7 +1047,7 @@ class SiteCrawlEvent(Base):
     )
     crawl_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("site_crawls.id", ondelete="CASCADE"),
+        ForeignKey(_FK_SITE_CRAWL, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
     event_type: Mapped[str] = mapped_column(String(48))

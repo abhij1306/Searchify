@@ -12,10 +12,8 @@
 from __future__ import annotations
 
 import base64
-import binascii
 import hashlib
 import json
-import uuid
 from collections.abc import Mapping
 
 from app.connectors.web_evidence.url_policy import canonicalize
@@ -34,23 +32,6 @@ def canonical_identity(url: str, *, base_url: str | None = None) -> tuple[str, s
     """
     canonical = canonicalize(url, base_url=base_url)
     return canonical, url_hash(canonical)
-
-
-def encode_cursor(*, normalized_url: str, row_id: uuid.UUID | str) -> str:
-    """Encode an opaque base64url keyset cursor from the sort tuple."""
-    payload = {"u": str(normalized_url), "i": str(row_id)}
-    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    return base64.urlsafe_b64encode(raw).decode("ascii")
-
-
-def decode_cursor(cursor: str) -> tuple[str, str]:
-    """Decode a cursor to ``(normalized_url, row_id)``; raise on tampering."""
-    try:
-        raw = base64.urlsafe_b64decode(cursor.encode("ascii"))
-        payload = json.loads(raw.decode("utf-8"))
-        return str(payload["u"]), str(payload["i"])
-    except (binascii.Error, ValueError, KeyError, TypeError) as exc:
-        raise ValueError("invalid cursor") from exc
 
 
 # =========================================================================
@@ -127,7 +108,7 @@ def decode_keyset_cursor(
         payload = json.loads(raw.decode("utf-8"))
         stored_fp = str(payload["fp"])
         values = [str(v) for v in payload["k"]]
-    except (binascii.Error, ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError) as exc:
         raise ValueError("invalid cursor") from exc
     if stored_fp != filter_fingerprint(scope, filters):
         raise CursorScopeError("cursor does not match the current endpoint filters")

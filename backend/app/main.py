@@ -34,6 +34,21 @@ logger = logging.getLogger("app")
 # All application routes live under /api/v1 (workspace-scoped per invariant 5).
 API_V1_PREFIX = "/api/v1"
 
+
+def _sanitize_correlation_id(value: str) -> str:
+    """Reject a client-supplied correlation id that is unsafe to echo back.
+
+    The id is reflected into a response header, so any control character
+    (notably CR/LF) could split the response (header injection). Accept only a
+    bounded run of unreserved token characters; anything else is treated as
+    absent so a fresh server-generated id is used instead.
+    """
+    candidate = value.strip()
+    if 0 < len(candidate) <= 128 and all(c.isalnum() or c in "-_." for c in candidate):
+        return candidate
+    return ""
+
+
 # Explicit router stubs registered now so B2–B6 fill them in place. Each router
 # owns its own paths; the prefix keeps the whole surface under /api/v1.
 _ROUTERS = (
@@ -75,7 +90,8 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def correlation_middleware(request: Request, call_next) -> Response:
         header_name = settings.request_id_header
-        correlation_id = request.headers.get(header_name) or generate_correlation_id()
+        supplied = request.headers.get(header_name) or ""
+        correlation_id = _sanitize_correlation_id(supplied) or generate_correlation_id()
         request.state.correlation_id = correlation_id
         token = set_correlation_id(correlation_id)
         try:

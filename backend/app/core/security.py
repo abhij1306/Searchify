@@ -45,15 +45,6 @@ def verify_password(password: str, hashed_password: str) -> bool:
         return False
 
 
-def password_needs_rehash(hashed_password: str) -> bool:
-    try:
-        if _is_argon2_hash(hashed_password):
-            return _PASSWORD_HASHER.check_needs_rehash(hashed_password)
-        return True
-    except (TypeError, ValueError, argon2_exceptions.Argon2Error):
-        return False
-
-
 def create_access_token(subject: str, *, token_version: int = 0) -> str:
     expires_at = datetime.now(UTC) + timedelta(hours=settings.jwt_expire_hours)
     payload = {"sub": subject, "exp": expires_at, "ver": token_version}
