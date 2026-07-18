@@ -4,10 +4,8 @@ import { Suspense } from 'react';
 
 import { PageTitle } from '@/components/ui/typography';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import {
-  DashboardSkeleton,
-  VisibilityDashboard,
-} from '@/components/visibility/visibility-dashboard';
+import { DashboardSkeleton } from '@/components/visibility/dashboard-skeleton';
+import { VisibilityDashboard } from '@/components/visibility/visibility-dashboard';
 
 /**
  * Visibility workspace screen (F9, four-tab IA).

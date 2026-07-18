@@ -14,6 +14,18 @@ import { Skeleton } from '@/components/ui/skeleton';
  * `fanout-evidence.tsx` reuse these so their states stay consistent.
  */
 
+import type { UseQueryResult } from '@tanstack/react-query';
+
+import type { VisibilityEvidenceResponse } from '@/lib/api/types';
+
+/** Props shared by both evidence tabs (Query Fanout, Mentions & Citations). */
+export type EvidenceTabProps = Readonly<{
+  query: UseQueryResult<VisibilityEvidenceResponse, unknown>;
+  isFiltered: boolean;
+  onClearFilters?: () => void;
+  limit: number;
+}>;
+
 export function EvidenceSkeleton({ title }: Readonly<{ title: string }>) {
   return (
     <Card aria-hidden>

@@ -5,8 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardSkeleton } from '@/components/visibility/dashboard-skeleton';
 import { VisibilityEmptyState } from '@/components/visibility/empty-state';
 import { FanoutEvidence } from '@/components/visibility/fanout-evidence';
 import { MentionsCitations } from '@/components/visibility/mentions-citations';
@@ -69,6 +68,8 @@ export function VisibilityDashboard() {
   // re-syncs from the URL on back/forward navigation.
   const [activeTab, setActiveTab] = useState<VisibilityTab>(urlTab);
   useEffect(() => {
+    // Intentional URL→state sync (external navigation is the source of truth).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab(urlTab);
   }, [urlTab]);
 
@@ -274,39 +275,6 @@ export function VisibilityDashboard() {
         onChangeGranularity={setGranularity}
       />
       <VisibilityTabs activeTab={activeTab} onSelectTab={selectTab} panel={panel} />
-    </div>
-  );
-}
-
-/**
- * Dashboard loading placeholder. Exported so the page's `<Suspense>` boundary
- * (required by `useSearchParams`) shows the same skeleton while suspended.
- */
-export function DashboardSkeleton() {
-  return (
-    <div className="grid gap-6" aria-hidden>
-      <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
-        <Card>
-          <CardContent className="grid justify-items-center gap-4">
-            <Skeleton className="size-28 rounded-full" />
-            <Skeleton className="h-4 w-40" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="grid gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-      <Card>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

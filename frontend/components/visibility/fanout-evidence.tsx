@@ -1,6 +1,5 @@
 'use client';
 
-import type { UseQueryResult } from '@tanstack/react-query';
 import { MinusCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +10,10 @@ import {
   EvidenceFilteredEmpty,
   EvidenceSkeleton,
   TruncationNotice,
+  type EvidenceTabProps,
 } from '@/components/visibility/evidence-states';
 import { engineLabel } from '@/lib/providers/catalog';
-import type { VisibilityEvidenceResponse, VisibilityExecutionEvidence } from '@/lib/api/types';
+import type { VisibilityExecutionEvidence } from '@/lib/api/types';
 import {
   countOnlyExplanation,
   formatExecutionDate,
@@ -41,17 +41,7 @@ const TITLE = 'Query Fanout';
  * States: skeleton, retryable error, empty, filtered-empty, and a truncation
  * notice when the newest window overflowed.
  */
-export function FanoutEvidence({
-  query,
-  isFiltered,
-  onClearFilters,
-  limit,
-}: Readonly<{
-  query: UseQueryResult<VisibilityEvidenceResponse, unknown>;
-  isFiltered: boolean;
-  onClearFilters?: () => void;
-  limit: number;
-}>) {
+export function FanoutEvidence({ query, isFiltered, onClearFilters, limit }: EvidenceTabProps) {
   if (query.isLoading) {
     return <EvidenceSkeleton title={TITLE} />;
   }

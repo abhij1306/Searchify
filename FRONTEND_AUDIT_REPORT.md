@@ -146,3 +146,36 @@ react-doctor: **37 → 27 issues** (bugs 11 → 4, security 2 → 0). Typecheck 
 - **B9** (session-guard chained state) — the 401-from-`me` effect is reacting to external query state, not chaining local state; the `redirectingRef` latch is deliberate
 - **B10** (effect re-subscribe on `clearSession`) — `clearSession` is a `useCallback` over stable deps (`queryClient`, `router`), so the QueryCache watchdog does not actually re-subscribe in practice
 - **B11** (preventDefault in prompt-form-dialog) — authenticated SPA dialog; server-action form is an architecture change, not a bug fix
+
+## ✅ Batch-2 outcome — mechanical cleanup + Next 16 upgrade (2026-07-18)
+
+Typecheck clean, ESLint clean, all 328 vitest tests pass, `next build` succeeds, all `check:policy` guards pass.
+
+**Dead code (fallow):**
+- Deleted `components/ui/index.ts` (unused barrel, no importers).
+- `lib/api/index.ts` was also deleted, then **restored**: `scripts/check-frontend-architecture.mjs` requires it as the no-transport compat facade. Fallow flags it because nothing imports it — treat as an intentional keep.
+- Removed 20 dead type aliases + their schema imports from `lib/api/types.ts`; removed `isTestOk`, `logicalEngines`, `DEFAULT_FILTERS`, `PROMPT_TYPE_OPTIONS`, `CardFooter`, `Subtitle`, `LIVE_ROUTES`, `scoreBandFill`; demoted locally-used-only exports to module-private across `lib/api/*` and `lib/visibility/*`.
+- `eslint-config-next` is a **fallow false positive** (consumed via `eslint.config.mjs`) — kept. `pnpm fallow fix` also corrupts `package.json`; re-check it after any future run.
+
+**Performance:**
+- Hoisted pure helpers to module scope (`trend-chart.tsx`, `csv-import-dialog.tsx`); converted three O(n²) `.includes()` loops to `Set` lookups (`lib/prompts/filter.ts`, `prompt-toolbar.tsx`, `launch-dialog.tsx`). Skipped P7 single-pass `.filter().map()` rewrites (negligible on these list sizes).
+
+**Duplication (D1–D8, all resolved):**
+- **D1** — new `lib/auth/use-auth-mutation.ts` (`useAuthMutation`): shared login/register mutation wiring (prime `me` cache, `router.replace('/')`, swallow-error submit); both auth pages now use it.
+- **D2** — new `components/ui/cursor-pager.tsx` (`CursorPager`): shared Previous/Next pair used by `inventory-selection.tsx` and `url-detail.tsx`; `onNext` made idempotent under rapid clicks (review finding).
+- **D3** — shared `EvidenceTabProps` type exported from `evidence-states.tsx`; both evidence tabs use it.
+- **D4/D5** — new `components/visibility/ranking-rows.tsx` (`RankingRowsTable` + `NO_RANKINGS_MESSAGE`), used by `rankings-table.tsx` and `visibility-trends.tsx`; `formatTrendRate` deleted (now unused, `formatRate` covers both).
+- **D6** — `DashboardSkeleton` moved to `components/visibility/dashboard-skeleton.tsx`; `visibility-overview.tsx` reuses it instead of its identical private copy.
+- **D7** — `visibilityTrendRankingRowSchema` is now an alias of `rankingRowSchema` (field-for-field identical).
+- **D8** — shared `analysisSummaryFields` object spread into `inventoryRowSchema` and `pageSummarySchema`.
+- Review finding: mention-badge key in `mentions-citations.tsx` now appends the array index (backend rows aren't guaranteed unique per `kind-name-offset`).
+
+**Next.js 16 upgrade (15.5.4 → 16.2.10):**
+- `next` → `^16.2.10`, `eslint-config-next` → `^16.2.10` (react 19.2 already satisfied peers; Node 24 ≥ 20.9 OK).
+- `next lint` was removed in Next 16 → `lint` script is now `eslint .`.
+- `eslint.config.mjs` migrated off `FlatCompat` to the native flat configs (`eslint-config-next/core-web-vitals`, `eslint-config-next/typescript`).
+- `next build` auto-set `jsx: react-jsx` in `tsconfig.json` (mandatory in 16) and reformatted the `lib` array — keep both.
+- eslint-plugin-react-hooks v7 (new in config 16) flagged 5 pre-existing patterns; each verified intentional and suppressed inline with a reason: URL→state tab sync (`visibility-dashboard.tsx`), one-time staged-selection promotion (`inventory-selection.tsx`), post-mount locale date (`history-drawer.tsx`), stored-project default promotion (`project-context.tsx`), and a `react-hooks/refs` false positive on `session-guard.tsx` (the memo captures ref-reading `clearSession`, but the ref is only read when invoked).
+- No `middleware.ts`, no `next/image`, no async-params pages (all dynamic routes use client `useParams`) — none of the other Next 16 breaking changes apply.
+
+**Still open (deliberately out of scope):** complexity refactors — `site-health-screen.tsx` (cognitive 62), `visibility-dashboard.tsx` (55), `inventory-selection.tsx` (36), `query-keys.ts` split.

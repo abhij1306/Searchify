@@ -584,6 +584,16 @@ export const cursorPageSchema = <T extends z.ZodTypeAny>(item: T) =>
     })
     .strict();
 
+// Nullable analysis-summary fields shared by inventory rows and analyzed-page
+// summary rows (null until analysis completes for that URL).
+const analysisSummaryFields = {
+  issue_count: z.number().int().nullable(),
+  technical_score: z.number().nullable(),
+  aeo_score: z.number().nullable(),
+  overall_score: z.number().nullable(),
+  last_audited: z.string().nullable(),
+};
+
 // One lightweight inventory row. Ordering is URL-only. The analysis summary
 // fields (`issue_count`, `technical_score`, `aeo_score`, `overall_score`,
 // `last_audited`) are null until analysis completes for that URL.
@@ -599,12 +609,7 @@ export const inventoryRowSchema = z
     monitored: z.boolean(),
     first_seen_at: z.string().nullable(),
     last_seen_at: z.string().nullable(),
-    // Nullable analysis summaries (null before analysis completes).
-    issue_count: z.number().int().nullable(),
-    technical_score: z.number().nullable(),
-    aeo_score: z.number().nullable(),
-    overall_score: z.number().nullable(),
-    last_audited: z.string().nullable(),
+    ...analysisSummaryFields,
   })
   .strict();
 
@@ -762,11 +767,7 @@ export const pageSummarySchema = z
     monitored: z.boolean(),
     analysis_status: pageAnalysisStatusSchema,
     error_code: z.string(),
-    issue_count: z.number().int().nullable(),
-    technical_score: z.number().nullable(),
-    aeo_score: z.number().nullable(),
-    overall_score: z.number().nullable(),
-    last_audited: z.string().nullable(),
+    ...analysisSummaryFields,
   })
   .strict();
 
@@ -940,20 +941,9 @@ export const visibilityTrendSovSchema = z
   .strict();
 
 // One brand-vs-competitor ranking-history row within a trend point (backend
-// `VisibilityTrendRankingRow`). `sentiment` / `avg_position` are present but
-// null until an LLM stage is added (decision B-2 / invariant 9).
-export const visibilityTrendRankingRowSchema = z
-  .object({
-    name: z.string(),
-    is_brand: z.boolean(),
-    mention_rate: z.number().nullable(),
-    citation_rate: z.number().nullable(),
-    share_of_voice: z.number().nullable(),
-    mention_count: z.number().int(),
-    sentiment: z.string().nullable(),
-    avg_position: z.number().nullable(),
-  })
-  .strict();
+// `VisibilityTrendRankingRow`). Field-for-field identical to `rankingRowSchema`
+// — aliased so the two contracts can't drift apart silently.
+export const visibilityTrendRankingRowSchema = rankingRowSchema;
 
 // One point in the cross-run Visibility trend (backend `VisibilityTrendPoint`).
 // A raw per-run point carries a set `audit_id`; a week/month bucket folds many

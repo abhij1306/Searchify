@@ -4,8 +4,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { Alert } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardSkeleton } from '@/components/visibility/dashboard-skeleton';
 import { EngineComparison } from '@/components/visibility/engine-comparison';
 import { RankingsTable } from '@/components/visibility/rankings-table';
 import { VisibilityScoreCard } from '@/components/visibility/score-card';
@@ -50,7 +49,7 @@ export function VisibilityOverview({
   } else if (query.isError) {
     body = null;
   } else {
-    body = <OverviewSkeleton />;
+    body = <DashboardSkeleton />;
   }
 
   return (
@@ -62,35 +61,6 @@ export function VisibilityOverview({
       ) : null}
 
       {body}
-    </div>
-  );
-}
-
-function OverviewSkeleton() {
-  return (
-    <div className="grid gap-6" aria-hidden>
-      <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
-        <Card>
-          <CardContent className="grid justify-items-center gap-4">
-            <Skeleton className="size-28 rounded-full" />
-            <Skeleton className="h-4 w-40" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="grid gap-3">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-      <Card>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

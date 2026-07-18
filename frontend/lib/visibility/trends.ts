@@ -296,9 +296,3 @@ export function rankingBookends(points: readonly VisibilityTrendPoint[]): {
     first: points.length > 1 ? points[0] : null,
   };
 }
-
-/** Format a 0–1 rate as a whole-percent string, or the placeholder. */
-export function formatTrendRate(rate: number | null): string {
-  if (rate === null || Number.isNaN(rate)) return '—';
-  return `${Math.round(rate * 100)}%`;
-}

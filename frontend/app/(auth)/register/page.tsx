@@ -1,9 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 
 import { Alert } from '@/components/ui/alert';
@@ -11,9 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { authApi } from '@/lib/api/auth';
-import { queryKeys } from '@/lib/api/query-keys';
-import type { SessionUser } from '@/lib/api/types';
 import { authErrorMessage, registerFormSchema, type RegisterFormValues } from '@/lib/auth/forms';
+import { useAuthMutation } from '@/lib/auth/use-auth-mutation';
 
 /**
  * Register page (F4). Mirrors the login page: react-hook-form + zod client
@@ -21,9 +18,6 @@ import { authErrorMessage, registerFormSchema, type RegisterFormValues } from '@
  * success — priming the `me` cache and redirecting to the authed landing.
  */
 export default function RegisterPage() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
   const {
     register,
     handleSubmit,
@@ -33,15 +27,11 @@ export default function RegisterPage() {
     defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
-  const mutation = useMutation({
-    mutationFn: (values: RegisterFormValues) => authApi.register(values.email, values.password),
-    onSuccess: (user: SessionUser) => {
-      queryClient.setQueryData(queryKeys.auth.me(), user);
-      router.replace('/');
-    },
-  });
+  const { mutation, submit } = useAuthMutation((values: RegisterFormValues) =>
+    authApi.register(values.email, values.password),
+  );
 
-  const onSubmit = handleSubmit((values) => mutation.mutateAsync(values).catch(() => undefined));
+  const onSubmit = handleSubmit(submit);
 
   return (
     <div className="grid gap-5">

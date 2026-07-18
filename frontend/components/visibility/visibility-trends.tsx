@@ -9,20 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendChart } from '@/components/ui/trend-chart';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { scoreBand, scoreBandText } from '@/components/ui/score-band';
+import { NO_RANKINGS_MESSAGE, RankingRowsTable } from '@/components/visibility/ranking-rows';
 import { cn } from '@/lib/utils';
-import type { VisibilityTrendPoint, VisibilityTrendRankingRow } from '@/lib/api/types';
+import type { VisibilityTrendPoint } from '@/lib/api/types';
 import {
   formatPointDate,
-  formatTrendRate,
   rankingBookends,
   sortedTrendRankings,
   toChartPoints,
@@ -266,67 +257,13 @@ function RankingHistoryCard({
       <CardContent className="p-0">
         {!point || rows.length === 0 ? (
           <p className="p-[var(--card-padding)] text-sm text-secondary">
-            {emptyNote ?? 'No brand or competitor mentions were recorded for this run.'}
+            {emptyNote ?? NO_RANKINGS_MESSAGE}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>Brand</TableHead>
-                <TableHead numeric>Visibility</TableHead>
-                <TableHead numeric>SOV</TableHead>
-                <TableHead numeric>Sentiment</TableHead>
-                <TableHead numeric>Avg Position</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row, index) => (
-                <RankingRow
-                  key={`${row.is_brand ? 'brand' : 'competitor'}-${row.name}`}
-                  row={row}
-                  index={index}
-                />
-              ))}
-            </TableBody>
-          </Table>
+          <RankingRowsTable rows={rows} />
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function RankingRow({ row, index }: Readonly<{ row: VisibilityTrendRankingRow; index: number }>) {
-  const visibilityPct = row.mention_rate === null ? null : Math.round(row.mention_rate * 100);
-  const bandClass = visibilityPct === null ? 'text-muted' : scoreBandText[scoreBand(visibilityPct)];
-  return (
-    <TableRow>
-      <TableCell numeric className="text-muted">
-        {index + 1}
-      </TableCell>
-      <TableCell>
-        <span className="flex items-center gap-2">
-          <span className="font-medium text-foreground">{row.name}</span>
-          {row.is_brand ? (
-            <Badge variant="neutral" className="normal-case">
-              You
-            </Badge>
-          ) : null}
-        </span>
-      </TableCell>
-      <TableCell numeric className={cn('mono font-semibold', bandClass)}>
-        {formatTrendRate(row.mention_rate)}
-      </TableCell>
-      <TableCell numeric className="mono text-foreground">
-        {formatTrendRate(row.share_of_voice)}
-      </TableCell>
-      <TableCell numeric className="mono text-muted">
-        —
-      </TableCell>
-      <TableCell numeric className="mono text-muted">
-        —
-      </TableCell>
-    </TableRow>
   );
 }
 

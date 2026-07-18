@@ -98,6 +98,10 @@ export function SessionGuard({
     [user, clearSession],
   );
 
+  // False positive: `clearSession` reads `redirectingRef` only when *invoked*
+  // (from effects/events), never during render — but the memoized `value`
+  // captures it, so the taint analysis flags this render-time null check.
+  // eslint-disable-next-line react-hooks/refs
   if (isLoading || isRedirecting || !value) {
     // Loading, or unauthenticated and mid-redirect: never render protected UI.
     // Surface the underlying error only for debugging (kept out of the DOM).

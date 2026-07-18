@@ -1,7 +1,5 @@
 'use client';
 
-import type { UseQueryResult } from '@tanstack/react-query';
-
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -10,9 +8,10 @@ import {
   EvidenceFilteredEmpty,
   EvidenceSkeleton,
   TruncationNotice,
+  type EvidenceTabProps,
 } from '@/components/visibility/evidence-states';
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
-import type { VisibilityEvidenceResponse, VisibilityExecutionEvidence } from '@/lib/api/types';
+import type { VisibilityExecutionEvidence } from '@/lib/api/types';
 import { engineLabel } from '@/lib/providers/catalog';
 import {
   formatExecutionDate,
@@ -34,17 +33,7 @@ const TITLE = 'Mentions & Citations';
  * States: skeleton, retryable error, empty (no persisted evidence), filtered
  * empty, and a truncation notice when the newest window overflowed.
  */
-export function MentionsCitations({
-  query,
-  isFiltered,
-  onClearFilters,
-  limit,
-}: Readonly<{
-  query: UseQueryResult<VisibilityEvidenceResponse, unknown>;
-  isFiltered: boolean;
-  onClearFilters?: () => void;
-  limit: number;
-}>) {
+export function MentionsCitations({ query, isFiltered, onClearFilters, limit }: EvidenceTabProps) {
   if (query.isLoading) {
     return <EvidenceSkeleton title={TITLE} />;
   }
@@ -131,9 +120,9 @@ function ExecutionEvidenceRow({
         <div className="grid gap-1.5">
           <p className="text-2xs font-semibold uppercase tracking-wide text-muted">Mentions</p>
           <div className="flex flex-wrap gap-1.5">
-            {item.mentions.map((mention) => (
+            {item.mentions.map((mention, index) => (
               <Badge
-                key={`${mention.kind}-${mention.name}-${mention.first_offset ?? 'na'}`}
+                key={`${mention.kind}-${mention.name}-${mention.first_offset ?? 'na'}-${index}`}
                 variant="classification"
                 value={mention.kind === 'brand' ? 'owned' : 'competitor'}
               >

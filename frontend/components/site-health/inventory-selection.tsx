@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { CursorPager } from '@/components/ui/cursor-pager';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -99,6 +100,9 @@ export function InventorySelection({
 
   useEffect(() => {
     if (!selection && effectiveSelection) {
+      // One-time promotion of the derived initial selection into state (see
+      // comment above) — intentionally not a render-time derivation.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelection(effectiveSelection);
     }
     // Only run when the derived initial selection first becomes available;
@@ -276,22 +280,19 @@ export function InventorySelection({
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCursorStack((prev) => prev.slice(0, -1))}
-              disabled={!canPrev}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => nextCursor && setCursorStack((prev) => [...prev, nextCursor])}
-              disabled={!nextCursor}
-            >
-              Next
-            </Button>
+            <CursorPager
+              canPrev={canPrev}
+              canNext={Boolean(nextCursor)}
+              onPrev={() => setCursorStack((prev) => prev.slice(0, -1))}
+              onNext={() =>
+                nextCursor &&
+                setCursorStack((prev) =>
+                  // Idempotent under rapid clicks: the captured nextCursor may
+                  // already be on the stack before the rerender lands.
+                  prev.at(-1) === nextCursor ? prev : [...prev, nextCursor],
+                )
+              }
+            />
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted">

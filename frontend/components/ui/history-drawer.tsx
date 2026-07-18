@@ -112,6 +112,8 @@ export function HistoryDrawer({
 function ShortDate({ value }: Readonly<{ value: string }>) {
   const [text, setText] = useState('');
   useEffect(() => {
+    // Post-mount on purpose: locale formatting must not run during SSR/hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setText(formatShortDate(value));
   }, [value]);
   return <span className="mono">{text}</span>;
