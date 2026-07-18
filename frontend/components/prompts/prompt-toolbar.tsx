@@ -40,8 +40,11 @@ export function PromptToolbar({
   const activeFilterCount =
     filters.intents.length + (filters.enabled === 'all' ? 0 : 1) + (filters.branded === 'all' ? 0 : 1);
 
+  // Set lookup: `checked` is computed per intent option in the render loop.
+  const selectedIntents = new Set(filters.intents);
+
   const toggleIntent = (value: string) => {
-    const next = filters.intents.includes(value)
+    const next = selectedIntents.has(value)
       ? filters.intents.filter((intent) => intent !== value)
       : [...filters.intents, value];
     onFiltersChange({ ...filters, intents: next });
@@ -84,7 +87,7 @@ export function PromptToolbar({
           {intentValues.map((value) => (
             <DropdownCheckboxItem
               key={value || 'unspecified'}
-              checked={filters.intents.includes(value)}
+              checked={selectedIntents.has(value)}
               onSelect={(event) => {
                 event.preventDefault();
                 toggleIntent(value);

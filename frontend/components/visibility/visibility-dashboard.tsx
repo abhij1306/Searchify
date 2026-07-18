@@ -278,7 +278,11 @@ export function VisibilityDashboard() {
   );
 }
 
-function DashboardSkeleton() {
+/**
+ * Dashboard loading placeholder. Exported so the page's `<Suspense>` boundary
+ * (required by `useSearchParams`) shows the same skeleton while suspended.
+ */
+export function DashboardSkeleton() {
   return (
     <div className="grid gap-6" aria-hidden>
       <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">

@@ -33,19 +33,6 @@ export function SectionTitle({
   );
 }
 
-/** Secondary supporting text. */
-export function Subtitle({
-  children,
-  className,
-  ...props
-}: Readonly<ComponentPropsWithoutRef<'p'>>) {
-  return (
-    <p {...props} className={cn('text-sm leading-normal text-secondary', className)}>
-      {children}
-    </p>
-  );
-}
-
 /** Uppercase micro-label. */
 export function Label({
   children,

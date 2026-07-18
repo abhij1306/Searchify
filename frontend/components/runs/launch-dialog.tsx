@@ -109,6 +109,8 @@ export function LaunchDialog({
 
   const noPromptSets = !promptSetsQuery.isLoading && promptSets.length === 0;
   const noEngines = !connectionsQuery.isLoading && configuredEngines.length === 0;
+  // Set lookup: `selected` is computed per engine chip in the render loop.
+  const selectedEngines = new Set(engines);
 
   return (
     <Dialog
@@ -170,7 +172,7 @@ export function LaunchDialog({
           ) : (
             <div className="flex flex-wrap gap-2">
               {configuredEngines.map((engine) => {
-                const selected = engines.includes(engine);
+                const selected = selectedEngines.has(engine);
                 return (
                   <button
                     key={engine}

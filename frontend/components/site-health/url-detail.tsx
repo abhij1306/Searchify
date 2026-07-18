@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -71,8 +71,9 @@ export function UrlDetail({
   // that stale terminal snapshot and turn polling off before ever observing
   // the freshly-enqueued task's `'pending'`/`'running'` state. We only allow
   // polling to stop once we've actually observed a non-terminal snapshot
-  // since the rerun was requested.
-  const [hasObservedActiveRerun, setHasObservedActiveRerun] = useState(false);
+  // since the rerun was requested. A ref (not state): it is never rendered,
+  // so updating it must not trigger a re-render.
+  const hasObservedActiveRerunRef = useRef(false);
   const [rerunError, setRerunError] = useState<string | null>(null);
   const detailQuery = useQuery({
     ...siteHealthQueries.page(crawlId, siteUrlId),
@@ -93,17 +94,17 @@ export function UrlDetail({
   useEffect(() => {
     if (!rerunPolling || !detail) return;
     if (detail.analysis_status === 'pending' || detail.analysis_status === 'running') {
-      if (!hasObservedActiveRerun) setHasObservedActiveRerun(true);
+      hasObservedActiveRerunRef.current = true;
       return;
     }
     // Terminal status observed. Only stop polling once we've actually seen
     // the rerun take effect (a pending/running snapshot); otherwise this is
     // just the stale pre-rerun cache and we must keep polling for it to
     // update.
-    if (hasObservedActiveRerun) {
+    if (hasObservedActiveRerunRef.current) {
       setRerunPolling(false);
     }
-  }, [rerunPolling, detail, hasObservedActiveRerun]);
+  }, [rerunPolling, detail]);
 
   if (detailQuery.isLoading) {
     return (
@@ -154,7 +155,7 @@ export function UrlDetail({
           if (result.crawl_id === crawlId && result.site_url_id === siteUrlId) {
             // Same crawl: poll in place. Reset the guard so the terminal-check
             // effect can't stop polling on the stale pre-rerun snapshot.
-            setHasObservedActiveRerun(false);
+            hasObservedActiveRerunRef.current = false;
             setRerunPolling(true);
             return;
           }

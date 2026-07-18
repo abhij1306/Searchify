@@ -51,7 +51,7 @@ export function RankingsTable({ visibility }: Readonly<{ visibility: Visibility 
                 const bandClass =
                   visibilityPct === null ? 'text-muted' : scoreBandText[scoreBand(visibilityPct)];
                 return (
-                  <TableRow key={`${row.name}-${index}`}>
+                  <TableRow key={`${row.is_brand ? 'brand' : 'competitor'}-${row.name}`}>
                     <TableCell numeric className="text-muted">
                       {index + 1}
                     </TableCell>

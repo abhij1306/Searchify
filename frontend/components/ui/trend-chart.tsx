@@ -20,6 +20,11 @@ export type TrendPoint = {
   } | null;
 };
 
+const toLinePath = (seg: { x: number; y: number }[]) =>
+  seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+const valueText = (v: number | null) => (v === null ? 'unavailable' : `${v}`);
+
 /**
  * TrendChart — line/area chart for the cross-run Visibility trend.
  *
@@ -89,12 +94,9 @@ export function TrendChart({
   const lineSegments = segments.filter((seg) => seg.length > 1);
   const areaSegments = segments.filter((seg) => seg.length > 1);
 
-  const toLinePath = (seg: { x: number; y: number }[]) =>
-    seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const toAreaPath = (seg: { x: number; y: number }[]) =>
     `${toLinePath(seg)} L${seg[seg.length - 1].x.toFixed(1)},${(height - padding).toFixed(1)} L${seg[0].x.toFixed(1)},${(height - padding).toFixed(1)} Z`;
 
-  const valueText = (v: number | null) => (v === null ? 'unavailable' : `${v}`);
   const summary = !data.length
     ? 'No trend data'
     : data.length === 1

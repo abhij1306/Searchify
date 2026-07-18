@@ -8,7 +8,6 @@ import { z } from 'zod';
 
 import { apiClient, type ApiRequestOptions } from './client';
 import {
-  logicalEngineSchema,
   providerCatalogSchema,
   providerConnectionSchema,
   strictValidate,
@@ -35,7 +34,7 @@ const connectionTestResultSchema = z.object({
   transport_model: z.string().optional().default(''),
   tested_at: z.string(),
 });
-export type ConnectionTestResult = z.infer<typeof connectionTestResultSchema>;
+type ConnectionTestResult = z.infer<typeof connectionTestResultSchema>;
 
 /** A route entry sent on create/update (B4 `ProviderRouteInput`). */
 export type ProviderRouteInput = {
@@ -44,7 +43,7 @@ export type ProviderRouteInput = {
   is_default?: boolean;
 };
 
-export type ProviderConnectionInput = {
+type ProviderConnectionInput = {
   transport_provider: TransportProvider;
   api_key: string;
   base_url?: string;
@@ -90,12 +89,6 @@ export const providersApi = {
   },
 };
 
-/** True when a test result represents a successful probe. */
-export function isTestOk(result: ConnectionTestResult): boolean {
-  return result.status === 'ok';
-}
-
-// Re-export so the logical-engine literal union is importable from the API
-// barrel without reaching into `schemas`.
+// Re-export so the logical-engine literal union is importable without
+// reaching into `schemas`.
 export type { LogicalEngine };
-export const logicalEngines = logicalEngineSchema.options;

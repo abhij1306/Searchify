@@ -1,8 +1,7 @@
 /**
  * Score-band mapping (§ score bands): low 0–24, mid 25–49, good 50–74,
- * high 75–100. Returns the bridged token utility classes for stroke/fill/text
- * so data-viz primitives stay token-only (no raw hex).
- */
+ * high 75–100. Returns the bridged token utility classes for stroke/text
+ * so data-viz primitives stay token-only (no raw hex). */
 export type ScoreBand = 'low' | 'mid' | 'good' | 'high';
 
 export function scoreBand(score: number): ScoreBand {
@@ -17,13 +16,6 @@ export const scoreBandStroke: Record<ScoreBand, string> = {
   mid: 'stroke-score-mid',
   good: 'stroke-score-good',
   high: 'stroke-score-high',
-};
-
-export const scoreBandFill: Record<ScoreBand, string> = {
-  low: 'fill-score-low',
-  mid: 'fill-score-mid',
-  good: 'fill-score-good',
-  high: 'fill-score-high',
 };
 
 export const scoreBandText: Record<ScoreBand, string> = {

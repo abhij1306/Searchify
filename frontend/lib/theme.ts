@@ -4,7 +4,7 @@ export type ThemeMode = 'light' | 'dark';
 export const THEME_STORAGE_KEY = 'searchify-theme';
 
 /** Attribute used to suppress transitions during a theme swap (see globals.css). */
-export const THEME_TRANSITION_ATTR = 'data-theme-transition';
+const THEME_TRANSITION_ATTR = 'data-theme-transition';
 
 /**
  * Inline pre-hydration bootstrap: read the persisted theme (or the OS

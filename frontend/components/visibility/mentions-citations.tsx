@@ -131,9 +131,9 @@ function ExecutionEvidenceRow({
         <div className="grid gap-1.5">
           <p className="text-2xs font-semibold uppercase tracking-wide text-muted">Mentions</p>
           <div className="flex flex-wrap gap-1.5">
-            {item.mentions.map((mention, index) => (
+            {item.mentions.map((mention) => (
               <Badge
-                key={`${mention.kind}-${mention.name}-${index}`}
+                key={`${mention.kind}-${mention.name}-${mention.first_offset ?? 'na'}`}
                 variant="classification"
                 value={mention.kind === 'brand' ? 'owned' : 'competitor'}
               >

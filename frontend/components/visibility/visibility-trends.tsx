@@ -282,7 +282,11 @@ function RankingHistoryCard({
             </TableHeader>
             <TableBody>
               {rows.map((row, index) => (
-                <RankingRow key={`${row.name}-${index}`} row={row} index={index} />
+                <RankingRow
+                  key={`${row.is_brand ? 'brand' : 'competitor'}-${row.name}`}
+                  row={row}
+                  index={index}
+                />
               ))}
             </TableBody>
           </Table>

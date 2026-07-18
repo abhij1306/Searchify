@@ -4,6 +4,23 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+# Supply-chain hardening: wait 7 days before installing freshly published
+# versions (malicious releases are usually caught and unpublished within
+# hours), and refuse packages whose trust signals (provenance, signatures)
+# weaken between updates.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+# Skip the downgrade check for releases older than ~1 year — they predate
+# widespread provenance publishing and trip the check for benign reasons.
+# Anything newer must keep (or strengthen) its trust evidence.
+trustPolicyIgnoreAfter: 525600
+# Pinned exceptions: recent versions that trip the downgrade check for benign
+# reasons (e.g. a release published without provenance while earlier ones had
+# it). Reviewed individually; keep this list short and exact.
+trustPolicyExclude:
+  - 'undici-types@6.21.0'
+  - 'eslint-import-resolver-typescript@3.10.1'
+
 # Force the transitive postcss (Next pulls 8.4.31) up to a patched line
 # (CVE-2026-41305). pnpm 10+ reads overrides here, not from package.json.
 overrides:

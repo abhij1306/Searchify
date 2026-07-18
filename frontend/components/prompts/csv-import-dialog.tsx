@@ -18,6 +18,17 @@ import type { PromptInput } from '@/lib/api/prompts';
 import { parsePromptCsv, validRows, type ParsedCsv } from '@/lib/prompts/csv';
 import { intentLabels } from '@/lib/prompts/forms';
 
+/** Read a File as text, falling back to FileReader where `File.text` is absent (jsdom). */
+const readFileText = (file: File) =>
+  typeof file.text === 'function'
+    ? file.text()
+    : new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(file);
+      });
+
 /**
  * CSV import dialog (F7). The file is parsed + validated in the browser and the
  * parsed rows are previewed (with per-row warnings/errors) BEFORE anything is
@@ -49,16 +60,6 @@ export function CsvImportDialog({
     setFileName(null);
     if (inputRef.current) inputRef.current.value = '';
   };
-
-  const readFileText = (file: File) =>
-    typeof file.text === 'function'
-      ? file.text()
-      : new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result ?? ''));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsText(file);
-        });
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;

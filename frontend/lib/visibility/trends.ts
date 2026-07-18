@@ -12,9 +12,6 @@ import type { TrendPoint } from '@/components/ui/trend-chart';
 import type { LogicalEngine, VisibilityTrendPoint, VisibilityTrendRankingRow } from '@/lib/api/types';
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
 
-export { engineLabel } from '@/lib/providers/catalog';
-export { PLACEHOLDER } from '@/lib/visibility/dashboard';
-
 /** Trend granularity — mirrors the backend `granularity=run|week|month`. */
 export type TrendGranularity = 'run' | 'week' | 'month';
 
@@ -62,7 +59,7 @@ export function rangeToFrom(range: TrendRange, now: Date = new Date()): string |
 export type TrendMetric = 'visibility_score' | 'sov' | 'brand_mention_rate' | 'owned_citation_rate';
 
 /** Short x-axis label for a point's completion timestamp. */
-export function formatPointLabel(timestamp: string): string {
+function formatPointLabel(timestamp: string): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -76,7 +73,7 @@ export function formatPointDate(timestamp: string): string {
 }
 
 /** A metric's 0–100 value for a point (percentages scaled to whole percent). */
-export function metricValue(point: VisibilityTrendPoint, metric: TrendMetric): number | null {
+function metricValue(point: VisibilityTrendPoint, metric: TrendMetric): number | null {
   switch (metric) {
     case 'visibility_score':
       return point.visibility_score;
@@ -116,7 +113,7 @@ export function toChartPoints(points: readonly VisibilityTrendPoint[], metric: T
 }
 
 /** Human note for a version-change marker (which version set now applies). */
-export function versionChangeNote(point: VisibilityTrendPoint): string {
+function versionChangeNote(point: VisibilityTrendPoint): string {
   const scoring = point.scoring_rule_versions.join(', ') || 'unknown';
   return point.spans_version_boundary
     ? `Mixed scoring versions in this bucket (${scoring})`
@@ -145,7 +142,7 @@ export function versionMarkerSummary(points: readonly VisibilityTrendPoint[]): s
  * (summed across the bucket by the backend). This is a raw count, not a rate,
  * so it is surfaced as a volume stat rather than plotted on the 0–100 charts.
  */
-export function brandMentionCount(point: VisibilityTrendPoint): number | null {
+function brandMentionCount(point: VisibilityTrendPoint): number | null {
   const brand = point.rankings.find((row) => row.is_brand);
   return brand ? brand.mention_count : null;
 }

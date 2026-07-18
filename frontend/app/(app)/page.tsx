@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -17,22 +18,41 @@ import { SessionGuard } from '@/lib/auth/session-guard';
  *   - has ≥1 project → `/visibility` (the live dashboard);
  *   - no project yet → `/setup` (first-run brand/project creation).
  *
- * The project list comes from F2's `projects.ts`. If the backend endpoint is
- * not live yet it returns an empty list (or errors, handled by the guard's
- * global 401 watchdog), and we default to `/setup`.
+ * The project list comes from F2's `projects.ts`. A 401 is handled by the
+ * guard's global watchdog (→ /login). Any other failure (network blip, 5xx)
+ * renders a retry state instead of redirecting — a user who has projects must
+ * not be dumped into first-run setup because one request failed.
+ *
+ * The redirect is issued during render (not in an effect) via `redirect()`,
+ * so the splash never flashes an already-resolved destination.
  */
 function LandingRedirect() {
-  const router = useRouter();
-
-  const { data: projects, isLoading } = useQuery({
+  const {
+    data: projects,
+    isSuccess,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: queryKeys.projects.list(),
     queryFn: ({ signal }) => projectsApi.listProjects({ signal }),
   });
 
-  useEffect(() => {
-    if (isLoading) return;
-    router.replace(projects && projects.length > 0 ? '/visibility' : '/setup');
-  }, [isLoading, projects, router]);
+  if (isError) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+        <div className="grid w-full max-w-md gap-3">
+          <Alert tone="danger">Could not load your workspace. Please try again.</Alert>
+          <Button variant="secondary" onClick={() => refetch()}>
+            Retry
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (isSuccess) {
+    redirect(projects.length > 0 ? '/visibility' : '/setup');
+  }
 
   return <LandingSplash />;
 }

@@ -21,7 +21,7 @@ import { definedQuery, withQuery } from './shared';
 import type { Visibility, VisibilityEvidenceResponse, VisibilityTrendPoint } from './types';
 
 /** Filters for the cross-run trend request (all optional; same-origin only). */
-export type VisibilityTrendParams = {
+type VisibilityTrendParams = {
   /** Logical engine slice (`chatgpt` | `gemini` | `claude`); omit for all. */
   engine?: string;
   /** Inclusive UTC lower bound (ISO 8601) for the completion window. */
@@ -37,7 +37,7 @@ export type VisibilityTrendParams = {
  * `audit_id` and a date bound are set the backend intersects them (the selected
  * audit must fall inside the inclusive window). Same-origin only.
  */
-export type VisibilityEvidenceParams = {
+type VisibilityEvidenceParams = {
   /** Restrict to one audit in the authorized project. */
   audit_id?: string;
   /** Restrict by the source prompt frozen on `AuditPromptSnapshot.prompt_id`. */

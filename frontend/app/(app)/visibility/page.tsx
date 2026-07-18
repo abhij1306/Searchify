@@ -1,8 +1,13 @@
 'use client';
 
+import { Suspense } from 'react';
+
 import { PageTitle } from '@/components/ui/typography';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { VisibilityDashboard } from '@/components/visibility/visibility-dashboard';
+import {
+  DashboardSkeleton,
+  VisibilityDashboard,
+} from '@/components/visibility/visibility-dashboard';
 
 /**
  * Visibility workspace screen (F9, four-tab IA).
@@ -39,7 +44,9 @@ export default function VisibilityPage() {
             evidence behind the scores.
           </p>
         </div>
-        <VisibilityDashboard />
+        <Suspense fallback={<DashboardSkeleton />}>
+          <VisibilityDashboard />
+        </Suspense>
       </div>
     </TooltipProvider>
   );

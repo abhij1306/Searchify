@@ -32,12 +32,13 @@ export function filterPrompts(
   filters: PromptFilters,
 ): Prompt[] {
   const needle = search.trim().toLowerCase();
+  const intentSet = new Set(filters.intents);
   return prompts.filter((prompt) => {
     if (needle) {
       const haystack = `${prompt.text} ${prompt.theme ?? ''}`.toLowerCase();
       if (!haystack.includes(needle)) return false;
     }
-    if (filters.intents.length > 0 && !filters.intents.includes(prompt.intent)) return false;
+    if (intentSet.size > 0 && !intentSet.has(prompt.intent)) return false;
     if (!matchesTriState(prompt.enabled, filters.enabled)) return false;
     if (!matchesTriState(prompt.branded, filters.branded)) return false;
     return true;

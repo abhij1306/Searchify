@@ -206,14 +206,14 @@ export const providerConnectionSchema = z
   // violation and must fail loud — the secret is never present on the wire.
   .strict();
 
-export const providerCatalogRouteSchema = z
+const providerCatalogRouteSchema = z
   .object({
     transport_provider: transportProviderSchema,
     default_model: z.string(),
   })
   .strict();
 
-export const providerCatalogEngineSchema = z
+const providerCatalogEngineSchema = z
   .object({
     logical_engine: logicalEngineSchema,
     routes: z.array(providerCatalogRouteSchema),
@@ -773,7 +773,7 @@ export const pageSummarySchema = z
 export const pagesPageSchema = cursorPageSchema(pageSummarySchema);
 
 // One persisted rule evaluation on a page (all outcomes, current label).
-export const ruleEvaluationSchema = z
+const ruleEvaluationSchema = z
   .object({
     id: uuid(),
     rule_id: z.string(),
@@ -791,7 +791,7 @@ export const ruleEvaluationSchema = z
   .strict();
 
 // One deduplicated link/asset reference discovered on a page.
-export const linkReferenceSchema = z
+const linkReferenceSchema = z
   .object({
     id: uuid(),
     kind: z.string(),

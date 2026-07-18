@@ -20,7 +20,7 @@ import type {
 } from '@/lib/api/types';
 
 /** Audit statuses that carry a dashboard-ready metric snapshot (B6). */
-export const DASHBOARD_STATUSES: readonly AuditStatus[] = ['completed', 'partially_completed'];
+const DASHBOARD_STATUSES: readonly AuditStatus[] = ['completed', 'partially_completed'];
 
 /**
  * The four Visibility workspace tabs, in display order. Exactly these four —
@@ -41,7 +41,7 @@ export const VISIBILITY_TABS: readonly { id: VisibilityTab; label: string }[] = 
 ] as const;
 
 /** The default (and invalid-value fallback) tab. */
-export const DEFAULT_TAB: VisibilityTab = 'overview';
+const DEFAULT_TAB: VisibilityTab = 'overview';
 
 /** Narrow an arbitrary `?tab=` value to a known tab, else the default. */
 export function normalizeTab(value: string | null | undefined): VisibilityTab {
@@ -53,26 +53,11 @@ export function isEvidenceTab(tab: VisibilityTab): boolean {
   return tab === 'mentions-citations' || tab === 'query-fanout';
 }
 
-/**
- * Prompt-type filter options, kept for the disabled "coming soon" control. The
- * backend `VisibilityResponse` has no per-prompt-type breakdown at MVP, so this
- * is display-only and never sent to the API / folded into the query key.
- */
-export const PROMPT_TYPE_OPTIONS = [
-  { value: 'all', label: 'All prompts' },
-  { value: 'branded', label: 'Branded' },
-  { value: 'non_branded', label: 'Non-branded' },
-] as const;
-
-export type PromptTypeFilter = (typeof PROMPT_TYPE_OPTIONS)[number]['value'];
-
 /** Filters that drive the visibility query key + client-side display. */
 export type VisibilityFilters = {
   /** `'all'` shows every engine; otherwise narrows the per-engine comparison. */
   engine: LogicalEngine | 'all';
 };
-
-export const DEFAULT_FILTERS: VisibilityFilters = { engine: 'all' };
 
 /** A run option for the selector, ordered latest-first. */
 export type RunOption = {
@@ -118,7 +103,7 @@ export function toRunOptions(
 }
 
 /** Short, stable label for a run — the completion date/time. */
-export function formatRunLabel(timestamp: string): string {
+function formatRunLabel(timestamp: string): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
   return date.toLocaleString(undefined, {

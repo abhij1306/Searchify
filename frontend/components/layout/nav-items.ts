@@ -69,8 +69,3 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
-
-/** The set of MVP-live routes, useful for tests + guards. */
-export const LIVE_ROUTES = NAV_GROUPS.flatMap((group) =>
-  group.items.filter((item) => item.live).map((item) => item.href),
-);

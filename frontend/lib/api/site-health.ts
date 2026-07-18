@@ -47,7 +47,7 @@ import type {
 } from './types';
 
 /** `POST /site-crawls` body. Workspace is resolved from `X-Workspace-Id`. */
-export type CreateCrawlInput = {
+type CreateCrawlInput = {
   project_id: string;
   include_globs?: string[];
   exclude_globs?: string[];
@@ -68,7 +68,7 @@ export type InventoryParams = {
   monitored?: boolean;
 };
 
-export type CrawlListParams = { project_id: string; limit?: number; cursor?: string };
+type CrawlListParams = { project_id: string; limit?: number; cursor?: string };
 export type PagesParams = { cursor?: string; limit?: number; status?: string; monitored?: boolean };
 export type IssuesParams = {
   cursor?: string;
@@ -82,13 +82,13 @@ export type IssuesParams = {
 };
 
 /** Keyset params for a grouped issue's affected-URL page. */
-export type IssueDetailParams = { cursor?: string; limit?: number };
+type IssueDetailParams = { cursor?: string; limit?: number };
 
 /** Keyset params for a URL's crawl-bounded issue history. */
-export type IssueHistoryParams = { cursor?: string; limit?: number };
+type IssueHistoryParams = { cursor?: string; limit?: number };
 
 /** `PUT /projects/{id}/monitored-urls` body — atomic full-set replacement. */
-export type ReplaceMonitoredInput = {
+type ReplaceMonitoredInput = {
   site_url_ids: string[];
   expected_selection_version: number;
 };

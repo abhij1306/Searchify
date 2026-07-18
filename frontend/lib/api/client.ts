@@ -221,4 +221,4 @@ function delay(ms: number, signal?: AbortSignal) {
   });
 }
 
-export { ApiError, httpErrorStatus, isAbortError } from './errors';
+export { ApiError, httpErrorStatus } from './errors';

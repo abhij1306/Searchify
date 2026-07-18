@@ -4,9 +4,8 @@ import { cn } from '@/lib/utils';
 
 /**
  * Card (§8) — bg-panel, border, --radius-lg, --card-padding, shadow-card.
- * Composed from header / title / description / content / footer slots.
- */
-export function Card({
+ * Composed from header / title / description / content slots.
+ */export function Card({
   children,
   className,
   ...props
@@ -78,23 +77,5 @@ export function CardContent({
     <div {...props} className={cn('p-[var(--card-padding)]', className)}>
       {children}
     </div>
-  );
-}
-
-export function CardFooter({
-  children,
-  className,
-  ...props
-}: Readonly<ComponentPropsWithoutRef<'footer'>>) {
-  return (
-    <footer
-      {...props}
-      className={cn(
-        'flex items-center gap-2 border-t border-border-subtle p-[var(--card-padding)]',
-        className,
-      )}
-    >
-      {children}
-    </footer>
   );
 }

@@ -2,6 +2,7 @@
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { History, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from './badge';
@@ -90,7 +91,7 @@ export function HistoryDrawer({
                       ) : null}
                       <div className="flex w-full items-center justify-between text-xs text-muted">
                         <span>{item.meta ?? 'No details'}</span>
-                        <span className="mono">{formatShortDate(item.createdAt)}</span>
+                        <ShortDate value={item.createdAt} />
                       </div>
                     </button>
                   </li>
@@ -102,6 +103,18 @@ export function HistoryDrawer({
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
+}
+
+/**
+ * Locale/timezone-dependent date, formatted only after mount so server-rendered
+ * markup can never disagree with the browser's locale (hydration safety).
+ */
+function ShortDate({ value }: Readonly<{ value: string }>) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    setText(formatShortDate(value));
+  }, [value]);
+  return <span className="mono">{text}</span>;
 }
 
 function formatShortDate(value: string) {
