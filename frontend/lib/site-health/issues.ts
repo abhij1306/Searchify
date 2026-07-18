@@ -32,9 +32,13 @@ export function severityBadgeValue(severity: IssueSeverity): StatusValue {
   }
 }
 
-/** Short uppercase severity label for a badge (HIGH / MEDIUM / LOW / …). */
+/** Short uppercase severity label for a badge (HIGH / MEDIUM / LOW / …).
+ *
+ * The catalog exposes a three-tier vocabulary: `critical` folds into HIGH so
+ * badges, chips, and filters all agree (no separate "CRITICAL" tier in the UI).
+ */
 export function severityLabel(severity: IssueSeverity): string {
-  return severity.toUpperCase();
+  return severity === 'critical' ? 'HIGH' : severity.toUpperCase();
 }
 
 /** Severity ordering rank (lower = more severe) for client-side sorting. */

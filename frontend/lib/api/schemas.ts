@@ -716,11 +716,13 @@ export const siteIssueSchema = z
   .strict();
 
 // Grouped-issue catalog summary (occurrence + severity + affected-page counts).
-// `severity_counts` keys are the severity vocabulary; values are group counts.
+// `severity_counts` keys are the severity vocabulary; `dimension_counts` keys
+// are the rule dimensions (technical/aeo); values are occurrence counts.
 export const issuesSummarySchema = z
   .object({
     issue_count: z.number().int(),
     severity_counts: z.record(z.string(), z.number().int()),
+    dimension_counts: z.record(z.string(), z.number().int()),
     affected_url_count: z.number().int(),
     monitored_affected_url_count: z.number().int(),
   })

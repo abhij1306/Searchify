@@ -62,6 +62,7 @@ from app.models.site_health import (
     SiteCrawl,
     SiteCrawlTask,
     SiteUrl,
+    SiteUrlObservation,
     WorkspaceSiteHealthEntitlement,
 )
 
@@ -326,6 +327,7 @@ async def _add_free_sample(
     url: str,
     url_hash_value: str,
     depth: int,
+    source_kind: str = OBSERVATION_SOURCE_LINK,
 ) -> bool:
     """Add/reactivate a system-managed sample monitored row + auto-enqueue.
 
@@ -379,6 +381,28 @@ async def _add_free_sample(
         .returning(MonitoredSiteUrl.id)
     )
     newly_activated = activated_id is not None
+    # Record per-crawl admission provenance for the sampled URL. The pages /
+    # inventory read paths scope strictly through ``SiteUrlObservation``
+    # (see ``_admitted_site_url_subquery``), and a Free crawl fetches most of
+    # its sample via analyze-only tasks (no per-URL discover task ever runs),
+    # so without this row 9 of 10 sampled URLs would be invisible in the UI.
+    # Conflict-safe on the unique ``(crawl_id, site_url_id)`` pair; the richer
+    # discover-path observation (status/title/artifact) wins if it ran first,
+    # and this sparse admission row is enriched later by the analyze result.
+    await session.execute(
+        pg_insert(SiteUrlObservation)
+        .values(
+            workspace_id=crawl.workspace_id,
+            project_id=crawl.project_id,
+            crawl_id=crawl.id,
+            site_url_id=site_url_id,
+            source_kind=source_kind,
+            depth=depth,
+            observed_url=url,
+            final_url=url,
+        )
+        .on_conflict_do_nothing(index_elements=["crawl_id", "site_url_id"])
+    )
     await _enqueue_task(
         session,
         crawl=crawl,
@@ -482,6 +506,7 @@ async def admit_candidates(
                 url=candidate.url,
                 url_hash_value=candidate.url_hash,
                 depth=candidate.depth,
+                source_kind=candidate.source_kind,
             )
             if newly_activated and remaining is not None:
                 remaining -= 1

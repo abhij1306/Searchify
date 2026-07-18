@@ -4,6 +4,12 @@ import { render, screen } from '@testing-library/react';
 import { AnalysisProgress } from './analysis-progress';
 import type { PageSummary, SiteCrawl } from '@/lib/api/types';
 
+// AnalysisProgress renders PagesTable, which calls useRouter for clickable
+// rows; stub next/navigation (unavailable in jsdom).
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const CRAWL = '22222222-2222-4222-8222-222222222222';
 
 function page(overrides: Partial<PageSummary> = {}): PageSummary {

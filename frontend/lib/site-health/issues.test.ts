@@ -28,6 +28,10 @@ describe('labels', () => {
     expect(severityLabel('medium')).toBe('MEDIUM');
   });
 
+  it('folds critical into HIGH (three-tier catalog vocabulary)', () => {
+    expect(severityLabel('critical')).toBe('HIGH');
+  });
+
   it('maps dimensions to their catalog labels', () => {
     expect(dimensionLabel('aeo')).toBe('AEO');
     expect(dimensionLabel('technical')).toBe('TECHNICAL');

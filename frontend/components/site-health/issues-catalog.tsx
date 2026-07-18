@@ -52,6 +52,28 @@ function filterParams(filter: FilterKey): Pick<IssuesParams, 'severity' | 'dimen
 }
 
 /**
+ * Per-chip occurrence count from the chip-independent summary. `high` folds in
+ * `critical` so the chip agrees with the "High Severity" tile above it.
+ */
+function filterCount(
+  filter: FilterKey,
+  summary: import('@/lib/api/types').IssuesSummary,
+): number {
+  switch (filter) {
+    case 'high':
+      return (summary.severity_counts.high ?? 0) + (summary.severity_counts.critical ?? 0);
+    case 'medium':
+    case 'low':
+      return summary.severity_counts[filter] ?? 0;
+    case 'technical':
+    case 'aeo':
+      return summary.dimension_counts?.[filter] ?? 0;
+    default:
+      return summary.issue_count;
+  }
+}
+
+/**
  * Grouped Issues catalog (Slice 8, mockup 710).
  *
  * Renders the API-owned occurrence / severity / affected-page summary, a
@@ -101,8 +123,6 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
 
   return (
     <div className="grid gap-6">
-      <SummaryTiles summary={summary} loading={issuesQuery.isLoading} />
-
       <form onSubmit={applySearch} className="flex flex-wrap items-center gap-2">
         <Input
           type="search"
@@ -127,7 +147,7 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
               )}
             >
               {f.label}
-              {f.key === 'all' && summary ? ` (${summary.issue_count})` : ''}
+              {summary ? ` (${filterCount(f.key, summary)})` : ''}
             </button>
           ))}
         </div>
@@ -164,51 +184,6 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
           </Button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function SummaryTiles({
-  summary,
-  loading,
-}: Readonly<{ summary: import('@/lib/api/types').IssuesSummary | null; loading: boolean }>) {
-  if (loading && !summary) {
-    return (
-      <div className="grid gap-3 sm:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 w-full" />
-        ))}
-      </div>
-    );
-  }
-  if (!summary) return null;
-  const high = summary.severity_counts.high ?? 0;
-  const critical = summary.severity_counts.critical ?? 0;
-  const tiles = [
-    { label: 'Total Issues', value: `${summary.issue_count}`, tone: 'text-foreground' },
-    { label: 'High Severity', value: `${high + critical}`, tone: 'text-danger-text' },
-    { label: 'Medium', value: `${summary.severity_counts.medium ?? 0}`, tone: 'text-warning-text' },
-    { label: 'Low', value: `${summary.severity_counts.low ?? 0}`, tone: 'text-info-text' },
-    {
-      label: 'Pages Affected',
-      value: `${summary.monitored_affected_url_count}`,
-      sub: `/ ${summary.affected_url_count}`,
-      tone: 'text-foreground',
-    },
-  ];
-  return (
-    <div className="grid gap-3 sm:grid-cols-5">
-      {tiles.map((tile) => (
-        <Card key={tile.label}>
-          <CardContent className="grid gap-1 py-4">
-            <Label>{tile.label}</Label>
-            <span className={cn('mono text-2xl font-semibold', tile.tone)}>
-              {tile.value}
-              {tile.sub ? <span className="ml-1 text-sm text-muted">{tile.sub}</span> : null}
-            </span>
-          </CardContent>
-        </Card>
-      ))}
     </div>
   );
 }

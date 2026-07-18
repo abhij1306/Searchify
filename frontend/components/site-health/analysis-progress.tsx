@@ -36,8 +36,16 @@ export function AnalysisProgress({
   cancelPending: boolean;
 }>) {
   const summary = crawl.score_summary;
-  const selected = summary?.selected_count ?? 0;
+  // Fallbacks while the crawl is still running: `score_summary` is only
+  // written when the crawl terminalizes, so derive the live view from the
+  // monitored pages subset instead of rendering 0s (`pages` is the complete
+  // bounded monitored set — see the docstring above).
+  const selected = summary?.selected_count || pages.length;
   const analyzed = summary?.analyzed_count ?? crawl.analyzed_count;
+  const liveScores = summary ? null : computeLiveScores(pages);
+  const overall = summary?.overall_score ?? liveScores?.overall ?? null;
+  const technical = summary?.technical_score ?? liveScores?.technical ?? null;
+  const aeo = summary?.aeo_score ?? liveScores?.aeo ?? null;
 
   // Per-status page counts drive the running / queued cards. `completed` uses
   // the server-aggregated `analyzed_count` (authoritative crawl-wide count)
@@ -52,9 +60,9 @@ export function AnalysisProgress({
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <ScoreCell label="Site Health" value={summary?.overall_score ?? null} sub={`based on ${analyzed} of ${selected} pages`} />
-        <ScoreCell label="Technical" value={summary?.technical_score ?? null} />
-        <ScoreCell label="AEO" value={summary?.aeo_score ?? null} />
+        <ScoreCell label="Site Health" value={overall} sub={`based on ${analyzed} of ${selected} pages`} />
+        <ScoreCell label="Technical" value={technical} />
+        <ScoreCell label="AEO" value={aeo} />
       </div>
 
       <Card>
@@ -89,6 +97,30 @@ export function AnalysisProgress({
       </Card>
     </div>
   );
+}
+
+/**
+ * Running mean of the per-page scores that have landed so far. Only pages with
+ * a completed analysis contribute; returns null (rendered as `—`) until at
+ * least one page has scores — never a fabricated zero.
+ */
+function computeLiveScores(
+  pages: PageSummary[],
+): { overall: number | null; technical: number | null; aeo: number | null } | null {
+  const scored = pages.filter((p) => p.overall_score !== null);
+  if (scored.length === 0) return null;
+  const mean = (pick: (p: PageSummary) => number | null) => {
+    const values = scored
+      .map(pick)
+      .filter((v): v is number => v !== null);
+    if (values.length === 0) return null;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  };
+  return {
+    overall: mean((p) => p.overall_score),
+    technical: mean((p) => p.technical_score),
+    aeo: mean((p) => p.aeo_score),
+  };
 }
 
 function ScoreCell({

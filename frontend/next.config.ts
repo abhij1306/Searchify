@@ -21,6 +21,10 @@ const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? 'http://localhost:8000';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Next 16 blocks cross-origin requests to /_next/* dev resources. The app is
+  // opened via 127.0.0.1 while the dev server treats `localhost` as canonical,
+  // so allow the loopback IP or the browser gets a blank (unhydrated) page.
+  allowedDevOrigins: ['127.0.0.1'],
   async rewrites() {
     return [
       {

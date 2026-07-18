@@ -39,6 +39,7 @@ from app.core.config.site_health import (
     PAGE_ANALYSIS_STATUS_COMPLETED,
     PAGE_ANALYSIS_STATUS_PARTIALLY_COMPLETED,
     POLICY_BLOCKING_ERROR_CODES,
+    RULE_DIMENSIONS,
     SCORING_VERSION,
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
@@ -1226,7 +1227,15 @@ def _issue_filter_clause(
 ):
     clauses = [SiteIssue.crawl_id == crawl_id]
     if severity:
-        clauses.append(SiteIssue.severity == severity)
+        if severity == SEVERITY_HIGH:
+            # The catalog UI exposes a three-tier vocabulary (high/medium/low);
+            # ``critical`` folds into ``high`` so the High filter matches the
+            # rows its chip count includes.
+            clauses.append(
+                SiteIssue.severity.in_([SEVERITY_HIGH, SEVERITY_CRITICAL])
+            )
+        else:
+            clauses.append(SiteIssue.severity == severity)
     if category:
         clauses.append(SiteIssue.category == category)
     if dimension:
@@ -1314,21 +1323,37 @@ async def _load_issue_groups(
 async def _issues_summary(
     session: AsyncSession, *, crawl_id: uuid.UUID, clauses: list
 ) -> dict:
-    """Crawl-level occurrence/severity + distinct affected/monitored counts."""
+    """Crawl-level canonical-group/severity/dimension + distinct affected counts.
+
+    Counts are DISTINCT RULE GROUPS (the canonical issue cards the catalog
+    renders), not per-page occurrence rows: 6 issue types across 10 pages is
+    "6 issues", matching what the user sees in the list. Per-page multiplicity
+    is carried by each group's ``affected_url_count`` instead.
+    """
     total = (
         await session.scalar(
-            select(func.count()).select_from(SiteIssue).where(*clauses)
+            select(func.count(func.distinct(SiteIssue.rule_id)))
+            .select_from(SiteIssue)
+            .where(*clauses)
         )
         or 0
     )
     sev_rows = await session.execute(
-        select(SiteIssue.severity, func.count())
+        select(SiteIssue.severity, func.count(func.distinct(SiteIssue.rule_id)))
         .where(*clauses)
         .group_by(SiteIssue.severity)
     )
     severity_counts = {name: 0 for name in _SEVERITY_ORDER}
     for name, count in sev_rows.all():
         severity_counts[name] = int(count)
+    dim_rows = await session.execute(
+        select(SiteIssue.dimension, func.count(func.distinct(SiteIssue.rule_id)))
+        .where(*clauses)
+        .group_by(SiteIssue.dimension)
+    )
+    dimension_counts = {name: 0 for name in sorted(RULE_DIMENSIONS)}
+    for name, count in dim_rows.all():
+        dimension_counts[name] = int(count)
     affected = (
         await session.scalar(
             select(func.count(func.distinct(SiteIssue.site_url_id))).where(*clauses)
@@ -1354,6 +1379,7 @@ async def _issues_summary(
     return {
         "issue_count": int(total),
         "severity_counts": severity_counts,
+        "dimension_counts": dimension_counts,
         "affected_url_count": int(affected),
         "monitored_affected_url_count": int(monitored_affected),
     }
@@ -1458,7 +1484,20 @@ async def get_issues(
         }
         for g in window
     ]
-    summary = await _issues_summary(session, crawl_id=crawl_id, clauses=clauses)
+    # The summary powers the tiles + filter-chip counts, so it is computed
+    # WITHOUT the severity/dimension chip filters (but WITH search/rule/url
+    # narrowing): selecting the "High" chip must not zero out the other
+    # chips' counts or shrink the headline tiles.
+    summary_clauses = _issue_filter_clause(
+        crawl_id=crawl_id,
+        query=query,
+        severity=None,
+        category=category,
+        dimension=None,
+        rule=rule,
+        site_url_id=site_url_id,
+    )
+    summary = await _issues_summary(session, crawl_id=crawl_id, clauses=summary_clauses)
     return {"items": items, "next_cursor": next_cursor, "summary": summary}
 
 

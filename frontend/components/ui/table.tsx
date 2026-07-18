@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
  * Dense analytics table (§8):
  *  - sticky 32px header (--table-header-height), --text-xs uppercase, tracking-wide
  *  - 40px rows (--table-row-height), --text-sm cells
- *  - hover row highlight, tabular numerals for numeric columns (add `numeric`)
+ *  - hover row highlight; numeric columns (add `numeric`) center-align with
+ *    tabular numerals, text/date columns stay left-aligned
  * The wrapper is scroll-capable so the sticky header pins on vertical scroll.
  */
 export function Table({
@@ -98,7 +99,7 @@ export function TableHead({
       {...props}
       className={cn(
         'sticky top-0 z-10 h-[var(--table-header-height)] border-b border-border bg-background-alt px-3 align-middle text-[length:var(--table-header-font-size)] font-semibold uppercase tracking-wide text-muted',
-        numeric ? 'text-right tabular-nums' : 'text-left',
+        numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}
     >
@@ -120,7 +121,7 @@ export function TableCell({
       {...props}
       className={cn(
         'px-3 py-0 align-middle text-foreground',
-        numeric ? 'text-right tabular-nums' : 'text-left',
+        numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}
     >

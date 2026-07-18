@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { PagesTable } from './pages-table';
 import type { PageSummary } from '@/lib/api/types';
+
+// Stub next/navigation (unavailable in jsdom). `push` is asserted by the
+// clickable-row test.
+const push = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+}));
 
 const UUID = '11111111-1111-4111-8111-111111111111';
 const CRAWL = '22222222-2222-4222-8222-222222222222';
@@ -67,6 +74,15 @@ describe('PagesTable', () => {
     expect(anchor).not.toBeNull();
     expect(anchor).toHaveAttribute(
       'href',
+      `/site-health/crawls/${CRAWL}/pages/${UUID}`,
+    );
+  });
+
+  it('navigates to the per-URL detail when the row is clicked', () => {
+    push.mockClear();
+    render(<PagesTable pages={[page()]} crawlId={CRAWL} />);
+    fireEvent.click(screen.getByText('Homepage'));
+    expect(push).toHaveBeenCalledWith(
       `/site-health/crawls/${CRAWL}/pages/${UUID}`,
     );
   });

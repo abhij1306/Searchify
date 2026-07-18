@@ -1354,6 +1354,31 @@ class SiteHealthWorker:
         )
         evaluations: list[RuleEvaluation] = evaluate_all(facts)
         scores = score_analysis(evaluations)
+        # Refresh the lightweight identity/observation state from the analyze
+        # fetch. A Free sample URL is fetched ONLY by its analyze task (no
+        # per-URL discover runs), so its admission-time observation row is
+        # sparse (no title/status) until enriched here; without this the pages
+        # table shows blank titles for 9 of 10 sampled URLs.
+        site_url = await session.get(SiteUrl, site_url_id)
+        if site_url is not None:
+            title = str(facts.get("title") or "")
+            if title:
+                site_url.latest_title = title[:1024]
+            site_url.latest_content_type = str(facts.get("content_type") or "")[:128]
+            site_url.last_seen_crawl_id = crawl.id
+            site_url.discovery_status = DISCOVERY_STATUS_COMPLETED
+        observation = await session.scalar(
+            select(SiteUrlObservation).where(
+                SiteUrlObservation.crawl_id == crawl.id,
+                SiteUrlObservation.site_url_id == site_url_id,
+            )
+        )
+        if observation is not None and observation.status_code is None:
+            observation.status_code = facts.get("status_code")
+            observation.final_url = str(facts.get("final_url") or "")[:2048]
+            observation.content_type = str(facts.get("content_type") or "")[:128]
+            observation.title = str(facts.get("title") or "")[:1024]
+            observation.source_artifact_id = artifact_id
         analysis = SitePageAnalysis(
             workspace_id=crawl.workspace_id,
             project_id=crawl.project_id,

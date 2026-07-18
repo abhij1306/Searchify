@@ -322,6 +322,7 @@ class AffectedUrl(_Model):
 class IssuesSummary(_Model):
     issue_count: int
     severity_counts: dict[str, int]
+    dimension_counts: dict[str, int]
     affected_url_count: int
     monitored_affected_url_count: int
 

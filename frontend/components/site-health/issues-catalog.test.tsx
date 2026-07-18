@@ -33,6 +33,7 @@ function issue(overrides: Partial<SiteIssue> = {}): SiteIssue {
 const summary = {
   issue_count: 47,
   severity_counts: { high: 12, medium: 23, low: 12 },
+  dimension_counts: { technical: 30, aeo: 17 },
   affected_url_count: 50,
   monitored_affected_url_count: 38,
 };
@@ -52,10 +53,11 @@ describe('IssuesCatalog', () => {
     renderWithProviders(<IssuesCatalog crawlId={CRAWL} />);
 
     expect(await screen.findByText('WebSite schema is missing')).toBeInTheDocument();
-    // Summary tiles: total, high (12), medium (23), pages affected (38).
-    expect(screen.getByText('47')).toBeInTheDocument();
-    expect(screen.getByText('23')).toBeInTheDocument();
-    expect(screen.getByText('38')).toBeInTheDocument();
+    // Chip counts (tiles removed): All (47), Medium (23), AEO (17). The counts
+    // come from the API-owned summary, not a client re-count.
+    expect(screen.getByRole('button', { name: 'All (47)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Medium (23)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AEO (17)' })).toBeInTheDocument();
     // Severity + dimension badges + affected-count copy.
     expect(screen.getByText('HIGH')).toBeInTheDocument();
     expect(screen.getAllByText('AEO').length).toBeGreaterThan(0);
@@ -79,7 +81,7 @@ describe('IssuesCatalog', () => {
     renderWithProviders(<IssuesCatalog crawlId={CRAWL} />);
     await screen.findByText('WebSite schema is missing');
 
-    await user.click(screen.getByRole('button', { name: 'Medium' }));
+    await user.click(screen.getByRole('button', { name: 'Medium (23)' }));
     await waitFor(() => expect(seen).toContain('medium'));
   });
 
