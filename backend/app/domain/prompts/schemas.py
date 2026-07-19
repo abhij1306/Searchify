@@ -153,6 +153,9 @@ class PromptGenerateRequest(BaseModel):
 class PromptGenerateResponse(BaseModel):
     generated: list[PromptResponse] = Field(default_factory=list)
     topics: list[TopicResponse] = Field(default_factory=list)
+    # Total prompts dropped as duplicates: intra-response collapses (an
+    # equivalent text repeated within one model response) plus DB
+    # ``ON CONFLICT`` skips against pre-existing prompts in the set.
     dropped_duplicates: int = 0
 
 

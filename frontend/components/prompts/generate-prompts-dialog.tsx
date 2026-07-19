@@ -16,8 +16,9 @@ import type { PromptGenerateResponse, Topic } from '@/lib/api/types';
  * target topic, and requires an explicit consent checkbox before the brand
  * profile (name, aliases, competitors, market) is sent to the configured
  * default agent — the backend independently enforces the same gate
- * (`confirm_send_evidence`). Suggestions land in the Proposed tab; nothing is
- * audit-eligible until a human accepts it.
+ * (`confirm_send_evidence`). Suggestions fill the set-wide active pool first
+ * and the rest land in Proposed; nothing beyond the pool is audit-eligible
+ * until a human accepts it.
  */
 export function GeneratePromptsDialog({
   open,
@@ -87,21 +88,7 @@ export function GeneratePromptsDialog({
     >
       <div className="grid gap-4">
         {error ? <GenerateErrorAlert error={error} /> : null}
-        {result ? (
-          <Alert tone="success">
-            Added {result.generated.length} proposed prompt
-            {result.generated.length === 1 ? '' : 's'}
-            {result.topics.length > 0
-              ? ` across ${result.topics.length} topic${result.topics.length === 1 ? '' : 's'}`
-              : ''}
-            {result.dropped_duplicates > 0
-              ? `; ${result.dropped_duplicates} duplicate${
-                  result.dropped_duplicates === 1 ? '' : 's'
-                } skipped`
-              : ''}
-            . Review them in the Proposed tab.
-          </Alert>
-        ) : null}
+        {result && !error ? <GenerateResultAlert result={result} /> : null}
 
         <label className="grid gap-1.5">
           <span className="text-xs font-medium text-secondary">Number of prompts (1–20)</span>
@@ -139,7 +126,7 @@ export function GeneratePromptsDialog({
             checked={confirmed}
             onChange={(event) => setConfirmed(event.target.checked)}
             aria-label="Confirm sending brand details to the AI provider"
-            className="focus-ring mt-0.5 size-4 shrink-0 accent-[var(--color-accent,#4f46e5)]"
+            className="focus-ring mt-0.5 size-4 shrink-0 accent-accent"
           />
           <span className="text-secondary">
             I understand my brand profile (brand name, aliases, competitors, and market) will be
@@ -148,6 +135,44 @@ export function GeneratePromptsDialog({
         </label>
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * Success summary. Generated prompts fill the set-wide active pool first, so a
+ * run can land rows in Active and/or Proposed — report both counts (and any
+ * dropped duplicates) and point the user at the tab(s) that received rows.
+ */
+function GenerateResultAlert({ result }: Readonly<{ result: PromptGenerateResponse }>) {
+  const total = result.generated.length;
+  const proposed = result.generated.filter((prompt) => prompt.status === 'proposed').length;
+  const active = result.generated.filter((prompt) => prompt.status === 'active').length;
+
+  // Count topics that actually received generated rows — i.e. the unique
+  // non-null topic_id values on `generated` — rather than every topic the run
+  // touched (`result.topics` also includes topics whose only change was a
+  // dropped duplicate, so it can overstate where rows landed).
+  const topicCount = new Set(
+    result.generated
+      .map((prompt) => prompt.topic_id)
+      .filter((id): id is string => id != null),
+  ).size;
+
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  const placements: string[] = [];
+  if (active > 0) placements.push(`${plural(active, 'prompt')} added to Active`);
+  if (proposed > 0) placements.push(`${plural(proposed, 'prompt')} proposed for review`);
+
+  return (
+    <Alert tone="success">
+      Generated {plural(total, 'prompt')}
+      {topicCount > 0 ? ` across ${plural(topicCount, 'topic')}` : ''}
+      {result.dropped_duplicates > 0
+        ? `; ${plural(result.dropped_duplicates, 'duplicate')} skipped`
+        : ''}
+      .{placements.length > 0 ? ` ${placements.join('; ')}.` : ''}
+    </Alert>
   );
 }
 

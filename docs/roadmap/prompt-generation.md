@@ -14,8 +14,12 @@
 >    `app/domain/prompts/topics.py`) groups prompts per project; generation produces topics
 >    **and** prompts in one call, or can be scoped to a single existing topic.
 > 3. **Review lifecycle via `status`, not `review_status`/`enabled`.** Prompts carry
->    `status ∈ {proposed, active, archived}`; AI output lands as `proposed` and only
->    user-accepted (`active` + `enabled`) prompts are audit-eligible.
+>    `status ∈ {proposed, active, archived}`; generation fills a set-wide pool of
+>    `GENERATION_ACTIVE_THRESHOLD` (default 20) `active` prompts from the earliest
+>    generated rows (promoted atomically under a prompt-set advisory lock), and prompts
+>    beyond the pool land `proposed` until a user promotes them. Only `active` + `enabled`
+>    prompts are audit/scheduled-run eligible. Existing manual/active rows count toward the
+>    pool; archived rows are never auto-reactivated.
 >
 > As-built code: `app/domain/prompts/generation.py`, `app/connectors/agent/client.py`,
 > `app/domain/prompts/topics.py`, `app/core/config/prompts.py` (count caps, system prompt,

@@ -21,9 +21,10 @@ from app.core.config.projects import (
     PROMPT_ORIGIN_MANUAL,
 )
 from app.domain.projects.normalization import normalize_intent
+from app.domain.prompts.locks import acquire_project_lock, acquire_prompt_set_lock
 from app.domain.prompts.normalization import prompt_text_hash
 from app.models.project import Project
-from app.models.prompt import Prompt, PromptSet
+from app.models.prompt import Prompt, PromptSet, Topic
 
 
 class PromptSetNotFoundError(LookupError):
@@ -32,6 +33,12 @@ class PromptSetNotFoundError(LookupError):
 
 class PromptNotFoundError(LookupError):
     """Raised when a prompt is missing or not in the caller's workspace."""
+
+
+class TopicNotFoundError(LookupError):
+    """Raised when a topic is missing, cross-workspace, or not in the prompt's
+    own project (a prompt can only be filed under a topic of its own
+    project)."""
 
 
 class DuplicatePromptError(ValueError):
@@ -155,6 +162,11 @@ async def delete_prompt_set(
     prompt_set = await _get_prompt_set(
         session, workspace_id=workspace_id, prompt_set_id=prompt_set_id
     )
+    # Serialize against a concurrent generation for this set (which acquires
+    # the same locks in the same order: project first, then set) so a delete
+    # can't interleave between generation's re-resolution and its inserts.
+    await acquire_project_lock(session, prompt_set.project_id)
+    await acquire_prompt_set_lock(session, prompt_set_id)
     await session.delete(prompt_set)
     await session.commit()
 
@@ -223,6 +235,38 @@ async def _get_prompt(
     return prompt
 
 
+async def _validate_topic_scope(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    prompt: Prompt,
+    topic_id: uuid.UUID | None,
+) -> None:
+    """Ensure ``topic_id`` names a topic of the prompt's own project.
+
+    A prompt may only be filed under a topic that belongs to the same project
+    as the prompt's set (topics are per-project, and projects are
+    workspace-scoped, invariant 5). ``None`` (detach) is always allowed.
+    Anything else — an unknown topic, a topic in a sibling project, or a topic
+    in another workspace — raises ``TopicNotFoundError`` (404 at the API
+    layer, no existence oracle) instead of committing a cross-scope FK.
+    """
+    if topic_id is None:
+        return
+    result = await session.execute(
+        select(Topic.id)
+        .join(Project, Project.id == Topic.project_id)
+        .join(PromptSet, PromptSet.project_id == Project.id)
+        .where(
+            Topic.id == topic_id,
+            PromptSet.id == prompt.prompt_set_id,
+            Project.workspace_id == workspace_id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise TopicNotFoundError("Topic not found in this prompt's project")
+
+
 async def update_prompt(
     session: AsyncSession,
     *,
@@ -245,6 +289,12 @@ async def update_prompt(
     if data.get("status") is not None:
         prompt.status = data["status"]
     if "topic_id" in data:
+        await _validate_topic_scope(
+            session,
+            workspace_id=workspace_id,
+            prompt=prompt,
+            topic_id=data["topic_id"],
+        )
         prompt.topic_id = data["topic_id"]
     try:
         await session.commit()

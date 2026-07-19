@@ -12,8 +12,9 @@
 1. **First-class `Topic` table** (project-scoped) + nullable `topic_id` FK on `prompts`.
    Users can add topics manually; generation proposes topics AND prompts together.
 2. **Prompt review states**: new `status` column — `proposed | active | archived`.
-   Manual/CSV prompts start `active`; generated prompts start `proposed`; audits only ever
-   consume `status='active' AND enabled=true` (preserves the "no auto-run" non-goal).
+   Manual/CSV prompts start `active`; generation fills a set-wide pool of the earliest 20
+   (`GENERATION_ACTIVE_THRESHOLD`) `active` prompts and leaves the rest `proposed`; audits only
+   ever consume `status='active' AND enabled=true` (preserves the "no auto-run" non-goal).
 3. **One-call generation**: brand context (name, aliases, competitors, market, existing topics,
    existing prompt texts) → default agent → JSON `{topics:[{name, prompts:[...]}]}`. Optional
    `topic_id` in the request scopes generation to one existing topic. Inline execution only

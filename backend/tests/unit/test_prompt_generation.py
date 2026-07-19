@@ -12,6 +12,9 @@ import pytest
 
 from app.domain.prompts.generation import (
     GenerationOutputError,
+    SuggestedPrompt,
+    SuggestedTopic,
+    _cap_suggestions_to_count,
     build_generation_user_message,
     parse_generation_output,
 )
@@ -70,7 +73,8 @@ class TestParseGenerationOutput:
                 ]
             }
         )
-        topics = parse_generation_output(raw)
+        topics, dropped = parse_generation_output(raw)
+        assert dropped == 0
         assert len(topics) == 1
         assert topics[0].name == "Footwear"
         assert [p.intent for p in topics[0].prompts] == ["discovery", "comparison"]
@@ -79,7 +83,7 @@ class TestParseGenerationOutput:
         raw = json.dumps(
             {"topics": [{"name": "T", "prompts": [{"text": "x", "intent": "warp"}]}]}
         )
-        assert parse_generation_output(raw)[0].prompts[0].intent == ""
+        assert parse_generation_output(raw)[0][0].prompts[0].intent == ""
 
     def test_intent_is_casefolded(self) -> None:
         raw = json.dumps(
@@ -89,7 +93,7 @@ class TestParseGenerationOutput:
                 ]
             }
         )
-        assert parse_generation_output(raw)[0].prompts[0].intent == "discovery"
+        assert parse_generation_output(raw)[0][0].prompts[0].intent == "discovery"
 
     def test_duplicates_within_response_collapse(self) -> None:
         raw = json.dumps(
@@ -100,9 +104,10 @@ class TestParseGenerationOutput:
                 ]
             }
         )
-        topics = parse_generation_output(raw)
+        topics, dropped = parse_generation_output(raw)
         assert len(topics) == 1  # topic B became empty and was dropped
         assert topics[0].name == "A"
+        assert dropped == 1  # the collapsed duplicate is counted
 
     def test_empty_prompts_and_topics_dropped(self) -> None:
         raw = json.dumps(
@@ -113,9 +118,10 @@ class TestParseGenerationOutput:
                 ]
             }
         )
-        topics = parse_generation_output(raw)
+        topics, dropped = parse_generation_output(raw)
         assert [t.name for t in topics] == ["Kept"]
         assert [p.text for p in topics[0].prompts] == ["ok"]
+        assert dropped == 0  # empties are not duplicates
 
     def test_malformed_json_raises(self) -> None:
         with pytest.raises(GenerationOutputError):
@@ -173,3 +179,67 @@ class TestBuildGenerationUserMessage:
         assert "Brand aliases: none" in message
         assert "Competitors: none" in message
         assert "do NOT duplicate" not in message
+
+
+# --------------------------------------------------------------------------
+# Output-count enforcement (model may return more than requested)
+# --------------------------------------------------------------------------
+def _topic(name: str, *texts: str) -> SuggestedTopic:
+    return SuggestedTopic(
+        name=name, prompts=[SuggestedPrompt(text=t) for t in texts]
+    )
+
+
+class TestCapSuggestionsToCount:
+    def test_no_trim_when_under_or_equal(self) -> None:
+        suggestions = [_topic("A", "one", "two"), _topic("B", "three")]
+        capped = _cap_suggestions_to_count(suggestions, 5)
+        assert [t.name for t in capped] == ["A", "B"]
+        assert sum(len(t.prompts) for t in capped) == 3
+
+    def test_trims_total_across_topics_in_order(self) -> None:
+        suggestions = [_topic("A", "one", "two"), _topic("B", "three", "four")]
+        capped = _cap_suggestions_to_count(suggestions, 3)
+        assert sum(len(t.prompts) for t in capped) == 3
+        # Response order preserved: A keeps both, B keeps only its first.
+        assert [p.text for p in capped[0].prompts] == ["one", "two"]
+        assert [p.text for p in capped[1].prompts] == ["three"]
+
+    def test_drops_emptied_topics(self) -> None:
+        suggestions = [_topic("A", "one", "two"), _topic("B", "three")]
+        capped = _cap_suggestions_to_count(suggestions, 2)
+        assert [t.name for t in capped] == ["A"]
+
+    def test_zero_count_yields_nothing(self) -> None:
+        assert _cap_suggestions_to_count([_topic("A", "one")], 0) == []
+
+
+# --------------------------------------------------------------------------
+# Settings validation (existing_prompt_context_limit lower bound)
+# --------------------------------------------------------------------------
+class TestPromptGenerationSettings:
+    def test_negative_context_limit_rejected(self) -> None:
+        from pydantic import ValidationError as PydValidationError
+
+        from app.core.config.prompts import PromptGenerationSettings
+
+        with pytest.raises(PydValidationError):
+            PromptGenerationSettings(
+                GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=-1
+            )
+
+    def test_zero_context_limit_accepted(self) -> None:
+        from app.core.config.prompts import PromptGenerationSettings
+
+        settings = PromptGenerationSettings(
+            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=0
+        )
+        assert settings.existing_prompt_context_limit == 0
+
+    def test_positive_context_limit_accepted(self) -> None:
+        from app.core.config.prompts import PromptGenerationSettings
+
+        settings = PromptGenerationSettings(
+            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=50
+        )
+        assert settings.existing_prompt_context_limit == 50

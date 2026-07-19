@@ -29,6 +29,7 @@ export function PhasePanel({
     dashboardQuery,
     pagesQuery,
     projectSelectedTotal,
+    projectSelectedError,
     createMutation,
     cancelMutation,
     startCrawl,
@@ -70,6 +71,12 @@ export function PhasePanel({
         <AnalysisProgress
           crawl={crawl}
           pages={pagesQuery.data?.items ?? []}
+          // Surface the page-window fetch state so a failed/loading query does
+          // not masquerade as a valid empty "no pages" table. React Query keeps
+          // the prior `data` during a refetch, so existing rows stay visible;
+          // these flags only drive an error alert / initial loading hint.
+          pagesError={pagesQuery.isError}
+          pagesLoading={pagesQuery.isLoading}
           // Per-project active monitored count — the server-side "selected"
           // total for THIS project's crawl (the workspace-wide dashboard
           // quota would overcount in multi-project workspaces). Null until
@@ -77,6 +84,7 @@ export function PhasePanel({
           // terminal score_summary.selected_count takes precedence once
           // written.
           selectedTotal={projectSelectedTotal}
+          selectedError={projectSelectedError}
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />

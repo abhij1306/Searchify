@@ -26,6 +26,7 @@ export function SiteHealthScreen() {
     crawl,
     active,
     phase,
+    recrawlStarting,
     createMutation,
     startCrawl,
     runExport,
@@ -81,6 +82,12 @@ export function SiteHealthScreen() {
       {exportError ? <Alert tone="danger">{exportError}</Alert> : null}
       {createMutation.isError ? (
         <Alert tone="danger">Could not start a crawl. It may already be running.</Alert>
+      ) : null}
+      {recrawlStarting ? (
+        <Alert tone="info">
+          Starting a fresh crawl — your previous results and monitored selection stay in view until
+          the new run takes over.
+        </Alert>
       ) : null}
 
       <PhasePanel screen={screen} entitlement={entitlementQuery.data!} projectId={projectId} />

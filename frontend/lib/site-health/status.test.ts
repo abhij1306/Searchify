@@ -4,10 +4,12 @@ import {
   PLACEHOLDER,
   canShowDiscoveredTotal,
   crawlBadgeValue,
+  dashboardRunNotice,
   discoveryProgressLabel,
   formatAudited,
   formatIssueCount,
   formatScore,
+  hasScoreData,
   isAnalysisTerminal,
   isCrawlCancelable,
   isDiscoveryProvisional,
@@ -196,6 +198,134 @@ describe('resolveSiteHealthPhase', () => {
         'starter',
       ),
     ).toBe('terminal');
+  });
+
+  it('routes a cancelled crawl WITH score data to the dashboard (keeps partial scores)', () => {
+    // Product rule: cancellation with partial data keeps the latest dashboard,
+    // partial scores, and inventory visible — never a bare terminal card.
+    const summary = {
+      overall_score: 71,
+      technical_score: 80,
+      aeo_score: 62,
+      selected_count: 10,
+      analyzed_count: 4,
+      issue_count: 3,
+      scoring_version: 's1',
+    };
+    expect(
+      resolveSiteHealthPhase(
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+          score_summary: summary,
+        },
+        'starter',
+      ),
+    ).toBe('dashboard');
+    // Free too — a cancelled-with-data crawl always keeps its results.
+    expect(
+      resolveSiteHealthPhase(
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+          score_summary: summary,
+        },
+        'free',
+      ),
+    ).toBe('dashboard');
+  });
+
+  it('routes a failed crawl WITH score data to the dashboard (partial results survive)', () => {
+    const summary = {
+      overall_score: 55,
+      technical_score: 60,
+      aeo_score: 50,
+      selected_count: 8,
+      analyzed_count: 3,
+      issue_count: 2,
+      scoring_version: 's1',
+    };
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'failed', discovery_status: 'failed', score_summary: summary },
+        'starter',
+      ),
+    ).toBe('dashboard');
+  });
+
+  it('is deterministic: score data outranks the discovering/analyzing sub-states', () => {
+    // Even mid-discovery, a landed projection means the dashboard is the one
+    // authoritative outcome — precedence is explicit, not order-dependent.
+    const summary = {
+      overall_score: null,
+      technical_score: null,
+      aeo_score: null,
+      selected_count: 5,
+      analyzed_count: 1,
+      issue_count: 0,
+      scoring_version: 's1',
+    };
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'running', discovery_status: 'running', score_summary: summary },
+        'starter',
+      ),
+    ).toBe('dashboard');
+  });
+
+  it('routes a Free discovered crawl (analysis pending) to analyzing, not selection', () => {
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, discovery_status: 'sample_completed', analysis_status: 'pending' },
+        'free',
+      ),
+    ).toBe('analyzing');
+  });
+});
+
+describe('score-data helpers (cancelled-with-data product rule)', () => {
+  const summary = {
+    overall_score: 71,
+    technical_score: 80,
+    aeo_score: 62,
+    selected_count: 10,
+    analyzed_count: 4,
+    issue_count: 3,
+    scoring_version: 's1',
+  };
+
+  it('hasScoreData reflects a present score_summary', () => {
+    expect(hasScoreData({ score_summary: summary })).toBe(true);
+    expect(hasScoreData({ score_summary: null })).toBe(false);
+  });
+});
+
+describe('dashboardRunNotice', () => {
+  it('returns null for a cleanly completed crawl (no notice)', () => {
+    expect(dashboardRunNotice({ status: 'completed' })).toBeNull();
+  });
+
+  it('labels a cancelled dashboard explicitly with a Cancelled badge + info tone', () => {
+    const notice = dashboardRunNotice({ status: 'cancelled' });
+    expect(notice?.badge).toBe('cancelled');
+    expect(notice?.tone).toBe('info');
+    expect(notice?.message).toMatch(/cancelled/i);
+    expect(notice?.message).toMatch(/re-crawl/i);
+  });
+
+  it('labels a partial dashboard with a Partial badge + warning tone', () => {
+    const notice = dashboardRunNotice({ status: 'partially_completed' });
+    expect(notice?.badge).toBe('partial');
+    expect(notice?.tone).toBe('warning');
+  });
+
+  it('labels a failed-with-data dashboard with a Failed badge', () => {
+    const notice = dashboardRunNotice({ status: 'failed' });
+    expect(notice?.badge).toBe('failed');
   });
 });
 
