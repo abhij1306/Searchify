@@ -1,6 +1,8 @@
 import uuid
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.prompts.locks import (
     _PROJECT_NAMESPACE,
@@ -40,8 +42,8 @@ async def test_advisory_lock_executes_single_bigint_with_derived_key() -> None:
         async def execute(self, statement: Any) -> None:
             executed.append(statement)
 
-    await _advisory_xact_lock(  # type: ignore[arg-type]
-        FakeSession(), _PROMPT_SET_NAMESPACE, entity_id
+    await _advisory_xact_lock(
+        cast(AsyncSession, FakeSession()), _PROMPT_SET_NAMESPACE, entity_id
     )
 
     assert len(executed) == 1

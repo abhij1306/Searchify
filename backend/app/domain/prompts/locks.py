@@ -53,9 +53,7 @@ async def _advisory_xact_lock(
     )
 
 
-async def acquire_project_lock(
-    session: AsyncSession, project_id: uuid.UUID
-) -> None:
+async def acquire_project_lock(session: AsyncSession, project_id: uuid.UUID) -> None:
     """Serialize topic-level writers for one project (transaction-scoped).
 
     Held by generation and by ``delete_topic`` so a topic cannot be deleted
@@ -76,4 +74,3 @@ async def acquire_prompt_set_lock(
     always runs on PostgreSQL where the lock is guaranteed.
     """
     await _advisory_xact_lock(session, _PROMPT_SET_NAMESPACE, prompt_set_id)
-

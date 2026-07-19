@@ -185,9 +185,7 @@ class TestBuildGenerationUserMessage:
 # Output-count enforcement (model may return more than requested)
 # --------------------------------------------------------------------------
 def _topic(name: str, *texts: str) -> SuggestedTopic:
-    return SuggestedTopic(
-        name=name, prompts=[SuggestedPrompt(text=t) for t in texts]
-    )
+    return SuggestedTopic(name=name, prompts=[SuggestedPrompt(text=t) for t in texts])
 
 
 class TestCapSuggestionsToCount:
@@ -224,22 +222,16 @@ class TestPromptGenerationSettings:
         from app.core.config.prompts import PromptGenerationSettings
 
         with pytest.raises(PydValidationError):
-            PromptGenerationSettings(
-                GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=-1
-            )
+            PromptGenerationSettings(GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=-1)
 
     def test_zero_context_limit_accepted(self) -> None:
         from app.core.config.prompts import PromptGenerationSettings
 
-        settings = PromptGenerationSettings(
-            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=0
-        )
+        settings = PromptGenerationSettings(GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=0)
         assert settings.existing_prompt_context_limit == 0
 
     def test_positive_context_limit_accepted(self) -> None:
         from app.core.config.prompts import PromptGenerationSettings
 
-        settings = PromptGenerationSettings(
-            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=50
-        )
+        settings = PromptGenerationSettings(GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=50)
         assert settings.existing_prompt_context_limit == 50

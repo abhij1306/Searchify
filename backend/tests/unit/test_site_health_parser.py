@@ -7,6 +7,8 @@ facts, and JSON-LD / microdata validation against the config schema map.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.analysis.site_health.parser import extract_page_facts
 from app.analysis.site_health.structured_data import (
     parse_jsonld_blocks,
@@ -48,7 +50,7 @@ _FULL_PAGE = b"""
 
 
 def _facts(body: bytes, **kwargs):
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         final_url="https://acme.example.com/widgets",
         content_type="text/html",
         status_code=200,

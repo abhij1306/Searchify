@@ -12,6 +12,7 @@ import { promptsApi } from './prompts';
 import { providersApi } from './providers';
 import { runsApi } from './runs';
 import { siteHealthApi } from './site-health';
+import { topicsApi } from './topics';
 import { visibilityApi } from './visibility';
 
 export const api = {
@@ -21,6 +22,7 @@ export const api = {
   ...providersApi,
   ...runsApi,
   ...siteHealthApi,
+  ...topicsApi,
   ...visibilityApi,
 };
 

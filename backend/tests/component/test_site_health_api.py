@@ -564,6 +564,7 @@ async def test_second_workspace_isolation(
         user = await session.scalar(
             select(User).where(User.email == "multi@example.com")
         )
+        assert user is not None
         other_ws = Workspace(name="Other WS")
         session.add(other_ws)
         await session.flush()
@@ -785,6 +786,7 @@ async def test_selected_crawl_scoping_no_downgrade_leakage(
                 SiteUrl.normalized_url == "https://acme.test/b",
             )
         )
+        assert url_b is not None
         url_b_id = url_b.id
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
 
@@ -897,6 +899,7 @@ async def test_issue_detail_canonicalizes_non_representative_member_id(
                 SiteUrl.normalized_url == "https://acme.test/c",
             )
         )
+        assert url_c is not None
         member_id = await _seed_issue_for_url(
             session,
             scn,
@@ -939,6 +942,7 @@ async def test_grouped_issues_canonical_id_stable_under_filters(
                 SiteUrl.normalized_url == "https://acme.test/c",
             )
         )
+        assert url_c is not None
         url_c_id = url_c.id
         await _seed_issue_for_url(
             session,

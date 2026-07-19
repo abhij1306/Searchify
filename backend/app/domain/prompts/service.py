@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -384,7 +384,9 @@ async def bulk_set_status(
         .where(Prompt.prompt_set_id == prompt_set_id, Prompt.id.in_(prompt_ids))
         .values(status=status)
     )
-    if result.rowcount != len(set(prompt_ids)):
+    # An UPDATE always yields a CursorResult (which has rowcount); the broad
+    # ``Result`` annotation on ``execute`` hides that.
+    if cast(CursorResult[Any], result).rowcount != len(set(prompt_ids)):
         await session.rollback()
         raise PromptNotFoundError("Prompt(s) not found in this set")
     await session.commit()

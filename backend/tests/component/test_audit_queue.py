@@ -80,6 +80,7 @@ async def test_sweeper_reclaims_expired_lease(
     # Force the lease into the past to simulate a crashed worker.
     async with session_factory() as session:
         task = await session.get(AuditTask, task_id)
+        assert task is not None
         task.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
         await session.commit()
 
@@ -88,6 +89,7 @@ async def test_sweeper_reclaims_expired_lease(
 
     async with session_factory() as session:
         task = await session.get(AuditTask, task_id)
+        assert task is not None
         # Attempts remain -> returned to retry_wait, available immediately.
         assert task.status == TASK_STATUS_RETRY_WAIT
         assert task.lease_owner is None
@@ -110,6 +112,7 @@ async def test_sweeper_fails_task_when_attempts_exhausted(
 
     async with session_factory() as session:
         task = await session.get(AuditTask, task_id)
+        assert task is not None
         task.attempt_count = task.max_attempts  # budget spent
         task.lease_expires_at = datetime.now(UTC) - timedelta(seconds=1)
         await session.commit()
@@ -119,6 +122,7 @@ async def test_sweeper_fails_task_when_attempts_exhausted(
 
     async with session_factory() as session:
         task = await session.get(AuditTask, task_id)
+        assert task is not None
         assert task.status == TASK_STATUS_FAILED
         assert task.completed_at is not None
 

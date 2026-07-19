@@ -37,7 +37,7 @@
 | `/opportunities` | Opportunities | Roadmap |
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
-| `/topics` | Dedicated Topics page (topic management already lives in the `/prompts` rail) | Roadmap |
+| `/topics` | Dedicated Topics page (topic management already lives in the `/prompt-research` rail) | Roadmap |
 | `/writing` (Tone/Style, Memory), Knowledge Base | Writing suite | Roadmap |
 | Settings → Integrations (GSC/GA4/Bing), Agent, MCP | Integrations / Agent | Roadmap |
 

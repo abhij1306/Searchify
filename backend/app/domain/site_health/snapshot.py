@@ -215,7 +215,7 @@ async def persist_crawl_snapshot(
         "technical_score": aggregate.technical_score,
         "aeo_score": aggregate.aeo_score,
         "overall_score": aggregate.overall_score,
-        "analyzed_url_count": aggregate.analyzed_url_count,
+        "analyzed_count": aggregate.analyzed_url_count,
         "selected_count": selected_url_count,
         "issue_count": issue_total,
         "scoring_version": aggregate.scoring_version,

@@ -13,6 +13,7 @@ Covers the logic that does not need a database:
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -40,6 +41,7 @@ from app.domain.site_health.service import (
     display_label_for,
     presentation_status_for,
 )
+from app.models.site_health import SiteCrawlTask, SitePageAnalysis
 
 # --------------------------------------------------------------------------
 # Keyset cursors
@@ -127,9 +129,11 @@ def _task(status: str, error_code: str = "") -> SimpleNamespace:
 
 def test_completed_analysis_wins() -> None:
     st, code = presentation_status_for(
-        analysis=_analysis(PAGE_ANALYSIS_STATUS_COMPLETED),
+        analysis=cast(SitePageAnalysis, _analysis(PAGE_ANALYSIS_STATUS_COMPLETED)),
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_FAILED, ERROR_SSRF_BLOCKED),
+        latest_analyze_task=cast(
+            SiteCrawlTask, _task(TASK_STATUS_FAILED, ERROR_SSRF_BLOCKED)
+        ),
     )
     assert st == PAGE_ANALYSIS_STATUS_COMPLETED
     assert code == ""
@@ -137,7 +141,9 @@ def test_completed_analysis_wins() -> None:
 
 def test_partially_completed_analysis_wins() -> None:
     st, code = presentation_status_for(
-        analysis=_analysis(PAGE_ANALYSIS_STATUS_PARTIALLY_COMPLETED),
+        analysis=cast(
+            SitePageAnalysis, _analysis(PAGE_ANALYSIS_STATUS_PARTIALLY_COMPLETED)
+        ),
         monitored=False,
         latest_analyze_task=None,
     )
@@ -150,7 +156,7 @@ def test_policy_denial_maps_to_blocked(code: str) -> None:
     st, out_code = presentation_status_for(
         analysis=None,
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_FAILED, code),
+        latest_analyze_task=cast(SiteCrawlTask, _task(TASK_STATUS_FAILED, code)),
     )
     assert st == "blocked"
     assert out_code == code
@@ -160,7 +166,7 @@ def test_other_terminal_failure_maps_to_error_not_failed() -> None:
     st, code = presentation_status_for(
         analysis=None,
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_FAILED, "timeout"),
+        latest_analyze_task=cast(SiteCrawlTask, _task(TASK_STATUS_FAILED, "timeout")),
     )
     assert st == "error"
     assert st != "failed"
@@ -171,7 +177,7 @@ def test_cancelled_without_code_maps_to_cancelled() -> None:
     st, code = presentation_status_for(
         analysis=None,
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_CANCELLED, ""),
+        latest_analyze_task=cast(SiteCrawlTask, _task(TASK_STATUS_CANCELLED, "")),
     )
     assert st == "cancelled"
     assert code == ""
@@ -181,7 +187,7 @@ def test_succeeded_task_without_analysis_is_pending() -> None:
     st, _ = presentation_status_for(
         analysis=None,
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_SUCCEEDED),
+        latest_analyze_task=cast(SiteCrawlTask, _task(TASK_STATUS_SUCCEEDED)),
     )
     assert st == "pending"
 
@@ -189,7 +195,9 @@ def test_succeeded_task_without_analysis_is_pending() -> None:
 @pytest.mark.parametrize("status", [TASK_STATUS_RUNNING, TASK_STATUS_LEASED])
 def test_in_flight_task_is_running(status: str) -> None:
     st, _ = presentation_status_for(
-        analysis=None, monitored=True, latest_analyze_task=_task(status)
+        analysis=None,
+        monitored=True,
+        latest_analyze_task=cast(SiteCrawlTask, _task(status)),
     )
     assert st == "running"
 
@@ -198,7 +206,7 @@ def test_queued_task_is_pending() -> None:
     st, _ = presentation_status_for(
         analysis=None,
         monitored=True,
-        latest_analyze_task=_task(TASK_STATUS_QUEUED),
+        latest_analyze_task=cast(SiteCrawlTask, _task(TASK_STATUS_QUEUED)),
     )
     assert st == "pending"
 

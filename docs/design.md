@@ -319,7 +319,7 @@ Below: a link toggling login/register. No sidebar/top-bar. Theme toggle in a cor
 **Left sidebar (240px, `bg-sidebar`)**: top = project-switcher (brand avatar + name, dropdown).
 A "Getting Started N of 6" progress card. Grouped nav sections — **Analytics** (Visibility =
 live; LLM Analytics, Traffic = disabled "soon"), **Prompts** (Your Prompts = live; Prompt
-Research = disabled), **Actions** (Content, Opportunities = disabled), **On Page** (Site Health,
+Research = live), **Actions** (Content, Opportunities = disabled), **On Page** (Site Health,
 Issues = live; Knowledge Base = disabled). Bottom = user-menu (avatar + email). **Top bar (52px)**:
 left = "Find anything…" search placeholder; right = Export hook, Learn link, theme-toggle.
 Active nav item uses accent-subtle bg + accent-text; disabled items are muted with a "soon"

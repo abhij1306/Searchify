@@ -15,6 +15,7 @@ Covers the v2 acceptance:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx
 import pytest
@@ -33,7 +34,7 @@ async def _register(client: httpx.AsyncClient, email: str) -> None:
 
 
 def _connection_payload(**overrides: object) -> dict:
-    payload = {
+    payload: dict[str, Any] = {
         "label": "Prod OpenAI",
         "transport_provider": "openai",
         "api_key": _SECRET,

@@ -7,6 +7,7 @@ rejected. This is the single gate every downstream query relies on.
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
 import pytest
 from fastapi import HTTPException
@@ -82,7 +83,9 @@ def test_unauthenticated_current_user_rejected() -> None:
     from app.api.deps import get_current_user
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(get_current_user(session_token=None, session=None))
+        asyncio.run(
+            get_current_user(session_token=None, session=cast(AsyncSession, None))
+        )
     assert exc.value.status_code == 401
 
 

@@ -152,6 +152,7 @@ async def test_worker_runs_all_tasks_and_finalizes(
         assert all(t.score is not None for t in tasks)
 
         refreshed = await session.get(Audit, audit.id)
+        assert refreshed is not None
         # Execution complete -> analysis stage runs -> audit COMPLETED (B6).
         assert refreshed.status == AUDIT_STATUS_COMPLETED
         assert refreshed.completed_count == 6
@@ -219,6 +220,7 @@ async def test_worker_persists_openai_provenance(
         task = await session.scalar(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
+        assert task is not None
         assert task.status == "succeeded"
         assert task.logical_engine == ENGINE_CHATGPT
         assert task.transport_provider == TRANSPORT_OPENAI
@@ -245,6 +247,7 @@ async def test_worker_rejects_frozen_openrouter_task_without_network(
         task = await session.scalar(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
+        assert task is not None
         task.transport_provider = "openrouter"
         snapshot = await session.get(AuditEngineSnapshot, task.engine_snapshot_id)
         if snapshot is not None:
@@ -302,6 +305,7 @@ async def test_worker_stops_at_boundary_when_cancelled(
 
     async with session_factory() as session:
         refreshed = await session.get(Audit, audit.id)
+        assert refreshed is not None
         assert refreshed.status == AUDIT_STATUS_CANCELLED
         # No provider was called -> no artifacts.
         artifacts = await session.scalar(
@@ -332,6 +336,7 @@ async def test_worker_cuts_off_at_run_deadline(
         from datetime import UTC, datetime
 
         refreshed = await session.get(Audit, audit.id)
+        assert refreshed is not None
         refreshed.started_at = datetime.now(UTC)
         await session.commit()
 
@@ -427,6 +432,7 @@ async def test_worker_discards_success_when_cancelled_mid_call(
 
     async with session_factory() as session:
         refreshed = await session.get(Audit, audit.id)
+        assert refreshed is not None
         assert refreshed.status == AUDIT_STATUS_CANCELLED
         # The stale success was discarded: no artifact/attempt/analysis rows.
         artifacts = await session.scalar(
@@ -468,6 +474,7 @@ async def test_worker_discards_success_when_lease_lost_mid_call(
             task = await session.scalar(
                 select(AuditTask).where(AuditTask.audit_id == audit.id)
             )
+            assert task is not None
             task.lease_owner = "worker-b"  # another worker holds it now
             await session.commit()
 
@@ -497,6 +504,7 @@ async def test_worker_discards_success_when_lease_lost_mid_call(
         task = await session.scalar(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
+        assert task is not None
         # The task still belongs to Worker B, not finalized by the stale worker.
         assert task.lease_owner == "worker-b"
         assert task.status == "running"
@@ -545,6 +553,7 @@ async def test_worker_records_one_attempt_per_provider_call(
         task = await session.scalar(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
+        assert task is not None
         assert task.status == "succeeded"
         assert task.attempt_count == 3
 

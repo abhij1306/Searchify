@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import cast
 
 import httpx
 import pytest
@@ -27,7 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import app.api.prompts as prompts_api
-from app.connectors.agent.client import AgentNotConfiguredError
+from app.connectors.agent.client import AgentNotConfiguredError, DefaultAgentClient
 from app.domain.audits.planner import AuditValidationError, create_audit, list_tasks
 from app.models.prompt import Prompt
 from tests.component.audit_helpers import seed_audit_fixtures
@@ -194,6 +195,7 @@ async def test_generate_persists_provenance_evidence(
     run_ids = set()
     for prompt in prompts:
         evidence = prompt.generation_evidence
+        assert evidence is not None
         assert evidence["generator_version"] == "prompt-gen-v1"
         assert evidence["model_identity"] == {
             "transport_host": "agent.test",
@@ -532,9 +534,7 @@ async def test_generate_bounds_existing_prompt_context(
     from app.core.config.prompts import prompt_generation_settings
 
     _, prompt_set_id = await _make_project_and_set(client, "ctx1@example.com")
-    monkeypatch.setattr(
-        prompt_generation_settings, "existing_prompt_context_limit", 3
-    )
+    monkeypatch.setattr(prompt_generation_settings, "existing_prompt_context_limit", 3)
     for i in range(6):
         created = await client.post(
             f"/api/v1/prompt-sets/{prompt_set_id}/prompts",
@@ -574,6 +574,7 @@ async def test_concurrent_generation_never_exceeds_active_pool(
 
     async with session_factory() as session:
         proj = await session.get(Project, uuid.UUID(project["id"]))
+        assert proj is not None
         workspace_id = proj.workspace_id
 
     class _CountingAgent:
@@ -595,20 +596,24 @@ async def test_concurrent_generation_never_exceeds_active_pool(
                 workspace_id=workspace_id,
                 prompt_set_id=uuid.UUID(prompt_set_id),
                 payload=PromptGenerateRequest(count=n, confirm_send_evidence=True),
-                agent=_CountingAgent(topic, n),
+                agent=cast(DefaultAgentClient, _CountingAgent(topic, n)),
             )
 
     await asyncio.gather(_run("Alpha", 15), _run("Beta", 15))
 
     async with session_factory() as session:
         active = (
-            await session.execute(
-                select(Prompt).where(
-                    Prompt.prompt_set_id == uuid.UUID(prompt_set_id),
-                    Prompt.status == "active",
+            (
+                await session.execute(
+                    select(Prompt).where(
+                        Prompt.prompt_set_id == uuid.UUID(prompt_set_id),
+                        Prompt.status == "active",
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     # 30 prompts inserted total, but the set-wide active pool is capped at 20.
     assert len(active) == 20
 
@@ -632,6 +637,7 @@ async def test_generation_racing_prompt_set_delete_is_scoped_not_found(
     project, prompt_set_id = await _make_project_and_set(client, "race1@example.com")
     async with session_factory() as session:
         proj = await session.get(Project, uuid.UUID(project["id"]))
+        assert proj is not None
         workspace_id = proj.workspace_id
 
     provider_entered = asyncio.Event()
@@ -656,10 +662,8 @@ async def test_generation_racing_prompt_set_delete_is_scoped_not_found(
                     session,
                     workspace_id=workspace_id,
                     prompt_set_id=uuid.UUID(prompt_set_id),
-                    payload=PromptGenerateRequest(
-                        count=3, confirm_send_evidence=True
-                    ),
-                    agent=_PausingAgent(),
+                    payload=PromptGenerateRequest(count=3, confirm_send_evidence=True),
+                    agent=cast(DefaultAgentClient, _PausingAgent()),
                 )
                 return None
             except BaseException as exc:  # noqa: BLE001
@@ -705,6 +709,7 @@ async def test_generation_racing_topic_delete_is_scoped_validation_error(
     ).json()
     async with session_factory() as session:
         proj = await session.get(Project, uuid.UUID(project["id"]))
+        assert proj is not None
         workspace_id = proj.workspace_id
 
     provider_entered = asyncio.Event()
@@ -731,7 +736,7 @@ async def test_generation_racing_topic_delete_is_scoped_validation_error(
                         confirm_send_evidence=True,
                         topic_id=uuid.UUID(topic["id"]),
                     ),
-                    agent=_PausingAgent(),
+                    agent=cast(DefaultAgentClient, _PausingAgent()),
                 )
                 return None
             except BaseException as exc:  # noqa: BLE001
@@ -753,12 +758,16 @@ async def test_generation_racing_topic_delete_is_scoped_validation_error(
     # No prompts were persisted into the vanished topic.
     async with session_factory() as session:
         remaining = (
-            await session.execute(
-                select(Prompt).where(
-                    Prompt.prompt_set_id == uuid.UUID(prompt_set_id)
+            (
+                await session.execute(
+                    select(Prompt).where(
+                        Prompt.prompt_set_id == uuid.UUID(prompt_set_id)
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert remaining == []
 
 
@@ -782,11 +791,10 @@ async def test_generation_unrelated_integrity_error_is_not_remapped(
     from app.domain.prompts.schemas import PromptGenerateRequest
     from app.models.project import Project
 
-    project, prompt_set_id = await _make_project_and_set(
-        client, "unrel1@example.com"
-    )
+    project, prompt_set_id = await _make_project_and_set(client, "unrel1@example.com")
     async with session_factory() as session:
         proj = await session.get(Project, uuid.UUID(project["id"]))
+        assert proj is not None
         workspace_id = proj.workspace_id
 
     async def _boom(*args: object, **kwargs: object) -> object:
@@ -800,11 +808,10 @@ async def test_generation_unrelated_integrity_error_is_not_remapped(
                 session,
                 workspace_id=workspace_id,
                 prompt_set_id=uuid.UUID(prompt_set_id),
-                payload=PromptGenerateRequest(
-                    count=2, confirm_send_evidence=True
-                ),
-                agent=FakeAgent(
-                    response=_agent_response_with_n_prompts(2, topic="Keep")
+                payload=PromptGenerateRequest(count=2, confirm_send_evidence=True),
+                agent=cast(
+                    DefaultAgentClient,
+                    FakeAgent(response=_agent_response_with_n_prompts(2, topic="Keep")),
                 ),
             )
 
@@ -1094,6 +1101,7 @@ async def test_planner_excludes_proposed_and_archived_prompts(
             seed.prompt_ids[:2], ("proposed", "archived"), strict=True
         ):
             prompt = await session.get(Prompt, prompt_id)
+            assert prompt is not None
             prompt.status = status
         await session.commit()
 

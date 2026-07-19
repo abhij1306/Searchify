@@ -166,6 +166,7 @@ async def test_metrics_and_visibility_are_projections(
     async with session_factory() as session:
         # Audit reached COMPLETED with a populated snapshot.
         refreshed = await session.get(type(audit), audit.id)
+        assert refreshed is not None
         assert refreshed.status == AUDIT_STATUS_COMPLETED
 
         metrics = await get_metrics(
@@ -261,6 +262,7 @@ async def test_execution_evidence_projection(
         analysis = await session.scalar(
             select(ResponseAnalysis).where(ResponseAnalysis.audit_id == audit.id)
         )
+        assert analysis is not None
         # Keyed on the execution (AuditTask) id, matching the id clients get
         # from GET /audits/{id}/executions — not the internal analysis id.
         evidence = await get_execution_evidence(
@@ -377,6 +379,8 @@ async def test_snapshot_records_source_provenance(
             select(MetricSnapshot).where(MetricSnapshot.audit_id == audit.id)
         )
         assert snapshot is not None
+        assert snapshot.source_analysis_ids is not None
+        assert snapshot.source_artifact_ids is not None
         expected_analysis_ids = {str(a.id) for a in analyses}
         expected_artifact_ids = {
             str(a.artifact_id) for a in analyses if a.artifact_id is not None

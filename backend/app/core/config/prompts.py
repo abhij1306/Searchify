@@ -66,14 +66,19 @@ class PromptGenerationSettings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
+    # ``ge=1`` floors mirror ``PromptGenerateRequest.count``'s ``ge=1``: a
+    # zero/negative env override would otherwise produce an unrequestable
+    # default or an always-rejecting cap, so fail at settings construction.
     default_count: int = Field(
         default=10,
+        ge=1,
         validation_alias=AliasChoices(
             "GENERATION_DEFAULT_COUNT", "generation_default_count"
         ),
     )
     max_count: int = Field(
         default=20,
+        ge=1,
         validation_alias=AliasChoices("GENERATION_MAX_COUNT", "generation_max_count"),
     )
     # Set-wide pool of prompts that are ``active`` (audit/scheduled-run
@@ -83,6 +88,7 @@ class PromptGenerationSettings(BaseSettings):
     # rows count toward the pool; archived rows are never auto-reactivated.
     active_threshold: int = Field(
         default=20,
+        ge=1,
         validation_alias=AliasChoices(
             "GENERATION_ACTIVE_THRESHOLD", "generation_active_threshold"
         ),

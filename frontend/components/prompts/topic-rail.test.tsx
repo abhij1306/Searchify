@@ -135,8 +135,19 @@ describe('TopicRail error handling', () => {
   it('surfaces a load failure in both the rail and the narrow selector', () => {
     renderRail({ loadError: true });
     const alerts = screen.getAllByRole('alert');
-    expect(alerts.length).toBeGreaterThanOrEqual(1);
-    expect(alerts.some((a) => /Couldn't load topics/.test(a.textContent ?? ''))).toBe(true);
+    expect(alerts).toHaveLength(2);
+    for (const alert of alerts) {
+      expect(alert).toHaveTextContent("Couldn't load topics");
+    }
+    // One alert per responsive variant: inside the desktop rail <nav>, and
+    // beside the narrow <select> (outside the nav).
+    const rail = screen.getByRole('navigation', { name: 'Topics' });
+    const [inRail, outsideRail] = [
+      alerts.filter((a) => rail.contains(a)),
+      alerts.filter((a) => !rail.contains(a)),
+    ];
+    expect(inRail).toHaveLength(1);
+    expect(outsideRail).toHaveLength(1);
   });
 
   it('renders a create/delete action error', () => {

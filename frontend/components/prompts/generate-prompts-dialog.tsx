@@ -45,11 +45,21 @@ export function GeneratePromptsDialog({
   const [topicId, setTopicId] = useState<string>(defaultTopicId ?? '');
   const [confirmed, setConfirmed] = useState(false);
 
+  // Sync from the controlled `open` prop, not `handleOpenChange`: the parent
+  // can open the dialog without a Dialog-driven open event, and the
+  // preselected topic must still track the current view. Render-time state
+  // adjustment (not an effect) per the React "you might not need an effect"
+  // guidance.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setTopicId(defaultTopicId ?? '');
+  }
+
   const parsedCount = Number.parseInt(count, 10);
   const countValid = Number.isFinite(parsedCount) && parsedCount >= 1 && parsedCount <= 20;
 
   const handleOpenChange = (next: boolean) => {
-    if (next) setTopicId(defaultTopicId ?? '');
     if (!next) setConfirmed(false);
     onOpenChange(next);
   };
