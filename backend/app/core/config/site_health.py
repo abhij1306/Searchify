@@ -15,6 +15,7 @@
 # in-flight run (matches the audit determinism contract, invariant 9).
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from pydantic import model_validator
@@ -24,6 +25,11 @@ from app.core.config.task_queue import (
     ERROR_MAX_ATTEMPTS,
     PostgresQueueSpec,
 )
+
+# backend/app/core/config/site_health.py -> parents[3] == backend/
+_BASE_DIR = Path(__file__).resolve().parents[3]
+# Repo root (Searchify/) holds the shared .env used by docker + local dev.
+_PROJECT_ROOT = _BASE_DIR.parent
 
 if TYPE_CHECKING:
     # Type-only: config never imports a model at runtime (circular import).
@@ -41,7 +47,10 @@ CAPABILITY_STARTER: Final = "starter"
 SITE_HEALTH_CAPABILITIES: Final[frozenset[str]] = frozenset(
     {CAPABILITY_FREE, CAPABILITY_STARTER}
 )
-# The capability seeded/resolved for a workspace that has none yet.
+# The capability seeded/resolved for a workspace that has none yet. This is the
+# FALLBACK when ``SITE_HEALTH_DEFAULT_CAPABILITY`` is unset; runtime callers
+# resolve through ``default_site_health_capability()`` so the env override
+# (e.g. ``starter`` during development) takes effect.
 DEFAULT_SITE_HEALTH_CAPABILITY: Final = CAPABILITY_FREE
 
 # Discovery modes: Free crawls a deterministic bounded SAMPLE; Starter runs a
@@ -49,12 +58,18 @@ DEFAULT_SITE_HEALTH_CAPABILITY: Final = CAPABILITY_FREE
 DISCOVERY_MODE_SAMPLE: Final = "sample"
 DISCOVERY_MODE_FULL: Final = "full"
 
-# Free: deterministic automatic sample of 10 admitted URLs across the whole
+# Capability limit DEFAULTS. The operative values are env-overridable via
+# ``SiteHealthSettings`` (``SITE_HEALTH_FREE_SAMPLE_URL_LIMIT`` etc.) so
+# development can lift them without a code change; ``capability_profile()``
+# always reads the live settings. These constants remain as the settings
+# defaults and as static column defaults on the entitlement model.
+#
+# Free: deterministic automatic sample of N admitted URLs across the whole
 # workspace; no user selection; no monitored set beyond the system sample.
 FREE_SAMPLE_URL_LIMIT: Final = 10
 FREE_MONITORED_URL_LIMIT: Final = 10
 
-# Starter: progressive inventory; up to 50 active monitored URLs workspace-wide.
+# Starter: progressive inventory; up to N active monitored URLs workspace-wide.
 STARTER_MONITORED_URL_LIMIT: Final = 50
 
 
@@ -98,28 +113,36 @@ class SiteHealthCapability:
         self.count_disclosure = count_disclosure
 
 
-# The two capability profiles, keyed by capability. Everything that must know
-# "what can this workspace do" resolves through ``capability_profile``.
-_CAPABILITY_PROFILES: Final[dict[str, SiteHealthCapability]] = {
-    CAPABILITY_FREE: SiteHealthCapability(
-        capability=CAPABILITY_FREE,
-        discovery_mode=DISCOVERY_MODE_SAMPLE,
-        discovery_url_cap=FREE_SAMPLE_URL_LIMIT,
-        sample_url_limit=FREE_SAMPLE_URL_LIMIT,
-        monitored_url_limit=FREE_MONITORED_URL_LIMIT,
-        allows_user_selection=False,
-        count_disclosure=False,
-    ),
-    CAPABILITY_STARTER: SiteHealthCapability(
-        capability=CAPABILITY_STARTER,
-        discovery_mode=DISCOVERY_MODE_FULL,
-        discovery_url_cap=None,
-        sample_url_limit=0,
-        monitored_url_limit=STARTER_MONITORED_URL_LIMIT,
-        allows_user_selection=True,
-        count_disclosure=True,
-    ),
-}
+# Capability profiles are BUILT FROM LIVE SETTINGS (env-overridable limits), so
+# everything that must know "what can this workspace do" resolves through
+# ``capability_profile`` and picks up ``SITE_HEALTH_*`` env overrides. The
+# resolved profile is frozen onto rows with two different lifecycles: existing
+# entitlement rows are REFRESHED to the live profile on next resolve (see
+# ``entitlements._sync_profile_drift`` — an env limit change needs no operator
+# command), while ``SiteCrawl.configuration`` stays frozen at creation so an
+# env change never alters an in-flight run (invariant 9).
+def _build_capability_profiles() -> dict[str, SiteHealthCapability]:
+    s = site_health_settings
+    return {
+        CAPABILITY_FREE: SiteHealthCapability(
+            capability=CAPABILITY_FREE,
+            discovery_mode=DISCOVERY_MODE_SAMPLE,
+            discovery_url_cap=s.free_sample_url_limit,
+            sample_url_limit=s.free_sample_url_limit,
+            monitored_url_limit=s.free_monitored_url_limit,
+            allows_user_selection=False,
+            count_disclosure=False,
+        ),
+        CAPABILITY_STARTER: SiteHealthCapability(
+            capability=CAPABILITY_STARTER,
+            discovery_mode=DISCOVERY_MODE_FULL,
+            discovery_url_cap=None,
+            sample_url_limit=0,
+            monitored_url_limit=s.starter_monitored_url_limit,
+            allows_user_selection=True,
+            count_disclosure=True,
+        ),
+    }
 
 
 def normalize_capability(value: str | None) -> str:
@@ -128,13 +151,23 @@ def normalize_capability(value: str | None) -> str:
     return key if key in SITE_HEALTH_CAPABILITIES else DEFAULT_SITE_HEALTH_CAPABILITY
 
 
+def default_site_health_capability() -> str:
+    """The capability seeded for a workspace with no entitlement row yet.
+
+    Env-overridable (``SITE_HEALTH_DEFAULT_CAPABILITY``) so development can
+    default new workspaces to ``starter``; an unknown value fails closed to
+    Free via ``normalize_capability``.
+    """
+    return normalize_capability(site_health_settings.default_capability)
+
+
 def capability_profile(capability: str | None) -> SiteHealthCapability:
-    """Resolve the frozen capability profile for a workspace entitlement.
+    """Resolve the capability profile for a workspace entitlement.
 
     Unknown/missing values resolve to the Free profile (fail-closed to the most
-    restrictive capability).
+    restrictive capability). Limits reflect the LIVE ``SITE_HEALTH_*`` settings.
     """
-    return _CAPABILITY_PROFILES[normalize_capability(capability)]
+    return _build_capability_profiles()[normalize_capability(capability)]
 
 
 # Selection source: a monitored row is either user-managed or a system-managed
@@ -661,7 +694,25 @@ class SiteHealthSettings(BaseSettings):
     1).
     """
 
-    model_config = SettingsConfigDict(env_prefix="SITE_HEALTH_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="SITE_HEALTH_",
+        extra="ignore",
+        # Same .env sources as the root Settings so SITE_HEALTH_* overrides in
+        # the repo-root / backend-local .env work without exporting them.
+        env_file=(str(_PROJECT_ROOT / ".env"), str(_BASE_DIR / ".env")),
+        env_file_encoding="utf-8",
+    )
+
+    # --- Capability limits / default capability (dev-tunable tiers) ---
+    # The capability a workspace with no entitlement row resolves to. Unknown
+    # values fail closed to "free". Set to "starter" in development to get
+    # full discovery + user selection without an operator command.
+    default_capability: str = DEFAULT_SITE_HEALTH_CAPABILITY
+    # Free: deterministic automatic sample size / monitored allowance.
+    free_sample_url_limit: int = FREE_SAMPLE_URL_LIMIT
+    free_monitored_url_limit: int = FREE_MONITORED_URL_LIMIT
+    # Starter: workspace-wide active monitored-URL quota.
+    starter_monitored_url_limit: int = STARTER_MONITORED_URL_LIMIT
 
     # --- Frontier / discovery bounds ---
     # Absolute frontier ceiling for a FULL (Starter) crawl to bound memory/time.
@@ -735,6 +786,23 @@ class SiteHealthSettings(BaseSettings):
     # --- SSE / events ---
     sse_poll_interval_seconds: float = 2.0
     sse_max_duration_seconds: float = 300.0
+
+    @model_validator(mode="after")
+    def _validate_capability_limits(self) -> SiteHealthSettings:
+        """Reject negative capability limits from env overrides.
+
+        The limits feed quota arithmetic and SQL ``LIMIT`` clauses; a negative
+        value would silently disable selection ("0 of -5") or break sampling.
+        Zero stays allowed (an intentional "nothing permitted" configuration).
+        """
+        for name in (
+            "free_sample_url_limit",
+            "free_monitored_url_limit",
+            "starter_monitored_url_limit",
+        ):
+            if getattr(self, name) < 0:
+                raise ValueError(f"{name} must be non-negative")
+        return self
 
     @model_validator(mode="after")
     def _validate_lease_and_heartbeat(self) -> SiteHealthSettings:

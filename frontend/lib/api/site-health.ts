@@ -93,6 +93,21 @@ type ReplaceMonitoredInput = {
   expected_selection_version: number;
 };
 
+/**
+ * `POST /projects/{id}/monitored-urls/bulk-select` body — server-resolved
+ * bulk selection. `first_n` selects the first `count` admitted URLs of
+ * `crawl_id` in the inventory's `(normalized_url, id)` order; `all` selects
+ * every admitted URL; `none` clears the selection. `query` applies the same
+ * substring filter as the inventory listing.
+ */
+export type BulkSelectMonitoredInput = {
+  mode: 'first_n' | 'all' | 'none';
+  crawl_id: string;
+  count?: number;
+  query?: string;
+  expected_selection_version: number;
+};
+
 export const siteHealthApi = {
   getEntitlements: async (options?: ApiRequestOptions) => {
     const res = await apiClient.get<SiteHealthEntitlement>('/entitlements', options);
@@ -138,6 +153,18 @@ export const siteHealthApi = {
       options,
     );
     return strictValidate(monitoredUrlsResponseSchema, res, 'siteHealth.replaceMonitoredUrls');
+  },
+  bulkSelectMonitoredUrls: async (
+    projectId: string,
+    input: BulkSelectMonitoredInput,
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.post<MonitoredUrlsResponse>(
+      `/projects/${projectId}/monitored-urls/bulk-select`,
+      input,
+      options,
+    );
+    return strictValidate(monitoredUrlsResponseSchema, res, 'siteHealth.bulkSelectMonitoredUrls');
   },
   getPages: async (crawlId: string, params?: PagesParams, options?: ApiRequestOptions) => {
     const path = withQuery(`/site-crawls/${crawlId}/pages`, definedQuery(params));
@@ -311,6 +338,11 @@ export const siteHealthMutations = {
     mutationOptions({
       mutationFn: (vars: { projectId: string; input: ReplaceMonitoredInput }) =>
         siteHealthApi.replaceMonitoredUrls(vars.projectId, vars.input),
+    }),
+  bulkSelectMonitoredUrls: () =>
+    mutationOptions({
+      mutationFn: (vars: { projectId: string; input: BulkSelectMonitoredInput }) =>
+        siteHealthApi.bulkSelectMonitoredUrls(vars.projectId, vars.input),
     }),
   rerunPage: () =>
     mutationOptions({

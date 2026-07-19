@@ -49,6 +49,7 @@ from app.core.config.task_queue import (
 from app.domain.site_health.entitlements import (
     entitlement_allows_monitored_analysis,
     lock_entitlement,
+    resolve_entitlement,
 )
 from app.models.project import Project
 from app.models.site_health import (
@@ -57,6 +58,7 @@ from app.models.site_health import (
     SiteCrawlTask,
     SiteHealthProfile,
     SiteUrl,
+    SiteUrlObservation,
 )
 
 
@@ -558,6 +560,139 @@ async def replace_monitored_set(
         workspace_limit=limit,
         enqueued_task_ids=tuple(enqueued_task_ids),
         cancelled_task_ids=tuple(cancelled_task_ids),
+    )
+
+
+# =========================================================================
+# Server-resolved bulk selection
+# =========================================================================
+BULK_SELECT_MODE_FIRST_N = "first_n"
+BULK_SELECT_MODE_ALL = "all"
+BULK_SELECT_MODE_NONE = "none"
+BULK_SELECT_MODES = (
+    BULK_SELECT_MODE_FIRST_N,
+    BULK_SELECT_MODE_ALL,
+    BULK_SELECT_MODE_NONE,
+)
+
+
+async def bulk_select_monitored_set(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    crawl_id: uuid.UUID,
+    mode: str,
+    count: int | None = None,
+    query: str | None = None,
+    expected_selection_version: int,
+) -> SelectionResult:
+    """Resolve a bulk selection server-side, then replace the monitored set.
+
+    Avoids shipping tens of thousands of ids through the client for "select
+    the first N / all discovered URLs": the candidate ``site_url_id``s are
+    resolved HERE, in the same deterministic ``(normalized_url, id)`` order
+    the inventory endpoint pages in, so "first N" always matches the first N
+    rows the user sees in the inventory (under the same ``query`` filter).
+
+    Modes:
+
+    - ``first_n`` — the first ``count`` admitted URLs (``count`` required).
+    - ``all``     — every admitted URL (quota still enforced downstream).
+    - ``none``    — clear the selection (empty set).
+
+    Candidates are scoped to the crawl's ADMITTED URLs (``SiteUrlObservation``
+    rows for this crawl), exactly like the inventory listing — a bulk select
+    can never sweep in URLs from an earlier crawl's fuller catalog.
+
+    The heavy lifting (capability gate, version check, workspace quota under
+    the entitlement lock, delta application, task enqueue/cancel) is delegated
+    to ``replace_monitored_set`` — same locks, same coded errors. An ``all``
+    selection larger than the workspace limit raises the SAME
+    ``site_health_quota_exceeded`` a manual over-selection would — but it is
+    raised HERE, before any lock is taken: candidate resolution is capped at
+    ``limit + 1`` ids, so an unfiltered ``all`` over a huge inventory can
+    never materialize tens of thousands of ids nor drag them through the
+    entitlement-locked replacement path. The under-lock quota check in
+    ``replace_monitored_set`` remains the race-safe authority; this pre-check
+    only bounds the work.
+    """
+    if mode not in BULK_SELECT_MODES:
+        raise SelectionValidationError(f"Unknown bulk selection mode: {mode!r}")
+
+    crawl = await session.scalar(
+        select(SiteCrawl).where(
+            SiteCrawl.id == crawl_id,
+            SiteCrawl.workspace_id == workspace_id,
+            SiteCrawl.project_id == project_id,
+        )
+    )
+    if crawl is None:
+        raise SelectionValidationError("Crawl not found in this project")
+
+    site_url_ids: list[uuid.UUID] = []
+    if mode != BULK_SELECT_MODE_NONE:
+        if mode == BULK_SELECT_MODE_FIRST_N and (count is None or count < 1):
+            raise SelectionValidationError(
+                "A positive count is required for first_n bulk selection"
+            )
+        # Read (not lock) the entitlement to bound candidate resolution: any
+        # set larger than the workspace limit is doomed to the same quota
+        # error downstream, so cap the query at limit + 1 and fail fast
+        # before the locked replacement path ever sees an oversized set.
+        entitlement = await resolve_entitlement(session, workspace_id)
+        limit = int(entitlement.monitored_url_limit)
+        fetch_cap = limit + 1 if count is None else min(count, limit + 1)
+        admitted = (
+            select(SiteUrlObservation.site_url_id)
+            .where(SiteUrlObservation.crawl_id == crawl_id)
+            .scalar_subquery()
+        )
+        stmt = select(SiteUrl.id).where(
+            SiteUrl.project_id == project_id,
+            SiteUrl.id.in_(admitted),
+        )
+        if query:
+            pattern = f"%{query.strip().lower()}%"
+            stmt = stmt.where(
+                func.lower(SiteUrl.normalized_url).like(pattern)
+                | func.lower(SiteUrl.display_url).like(pattern)
+            )
+        stmt = stmt.order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc()).limit(
+            fetch_cap
+        )
+        site_url_ids = list((await session.scalars(stmt)).all())
+        # Only pre-raise quota for entitlements that may select at all — a
+        # Free workspace must still get its usual StarterRequiredError from
+        # the locked path, not a misleading quota error.
+        if entitlement_allows_monitored_analysis(entitlement) and (
+            len(site_url_ids) > limit
+        ):
+            currently_used = int(
+                (
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(MonitoredSiteUrl)
+                        .where(
+                            MonitoredSiteUrl.workspace_id == workspace_id,
+                            MonitoredSiteUrl.active.is_(True),
+                        )
+                    )
+                )
+                or 0
+            )
+            raise QuotaExceededError(
+                "The selection would exceed the workspace monitored-URL limit",
+                limit=limit,
+                currently_used=currently_used,
+            )
+
+    return await replace_monitored_set(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        site_url_ids=site_url_ids,
+        expected_selection_version=expected_selection_version,
     )
 
 

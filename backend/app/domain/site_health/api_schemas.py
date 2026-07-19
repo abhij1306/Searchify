@@ -55,6 +55,23 @@ class ReplaceMonitoredRequest(_Model):
     expected_selection_version: int
 
 
+class BulkSelectMonitoredRequest(_Model):
+    """Server-resolved bulk selection of monitored URLs.
+
+    ``first_n`` selects the first ``count`` admitted URLs of ``crawl_id`` in
+    the inventory's ``(normalized_url, id)`` order (``count`` required);
+    ``all`` selects every admitted URL; ``none`` clears the selection.
+    ``query`` applies the same substring filter as the inventory listing, so
+    "select first N" matches exactly what a filtered inventory shows.
+    """
+
+    mode: Literal["first_n", "all", "none"]
+    crawl_id: uuid.UUID
+    count: int | None = None
+    query: str | None = None
+    expected_selection_version: int
+
+
 class RerunPageResponse(_Model):
     """Identity/status returned by the per-page rerun (202) so the frontend can
 

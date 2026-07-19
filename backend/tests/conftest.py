@@ -38,6 +38,38 @@ _COUNTER = itertools.count()
 _TEST_RUN_ID = uuid.uuid4().hex[:12]
 
 
+@pytest.fixture(autouse=True)
+def _pin_site_health_capability_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate the suite from dev ``.env`` capability overrides.
+
+    The Site Health capability profiles are settings-driven (the dev ``.env``
+    ships ``SITE_HEALTH_DEFAULT_CAPABILITY=starter`` and a raised monitored
+    limit for full-feature testing). Tests assert the SHIPPED defaults
+    (fail-closed free, 10/10/50), so pin the settings back to the constants
+    for every test regardless of the developer's local env.
+    """
+    from app.core.config.site_health import (
+        DEFAULT_SITE_HEALTH_CAPABILITY,
+        FREE_MONITORED_URL_LIMIT,
+        FREE_SAMPLE_URL_LIMIT,
+        STARTER_MONITORED_URL_LIMIT,
+        site_health_settings,
+    )
+
+    monkeypatch.setattr(
+        site_health_settings, "default_capability", DEFAULT_SITE_HEALTH_CAPABILITY
+    )
+    monkeypatch.setattr(
+        site_health_settings, "free_sample_url_limit", FREE_SAMPLE_URL_LIMIT
+    )
+    monkeypatch.setattr(
+        site_health_settings, "free_monitored_url_limit", FREE_MONITORED_URL_LIMIT
+    )
+    monkeypatch.setattr(
+        site_health_settings, "starter_monitored_url_limit", STARTER_MONITORED_URL_LIMIT
+    )
+
+
 @pytest.fixture(scope="session")
 def test_database_url() -> Iterator[str]:
     """Create a throwaway session database on the dev Postgres server.

@@ -37,6 +37,7 @@ from app.core.config.site_health import (
 from app.core.database import SessionLocal
 from app.domain.site_health import service
 from app.domain.site_health.api_schemas import (
+    BulkSelectMonitoredRequest,
     CrawlListPage,
     CrawlResponse,
     CreateCrawlRequest,
@@ -63,6 +64,7 @@ from app.domain.site_health.selection import (
     SelectionValidationError,
     StaleSelectionVersionError,
     StarterRequiredError,
+    bulk_select_monitored_set,
     replace_monitored_set,
     rerun_page,
 )
@@ -86,6 +88,47 @@ def _not_found(detail: str = "Not found") -> HTTPException:
 
 def _bad_cursor(exc: InvalidCursorError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+def _selection_error_response(exc: Exception) -> HTTPException:
+    """Map a coded selection error onto the Task 2 HTTP contract.
+
+    ``starter_required`` -> 403, ``site_health_quota_exceeded`` -> 403 (with
+    ``limit``/``currently_used``), ``stale_selection_version`` -> 409 (with
+    ``current_selection_version``), ``invalid_selection`` -> 422. Shared by
+    the PUT replacement and the bulk-select endpoints so both speak the same
+    coded-error dialect.
+    """
+    if isinstance(exc, QuotaExceededError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+                "limit": exc.limit,
+                "currently_used": exc.currently_used,
+            },
+        )
+    if isinstance(exc, StaleSelectionVersionError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.code,
+                "message": str(exc),
+                "current_selection_version": exc.current_version,
+            },
+        )
+    if isinstance(exc, StarterRequiredError):
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": exc.code, "message": str(exc)},
+        )
+    # SelectionValidationError (and any other coded selection error) -> 422.
+    code = getattr(exc, "code", "invalid_selection")
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"code": code, "message": str(exc)},
+    )
 
 
 # =========================================================================
@@ -261,39 +304,64 @@ async def replace_monitored_urls_endpoint(
             expected_selection_version=payload.expected_selection_version,
         )
         await session.commit()
-    except StarterRequiredError as exc:
+    except (
+        StarterRequiredError,
+        QuotaExceededError,
+        StaleSelectionVersionError,
+        SelectionValidationError,
+    ) as exc:
         await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": exc.code, "message": str(exc)},
-        ) from exc
-    except QuotaExceededError as exc:
+        raise _selection_error_response(exc) from exc
+
+    result = await service.get_monitored_set(
+        session, workspace_id=ctx.workspace_id, project_id=project_id
+    )
+    return MonitoredUrlsResponse.model_validate(result)
+
+
+@router.post(
+    "/projects/{project_id}/monitored-urls/bulk-select",
+    response_model=MonitoredUrlsResponse,
+)
+async def bulk_select_monitored_urls_endpoint(
+    project_id: uuid.UUID,
+    payload: BulkSelectMonitoredRequest,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> MonitoredUrlsResponse:
+    """Server-resolved bulk selection (first N / all / clear).
+
+    Resolves candidate ids server-side in the inventory's deterministic
+    ``(normalized_url, id)`` order, then reuses the SAME atomic replacement
+    path (locks, version check, workspace quota, coded errors) as the PUT.
+    """
+    # Authorize the project first so a foreign id is a 404 (not a coded error).
+    try:
+        await service.get_monitored_set(
+            session, workspace_id=ctx.workspace_id, project_id=project_id
+        )
+    except SiteHealthNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    try:
+        await bulk_select_monitored_set(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            crawl_id=payload.crawl_id,
+            mode=payload.mode,
+            count=payload.count,
+            query=payload.query,
+            expected_selection_version=payload.expected_selection_version,
+        )
+        await session.commit()
+    except (
+        StarterRequiredError,
+        QuotaExceededError,
+        StaleSelectionVersionError,
+        SelectionValidationError,
+    ) as exc:
         await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "code": exc.code,
-                "message": str(exc),
-                "limit": exc.limit,
-                "currently_used": exc.currently_used,
-            },
-        ) from exc
-    except StaleSelectionVersionError as exc:
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": exc.code,
-                "message": str(exc),
-                "current_selection_version": exc.current_version,
-            },
-        ) from exc
-    except SelectionValidationError as exc:
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": exc.code, "message": str(exc)},
-        ) from exc
+        raise _selection_error_response(exc) from exc
 
     result = await service.get_monitored_set(
         session, workspace_id=ctx.workspace_id, project_id=project_id

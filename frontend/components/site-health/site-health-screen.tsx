@@ -91,10 +91,11 @@ export function SiteHealthScreen() {
   useCrawlEvents(crawl?.id, projectId, active);
 
   // Poll pages while active so per-page rows advance without a reload. Scoped
-  // to `monitored: true` so the analysis-progress breakdown (queued/running/
-  // completed) never counts `not_selected` rows or omits a selected row that
-  // fell outside an unfiltered page — the monitored set is capped by the
-  // entitlement's `monitored_url_limit` (<= 50), well within this page size.
+  // to `monitored: true` so the per-page table shows only selected rows. This
+  // is a bounded WINDOW (first 200 by URL order) for the table + live score
+  // preview — with env-raised limits the monitored set may be far larger, so
+  // the progress COUNTS come from server counters (crawl `analyzed_count` /
+  // `failed_count` and the dashboard quota), never from this page fetch.
   const pagesQuery = useQuery({
     ...siteHealthQueries.pages(crawl?.id ?? '', { limit: 200, monitored: true }),
     enabled: Boolean(crawl?.id),
@@ -109,6 +110,20 @@ export function SiteHealthScreen() {
     enabled: Boolean(crawl?.id) && phase === 'discovering',
     refetchInterval: active ? POLL_INTERVAL_MS : false,
   });
+
+  // Per-PROJECT selected total for the analysis progress bar. The dashboard
+  // quota `used` is workspace-wide, so a multi-project workspace would
+  // overcount this crawl's queue — count this project's active monitored rows
+  // instead. Fetched only while analyzing (the set is frozen during a run).
+  const monitoredQuery = useQuery({
+    ...siteHealthQueries.monitored(projectId ?? ''),
+    enabled: Boolean(projectId) && phase === 'analyzing',
+  });
+  const projectSelectedTotal = useMemo(() => {
+    const rows = monitoredQuery.data?.monitored_urls;
+    if (!rows) return null;
+    return rows.filter((row) => row.active).length;
+  }, [monitoredQuery.data]);
 
   const createMutation = useMutation({
     ...siteHealthMutations.createCrawl(),
@@ -238,6 +253,13 @@ export function SiteHealthScreen() {
         <AnalysisProgress
           crawl={crawl}
           pages={previewRows}
+          // Per-project active monitored count — the server-side "selected"
+          // total for THIS project's crawl (the workspace-wide dashboard
+          // quota would overcount in multi-project workspaces). Null until
+          // loaded; the component falls back to pages.length, and the
+          // terminal score_summary.selected_count takes precedence once
+          // written.
+          selectedTotal={projectSelectedTotal}
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />

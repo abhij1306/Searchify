@@ -69,6 +69,10 @@ export function InventorySelection({
   const [searchInput, setSearchInput] = useState('');
   const [selection, setSelection] = useState<StagedSelection | null>(null);
   const [staleNotice, setStaleNotice] = useState(false);
+  const [bulkCount, setBulkCount] = useState('');
+  // "Clear all" is destructive (wipes the committed selection immediately),
+  // so it requires a second explicit click to confirm.
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const cursor = cursorStack.at(-1) ?? undefined;
 
@@ -137,6 +141,66 @@ export function InventorySelection({
       }
     },
   });
+
+  // Server-resolved bulk selection (first N / all / clear). Unlike the staged
+  // flow, this COMMITS immediately: the server resolves the candidate ids in
+  // the inventory's deterministic order and replaces the monitored set in one
+  // atomic call — no shipping thousands of ids through the client.
+  const bulkSelectMutation = useMutation({
+    ...siteHealthMutations.bulkSelectMonitoredUrls(),
+    onSuccess: (response) => {
+      queryClient.setQueryData(queryKeys.siteHealth.monitored(projectId), response);
+      setSelection(initStagedSelection(committedFromResponse(response)));
+      setStaleNotice(false);
+    },
+    onError: async (error) => {
+      // Stale version → adopt the fresh server baseline; the user just retries
+      // the bulk action (their intent is the mode/count, not per-row edits).
+      if (error instanceof ApiError && error.status === 409) {
+        const fresh = await siteHealthApi.getMonitoredUrls(projectId);
+        queryClient.setQueryData(queryKeys.siteHealth.monitored(projectId), fresh);
+        setSelection(initStagedSelection(committedFromResponse(fresh)));
+        setStaleNotice(true);
+      }
+    },
+  });
+
+  const bulkSelect = (mode: 'first_n' | 'all' | 'none', count?: number) => {
+    if (!effectiveSelection) return;
+    bulkSelectMutation.mutate({
+      projectId,
+      input: {
+        mode,
+        crawl_id: crawl.id,
+        count,
+        // Bulk selection respects the active inventory search filter so
+        // "select first N" matches exactly what the filtered list shows.
+        query: filters.query.trim() || undefined,
+        expected_selection_version: effectiveSelection.committed.version,
+      },
+    });
+  };
+
+  const parsedBulkCount = (() => {
+    const n = Number.parseInt(bulkCount, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+
+  // Surface the server's quota message ("N of LIMIT") on a 403; generic text
+  // otherwise. The body is the raw JSON error payload from the transport.
+  const bulkSelectError = (() => {
+    const error = bulkSelectMutation.error;
+    if (!(error instanceof ApiError)) return null;
+    try {
+      const detail = (JSON.parse(error.body) as { detail?: { code?: string; limit?: number; currently_used?: number } }).detail;
+      if (detail?.code === 'site_health_quota_exceeded') {
+        return `That selection exceeds your monitored-URL limit (${detail.limit}). Try "Select first ${detail.limit}" instead.`;
+      }
+    } catch {
+      // Non-JSON body — fall through to the generic message.
+    }
+    return null;
+  })();
 
   const applyFilters = (next: Partial<InventoryFilters>) => {
     const changed = changeInventoryFilters(filters, next);
@@ -219,6 +283,86 @@ export function InventorySelection({
             </Button>
           ) : null}
         </form>
+
+        {/* Quick-select: server-resolved bulk selection. The ids are resolved
+            on the server in the inventory's deterministic order, so "first N"
+            always matches the first N rows shown here (under the same search
+            filter). Applies immediately — no separate commit step. */}
+        {effectiveSelection && entitlement.access_mode === 'selection' ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border-subtle bg-background-alt px-3 py-2">
+            <span className="text-xs font-medium text-secondary">Quick select</span>
+            <Input
+              type="number"
+              min={1}
+              max={entitlement.monitored_url_limit}
+              value={bulkCount}
+              onChange={(event) => setBulkCount(event.target.value)}
+              className="w-24"
+              aria-label="Number of pages to select"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={bulkSelectMutation.isPending || !parsedBulkCount}
+              onClick={() => parsedBulkCount && bulkSelect('first_n', parsedBulkCount)}
+            >
+              Select first {parsedBulkCount ?? 'N'}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={bulkSelectMutation.isPending}
+              onClick={() => bulkSelect('all')}
+            >
+              Select all
+            </Button>
+            {confirmClear ? (
+              <>
+                <span className="text-xs text-secondary">Deselect every page?</span>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={bulkSelectMutation.isPending}
+                  onClick={() => {
+                    setConfirmClear(false);
+                    bulkSelect('none');
+                  }}
+                >
+                  Confirm clear
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmClear(false)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={bulkSelectMutation.isPending}
+                onClick={() => setConfirmClear(true)}
+              >
+                Clear all
+              </Button>
+            )}
+            {bulkSelectMutation.isPending ? (
+              <span className="text-xs text-muted">Applying…</span>
+            ) : null}
+          </div>
+        ) : null}
+        {bulkSelectMutation.isError && !staleNotice ? (
+          <Alert tone="danger">
+            {bulkSelectError ?? 'Could not apply the bulk selection. Please try again.'}
+          </Alert>
+        ) : null}
 
         {quota?.overLimit ? (
           <Alert tone="warning">

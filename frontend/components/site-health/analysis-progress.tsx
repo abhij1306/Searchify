@@ -18,29 +18,33 @@ import { crawlBadgeValue, formatScore, statusLabel } from '@/lib/site-health/sta
  * SSE invalidation, no reload). A Cancel control is offered while active.
  * Scores render `—` when not yet produced (never a fabricated zero).
  *
- * `pages` MUST be the monitored (selected) subset for this crawl, not an
- * unfiltered first cursor page: the monitored set is capped by the
- * entitlement's `monitored_url_limit` (currently <= 50) so a single bounded
- * page always contains every selected row, never a truncated slice that could
- * omit selected rows or admit `not_selected` ones into these crawl-wide counts.
+ * `pages` is a bounded window of the monitored subset used for the per-page
+ * table and the live score preview only. The COUNTS never depend on it: with
+ * env-raised limits the monitored set can be thousands of URLs, far beyond one
+ * page fetch, so total/completed/queued derive from server-side counters —
+ * `selectedTotal` (this project's active monitored count) and the crawl's
+ * aggregated `analyzed_count` / `failed_count`.
  */
 export function AnalysisProgress({
   crawl,
   pages,
+  selectedTotal,
   onCancel,
   cancelPending,
 }: Readonly<{
   crawl: SiteCrawl;
   pages: PageSummary[];
+  /** This project's active monitored (selected) URL count; null until loaded. */
+  selectedTotal: number | null;
   onCancel: () => void;
   cancelPending: boolean;
 }>) {
   const summary = crawl.score_summary;
   // Fallbacks while the crawl is still running: `score_summary` is only
-  // written when the crawl terminalizes, so derive the live view from the
-  // monitored pages subset instead of rendering 0s (`pages` is the complete
-  // bounded monitored set — see the docstring above).
-  const selected = summary?.selected_count ?? pages.length;
+  // written when the crawl terminalizes, so derive the live view from server
+  // counters instead of rendering 0s. `pages.length` is the last resort (a
+  // bounded window, but better than nothing before the quota loads).
+  const selected = summary?.selected_count ?? selectedTotal ?? pages.length;
   const analyzed = summary?.analyzed_count ?? crawl.analyzed_count;
   // Live scores kick in per-field whenever a terminal score is missing —
   // including a summary written with null metrics (e.g. mid-run projection).
@@ -54,15 +58,15 @@ export function AnalysisProgress({
   const technical = summary?.technical_score ?? liveScores?.technical ?? null;
   const aeo = summary?.aeo_score ?? liveScores?.aeo ?? null;
 
-  // Per-status page counts drive the running / queued cards. `completed` uses
-  // the server-aggregated `analyzed_count` (authoritative crawl-wide count)
-  // rather than counting terminal statuses in `pages`, so it can never exceed
-  // `selected` or drift from the scores above.
+  // `completed`/`failed` use the server-aggregated crawl counters
+  // (authoritative crawl-wide counts). `running` is observed from the visible
+  // window (no server counter exists for it), and `queued` is the arithmetic
+  // remainder — clamped at 0 so a transiently-stale mix of counters can never
+  // render a negative count.
   const running = pages.filter((p) => p.analysis_status === 'running').length;
-  const queued = pages.filter(
-    (p) => p.analysis_status === 'pending' || p.analysis_status === 'not_selected',
-  ).length;
   const completed = analyzed;
+  const failed = crawl.failed_count;
+  const queued = Math.max(0, selected - completed - failed - running);
 
   return (
     <div className="grid gap-6">

@@ -82,6 +82,7 @@ describe('AnalysisProgress', () => {
       <AnalysisProgress
         crawl={crawl()}
         pages={[page({ analysis_status: 'completed' })]}
+        selectedTotal={3}
         onCancel={vi.fn()}
         cancelPending={false}
       />,
@@ -116,6 +117,7 @@ describe('AnalysisProgress', () => {
           page({ site_url_id: 'b', analysis_status: 'completed' }),
           page({ site_url_id: 'c', analysis_status: 'completed', monitored: false }),
         ]}
+        selectedTotal={2}
         onCancel={vi.fn()}
         cancelPending={false}
       />,

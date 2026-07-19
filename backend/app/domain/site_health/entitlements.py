@@ -24,10 +24,10 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.site_health import (
-    DEFAULT_SITE_HEALTH_CAPABILITY,
     SELECTION_SOURCE_FREE_SAMPLE,
     SELECTION_SOURCE_USER,
     capability_profile,
+    default_site_health_capability,
     normalize_capability,
 )
 from app.models.site_health import WorkspaceSiteHealthEntitlement
@@ -47,6 +47,31 @@ def _apply_profile(
     return row
 
 
+def _sync_profile_drift(row: WorkspaceSiteHealthEntitlement) -> bool:
+    """Refresh a row's frozen limits when the live profile for its capability
+    has drifted (env-overridable ``SITE_HEALTH_*`` limits changed).
+
+    The CAPABILITY KEY stays sticky — only ``set_entitlement`` changes it — but
+    the limit columns follow the live profile so a dev/ops limit change (e.g.
+    raising ``SITE_HEALTH_STARTER_MONITORED_URL_LIMIT``) takes effect without
+    re-running the operator command for every workspace. Crawl behavior is
+    still frozen per-run via ``SiteCrawl.configuration`` (invariant 9); this
+    only affects NEW quota checks and entitlement views. Returns True when the
+    row was changed (caller flushes).
+    """
+    profile = capability_profile(row.plan_key)
+    drifted = (
+        row.discovery_mode != profile.discovery_mode
+        or row.discovery_url_cap != profile.discovery_url_cap
+        or row.sample_url_limit != profile.sample_url_limit
+        or row.monitored_url_limit != profile.monitored_url_limit
+        or bool(row.count_disclosure) != profile.count_disclosure
+    )
+    if drifted:
+        _apply_profile(row, row.plan_key)
+    return drifted
+
+
 async def _load_entitlement(
     session: AsyncSession, workspace_id: uuid.UUID
 ) -> WorkspaceSiteHealthEntitlement | None:
@@ -62,16 +87,23 @@ async def resolve_entitlement(
     session: AsyncSession,
     workspace_id: uuid.UUID,
     *,
-    default_capability: str = DEFAULT_SITE_HEALTH_CAPABILITY,
+    default_capability: str | None = None,
 ) -> WorkspaceSiteHealthEntitlement:
-    """Return the workspace's entitlement, seeding a default (Free) row if none.
+    """Return the workspace's entitlement, seeding a default row if none.
 
-    Fail-closed: a workspace with no explicit entitlement resolves to the most
-    restrictive capability (Free). The seeded row is flushed so it can be locked
+    The seeded capability is the env-resolved default
+    (``SITE_HEALTH_DEFAULT_CAPABILITY``, falling back to Free — the most
+    restrictive capability). The seeded row is flushed so it can be locked
     ``FOR UPDATE`` for a subsequent quota check in the same transaction.
     """
+    if default_capability is None:
+        default_capability = default_site_health_capability()
     existing = await _load_entitlement(session, workspace_id)
     if existing is not None:
+        # Follow live limit settings for the row's (sticky) capability so an
+        # env change (dev limits) applies without an operator command.
+        if _sync_profile_drift(existing):
+            await session.flush()
         return existing
 
     # Seed the Free row with a PostgreSQL upsert instead of a plain ORM
@@ -147,7 +179,7 @@ async def lock_entitlement(
     session: AsyncSession,
     workspace_id: uuid.UUID,
     *,
-    default_capability: str = DEFAULT_SITE_HEALTH_CAPABILITY,
+    default_capability: str | None = None,
 ) -> WorkspaceSiteHealthEntitlement:
     """Resolve then lock the workspace entitlement row ``FOR UPDATE``.
 
