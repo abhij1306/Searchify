@@ -31,7 +31,7 @@ from app.models.brand import (
     UnintendedDomain,
 )
 from app.models.project import Project
-from app.models.prompt import Prompt, PromptSet
+from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
     DiscoveryModelConfig,
     ProviderConnection,
@@ -98,6 +98,7 @@ __all__ = [
     "SiteUrl",
     "SiteUrlObservation",
     "WorkspaceSiteHealthEntitlement",
+    "Topic",
     "UnintendedDomain",
     "User",
     "Workspace",

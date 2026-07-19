@@ -22,7 +22,7 @@ full-product surface is marked below.
 | Audit execution + queue + worker | `orchestration` + `workers` | **MVP — coded** |
 | Analysis + metrics + dashboard projection | `analysis` | **MVP — coded** |
 | Run/Executions evidence + CSV/MD export | `api/audits` + `analysis/exports` | **MVP — coded** |
-| AI-suggested prompt generation (`/generate`) | `domain/prompts` | Roadmap — **stub returns not-implemented** |
+| AI-suggested prompt generation (`/generate`) | `domain/prompts` + `connectors/agent` | **Coded** — topic-driven generation via the `.env` default agent; suggestions land as `status='proposed'` (never audit-eligible until accepted) |
 | Discovery/analysis model (`DiscoveryModelConfig`) | `domain/providers` | Plumbing-only (stored, not invoked) |
 | Cross-run Visibility trend history | `analysis` | **Coded** — `GET /projects/{id}/visibility/trends` (Trends tab) |
 | Persisted execution evidence (mentions/citations + query fanout) | `analysis` | **Coded** — `GET /projects/{id}/visibility/evidence` |
@@ -34,7 +34,7 @@ full-product surface is marked below.
 | Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
 | Issues catalog | `site_health` | **Implemented** — grouped issues + per-URL detail |
 | Brand / Competitors / E-E-A-T rich profile | — | Roadmap |
-| Topics | — | Roadmap |
+| Topics | `domain/prompts` (`topics.py`) | **Coded** — first-class `Topic` table, per-project CRUD with active/proposed counts; generation groups prompts by topic |
 | Tone/Writing Style, Memory, Knowledge Base | — | Roadmap |
 | GSC / GA4 / Bing integrations | — | Roadmap |
 | Agent, MCP, Settings/white-labelling | — | Roadmap |
@@ -68,7 +68,7 @@ services.
 | `app/api/auth.py` | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | `app/api/workspaces.py` | `GET /workspaces`, `POST /workspaces` |
 | `app/api/projects.py` | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `GET /projects/{id}/visibility?audit_id=`, `GET /projects/{id}/visibility/trends`, `GET /projects/{id}/visibility/evidence` |
-| `app/api/prompts.py` | `GET/POST /prompt-sets`, prompt CRUD (`PATCH/DELETE /prompts/{id}`), `POST /prompt-sets/{id}/import` (MVP CSV bulk-create), `POST /prompt-sets/{id}/generate` (**stub, not-implemented**) |
+| `app/api/prompts.py` | `GET/POST /prompt-sets`, prompt CRUD (`PATCH/DELETE /prompts/{id}`), `POST /prompt-sets/{id}/import` (MVP CSV bulk-create), `POST /prompt-sets/{id}/generate` (AI topic+prompt generation via default agent), `POST /prompt-sets/{id}/prompts/bulk-status`, topics CRUD (`GET/POST /projects/{id}/topics`, `PATCH/DELETE /topics/{id}`) |
 | `app/api/provider_connections.py` | `GET/POST /provider-connections`, `PATCH/DELETE /provider-connections/{id}`, `POST /provider-connections/{id}/test`; `GET /provider-catalog` |
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
@@ -141,7 +141,8 @@ project). No integer PKs, no `user_id` columns.
 | `models/workspace.py` `Workspace`, `WorkspaceMember` | Tenant + membership | — |
 | `models/project.py` `Project` | Workspace-scoped project (brand_name, website_url, country_code, language_code, benchmark_mode, default_repetitions) | — |
 | `models/brand.py` `Brand`, `BrandAlias`, `Competitor`, `OwnedDomain`, `UnintendedDomain` | Normalized brand identity (serialized back to the dict the scorer expects) | — |
-| `models/prompt.py` `PromptSet`, `Prompt` (text, theme, intent, branded, enabled, origin, `generation_evidence` JSONB) | Dedicated prompt resource | `origin` (generated/manual/imported) |
+| `models/prompt.py` `PromptSet`, `Prompt` (text, theme, intent, branded, enabled, origin, `status` proposed/active/archived, `topic_id`, `normalized_text_hash` dedupe key, `generation_evidence` JSONB) | Dedicated prompt resource | `origin` (generated/manual/imported); generated rows carry model identity + `generation_run_id` in `generation_evidence` |
+| `models/prompt.py` `Topic` (project-scoped, `origin` manual/generated, unique name per project) | Topic/category grouping for prompts (`Prompt.topic_id` SET NULL on delete) | `origin` (manual/generated) |
 | `models/provider.py` `ProviderConnection` (Fernet secret), `ProviderRoute` (logical_engine + transport_provider + transport_model + is_default), `ProviderConnectionTest` (append-only), `DiscoveryModelConfig` (plumbing-only) | BYOK provider config | route carries logical+transport+model identity (invariant 10) |
 | `models/audit.py` `Audit`, `AuditPromptSnapshot`, `AuditEngineSnapshot` | Run + frozen prompt/engine snapshots | `random_seed`, `configuration`, `analyzer_version` on finalize |
 | `models/audit.py` `AuditTask` | Queue row (see §9) | `idempotency_key` unique, `(audit_id, prompt_index, repetition)` unique |

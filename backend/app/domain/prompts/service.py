@@ -2,14 +2,17 @@
 #
 # A prompt set belongs to a project, which is workspace-scoped, so every query
 # joins through ``Project`` and filters by ``workspace_id`` (invariant 5). The
-# ``/generate`` endpoint is a roadmap stub (B-4) and lives in the router; the
-# service owns manual create + CSV bulk import.
+# service owns manual create + CSV bulk import + review-status transitions;
+# AI generation lives in ``generation.py``.
 from __future__ import annotations
 
 import uuid
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy import update as sa_update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -18,6 +21,7 @@ from app.core.config.projects import (
     PROMPT_ORIGIN_MANUAL,
 )
 from app.domain.projects.normalization import normalize_intent
+from app.domain.prompts.normalization import prompt_text_hash
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet
 
@@ -28,6 +32,10 @@ class PromptSetNotFoundError(LookupError):
 
 class PromptNotFoundError(LookupError):
     """Raised when a prompt is missing or not in the caller's workspace."""
+
+
+class DuplicatePromptError(ValueError):
+    """Raised when a prompt's normalized text already exists in the set."""
 
 
 async def _project_in_workspace(
@@ -174,9 +182,11 @@ async def create_prompt(
         workspace_id=workspace_id,
         prompt_set_id=payload.prompt_set_id,
     )
+    text = payload.text.strip()
+    # normalized_text_hash is set by the Prompt model's @validates("text") hook.
     prompt = Prompt(
         prompt_set_id=payload.prompt_set_id,
-        text=payload.text.strip(),
+        text=text,
         theme=payload.theme.strip(),
         intent=normalize_intent(payload.intent),
         branded=payload.branded,
@@ -184,7 +194,13 @@ async def create_prompt(
         origin=PROMPT_ORIGIN_MANUAL,
     )
     session.add(prompt)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise DuplicatePromptError(
+            "An equivalent prompt already exists in this set"
+        ) from exc
     await session.refresh(prompt)
     return prompt
 
@@ -226,7 +242,17 @@ async def update_prompt(
         prompt.branded = data["branded"]
     if data.get("enabled") is not None:
         prompt.enabled = data["enabled"]
-    await session.commit()
+    if data.get("status") is not None:
+        prompt.status = data["status"]
+    if "topic_id" in data:
+        prompt.topic_id = data["topic_id"]
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise DuplicatePromptError(
+            "An equivalent prompt already exists in this set"
+        ) from exc
     await session.refresh(prompt)
     return prompt
 
@@ -249,6 +275,9 @@ async def import_prompts(
     """MVP CSV bulk-create: persist already-parsed prompt rows as ``imported``.
 
     Rows with empty text are skipped; intents are casefolded + validated.
+    Duplicates (same normalized text as an existing prompt in the set, or a
+    repeat within the upload) are dropped by the DB via ``ON CONFLICT DO
+    NOTHING`` on the per-set hash constraint — never a request failure.
     Returns the refreshed prompt set (with all prompts) so the caller can
     project the whole set back — matching the frontend import contract.
     """
@@ -259,17 +288,55 @@ async def import_prompts(
         text = str(row.text or "").strip()
         if not text:
             continue
-        session.add(
-            Prompt(
+        stmt = (
+            pg_insert(Prompt)
+            .values(
+                id=uuid.uuid4(),
                 prompt_set_id=prompt_set_id,
                 text=text,
+                normalized_text_hash=prompt_text_hash(text),
                 theme=str(row.theme or "").strip(),
                 intent=normalize_intent(row.intent),
                 branded=bool(row.branded),
                 enabled=bool(row.enabled),
                 origin=PROMPT_ORIGIN_IMPORTED,
             )
+            .on_conflict_do_nothing(constraint="uq_prompt_set_normalized_text")
         )
+        await session.execute(stmt)
+    await session.commit()
+    return await _get_prompt_set(
+        session, workspace_id=workspace_id, prompt_set_id=prompt_set_id
+    )
+
+
+async def bulk_set_status(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    prompt_set_id: uuid.UUID,
+    prompt_ids: list[uuid.UUID],
+    status: str,
+) -> PromptSet:
+    """Review transition for many prompts at once (accept-all / archive).
+
+    Scoped to one set: ids outside the set (or workspace) are rejected as a
+    whole so the caller never silently transitions fewer prompts than asked.
+    The scoped UPDATE runs first and its rowcount is compared to the request
+    (no check-then-act window); on any mismatch we raise before committing,
+    so no partial transition ever persists.
+    """
+    await _get_prompt_set(
+        session, workspace_id=workspace_id, prompt_set_id=prompt_set_id
+    )
+    result = await session.execute(
+        sa_update(Prompt)
+        .where(Prompt.prompt_set_id == prompt_set_id, Prompt.id.in_(prompt_ids))
+        .values(status=status)
+    )
+    if result.rowcount != len(set(prompt_ids)):
+        await session.rollback()
+        raise PromptNotFoundError("Prompt(s) not found in this set")
     await session.commit()
     return await _get_prompt_set(
         session, workspace_id=workspace_id, prompt_set_id=prompt_set_id

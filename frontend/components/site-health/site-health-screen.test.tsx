@@ -87,6 +87,14 @@ function mockRoutes(crawlOverrides: Record<string, unknown> = {}) {
         quota: { used: 3, limit: 50 },
       }),
     ),
+    http.get(`/api/v1/projects/${PROJECT}/monitored-urls`, () =>
+      HttpResponse.json({
+        project_id: PROJECT,
+        selection_version: 1,
+        monitored_urls: [],
+        quota: { used: 0, limit: 50 },
+      }),
+    ),
     http.get(`/api/v1/site-crawls/${CRAWL}/pages`, () =>
       HttpResponse.json({ items: [], next_cursor: null }),
     ),
@@ -121,14 +129,61 @@ describe('SiteHealthScreen — terminal phase', () => {
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
   });
 
-  it('shows generic copy for a cancelled crawl (never the raw error_message copy)', async () => {
-    mockRoutes({ status: 'cancelled', error_message: '' });
+  it('shows generic terminal copy for a cancelled crawl with NOTHING discovered', async () => {
+    mockRoutes({ status: 'cancelled', error_message: '', visible_url_count: 0 });
 
     renderScreen();
 
     expect(
       await screen.findByText('This crawl was cancelled before it produced results.'),
     ).toBeInTheDocument();
+  });
+
+  it('keeps the discovered inventory (selection phase) for a cancelled Starter crawl', async () => {
+    // Cancelling discovery must NOT dead-end the discovered URLs: the
+    // inventory persists server-side, so the selection screen renders with a
+    // cancellation notice instead of the terminal card.
+    mockRoutes({ status: 'cancelled', error_message: '', visible_url_count: 3 });
+    mswServer.use(
+      http.get(`/api/v1/site-crawls/${CRAWL}/inventory`, () =>
+        HttpResponse.json({
+          items: [
+            {
+              site_url_id: '66666666-6666-4666-8666-666666666666',
+              normalized_url: 'https://acme.com/pricing',
+              display_url: 'https://acme.com/pricing',
+              title: null,
+              content_type: 'text/html',
+              source: 'link',
+              depth: 1,
+              monitored: false,
+              first_seen_at: null,
+              last_seen_at: null,
+              issue_count: null,
+              technical_score: null,
+              aeo_score: null,
+              overall_score: null,
+              last_audited: null,
+            },
+          ],
+          next_cursor: null,
+        }),
+      ),
+    );
+
+    renderScreen();
+
+    expect(
+      await screen.findByText(/Discovery was cancelled — the pages found so far are kept/),
+    ).toBeInTheDocument();
+    // The persisted inventory row itself is visible and selectable.
+    expect(
+      await screen.findByLabelText('Monitor https://acme.com/pricing'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start analysis' })).toBeInTheDocument();
+    expect(
+      screen.queryByText('This crawl was cancelled before it produced results.'),
+    ).not.toBeInTheDocument();
   });
 
   it('renders no Re-crawl button in the header while a crawl is still active (discovering)', async () => {

@@ -19,14 +19,17 @@ import type {
   historicalTransportProviderSchema,
   logicalEngineSchema,
   projectSchema,
+  promptGenerateResponseSchema,
   promptIntentSchema,
   promptSchema,
   promptSetSchema,
+  promptStatusSchema,
   providerCatalogSchema,
   providerConnectionSchema,
   rankingRowSchema,
   sessionUserSchema,
   transportProviderSchema,
+  topicSchema,
   visibilityEngineSchema,
   visibilityEvidenceResponseSchema,
   visibilityExecutionEvidenceSchema,
@@ -66,7 +69,10 @@ export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type PromptIntent = z.infer<typeof promptIntentSchema>;
 export type Prompt = z.infer<typeof promptSchema>;
+export type PromptStatus = z.infer<typeof promptStatusSchema>;
 export type PromptSet = z.infer<typeof promptSetSchema>;
+export type Topic = z.infer<typeof topicSchema>;
+export type PromptGenerateResponse = z.infer<typeof promptGenerateResponseSchema>;
 export type BenchmarkMode = z.infer<typeof benchmarkModeSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type TransportProvider = z.infer<typeof transportProviderSchema>;

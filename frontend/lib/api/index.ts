@@ -27,6 +27,7 @@ export const api = {
 export { authApi } from './auth';
 export { projectsApi } from './projects';
 export { promptsApi } from './prompts';
+export { topicsApi } from './topics';
 export { providersApi } from './providers';
 export { runsApi } from './runs';
 export { siteHealthApi, siteHealthQueries, siteHealthMutations } from './site-health';

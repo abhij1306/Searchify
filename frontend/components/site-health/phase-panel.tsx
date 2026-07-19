@@ -28,7 +28,6 @@ export function PhasePanel({
     active,
     dashboardQuery,
     pagesQuery,
-    discoveryPreviewQuery,
     projectSelectedTotal,
     createMutation,
     cancelMutation,
@@ -47,14 +46,24 @@ export function PhasePanel({
         <DiscoveryProgress
           crawl={crawl}
           entitlement={entitlement}
-          previewRows={discoveryPreviewQuery.data?.items ?? []}
+          active={active}
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />
       );
     case 'selection':
       return (
-        <InventorySelection crawl={crawl} entitlement={entitlement} projectId={projectId} />
+        <InventorySelection
+          crawl={crawl}
+          entitlement={entitlement}
+          projectId={projectId}
+          // A cancelled crawl keeps its discovered inventory but can no longer
+          // run analysis itself — selections persist, and "Start analysis"
+          // launches a fresh crawl that seeds them as analyze tasks.
+          crawlInactive={!active}
+          onStartAnalysis={startCrawl}
+          startPending={createMutation.isPending}
+        />
       );
     case 'analyzing':
       return (

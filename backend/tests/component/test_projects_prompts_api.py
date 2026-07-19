@@ -4,9 +4,10 @@ Adapted from the reference ``tests/component/test_ai_visibility_api.py`` to
 Searchify's UUID + workspace-scoped model. Covers the B3 acceptance:
   - project CRUD persists normalized brand identity + prompts, workspace-scoped;
   - prompt-intent + benchmark_mode validation;
-  - the ``/generate`` stub returns not-implemented;
   - CSV bulk-import persists prompts as ``imported``;
   - cross-workspace access is denied (reuses the B2 isolation pattern).
+
+The ``/generate`` endpoint is covered in ``test_prompt_generation_api.py``.
 """
 
 from __future__ import annotations
@@ -206,24 +207,6 @@ async def test_csv_import_accepts_json_rows(client: httpx.AsyncClient) -> None:
     assert resp.status_code == 201
     assert resp.json()["prompt_count"] == 2
     assert {p["origin"] for p in resp.json()["prompts"]} == {"imported"}
-
-
-@pytest.mark.asyncio
-async def test_generate_is_not_implemented_stub(
-    client: httpx.AsyncClient,
-) -> None:
-    await _register(client, "p6@example.com")
-    project = (await client.post("/api/v1/projects", json=_project_payload())).json()
-    prompt_set_id = (
-        await client.post(
-            "/api/v1/prompt-sets",
-            json={"project_id": project["id"], "name": "Gen"},
-        )
-    ).json()["id"]
-
-    resp = await client.post(f"/api/v1/prompt-sets/{prompt_set_id}/generate")
-    assert resp.status_code == 501
-    assert resp.json()["detail"]["code"] == "not_implemented"
 
 
 @pytest.mark.asyncio

@@ -1231,9 +1231,7 @@ def _issue_filter_clause(
             # The catalog UI exposes a three-tier vocabulary (high/medium/low);
             # ``critical`` folds into ``high`` so the High filter matches the
             # rows its chip count includes.
-            clauses.append(
-                SiteIssue.severity.in_([SEVERITY_HIGH, SEVERITY_CRITICAL])
-            )
+            clauses.append(SiteIssue.severity.in_([SEVERITY_HIGH, SEVERITY_CRITICAL]))
         else:
             clauses.append(SiteIssue.severity == severity)
     if category:

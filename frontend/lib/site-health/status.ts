@@ -139,15 +139,30 @@ export type SiteHealthPhase =
  * an explicit 'terminal' phase — otherwise they would fall through to
  * 'selection'/'analyzing' and render an active-looking progress view (and
  * another Cancel button) for a crawl that has already stopped.
+ *
+ * EXCEPTION: a CANCELLED Starter crawl that already admitted URLs routes to
+ * 'selection', not 'terminal'. Discovered URLs persist through a cancel (the
+ * backend deletes nothing), so the user keeps the inventory and can stage a
+ * monitored set — analysis then runs on the next crawl, which re-seeds the
+ * persisted selection. A cancelled crawl with NOTHING discovered stays
+ * 'terminal' (there is no inventory to show).
  */
 export function resolveSiteHealthPhase(
-  crawl: Pick<SiteCrawl, 'status' | 'discovery_status' | 'analysis_status' | 'score_summary'> | null,
+  crawl:
+    | Pick<
+        SiteCrawl,
+        'status' | 'discovery_status' | 'analysis_status' | 'score_summary' | 'visible_url_count'
+      >
+    | null,
   plan: SiteHealthEntitlement['plan_key'],
 ): SiteHealthPhase {
   if (!crawl) return 'empty';
   // Terminal crawls with score data → completed dashboard (even mid-analysis).
   if (['completed', 'partially_completed'].includes(crawl.status) || crawl.score_summary) {
     return 'dashboard';
+  }
+  if (crawl.status === 'cancelled' && plan === 'starter' && crawl.visible_url_count > 0) {
+    return 'selection';
   }
   if (crawl.status === 'failed' || crawl.status === 'cancelled') return 'terminal';
   // Discovery still running.

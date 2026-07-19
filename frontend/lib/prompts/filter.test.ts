@@ -13,6 +13,7 @@ function prompt(overrides: Partial<Prompt> = {}): Prompt {
     branded: false,
     enabled: true,
     origin: 'manual',
+    status: 'active',
     ...overrides,
   };
 }

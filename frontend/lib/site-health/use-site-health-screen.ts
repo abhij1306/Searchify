@@ -67,13 +67,6 @@ export function useSiteHealthScreen(projectId: string | null) {
     [crawl, plan],
   );
 
-  // Preview the admitted-URL inventory during discovery (bounded to this crawl).
-  const discoveryPreviewQuery = useQuery({
-    ...siteHealthQueries.inventory(crawl?.id ?? '', { limit: 25 }),
-    enabled: Boolean(crawl?.id) && phase === 'discovering',
-    refetchInterval: active ? POLL_INTERVAL_MS : false,
-  });
-
   // Per-PROJECT selected total for the analysis progress bar. The dashboard
   // quota `used` is workspace-wide, so a multi-project workspace would
   // overcount this crawl's queue — count this project's active monitored rows
@@ -129,7 +122,6 @@ export function useSiteHealthScreen(projectId: string | null) {
     entitlementQuery,
     dashboardQuery,
     pagesQuery,
-    discoveryPreviewQuery,
     crawl,
     active,
     phase,

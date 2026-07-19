@@ -91,6 +91,13 @@ class Project(Base):
         passive_deletes=True,
         order_by="PromptSet.created_at",
     )
+    topics: Mapped[list[Topic]] = relationship(
+        "Topic",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="Topic.created_at",
+    )
 
 
 # Imported at module end to avoid circular imports at definition time; the
@@ -101,4 +108,4 @@ from app.models.brand import (  # noqa: E402
     OwnedDomain,
     UnintendedDomain,
 )
-from app.models.prompt import PromptSet  # noqa: E402
+from app.models.prompt import PromptSet, Topic  # noqa: E402

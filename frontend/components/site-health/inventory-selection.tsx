@@ -38,15 +38,29 @@ const PAGE_LIMIT = 25;
  * the persistent monitored set. Staging/commit/bulk semantics (including stale
  * `selection_version` recovery) live in `useMonitoredSelection`; this component
  * owns only the inventory pagination/filters and layout.
+ *
+ * Also serves a CANCELLED crawl (`crawlInactive`): the discovered inventory
+ * survives a cancel, so the user can still browse it and stage/commit a
+ * monitored set — but analysis tasks only enqueue into an active crawl, so a
+ * "Start analysis" action (a fresh crawl that seeds the persisted selection)
+ * is offered instead of the implicit in-crawl analysis.
  */
 export function InventorySelection({
   crawl,
   entitlement,
   projectId,
+  crawlInactive = false,
+  onStartAnalysis,
+  startPending = false,
 }: Readonly<{
   crawl: SiteCrawl;
   entitlement: SiteHealthEntitlement;
   projectId: string;
+  /** True when the crawl is terminal (cancelled) — analysis needs a new crawl. */
+  crawlInactive?: boolean;
+  /** Starts a fresh crawl that seeds the committed monitored set (re-analysis). */
+  onStartAnalysis?: () => void;
+  startPending?: boolean;
 }>) {
   const [filters, setFilters] = useState<InventoryFilters>(emptyInventoryFilters);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
@@ -118,6 +132,12 @@ export function InventorySelection({
   return (
     <Card>
       <CardContent className="grid gap-4">
+        {crawlInactive ? (
+          <Alert tone="info">
+            Discovery was cancelled — the pages found so far are kept below. Select the pages to
+            monitor, save your selection, then start the analysis.
+          </Alert>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-0.5">
             <Label>Page Inventory</Label>
@@ -215,6 +235,7 @@ export function InventorySelection({
             </span>
             <Button
               size="sm"
+              variant={crawlInactive && !delta?.dirty ? 'secondary' : 'primary'}
               onClick={commit}
               disabled={
                 !effectiveSelection ||
@@ -226,9 +247,29 @@ export function InventorySelection({
               {replaceMutation.isPending
                 ? 'Saving…'
                 : effectiveSelection
-                  ? commitCtaLabel(effectiveSelection, entitlement.monitored_url_limit)
+                  ? crawlInactive
+                    ? `Save selection (${effectiveSelection.staged.size} of ${entitlement.monitored_url_limit})`
+                    : commitCtaLabel(effectiveSelection, entitlement.monitored_url_limit)
                   : 'Analyze pages'}
             </Button>
+            {crawlInactive && onStartAnalysis ? (
+              // A cancelled crawl cannot enqueue analyze tasks, so analysis is
+              // a fresh crawl: it re-discovers and seeds the COMMITTED
+              // monitored set. Enabled once a committed (saved) set exists and
+              // no unsaved edits are pending.
+              <Button
+                size="sm"
+                onClick={onStartAnalysis}
+                disabled={
+                  startPending ||
+                  !effectiveSelection ||
+                  delta?.dirty ||
+                  effectiveSelection.committed.siteUrlIds.size === 0
+                }
+              >
+                {startPending ? 'Starting…' : 'Start analysis'}
+              </Button>
+            ) : null}
           </div>
         </div>
       </CardContent>

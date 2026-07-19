@@ -28,6 +28,7 @@ describe('form mapping', () => {
       branded: true,
       enabled: false,
       origin: 'manual',
+      status: 'active',
     };
     expect(promptToFormValues(prompt)).toEqual({
       text: 'Best shoes?',

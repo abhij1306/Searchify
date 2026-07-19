@@ -15,6 +15,7 @@ import {
   isErrorRow,
   isSampleMode,
   pageStatusBadgeValue,
+  resolveSiteHealthPhase,
   shouldPollCrawl,
   statusLabel,
 } from './status';
@@ -129,8 +130,76 @@ describe('canShowDiscoveredTotal (Free redaction rendering input)', () => {
   });
 });
 
-describe('badge mapping', () => {
-  it('maps overall crawl status to a run-status badge value', () => {
+describe('resolveSiteHealthPhase', () => {
+  const base = {
+    status: 'running' as const,
+    discovery_status: 'running' as const,
+    analysis_status: 'pending' as const,
+    score_summary: null,
+    visible_url_count: 42,
+  };
+
+  it('resolves the active flow phases', () => {
+    expect(resolveSiteHealthPhase(null, 'starter')).toBe('empty');
+    expect(resolveSiteHealthPhase(base, 'starter')).toBe('discovering');
+    expect(
+      resolveSiteHealthPhase({ ...base, discovery_status: 'completed' }, 'starter'),
+    ).toBe('selection');
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, discovery_status: 'completed', analysis_status: 'running' },
+        'starter',
+      ),
+    ).toBe('analyzing');
+    expect(resolveSiteHealthPhase({ ...base, status: 'completed' }, 'starter')).toBe('dashboard');
+  });
+
+  it('keeps a cancelled Starter crawl with discovered URLs in the selection phase', () => {
+    // Discovered URLs persist through a cancel — the inventory must stay
+    // reachable so the user can select pages to analyze, not a dead-end card.
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'cancelled', discovery_status: 'cancelled', analysis_status: 'cancelled' },
+        'starter',
+      ),
+    ).toBe('selection');
+  });
+
+  it('is terminal for a cancelled crawl with nothing discovered', () => {
+    expect(
+      resolveSiteHealthPhase(
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+          visible_url_count: 0,
+        },
+        'starter',
+      ),
+    ).toBe('terminal');
+  });
+
+  it('is terminal for a cancelled Free crawl (no selection capability)', () => {
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'cancelled', discovery_status: 'cancelled', analysis_status: 'cancelled' },
+        'free',
+      ),
+    ).toBe('terminal');
+  });
+
+  it('stays terminal for a failed crawl even with discovered URLs', () => {
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'failed', discovery_status: 'failed', analysis_status: 'cancelled' },
+        'starter',
+      ),
+    ).toBe('terminal');
+  });
+});
+
+describe('badge mapping', () => {  it('maps overall crawl status to a run-status badge value', () => {
     expect(crawlBadgeValue('validating')).toBe('queued');
     expect(crawlBadgeValue('partially_completed')).toBe('partial');
     expect(crawlBadgeValue('running')).toBe('running');
