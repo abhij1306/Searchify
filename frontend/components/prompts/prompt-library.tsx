@@ -148,6 +148,9 @@ export function PromptLibrary() {
       const set = await ensurePromptSet();
       return promptsApi.generate(set.id, input);
     },
+    // Clear any prior success summary before a new attempt so a stale result
+    // can never render alongside a later retry's error.
+    onMutate: () => setGenerateResult(null),
     onSuccess: async (result) => {
       setGenerateResult(result);
       // Generated prompts fill the set-wide active pool first (backend
@@ -159,6 +162,10 @@ export function PromptLibrary() {
       const hasActive = result.generated.some((prompt) => prompt.status === 'active');
       if (hasProposed) setStatusTab('proposed');
       else if (hasActive) setStatusTab('active');
+      // Reset the topic filter to "All topics" so freshly generated rows are
+      // visible even if the run landed them in a topic other than the one the
+      // user was viewing.
+      setSelectedTopicId(null);
       await invalidate();
     },
   });

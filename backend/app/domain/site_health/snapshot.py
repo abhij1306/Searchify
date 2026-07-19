@@ -15,6 +15,12 @@
 # Idempotent per crawl: the ``site_health_snapshots`` table is unique on
 # ``crawl_id``, so this uses ``ON CONFLICT DO NOTHING`` for the immutable row and
 # always (re)writes the crawl ``score_summary`` projection.
+#
+# The single fetched aggregate row set is authoritative — when it is empty the
+# helper writes nothing and returns ``False`` (cancel), unless the caller passes
+# ``persist_empty=True`` to force a canonical empty/null-score snapshot (the
+# worker's clean terminalization). There is deliberately no separate precheck
+# (that would be a TOCTOU race against membership/analysis changes).
 from __future__ import annotations
 
 import uuid
@@ -44,7 +50,9 @@ from app.models.site_health import (
 __all__ = ["persist_crawl_snapshot"]
 
 
-async def persist_crawl_snapshot(session: AsyncSession, *, crawl: SiteCrawl) -> None:
+async def persist_crawl_snapshot(
+    session: AsyncSession, *, crawl: SiteCrawl, persist_empty: bool = False
+) -> bool:
     """Compute + persist the crawl aggregate snapshot (unique per crawl).
 
     Aggregates only the LATEST completed analyses for ACTIVE monitored URLs
@@ -52,6 +60,24 @@ async def persist_crawl_snapshot(session: AsyncSession, *, crawl: SiteCrawl) -> 
     issue severity/category counts, and writes both the immutable
     ``SiteHealthSnapshot`` (``ON CONFLICT DO NOTHING`` — one per crawl) and the
     crawl's rolled-up ``score_summary`` projection.
+
+    The single fetched aggregate row set is authoritative — there is no separate
+    precheck (which would be a TOCTOU race against membership/analysis changes).
+    When that row set is empty (zero aggregatable active completed analyses) the
+    behaviour depends on ``persist_empty``:
+
+      - ``persist_empty=False`` (default; used by ``service.cancel_crawl``):
+        write NEITHER the snapshot NOR the ``score_summary`` projection and
+        return ``False``. A partial cancel with nothing aggregable (e.g. its
+        only completed analysis belongs to a since-deactivated URL) keeps
+        ``score_summary`` null so the UI shows its terminal/selection state
+        instead of an empty dashboard from zero aggregated rows.
+      - ``persist_empty=True`` (used by the worker's clean terminalization):
+        still write the explicit empty/null-score snapshot + projection, so an
+        empty-plan crawl terminalizes with a canonical (zeroed) snapshot.
+
+    Returns ``True`` when a snapshot/projection was (re)written, ``False`` when
+    persistence was skipped because the aggregate was empty.
     """
     # Exactly one latest completed analysis per ACTIVE monitored URL in this
     # crawl. Rank by the full timestamp, then UUID for a deterministic tie-break
@@ -98,6 +124,13 @@ async def persist_crawl_snapshot(session: AsyncSession, *, crawl: SiteCrawl) -> 
             ).where(ranked.c.latest_rank == 1)
         )
     ).all()
+
+    # The single fetched aggregate row set decides persistence — no separate
+    # precheck (which would race membership/analysis changes). Zero aggregatable
+    # active completed analyses => write nothing unless the caller explicitly
+    # wants an empty/null-score snapshot (the worker's empty-plan terminalize).
+    if not rows and not persist_empty:
+        return False
 
     inputs: list[AnalysisScoreInput] = []
     analysis_ids: list[uuid.UUID] = []
@@ -187,3 +220,4 @@ async def persist_crawl_snapshot(session: AsyncSession, *, crawl: SiteCrawl) -> 
         "issue_count": issue_total,
         "scoring_version": aggregate.scoring_version,
     }
+    return True

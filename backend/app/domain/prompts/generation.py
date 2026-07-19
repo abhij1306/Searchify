@@ -563,13 +563,82 @@ async def generate_prompts(
 
         await session.commit()
     except IntegrityError as exc:
-        # Belt-and-suspenders: if a referenced set/topic still disappeared
-        # (e.g. lock skipped on a non-PostgreSQL dialect), surface a scoped
-        # not-found instead of a raw FK 500.
+        # A referenced set/topic may have disappeared despite the advisory
+        # lock (e.g. lock skipped on a non-PostgreSQL dialect). Rather than
+        # blindly mapping EVERY integrity error to a 404 — which would mask
+        # genuine constraint bugs (unique/check/unrelated FK violations) as a
+        # phantom "prompt set not found" — roll back and re-check ONLY the
+        # scoped entities this request depends on. A disappeared set maps to a
+        # scoped 404; a disappeared target topic maps to a scoped 422; any
+        # other integrity error is unrelated and re-raised unchanged (500).
         await session.rollback()
-        raise PromptSetNotFoundError("Prompt set not found") from exc
+        await _reraise_scoped_integrity_error(
+            session,
+            workspace_id=workspace_id,
+            prompt_set_id=prompt_set_id,
+            topic_id=payload.topic_id,
+            exc=exc,
+        )
 
     return inserted, touched_topics, dropped
+
+
+async def _reraise_scoped_integrity_error(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    prompt_set_id: uuid.UUID,
+    topic_id: uuid.UUID | None,
+    exc: IntegrityError,
+) -> None:
+    """Map an insert-time ``IntegrityError`` to a scoped domain error.
+
+    Called after ``session.rollback()``. Re-reads committed state to decide
+    which referenced entity (if any) actually vanished:
+
+    - prompt set gone (in this workspace) -> ``PromptSetNotFoundError`` (404);
+    - scoped ``topic_id`` gone from the set's project ->
+      ``GenerationValidationError`` (422);
+    - neither missing -> the error is unrelated (unique/check/other FK), so
+      re-raise it unchanged so a real bug surfaces as a 500, never a phantom
+      not-found.
+
+    This never returns normally: it always raises.
+    """
+    set_exists = (
+        await session.execute(
+            select(PromptSet.id)
+            .join(Project, Project.id == PromptSet.project_id)
+            .where(
+                PromptSet.id == prompt_set_id,
+                Project.workspace_id == workspace_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if set_exists is None:
+        raise PromptSetNotFoundError("Prompt set not found") from exc
+
+    if topic_id is not None:
+        topic_exists = (
+            await session.execute(
+                select(Topic.id)
+                .join(Project, Project.id == Topic.project_id)
+                .join(PromptSet, PromptSet.project_id == Project.id)
+                .where(
+                    Topic.id == topic_id,
+                    PromptSet.id == prompt_set_id,
+                    Project.workspace_id == workspace_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if topic_exists is None:
+            raise GenerationValidationError(
+                "topic_id is not a topic of this project"
+            ) from exc
+
+    # The scoped set/topic are both intact, so the integrity error is
+    # unrelated to a lost FK reference. Re-raise it so it isn't masked.
+    raise exc
 
 
 async def _hydrate_inserted(

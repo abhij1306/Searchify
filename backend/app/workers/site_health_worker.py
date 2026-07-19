@@ -1877,9 +1877,12 @@ class SiteHealthWorker:
 
         Delegates to the canonical ``persist_crawl_snapshot`` domain helper so
         the worker and ``service.cancel_crawl`` share ONE aggregation algorithm
-        (no duplicate scoring/rollup logic).
+        (no duplicate scoring/rollup logic). ``persist_empty=True`` because a
+        clean terminalization (including an empty analysis plan) must always
+        write a canonical snapshot — an empty/null-score one when nothing was
+        aggregated — unlike a cancel, which leaves ``score_summary`` null.
         """
-        await persist_crawl_snapshot(session, crawl=crawl)
+        await persist_crawl_snapshot(session, crawl=crawl, persist_empty=True)
 
 
 def main() -> None:  # pragma: no cover - process entrypoint

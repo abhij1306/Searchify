@@ -1625,6 +1625,164 @@ async def test_cancel_crawl_with_only_deactivated_completed_analyses_skips_snaps
 
 
 @pytest.mark.asyncio
+async def test_persist_crawl_snapshot_returns_false_and_writes_nothing_when_empty(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Empty aggregate row set => skip persistence, return False (cancel path).
+
+    ``persist_crawl_snapshot`` decides from its single fetched aggregate row set
+    (no separate TOCTOU precheck): with zero aggregatable active completed
+    analyses and the default ``persist_empty=False`` it writes NEITHER the
+    snapshot NOR the ``score_summary`` projection and returns ``False``.
+    """
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+
+    assert persisted is False
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
+async def test_persist_crawl_snapshot_persist_empty_writes_null_score_snapshot(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """``persist_empty=True`` forces a canonical empty/null-score snapshot.
+
+    The worker's clean terminalization (including an empty analysis plan) must
+    always write a snapshot. With no aggregatable rows and ``persist_empty=True``
+    the helper writes the explicit zeroed/null-score snapshot + projection and
+    returns ``True``.
+    """
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        persisted = await persist_crawl_snapshot(
+            session, crawl=crawl, persist_empty=True
+        )
+        await session.commit()
+
+    assert persisted is True
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        assert snapshot.analyzed_url_count == 0
+        assert snapshot.overall_score is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl.score_summary is not None
+        assert crawl.score_summary["overall_score"] is None
+
+
+@pytest.mark.asyncio
+async def test_persist_crawl_snapshot_returns_true_when_active_rows_present(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A completed analysis for an ACTIVE URL persists and returns True.
+
+    Regression for membership: the same call returns ``False`` once its only
+    completed analysis's monitored URL is deactivated (no active rows), proving
+    the decision derives from the single fetched aggregate row set rather than a
+    precheck.
+    """
+    from app.core.config.site_health import (
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        await session.commit()
+
+    # Active membership present -> persists + returns True.
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+    assert persisted is True
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        assert snapshot.analyzed_url_count == 1
+
+    # Deactivate the monitored URL: the (idempotent) snapshot row survives, but a
+    # fresh call now sees zero active rows and reports no persistence occurred.
+    async with session_factory() as session:
+        monitored = (
+            await session.execute(
+                select(MonitoredSiteUrl).where(
+                    MonitoredSiteUrl.site_url_id == site_url_id
+                )
+            )
+        ).scalar_one()
+        monitored.active = False
+        await session.commit()
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+    assert persisted is False
+
+
+@pytest.mark.asyncio
 async def test_snapshot_uses_only_latest_completed_analysis_and_issues(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

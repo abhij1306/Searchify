@@ -89,9 +89,12 @@ class PromptGenerationSettings(BaseSettings):
     )
     # Upper bound on how many existing prompt texts are sent to the model as
     # "do not duplicate" context, so the user message can't grow unbounded as
-    # a set accumulates prompts.
+    # a set accumulates prompts. Must be >= 0: a negative env override would
+    # silently reverse the slice (``[:negative]`` drops from the tail), so
+    # reject it at construction. Zero is valid — it sends no existing prompts.
     existing_prompt_context_limit: int = Field(
         default=200,
+        ge=0,
         validation_alias=AliasChoices(
             "GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT",
             "generation_existing_prompt_context_limit",

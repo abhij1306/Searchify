@@ -212,3 +212,34 @@ class TestCapSuggestionsToCount:
 
     def test_zero_count_yields_nothing(self) -> None:
         assert _cap_suggestions_to_count([_topic("A", "one")], 0) == []
+
+
+# --------------------------------------------------------------------------
+# Settings validation (existing_prompt_context_limit lower bound)
+# --------------------------------------------------------------------------
+class TestPromptGenerationSettings:
+    def test_negative_context_limit_rejected(self) -> None:
+        from pydantic import ValidationError as PydValidationError
+
+        from app.core.config.prompts import PromptGenerationSettings
+
+        with pytest.raises(PydValidationError):
+            PromptGenerationSettings(
+                GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=-1
+            )
+
+    def test_zero_context_limit_accepted(self) -> None:
+        from app.core.config.prompts import PromptGenerationSettings
+
+        settings = PromptGenerationSettings(
+            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=0
+        )
+        assert settings.existing_prompt_context_limit == 0
+
+    def test_positive_context_limit_accepted(self) -> None:
+        from app.core.config.prompts import PromptGenerationSettings
+
+        settings = PromptGenerationSettings(
+            GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT=50
+        )
+        assert settings.existing_prompt_context_limit == 50

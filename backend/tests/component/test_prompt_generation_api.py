@@ -762,6 +762,53 @@ async def test_generation_racing_topic_delete_is_scoped_validation_error(
     assert remaining == []
 
 
+@pytest.mark.asyncio
+async def test_generation_unrelated_integrity_error_is_not_remapped(
+    client: httpx.AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """An IntegrityError unrelated to a lost set/topic FK must NOT be masked.
+
+    When the referenced set and (unscoped) topics are all still present, an
+    insert-time integrity error is a genuine constraint bug, so it must
+    re-raise as ``IntegrityError`` — never a phantom ``PromptSetNotFoundError``
+    (404) or ``GenerationValidationError`` (422).
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    import app.domain.prompts.generation as generation
+    from app.domain.prompts.generation import generate_prompts
+    from app.domain.prompts.schemas import PromptGenerateRequest
+    from app.models.project import Project
+
+    project, prompt_set_id = await _make_project_and_set(
+        client, "unrel1@example.com"
+    )
+    async with session_factory() as session:
+        proj = await session.get(Project, uuid.UUID(project["id"]))
+        workspace_id = proj.workspace_id
+
+    async def _boom(*args: object, **kwargs: object) -> object:
+        raise IntegrityError("boom", params=None, orig=Exception("unrelated"))
+
+    monkeypatch.setattr(generation, "_insert_prompts_returning", _boom)
+
+    with pytest.raises(IntegrityError):
+        async with session_factory() as session:
+            await generate_prompts(
+                session,
+                workspace_id=workspace_id,
+                prompt_set_id=uuid.UUID(prompt_set_id),
+                payload=PromptGenerateRequest(
+                    count=2, confirm_send_evidence=True
+                ),
+                agent=FakeAgent(
+                    response=_agent_response_with_n_prompts(2, topic="Keep")
+                ),
+            )
+
+
 # --------------------------------------------------------------------------
 # Topics CRUD
 # --------------------------------------------------------------------------

@@ -88,7 +88,7 @@ export function GeneratePromptsDialog({
     >
       <div className="grid gap-4">
         {error ? <GenerateErrorAlert error={error} /> : null}
-        {result ? <GenerateResultAlert result={result} /> : null}
+        {result && !error ? <GenerateResultAlert result={result} /> : null}
 
         <label className="grid gap-1.5">
           <span className="text-xs font-medium text-secondary">Number of prompts (1–20)</span>
@@ -148,6 +148,16 @@ function GenerateResultAlert({ result }: Readonly<{ result: PromptGenerateRespon
   const proposed = result.generated.filter((prompt) => prompt.status === 'proposed').length;
   const active = result.generated.filter((prompt) => prompt.status === 'active').length;
 
+  // Count topics that actually received generated rows — i.e. the unique
+  // non-null topic_id values on `generated` — rather than every topic the run
+  // touched (`result.topics` also includes topics whose only change was a
+  // dropped duplicate, so it can overstate where rows landed).
+  const topicCount = new Set(
+    result.generated
+      .map((prompt) => prompt.topic_id)
+      .filter((id): id is string => id != null),
+  ).size;
+
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
   const placements: string[] = [];
@@ -157,7 +167,7 @@ function GenerateResultAlert({ result }: Readonly<{ result: PromptGenerateRespon
   return (
     <Alert tone="success">
       Generated {plural(total, 'prompt')}
-      {result.topics.length > 0 ? ` across ${plural(result.topics.length, 'topic')}` : ''}
+      {topicCount > 0 ? ` across ${plural(topicCount, 'topic')}` : ''}
       {result.dropped_duplicates > 0
         ? `; ${plural(result.dropped_duplicates, 'duplicate')} skipped`
         : ''}

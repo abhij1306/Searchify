@@ -448,15 +448,14 @@ async def cancel_crawl(
     # algorithm, no duplication). This makes ``score_summary`` non-null so the
     # frontend keeps the dashboard (partial scores + inventory), labels the run
     # Cancelled, and offers Recrawl — instead of hiding results behind a null
-    # summary. When nothing aggregable exists the summary stays null (there is
-    # no data to project — never a fabricated zero), and the UI shows its
-    # terminal / selection state. The precheck shares ``persist_crawl_snapshot``
-    # 's active-membership predicate exactly, so a completed analysis whose
-    # monitored URL was since deactivated never triggers an empty snapshot.
-    if await _has_completed_active_analyses(
-        session, crawl_id=crawl_id, project_id=crawl.project_id
-    ):
-        await persist_crawl_snapshot(session, crawl=crawl)
+    # summary. ``persist_crawl_snapshot`` decides from its single fetched
+    # aggregate row set: when nothing aggregable exists (no active completed
+    # analyses — including a completed analysis whose monitored URL was since
+    # deactivated) it writes neither the snapshot nor the projection and returns
+    # ``False``, so the summary stays null (never a fabricated zero) and the UI
+    # shows its terminal / selection state. No separate precheck — that would be
+    # a TOCTOU race against membership/analysis changes.
+    await persist_crawl_snapshot(session, crawl=crawl)
 
     record_crawl_event(
         session,
@@ -468,34 +467,6 @@ async def cancel_crawl(
     await session.commit()
     refreshed = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     return project_crawl(refreshed)
-
-
-async def _has_completed_active_analyses(
-    session: AsyncSession, *, crawl_id: uuid.UUID, project_id: uuid.UUID
-) -> bool:
-    """True when this crawl has ≥1 completed analysis for an ACTIVE monitored URL.
-
-    Mirrors ``persist_crawl_snapshot``'s aggregation predicate exactly (join to
-    an active ``MonitoredSiteUrl`` in the same project). A completed analysis
-    whose monitored URL was since deactivated is NOT aggregatable, so it must
-    not trigger a snapshot / non-null ``score_summary`` (which would render an
-    empty dashboard from zero aggregated rows).
-    """
-    found = await session.scalar(
-        select(SitePageAnalysis.id)
-        .join(
-            MonitoredSiteUrl,
-            MonitoredSiteUrl.site_url_id == SitePageAnalysis.site_url_id,
-        )
-        .where(
-            SitePageAnalysis.crawl_id == crawl_id,
-            SitePageAnalysis.status == PAGE_ANALYSIS_STATUS_COMPLETED,
-            MonitoredSiteUrl.project_id == project_id,
-            MonitoredSiteUrl.active.is_(True),
-        )
-        .limit(1)
-    )
-    return found is not None
 
 
 # =========================================================================

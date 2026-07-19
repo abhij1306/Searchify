@@ -16,23 +16,26 @@
 # set lock before a project lock, so opposing lock orders cannot arise.
 from __future__ import annotations
 
+import hashlib
 import uuid
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Fixed namespaces so our advisory keys can't collide with any other feature's
-# advisory locks (or each other) in the same database.
+# Fixed namespaces are included in the 64-bit hash, making accidental lock-key
+# overlap with another entity class negligibly unlikely at application scale.
 _PROMPT_SET_NAMESPACE = 0x50524F4D  # "PROM"
 _PROJECT_NAMESPACE = 0x50524F4A  # "PROJ"
 
 
-def _to_signed_int32(n: int) -> int:
-    """Map an unsigned 32-bit value into the signed int32 range Postgres wants.
-
-    ``pg_advisory_xact_lock(int, int)`` takes signed 32-bit integers.
-    """
-    return n - 0x100000000 if n >= 0x80000000 else n
+def _advisory_lock_key(namespace: int, entity_id: uuid.UUID) -> int:
+    """Derive the stable signed 64-bit key used by every lock participant."""
+    digest = hashlib.blake2b(
+        namespace.to_bytes(4, "big") + entity_id.bytes,
+        digest_size=8,
+        person=b"searchify-locks",
+    ).digest()
+    return int.from_bytes(digest, "big", signed=True)
 
 
 def _is_postgres(session: AsyncSession) -> bool:
@@ -44,11 +47,9 @@ async def _advisory_xact_lock(
 ) -> None:
     if not _is_postgres(session):
         return
-    key = int.from_bytes(entity_id.bytes[:4], "big")
+    key = _advisory_lock_key(namespace, entity_id)
     await session.execute(
-        text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
-            k1=_to_signed_int32(namespace), k2=_to_signed_int32(key)
-        )
+        text("SELECT pg_advisory_xact_lock(:key)").bindparams(key=key)
     )
 
 
