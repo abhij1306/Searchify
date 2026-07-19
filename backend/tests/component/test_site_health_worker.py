@@ -1378,6 +1378,253 @@ async def test_partial_analysis_failure_partially_completes(
 
 
 @pytest.mark.asyncio
+async def test_cancel_crawl_persists_partial_snapshot_from_completed_analyses(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Cancelling a run with completed analyses persists a partial snapshot.
+
+    The dashboard requires a non-null ``score_summary``; cancellation must roll
+    the already-completed analyses into the SAME canonical snapshot the worker
+    writes on clean terminalization, so a partial cancel keeps its scores +
+    inventory instead of hiding the dashboard behind a null summary.
+    """
+    from app.core.config.site_health import (
+        CRAWL_STATUS_CANCELLED,
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        # One analyze task already succeeded and produced a completed analysis;
+        # a second URL is still queued (the not-yet-analyzed remainder).
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        # A still-queued analyze task for a second monitored URL — the run is
+        # mid-flight when the user cancels.
+        second_url = "https://example.com/pending"
+        canonical, url_hash = canonical_identity(second_url)
+        second_site_url = SiteUrl(
+            workspace_id=seed.workspace_id,
+            project_id=seed.project_id,
+            normalized_url=canonical,
+            url_hash=url_hash,
+            display_url=canonical,
+            host="example.com",
+            depth=0,
+        )
+        session.add(second_site_url)
+        await session.flush()
+        session.add(
+            MonitoredSiteUrl(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                profile_id=seed.profile_id,
+                site_url_id=second_site_url.id,
+                active=True,
+                selection_source="user",
+            )
+        )
+        session.add(
+            SiteCrawlTask(
+                crawl_id=seed.crawl_id,
+                workspace_id=seed.workspace_id,
+                site_url_id=second_site_url.id,
+                task_kind=TASK_KIND_ANALYZE,
+                requested_url=second_url,
+                url_hash=url_hash,
+                generation=0,
+                idempotency_key=f"{seed.crawl_id}:{TASK_KIND_ANALYZE}:{url_hash}:0",
+                status=TASK_STATUS_QUEUED,
+                priority=1,
+                randomized_position=1,
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    # The returned DTO carries the partial score_summary (dashboard-ready).
+    summary = dto["score_summary"]
+    assert summary is not None
+    assert summary["overall_score"] is not None
+    assert summary["overall_score"] > 0
+    assert summary["analyzed_count"] == 1
+    assert summary["selected_count"] == 2
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        # Only the one completed analysis is aggregated; the queued URL is never
+        # fabricated as a zero.
+        assert snapshot.analyzed_url_count == 1
+        assert snapshot.selected_url_count == 2
+        assert snapshot.overall_score is not None
+        assert snapshot.overall_score > 0
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl.status == CRAWL_STATUS_CANCELLED
+        # The still-queued analyze task was cancelled by terminalization.
+        queued = await session.scalar(
+            select(func.count())
+            .select_from(SiteCrawlTask)
+            .where(
+                SiteCrawlTask.crawl_id == seed.crawl_id,
+                SiteCrawlTask.status == TASK_STATUS_QUEUED,
+            )
+        )
+        assert queued == 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_crawl_without_completed_analyses_leaves_summary_null(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Cancelling before any analysis completes leaves score_summary null.
+
+    With no completed analyses there is nothing to project — the summary stays
+    null (never a fabricated zero) so the UI shows its terminal/selection state.
+    """
+    from app.core.config.site_health import CRAWL_STATUS_CANCELLED
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+    assert dto["score_summary"] is None
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_crawl_with_only_deactivated_completed_analyses_skips_snapshot(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A completed analysis whose monitored URL was deactivated is not aggregable.
+
+    ``persist_crawl_snapshot`` aggregates only ACTIVE monitored URLs, so a cancel
+    whose only completed analysis belongs to a since-deactivated URL must NOT
+    write a snapshot or a non-null ``score_summary`` — otherwise the dashboard
+    renders empty (zero aggregated rows). The precheck shares the persist
+    helper's active-membership predicate to enforce this.
+    """
+    from app.core.config.site_health import (
+        CRAWL_STATUS_CANCELLED,
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        # One analysis completed, then its monitored URL was deactivated.
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        # Deactivate the monitored URL — no ACTIVE monitored row remains.
+        monitored = (
+            await session.execute(
+                select(MonitoredSiteUrl).where(
+                    MonitoredSiteUrl.site_url_id == site_url_id
+                )
+            )
+        ).scalar_one()
+        monitored.active = False
+        await session.commit()
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+    assert dto["score_summary"] is None
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
 async def test_snapshot_uses_only_latest_completed_analysis_and_issues(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

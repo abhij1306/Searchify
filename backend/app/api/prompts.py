@@ -71,6 +71,9 @@ from app.domain.prompts.service import (
     update_prompt,
     update_prompt_set,
 )
+from app.domain.prompts.service import (
+    TopicNotFoundError as PromptTopicNotFoundError,
+)
 from app.domain.prompts.topics import (
     DuplicateTopicError,
     TopicNotFoundError,
@@ -229,6 +232,8 @@ async def update_prompt_endpoint(
         )
     except PromptNotFoundError as exc:
         raise _not_found("Prompt not found") from exc
+    except PromptTopicNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
     except DuplicatePromptError as exc:
         raise _conflict(str(exc)) from exc
     return prompt_to_response(prompt)

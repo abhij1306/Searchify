@@ -17,6 +17,7 @@ from app.core.config.prompts import (
     PROMPT_STATUS_PROPOSED,
     TOPIC_ORIGIN_MANUAL,
 )
+from app.domain.prompts.locks import acquire_project_lock
 from app.domain.prompts.schemas import TopicCreate, TopicUpdate
 from app.models.project import Project
 from app.models.prompt import Prompt, Topic
@@ -146,5 +147,9 @@ async def delete_topic(
     session: AsyncSession, *, workspace_id: uuid.UUID, topic_id: uuid.UUID
 ) -> None:
     topic = await _get_topic(session, workspace_id=workspace_id, topic_id=topic_id)
+    # Serialize against a concurrent generation for this project (which takes
+    # the project lock before touching topics), so a topic can't be deleted
+    # between generation's topic re-resolution and its inserts.
+    await acquire_project_lock(session, topic.project_id)
     await session.delete(topic)
     await session.commit()

@@ -168,13 +168,69 @@ describe('PromptResearchPage', () => {
 
     await waitFor(() => expect(generateBody).not.toBeNull());
     expect(generateBody).toMatchObject({ confirm_send_evidence: true, count: 10 });
-    // Success summary + auto-switch to the Proposed tab with the new prompt.
-    expect(await within(dialog).findByText(/Added 1 proposed prompt/)).toBeInTheDocument();
+    // Success summary reports the placement (proposed) + auto-switch to the
+    // Proposed tab with the new prompt.
+    expect(await within(dialog).findByText(/1 prompt proposed for review/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute(
       'aria-selected',
       'true',
     );
+  });
+
+  it('selects the Active tab and reports placement when generated prompts land active', async () => {
+    const user = userEvent.setup();
+    baseHandlers([makePrompt()]);
+    const generatedActive = makePrompt({
+      id: '66666666-6666-4666-8666-666666666666',
+      text: 'Auto-promoted prompt',
+      status: 'active',
+      origin: 'generated',
+    });
+    mswServer.use(
+      http.post(`/api/v1/prompt-sets/${SET_ID}/generate`, () =>
+        HttpResponse.json(
+          { generated: [generatedActive], topics: [], dropped_duplicates: 0 },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    renderPage();
+    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
+    await user.click(screen.getByRole('button', { name: /Generate prompts & topics/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: /Confirm sending brand details/i }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
+
+    // Summary reports the Active placement, not an unconditional "proposed".
+    expect(await within(dialog).findByText(/1 prompt added to Active/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    // The Active tab (which holds the generated row) stays selected — the user
+    // is not dumped on an empty Proposed tab.
+    expect(screen.getByRole('tab', { name: /Active/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+  });
+
+  it('surfaces a topic load failure in the rail', async () => {
+    const set = makeSet([makePrompt()]);
+    mswServer.use(
+      http.get('/api/v1/projects', () => HttpResponse.json([makeProject([set])])),
+      http.get('/api/v1/prompt-sets', () => HttpResponse.json([set])),
+      http.get(`/api/v1/projects/${PROJECT_ID}/topics`, () =>
+        HttpResponse.json({ detail: 'boom' }, { status: 400 }),
+      ),
+    );
+
+    renderPage();
+    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
+    expect(await screen.findAllByText(/Couldn't load topics/)).not.toHaveLength(0);
   });
 
   it('shows actionable config guidance when no agent is configured (503)', async () => {

@@ -127,4 +127,109 @@ describe('AnalysisProgress', () => {
     const completedValue = completedLabel.parentElement?.querySelector('.text-run-completed');
     expect(completedValue?.textContent).toBe('2');
   });
+
+  it('shows — for Queued (not a false 0) while the selected total is unknown', () => {
+    // No terminal score_summary yet AND the per-project monitored count has not
+    // loaded (selectedTotal=null): the total is genuinely unknown, so Queued
+    // must render the em-dash placeholder rather than a misleading 0.
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null, analyzed_count: 0 })}
+        pages={[]}
+        selectedTotal={null}
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    const queuedLabel = screen.getByText('Queued', { selector: 'span.text-2xs.text-muted' });
+    expect(queuedLabel.parentElement?.textContent).toContain('—');
+    const totalLabel = screen.getByText('Total pages', { selector: 'span.text-2xs.text-muted' });
+    expect(totalLabel.parentElement?.textContent).toContain('—');
+  });
+
+  it('shows a real Queued count once the selected total is known', () => {
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null, analyzed_count: 1, failed_count: 0 })}
+        pages={[page({ analysis_status: 'running' })]}
+        selectedTotal={5}
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    // selected(5) - completed(1) - failed(0) - running(1) = 3 queued.
+    const queuedLabel = screen.getByText('Queued', { selector: 'span.text-2xs.text-muted' });
+    const queuedValue = queuedLabel.parentElement?.querySelector('.text-xl');
+    expect(queuedValue?.textContent).toBe('3');
+  });
+
+  it('surfaces a monitored-count fetch error instead of silently approximating', () => {
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null })}
+        pages={[]}
+        selectedTotal={null}
+        selectedError
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    expect(screen.getByText(/Could not load the selected-page count/)).toBeInTheDocument();
+  });
+
+  it('shows a loading hint (not an empty "no pages" table) while the first page window loads', () => {
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null })}
+        pages={[]}
+        selectedTotal={5}
+        pagesLoading
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    expect(screen.getByText(/Loading audited pages/)).toBeInTheDocument();
+    // No table header renders while the initial window is still loading.
+    expect(screen.queryByText('Page URL')).not.toBeInTheDocument();
+  });
+
+  it('surfaces a page-window fetch error rather than masquerading as an empty table', () => {
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null })}
+        pages={[]}
+        selectedTotal={5}
+        pagesError
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    expect(screen.getByText(/Could not load the per-page audit table/)).toBeInTheDocument();
+    // With no cached rows, the table (and its headers) must not render — an
+    // empty PagesTable header row would read as a valid "no pages" result.
+    expect(screen.queryByText('Page URL')).not.toBeInTheDocument();
+  });
+
+  it('keeps the last loaded rows visible when a page-window refetch errors', () => {
+    render(
+      <AnalysisProgress
+        crawl={crawl({ score_summary: null })}
+        pages={[page({ title: 'Homepage' })]}
+        selectedTotal={5}
+        pagesError
+        onCancel={vi.fn()}
+        cancelPending={false}
+      />,
+    );
+
+    // Prior rows stay in view (React Query keeps `data` across refetches)…
+    expect(screen.getByText('Homepage')).toBeInTheDocument();
+    // …alongside a notice that the refresh failed and shows the last results.
+    expect(screen.getByText(/showing the last loaded results/)).toBeInTheDocument();
+  });
 });

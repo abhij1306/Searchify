@@ -166,6 +166,76 @@ Data flow notes:
 
 ---
 
+## Screen lifecycle & phase precedence
+
+The Site Health screen renders exactly one phase, derived by
+`resolveSiteHealthPhase(crawl, plan)` in `frontend/lib/site-health/status.ts`.
+That function is the **single source of truth** for phase — the components hold
+no duplicated lifecycle flags. Its clauses are mutually exclusive and evaluated
+in this **explicit, deterministic precedence** (top wins):
+
+1. **no crawl** → `empty` (first-run "Start discovery" card).
+2. **`completed` / `partially_completed`** → `dashboard`.
+3. **any crawl with `score_summary`** (including `cancelled`/`failed` mid-run) →
+   `dashboard`. Score data always outranks the discovering/analyzing sub-states,
+   so a landed projection is never hidden behind an active-looking view.
+4. **`failed` without data** → `terminal` (explicit stopped card + restart).
+5. **`cancelled` without data**: Starter with discovered URLs → `selection`
+   (the inventory persists through a cancel and re-seeds the next crawl);
+   otherwise → `terminal`.
+6. **discovery still running** → `discovering`.
+7. **analysis running** → `analyzing`.
+8. **Starter + analysis pending** → `selection`; otherwise (Free auto-analysis)
+   → `analyzing`.
+
+### Cancellation with partial data
+
+When a run is cancelled after it produced scores, the product keeps the **latest
+dashboard, partial scores, and URL inventory visible**, explicitly labels the run
+**Cancelled** (a text-labelled badge + notice, never color alone —
+`dashboardRunNotice` in `status.ts`), and offers **Re-crawl**. The same
+notice covers `partially_completed` (Partial) and `failed`-with-data. A cancel
+that produced *no* data routes to `selection` (Starter, inventory survives) or
+`terminal`.
+
+### Retaining content during transitions
+
+- **Cancelling** (cancel request in flight): the discovery/analysis views keep
+  their inventory and counts on screen and swap the status line to an
+  `aria-live` "Cancelling…" message — nothing is torn down mid-request.
+- **Re-crawl starting** (`recrawlStarting` in `use-site-health-screen.ts`): the
+  prior dashboard/selection stays in view behind an info notice until the new
+  crawl's first projection takes over.
+- **Recrawl** re-seeds from the committed monitored set — a fresh crawl
+  re-discovers and enqueues the persisted selection (a cancelled crawl cannot
+  enqueue analyze tasks itself).
+
+### Count integrity during loading
+
+The live analysis counters come from server-side aggregates
+(`analyzed_count` / `failed_count`) and the per-project monitored count, never
+from the bounded page window. Until the selected total is known (no terminal
+`score_summary` **and** the monitored count has not resolved), **Total pages**
+and **Queued** render `—` rather than a misleading `0`. A failed monitored-count
+fetch is surfaced as a warning (`projectSelectedError`) instead of silently
+approximating or disabling actions. Missing scores always render `—`, never a
+fabricated zero.
+
+The per-page audit table window (`pagesQuery`, bounded `limit: 200,
+monitored: true`) distinguishes its own fetch state from a genuine empty
+result. React Query keeps the prior `data` across refetches, so existing rows
+stay visible; on top of that `AnalysisProgress` receives `pagesLoading` /
+`pagesError`: a first-load with no rows shows a "Loading audited pages…" hint
+(not an empty "no pages" table), and a failed fetch shows a warning while
+retaining the last-loaded rows. A failed or in-flight query must never
+masquerade as a valid empty table.
+
+Free non-disclosure is preserved across every state: no phase leaks a
+discovered/full-site total, and sample-mode discovery never implies continued
+full-site scanning.
+
+---
+
 ## Guardrails (for anyone extending Site Health)
 
 - Keep workspace resolution on `require_active_workspace`; a foreign/missing id

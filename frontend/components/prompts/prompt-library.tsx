@@ -150,7 +150,15 @@ export function PromptLibrary() {
     },
     onSuccess: async (result) => {
       setGenerateResult(result);
-      setStatusTab('proposed');
+      // Generated prompts fill the set-wide active pool first (backend
+      // auto-promotes up to a threshold), so a run can land rows in either
+      // Active or Proposed. Switch to a tab that actually contains new rows —
+      // prefer Proposed when it has any, otherwise Active — so the user never
+      // lands on an empty tab after generating.
+      const hasProposed = result.generated.some((prompt) => prompt.status === 'proposed');
+      const hasActive = result.generated.some((prompt) => prompt.status === 'active');
+      if (hasProposed) setStatusTab('proposed');
+      else if (hasActive) setStatusTab('active');
       await invalidate();
     },
   });
@@ -235,17 +243,27 @@ export function PromptLibrary() {
         onAdd={openAdd}
       />
 
-      <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
         <TopicRail
           topics={topics}
           selectedTopicId={selectedTopicId}
           onSelect={setSelectedTopicId}
-          onCreate={(name) => createTopicMutation.mutate(name)}
+          onCreate={async (name) => {
+            await createTopicMutation.mutateAsync(name);
+          }}
           onDelete={(topic) => deleteTopicMutation.mutate(topic)}
           isCreating={createTopicMutation.isPending}
+          loadError={topicsQuery.isError}
+          actionError={
+            createTopicMutation.isError
+              ? errorMessage(createTopicMutation.error)
+              : deleteTopicMutation.isError
+                ? errorMessage(deleteTopicMutation.error)
+                : null
+          }
         />
 
-        <div className="grid content-start gap-3">
+        <div className="grid min-w-0 content-start gap-3 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border">
             <div role="tablist" aria-label="Prompt status" className="flex gap-0">
               {STATUS_TABS.map((tab) => {

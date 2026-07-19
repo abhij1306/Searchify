@@ -22,7 +22,7 @@ full-product surface is marked below.
 | Audit execution + queue + worker | `orchestration` + `workers` | **MVP — coded** |
 | Analysis + metrics + dashboard projection | `analysis` | **MVP — coded** |
 | Run/Executions evidence + CSV/MD export | `api/audits` + `analysis/exports` | **MVP — coded** |
-| AI-suggested prompt generation (`/generate`) | `domain/prompts` + `connectors/agent` | **Coded** — topic-driven generation via the `.env` default agent; suggestions land as `status='proposed'` (never audit-eligible until accepted) |
+| AI-suggested prompt generation (`/generate`) | `domain/prompts` + `connectors/agent` | **Coded** — topic-driven generation via the `.env` default agent; the earliest prompts fill a set-wide pool of `GENERATION_ACTIVE_THRESHOLD` (default 20) `active` (audit/scheduled-run eligible) prompts, promoted atomically under a prompt-set advisory lock; prompts beyond the pool land `status='proposed'` until a human promotes them |
 | Discovery/analysis model (`DiscoveryModelConfig`) | `domain/providers` | Plumbing-only (stored, not invoked) |
 | Cross-run Visibility trend history | `analysis` | **Coded** — `GET /projects/{id}/visibility/trends` (Trends tab) |
 | Persisted execution evidence (mentions/citations + query fanout) | `analysis` | **Coded** — `GET /projects/{id}/visibility/evidence` |

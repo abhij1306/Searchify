@@ -83,8 +83,9 @@ export function DiscoveryProgress({
               {statusLabel(crawl.status)}
             </Badge>
             <span className="text-sm text-secondary" aria-live="polite">
-              {discoveryProgressLabel(crawl)}
-              {provisional ? ' — scanning continues in the background' : ''}
+              {cancelPending
+                ? 'Cancelling discovery — finishing the page in flight and stopping'
+                : `${discoveryProgressLabel(crawl)}${provisional ? ' — scanning continues in the background' : ''}`}
             </span>
           </div>
           <Button variant="destructive" size="sm" onClick={onCancel} disabled={cancelPending}>

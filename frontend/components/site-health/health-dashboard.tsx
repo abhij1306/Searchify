@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScoreRing } from '@/components/ui/score-ring';
@@ -13,7 +14,7 @@ import { PagesTable } from '@/components/site-health/pages-table';
 import { siteHealthQueries, type PagesParams } from '@/lib/api/site-health';
 import type { SiteCrawl, SiteHealthDashboard } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
-import { PLACEHOLDER, formatScore } from '@/lib/site-health/status';
+import { PLACEHOLDER, dashboardRunNotice, formatScore, statusLabel } from '@/lib/site-health/status';
 
 /** The three server-backed page tabs (design mockup 713). */
 type TabKey = 'monitored' | 'all' | 'errors';
@@ -75,8 +76,25 @@ export function HealthDashboard({
   const goPrev = () =>
     setCursorStack((prev) => ({ ...prev, [tab]: prev[tab].slice(0, -1) }));
 
+  // A dashboard shown for a crawl that did not complete cleanly (cancelled with
+  // partial data, partially_completed, or failed-with-data) gets an explicit,
+  // text-labelled run notice — the scores/inventory stay visible, the outcome is
+  // never hidden behind color alone, and the header offers Re-crawl.
+  const runNotice = dashboardRunNotice(crawl);
+
   return (
     <div className="grid gap-6">
+      {runNotice ? (
+        <Alert tone={runNotice.tone}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="run-status" value={runNotice.badge}>
+              {statusLabel(crawl.status)}
+            </Badge>
+            <span>{runNotice.message}</span>
+          </div>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <ScoreCard label="Site Health" value={summary?.overall_score ?? null} sub={coverageSub(summary)} />
         <ScoreCard label="Technical" value={summary?.technical_score ?? null} sub="Response codes, headers, delivery" />

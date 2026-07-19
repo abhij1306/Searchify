@@ -80,6 +80,10 @@ export function useSiteHealthScreen(projectId: string | null) {
     if (!rows) return null;
     return rows.filter((row) => row.active).length;
   }, [monitoredQuery.data]);
+  // Surface a failed monitored-count fetch rather than silently disabling the
+  // analysis view: the count query is best-effort (the counters degrade to the
+  // visible window), but the error is exposed so the screen can note it.
+  const projectSelectedError = monitoredQuery.isError;
 
   const createMutation = useMutation({
     ...siteHealthMutations.createCrawl(),
@@ -105,6 +109,13 @@ export function useSiteHealthScreen(projectId: string | null) {
   const startCrawl = () => projectId && createMutation.mutate({ project_id: projectId });
   const cancelCrawl = () => crawl && cancelMutation.mutate(crawl.id);
 
+  // "Re-crawl starting": the user launched a fresh crawl from a dashboard /
+  // terminal state and the create request is in flight. Retain the prior
+  // content (dashboard, partial scores, inventory) behind a starting notice
+  // rather than blanking it until the new crawl's first projection lands.
+  const recrawlStarting =
+    createMutation.isPending && (phase === 'dashboard' || phase === 'terminal' || phase === 'selection');
+
   const runExport = async (format: ExportFormat, view: ExportView) => {
     if (!crawl) return;
     setExportError(null);
@@ -126,6 +137,8 @@ export function useSiteHealthScreen(projectId: string | null) {
     active,
     phase,
     projectSelectedTotal,
+    projectSelectedError,
+    recrawlStarting,
     createMutation,
     cancelMutation,
     startCrawl,

@@ -203,4 +203,55 @@ describe('SiteHealthScreen — terminal phase', () => {
     // dedicated in-flow Cancel button is the only control while active.
     expect(screen.queryByRole('button', { name: /Re-crawl now/ })).not.toBeInTheDocument();
   });
+
+  it('keeps the dashboard + partial scores and labels the run Cancelled (with Re-crawl)', async () => {
+    // Cancellation with partial data must keep the latest dashboard, partial
+    // scores, and inventory visible, explicitly labelled Cancelled, and offer
+    // Re-crawl — never blank the results.
+    const summary = {
+      overall_score: 71,
+      technical_score: 80,
+      aeo_score: 62,
+      selected_count: 10,
+      analyzed_count: 4,
+      issue_count: 3,
+      scoring_version: 's1',
+    };
+    mockRoutes({
+      status: 'cancelled',
+      discovery_status: 'cancelled',
+      analysis_status: 'cancelled',
+      score_summary: summary,
+    });
+    mswServer.use(
+      http.get(`/api/v1/projects/${PROJECT}/site-health`, () =>
+        HttpResponse.json({
+          project_id: PROJECT,
+          crawl: crawl({
+            status: 'cancelled',
+            discovery_status: 'cancelled',
+            analysis_status: 'cancelled',
+            score_summary: summary,
+          }),
+          score_summary: summary,
+          quota: { used: 4, limit: 50 },
+        }),
+      ),
+    );
+
+    renderScreen();
+
+    // Explicit, text-labelled Cancelled notice (not color-only) with Re-crawl copy.
+    expect(
+      await screen.findByText(/This run was cancelled — showing the pages analyzed so far/),
+    ).toBeInTheDocument();
+    // The dashboard score value stays visible (partial results kept).
+    expect(await screen.findByText('71 / 100')).toBeInTheDocument();
+    // The header offers Re-crawl for a terminal-with-data dashboard.
+    expect(screen.getByRole('button', { name: /Re-crawl now/ })).toBeInTheDocument();
+    // Not the bare terminal card.
+    expect(
+      screen.queryByText('This crawl was cancelled before it produced results.'),
+    ).not.toBeInTheDocument();
+  });
 });

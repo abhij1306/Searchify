@@ -76,6 +76,27 @@ class PromptGenerationSettings(BaseSettings):
         default=20,
         validation_alias=AliasChoices("GENERATION_MAX_COUNT", "generation_max_count"),
     )
+    # Set-wide pool of prompts that are ``active`` (audit/scheduled-run
+    # eligible across all three AI providers). Generation promotes the
+    # earliest newly-inserted prompts to fill this pool; anything beyond it
+    # stays ``proposed`` until a human promotes it. Existing manual/active
+    # rows count toward the pool; archived rows are never auto-reactivated.
+    active_threshold: int = Field(
+        default=20,
+        validation_alias=AliasChoices(
+            "GENERATION_ACTIVE_THRESHOLD", "generation_active_threshold"
+        ),
+    )
+    # Upper bound on how many existing prompt texts are sent to the model as
+    # "do not duplicate" context, so the user message can't grow unbounded as
+    # a set accumulates prompts.
+    existing_prompt_context_limit: int = Field(
+        default=200,
+        validation_alias=AliasChoices(
+            "GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT",
+            "generation_existing_prompt_context_limit",
+        ),
+    )
 
 
 prompt_generation_settings = PromptGenerationSettings()
