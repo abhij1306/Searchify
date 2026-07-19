@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Searchify — Settings · Account (Dark)</title>
+<meta name="description" content="Product-native Searchify Settings screen: a minimal Account sub-navigation with read-only account essentials, an appearance preference, and a link out to existing Provider Settings. Dark theme." />
+<!--
+  DESIGN SYSTEM (docs/design.md + globals.css, verbatim):
+  Type scale: page heading --text-xl 21px/700; card heading --text-lg 17px/600; body --text-base 14px/400;
+    secondary --text-sm 13px; label --text-2xs 10px uppercase +0.06em. Mono (tabular-nums) for ids/dates.
+  Surfaces (light): bg-base #f7f8f7 · bg-panel #fff · bg-sidebar #f2f4f2 · bg-alt #eef0ee · bg-well #e2e5e2.
+  Borders: subtle #edefed · border #e2e5e2 · strong #d0d4d0. Accent teal-green #0f9d76 (text #0b6f52, soft rgba .06).
+  Layout: 240px sidebar + 52px top-bar + content region (max 1440px, 32px content-gutter). Radii lg 10 / md 7 / full.
+  Shadows: card 0 12px 28px rgba(18,22,20,.04). Icons: lucide (24 viewBox, stroke 2, round caps).
+-->
+<style>
+  :root{
+    color-scheme:dark;
+    --font-sans:"Geist","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-mono:"Geist Mono",ui-monospace,"Cascadia Code","Fira Code",monospace;
+    --bg-base:#0e0f0e; --bg-alt:#161816; --bg-panel:#1d1f1d; --bg-well:#2e312e; --bg-sidebar:#131513;
+    --border-subtle:#1e201e; --border:#2a2d2a; --border-strong:#383c38;
+    --text-primary:#e8ebe8; --text-secondary:#9ca39c; --text-muted:#6b716b; --text-subtle:#474b47;
+    --accent:#2dd4a7; --accent-hover:#4fe0ba; --accent-fg:#06231a; --accent-soft:rgba(45,212,167,.08);
+    --accent-subtle:rgba(45,212,167,.14); --accent-border:rgba(45,212,167,.32); --accent-text:#58e0bb;
+    --success:#3ecf8e; --success-bg:rgba(62,207,142,.10); --success-border:rgba(62,207,142,.24); --success-text:#5fdaa2;
+    --neutral-bg:rgba(255,255,255,.04);
+    --shadow-card:0 2px 8px rgba(0,0,0,.4);
+    --shadow-sm:0 2px 4px rgba(0,0,0,.6);
+    --focus-ring:0 0 0 3px rgba(45,212,167,.28);
+    --radius-md:7px; --radius-lg:10px; --radius-full:9999px;
+    --control-height:34px; --card-padding:20px; --content-gutter:32px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:var(--font-sans); font-size:14px; line-height:1.5;
+    background:var(--bg-base); color:var(--text-primary);
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+  .mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums; letter-spacing:0;}
+  svg.icon{width:16px;height:16px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;flex:none;}
+
+  /* ── App shell ── */
+  .shell{display:flex;height:100dvh;overflow:hidden;background:var(--bg-base);}
+  .sidebar{display:flex;flex-direction:column;gap:16px;width:240px;flex:none;padding:16px;background:var(--bg-sidebar);border-right:1px solid var(--border);}
+  .main{display:flex;min-width:0;flex:1;flex-direction:column;}
+  .content{min-height:0;flex:1;overflow-y:auto;}
+  .content-inner{width:100%;max-width:1440px;margin:0 auto;padding:var(--content-gutter);}
+
+  /* ── Project switcher ── */
+  .switcher{display:flex;width:100%;align-items:center;gap:10px;padding:6px 10px;text-align:left;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg-panel);}
+  .switcher .avatar{display:flex;width:28px;height:28px;flex:none;align-items:center;justify-content:center;border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent-text);font-size:10px;font-weight:700;text-transform:uppercase;}
+  .switcher .meta{min-width:0;flex:1;}
+  .switcher .name{display:block;font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .switcher .sub{display:block;font-size:10px;color:var(--text-muted);}
+  .switcher .chev{color:var(--text-muted);}
+
+  /* ── Getting started card ── */
+  .gs{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg-panel);padding:12px;box-shadow:var(--shadow-card);}
+  .gs .row{display:flex;align-items:center;justify-content:space-between;}
+  .gs .kick{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);}
+  .gs .count{font-size:10px;font-weight:600;color:var(--text-secondary);}
+  .gs .bar{margin-top:8px;height:6px;width:100%;overflow:hidden;border-radius:var(--radius-full);background:var(--neutral-bg);}
+  .gs .bar>span{display:block;height:100%;border-radius:var(--radius-full);background:var(--accent);}
+  .gs .next{margin-top:10px;display:block;font-size:13px;font-weight:500;color:var(--accent-text);text-decoration:none;}
+
+  /* ── Sidebar nav ── */
+  .nav{display:flex;flex-direction:column;gap:20px;overflow-y:auto;flex:1;min-height:0;}
+  .nav-group{display:flex;flex-direction:column;gap:4px;}
+  .nav-group>p{margin:0;padding:0 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--radius-md);font-size:13px;font-weight:500;color:var(--text-secondary);text-decoration:none;}
+  .nav-item:hover{background:var(--bg-alt);color:var(--text-primary);}
+  .nav-item.active{background:var(--accent-subtle);color:var(--accent-text);}
+  .nav-item.soon{color:var(--text-subtle);cursor:not-allowed;}
+  .nav-item .pill{margin-left:auto;border-radius:var(--radius-full);background:var(--neutral-bg);padding:2px 6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);}
+
+  /* ── User menu (bottom) ── */
+  .usermenu-wrap{border-top:1px solid var(--border-subtle);padding-top:8px;}
+  .usermenu{display:flex;width:100%;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--radius-md);text-align:left;background:transparent;border:0;cursor:pointer;}
+  .usermenu:hover{background:var(--bg-alt);}
+  .usermenu .avatar{display:flex;width:28px;height:28px;flex:none;align-items:center;justify-content:center;border-radius:var(--radius-full);background:var(--accent-soft);color:var(--accent-text);font-size:10px;font-weight:700;text-transform:uppercase;}
+  .usermenu .meta{min-width:0;flex:1;}
+  .usermenu .email{display:block;font-size:13px;font-weight:500;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .usermenu .role{display:block;font-size:10px;text-transform:capitalize;color:var(--text-muted);}
+
+  /* ── Top bar ── */
+  .topbar{display:flex;height:52px;flex:none;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--bg-panel);padding:0 16px;}
+  .search{display:flex;min-width:0;flex:1;align-items:center;gap:8px;color:var(--text-muted);}
+  .search input{width:100%;max-width:384px;border:0;background:transparent;font-size:13px;color:var(--text-primary);}
+  .search input::placeholder{color:var(--text-muted);}
+  .topbar-actions{display:flex;align-items:center;gap:4px;}
+  .tb-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:var(--radius-md);border:0;background:transparent;color:var(--text-secondary);font-size:11px;font-weight:500;font-family:inherit;cursor:pointer;}
+  .tb-btn:hover{background:var(--bg-alt);color:var(--text-primary);}
+  .tb-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .tb-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--radius-md);border:0;background:transparent;color:var(--text-secondary);cursor:pointer;}
+  .tb-icon:hover{background:var(--bg-alt);color:var(--text-primary);}
+
+  /* ── Page ── */
+  .page-title{display:flex;flex-direction:column;gap:4px;}
+  .kicker{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-text);}
+  h1.page-h{margin:0;font-size:21px;line-height:1.25;letter-spacing:-.02em;font-weight:700;color:var(--text-primary);}
+  .page-lede{margin:8px 0 0;max-width:640px;font-size:13px;color:var(--text-secondary);}
+
+  .settings-layout{display:grid;grid-template-columns:200px 1fr;gap:32px;margin-top:24px;align-items:start;}
+
+  /* settings sub-nav */
+  .subnav{position:sticky;top:0;display:flex;flex-direction:column;gap:16px;}
+  .subnav-group{display:flex;flex-direction:column;gap:4px;}
+  .subnav-group>p{margin:0;padding:0 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);}
+  .subnav-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius-md);font-size:13px;font-weight:500;color:var(--text-secondary);text-decoration:none;}
+  .subnav-item:hover{background:var(--bg-alt);color:var(--text-primary);}
+  .subnav-item.active{background:var(--accent-subtle);color:var(--accent-text);}
+  .subnav-item .ext{margin-left:auto;color:var(--text-subtle);}
+
+  .stack{display:grid;gap:24px;max-width:760px;}
+
+  .card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg-panel);box-shadow:var(--shadow-card);}
+  .card-header{display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--border-subtle);padding:var(--card-padding);}
+  .card-header h2{margin:0;font-size:17px;line-height:1.35;letter-spacing:-.01em;font-weight:600;color:var(--text-primary);}
+  .card-header p{margin:0;font-size:13px;color:var(--text-secondary);}
+  .card-body{padding:var(--card-padding);}
+
+  /* account summary */
+  .acct-summary{display:flex;align-items:center;gap:14px;}
+  .acct-summary .avatar{display:flex;width:44px;height:44px;flex:none;align-items:center;justify-content:center;border-radius:var(--radius-full);background:var(--accent-soft);color:var(--accent-text);font-size:15px;font-weight:700;text-transform:uppercase;}
+  .acct-summary .who{min-width:0;}
+  .acct-summary .who .primary{font-size:15px;font-weight:600;color:var(--text-primary);}
+  .acct-summary .who .secondary{margin-top:2px;font-size:13px;color:var(--text-muted);}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:var(--radius-full);padding:2px 8px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:capitalize;}
+  .badge.success{background:var(--success-bg);color:var(--success-text);border-color:var(--success-border);}
+  .badge.neutral{background:var(--neutral-bg);color:var(--text-secondary);}
+  .dot{width:6px;height:6px;border-radius:var(--radius-full);background:currentColor;}
+
+  .detail-list{margin-top:20px;border-top:1px solid var(--border-subtle);}
+  .detail-row{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--border-subtle);}
+  .detail-row:last-child{border-bottom:0;padding-bottom:0;}
+  .detail-row .k{font-size:13px;font-weight:500;color:var(--text-secondary);}
+  .detail-row .v{font-size:13px;color:var(--text-primary);}
+  .detail-row .v.mono{font-size:12px;color:var(--text-secondary);}
+
+  /* appearance segmented */
+  .field-label{font-size:13px;font-weight:500;color:var(--text-secondary);}
+  .field-hint{margin-top:4px;font-size:11px;color:var(--text-muted);}
+  .segmented{display:inline-flex;padding:3px;border-radius:var(--radius-full);background:var(--bg-alt);border:1px solid var(--border);}
+  .segmented button{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 14px;border:0;border-radius:var(--radius-full);background:transparent;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-secondary);cursor:pointer;}
+  .segmented button.on{background:var(--accent);color:var(--accent-fg);box-shadow:var(--shadow-sm);}
+
+  /* providers link card */
+  .config-links{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--control-height);padding:0 14px;border-radius:var(--radius-md);border:1px solid transparent;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;}
+  .btn.primary{background:var(--accent);color:var(--accent-fg);}
+  .btn.primary:hover{background:var(--accent-hover);}
+  .btn.secondary{background:var(--bg-panel);color:var(--text-primary);border-color:var(--border-strong);}
+  .btn.secondary:hover{background:var(--bg-alt);}
+
+  .field-row{display:flex;align-items:center;justify-content:space-between;gap:24px;}
+</style>
+</head>
+<body>
+<!-- lucide icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-bar" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/></symbol>
+  <symbol id="i-checks" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m2 22 3-3"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m18 3-4 4h6l-4 4"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+</svg>
+
+<div class="shell">
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <button class="switcher" data-component-id="project-switcher" aria-label="Switch project">
+      <span class="avatar">BL</span>
+      <span class="meta"><span class="name">best&amp;less</span><span class="sub">3 projects</span></span>
+      <svg class="icon chev"><use href="#i-chev"/></svg>
+    </button>
+
+    <section class="gs" aria-label="Getting started progress">
+      <div class="row"><span class="kick">Getting Started</span><span class="count">4 of 6</span></div>
+      <div class="bar" role="progressbar" aria-valuenow="4" aria-valuemin="0" aria-valuemax="6"><span style="width:67%"></span></div>
+      <a class="next" href="#">Next: Launch your first run</a>
+    </section>
+
+    <nav class="nav" aria-label="Primary">
+      <div class="nav-group">
+        <p>Analytics</p>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-gauge"/></svg><span>Visibility</span></a>
+        <span class="nav-item soon"><svg class="icon"><use href="#i-bar"/></svg><span>LLM Analytics</span><span class="pill">soon</span></span>
+        <span class="nav-item soon"><svg class="icon"><use href="#i-trend"/></svg><span>Traffic</span><span class="pill">soon</span></span>
+      </div>
+      <div class="nav-group">
+        <p>Prompts</p>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-msg"/></svg><span>Your Prompts</span></a>
+        <span class="nav-item soon"><svg class="icon"><use href="#i-sparkles"/></svg><span>Prompt Research</span><span class="pill">soon</span></span>
+      </div>
+      <div class="nav-group">
+        <p>Actions</p>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-checks"/></svg><span>Runs</span></a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-plug"/></svg><span>Providers</span></a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-file"/></svg><span>Content</span></a>
+        <span class="nav-item soon"><svg class="icon"><use href="#i-bulb"/></svg><span>Opportunities</span><span class="pill">soon</span></span>
+      </div>
+      <div class="nav-group">
+        <p>On Page</p>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-settings"/></svg><span>Setup</span></a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-shield"/></svg><span>Site Health</span></a>
+        <a class="nav-item" href="#"><svg class="icon"><use href="#i-route"/></svg><span>Issues</span></a>
+        <span class="nav-item soon"><svg class="icon"><use href="#i-layers"/></svg><span>Knowledge Base</span><span class="pill">soon</span></span>
+      </div>
+    </nav>
+
+    <div class="usermenu-wrap">
+      <button class="usermenu" data-component-id="user-menu-trigger" aria-label="Open account menu">
+        <span class="avatar">AB</span>
+        <span class="meta"><span class="email">abhineet.jain@cube27.com</span><span class="role">user</span></span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <header class="topbar">
+      <label class="search" aria-label="Search">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="search" placeholder="Find anything…" disabled />
+      </label>
+      <div class="topbar-actions">
+        <button class="tb-btn" disabled><svg class="icon"><use href="#i-download"/></svg>Export</button>
+        <a class="tb-btn" href="#"><svg class="icon"><use href="#i-ext"/></svg>Learn</a>
+        <button class="tb-icon" aria-label="Toggle color theme"><svg class="icon"><use href="#i-moon"/></svg></button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="content-inner">
+        <div class="page-title" data-component-id="settings-page-title">
+          <p class="kicker">Account</p>
+          <h1 class="page-h">Settings</h1>
+          <p class="page-lede">Your Searchify account details and preferences. Account fields are managed by your workspace and shown here for reference.</p>
+        </div>
+
+        <div class="settings-layout">
+          <!-- settings sub-navigation -->
+          <nav class="subnav" data-component-id="settings-subnav" aria-label="Settings">
+            <div class="subnav-group">
+              <p>Account</p>
+              <a class="subnav-item active" href="#account" aria-current="page"><svg class="icon"><use href="#i-user"/></svg><span>Account</span></a>
+              <a class="subnav-item" href="#appearance"><svg class="icon"><use href="#i-moon"/></svg><span>Appearance</span></a>
+            </div>
+            <div class="subnav-group">
+              <p>Configuration</p>
+              <a class="subnav-item" href="#providers"><svg class="icon"><use href="#i-plug"/></svg><span>Model providers</span><svg class="icon ext"><use href="#i-ext"/></svg></a>
+              <a class="subnav-item" href="#setup"><svg class="icon"><use href="#i-settings"/></svg><span>Project setup</span><svg class="icon ext"><use href="#i-ext"/></svg></a>
+            </div>
+          </nav>
+
+          <!-- main settings content -->
+          <div class="stack">
+            <section class="card" id="account" data-component-id="settings-account-card">
+              <header class="card-header"><h2>Account</h2></header>
+              <div class="card-body">
+                <div class="acct-summary">
+                  <span class="avatar" aria-hidden="true">AB</span>
+                  <div class="who">
+                    <div class="primary">abhineet.jain@cube27.com</div>
+                    <div class="secondary">Account role: User</div>
+                  </div>
+                  <span style="margin-left:auto"><span class="badge success"><span class="dot"></span>Active</span></span>
+                </div>
+
+                <dl class="detail-list">
+                  <div class="detail-row"><dt class="k">Email</dt><dd class="v" style="margin:0">abhineet.jain@cube27.com</dd></div>
+                  <div class="detail-row"><dt class="k">Account role</dt><dd class="v" style="margin:0"><span class="badge neutral">User</span></dd></div>
+                  <div class="detail-row"><dt class="k">Account status</dt><dd class="v" style="margin:0"><span class="badge success"><span class="dot"></span>Active</span></dd></div>
+                  <div class="detail-row"><dt class="k">Account created</dt><dd class="v mono" style="margin:0">2026-01-03 08:15 UTC</dd></div>
+                  <div class="detail-row"><dt class="k">Last updated</dt><dd class="v mono" style="margin:0">2026-07-14 09:22 UTC</dd></div>
+                  <div class="detail-row"><dt class="k">User ID</dt><dd class="v mono" style="margin:0">2f9a1c04-77b3-4e19-8a6d-c1e0b4d92f10</dd></div>
+                </dl>
+              </div>
+            </section>
+
+            <section class="card" id="appearance" data-component-id="settings-appearance-card">
+              <header class="card-header"><h2>Appearance</h2></header>
+              <div class="card-body">
+                <div class="field-row">
+                  <div>
+                    <div class="field-label">Theme</div>
+                    <div class="field-hint">Applies to this browser and syncs with the top-bar toggle.</div>
+                  </div>
+                  <div class="segmented" role="group" aria-label="Theme">
+                    <button aria-pressed="false"><svg class="icon" style="width:14px;height:14px"><use href="#i-sun"/></svg>Light</button>
+                    <button class="on" aria-pressed="true"><svg class="icon" style="width:14px;height:14px"><use href="#i-moon"/></svg>Dark</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card" id="providers" data-component-id="settings-providers-card">
+              <header class="card-header">
+                <h2>Configuration</h2>
+                <p>Manage where Searchify runs from. Model provider keys are write-only — Searchify never displays a stored secret.</p>
+              </header>
+              <div class="card-body">
+                <div class="config-links">
+                  <a class="btn primary" href="#" data-component-id="open-provider-settings">Open Provider Settings <svg class="icon"><use href="#i-arrow"/></svg></a>
+                  <a class="btn secondary" href="#" data-component-id="open-project-setup">Open Project Setup <svg class="icon"><use href="#i-arrow"/></svg></a>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
