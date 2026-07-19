@@ -124,6 +124,41 @@ export function canShowDiscoveredTotal(
   return entitlement.can_view_discovered_total && !crawl.sample_mode && crawl.total_url_count !== null;
 }
 
+/** Which phase of the Site Health flow to render for the active crawl. */
+export type SiteHealthPhase =
+  | 'empty'
+  | 'discovering'
+  | 'selection'
+  | 'analyzing'
+  | 'dashboard'
+  | 'terminal';
+
+/**
+ * Resolve the screen phase for the active crawl (discovery → selection →
+ * analysis → dashboard). Terminal failures/cancellations WITHOUT score data get
+ * an explicit 'terminal' phase — otherwise they would fall through to
+ * 'selection'/'analyzing' and render an active-looking progress view (and
+ * another Cancel button) for a crawl that has already stopped.
+ */
+export function resolveSiteHealthPhase(
+  crawl: Pick<SiteCrawl, 'status' | 'discovery_status' | 'analysis_status' | 'score_summary'> | null,
+  plan: SiteHealthEntitlement['plan_key'],
+): SiteHealthPhase {
+  if (!crawl) return 'empty';
+  // Terminal crawls with score data → completed dashboard (even mid-analysis).
+  if (['completed', 'partially_completed'].includes(crawl.status) || crawl.score_summary) {
+    return 'dashboard';
+  }
+  if (crawl.status === 'failed' || crawl.status === 'cancelled') return 'terminal';
+  // Discovery still running.
+  if (!TERMINAL_DISCOVERY.has(crawl.discovery_status)) return 'discovering';
+  // Discovery done. Free auto-analyzes its sample (no manual selection); Starter
+  // stages a monitored set unless analysis has already started.
+  if (crawl.analysis_status === 'running') return 'analyzing';
+  if (plan === 'starter' && crawl.analysis_status === 'pending') return 'selection';
+  return 'analyzing';
+}
+
 /** Map an overall crawl status onto a run-status badge value. */
 export function crawlBadgeValue(status: CrawlOverallStatus): RunStatusValue {
   switch (status) {

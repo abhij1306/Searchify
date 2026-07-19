@@ -1,0 +1,62 @@
+'use client';
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import type { InventoryRow } from '@/lib/api/types';
+
+/** The cursor-paginated inventory rows with per-row monitored checkboxes. */
+export function InventoryTable({
+  rows,
+  isStaged,
+  disabled,
+  onToggle,
+}: Readonly<{
+  rows: readonly InventoryRow[];
+  isStaged: (siteUrlId: string) => boolean;
+  disabled: boolean;
+  onToggle: (siteUrlId: string) => void;
+}>) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-10" />
+          <TableHead>Page URL</TableHead>
+          <TableHead>Type</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.site_url_id}>
+            <TableCell>
+              <input
+                type="checkbox"
+                checked={isStaged(row.site_url_id)}
+                disabled={disabled}
+                aria-label={`Monitor ${row.display_url}`}
+                onChange={() => onToggle(row.site_url_id)}
+              />
+            </TableCell>
+            <TableCell>
+              <span className="flex flex-col">
+                <span className="font-medium text-foreground">
+                  {row.title ?? row.display_url}
+                </span>
+                <span className="mono text-2xs text-muted">{row.display_url}</span>
+              </span>
+            </TableCell>
+            <TableCell className="text-xs text-secondary">
+              {row.content_type ?? '—'}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}

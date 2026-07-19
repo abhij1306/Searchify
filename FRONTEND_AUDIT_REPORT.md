@@ -179,3 +179,27 @@ Typecheck clean, ESLint clean, all 328 vitest tests pass, `next build` succeeds,
 - No `middleware.ts`, no `next/image`, no async-params pages (all dynamic routes use client `useParams`) — none of the other Next 16 breaking changes apply.
 
 **Still open (deliberately out of scope):** complexity refactors — `site-health-screen.tsx` (cognitive 62), `visibility-dashboard.tsx` (55), `inventory-selection.tsx` (36), `query-keys.ts` split.
+
+## ✅ Batch-3 outcome — complexity refactors (2026-07-19)
+
+Typecheck clean, ESLint clean, all 330 vitest tests pass, `next build` succeeds, all `check:policy` guards pass. Fallow refactoring-targets list is now **empty** (was 5 → 0); maintainability 90.9 → **91.2**. react-doctor 27 → **9** (all 9 verified false positives / intentional, see below).
+
+**`query-keys.ts` split (priority 25.8):** now a 32-line facade over `lib/api/query-keys/` — `core.ts` (auth, workspaces, projects, prompts, providers), `runs.ts` (runs + visibility), `site-health.ts`, `shared.ts` (`ListFilters`). All 21 importers keep the `@/lib/api/query-keys` entry point and the `queryKeys.*` shape — zero call-site changes. A domain-key change now touches one small module instead of a 25-dependent monolith.
+
+**`site-health-screen.tsx` (cognitive 62 → screen at 89 LOC):**
+- `resolvePhase` moved to `lib/site-health/status.ts` as `resolveSiteHealthPhase` (+ exported `SiteHealthPhase`) — pure, colocated with the terminal-status sets it reads. The redundant analyzing/dashboard sub-branch inside the score-data case (both arms returned `'dashboard'`) was collapsed; behavior identical.
+- Data orchestration (5 queries, 2 mutations, export flow, phase resolution) → `lib/site-health/use-site-health-screen.ts`.
+- Presentational pieces → `components/site-health/screen-states.tsx` (`ScreenHeader`, `ScreenSkeleton`, `EmptyPhaseCard`, `TerminalPhaseCard`) and `phase-panel.tsx` (`PhasePanel`, the one-phase-at-a-time switch).
+
+**`visibility-dashboard.tsx` (cognitive 55 → container at 124 LOC):**
+- URL-synced `?tab=` state + shared filter state → `useVisibilityFilters`; per-tab queries → `useVisibilityQueries` (with private `useRunSelection` and `useEvidenceQueries` helpers) — both in `lib/visibility/use-visibility-dashboard.ts`, which also owns `EVIDENCE_LIMIT`. All cache-key invariants preserved verbatim (engine deliberately absent from the Overview key; one identical evidence key across both evidence tabs; prompt-options query reuses the evidence cache when no prompt is selected).
+
+**`inventory-selection.tsx` (cognitive 36 → container at 234 LOC):**
+- Staging session + commit/bulk mutations (incl. the 409 rebase/adopt recovery paths and the quota-403 message parse) → `lib/site-health/use-monitored-selection.ts`.
+- UI extractions: `quick-select-bar.tsx` (bulk first-N/all/clear incl. the confirm-clear two-step and its local input state), `inventory-table.tsx` (rows + checkboxes), `selection-notices.tsx` (the stacked alert strip). The container keeps only pagination/filter state and layout.
+
+**Also:** removed `@eslint/eslintrc` (devDependency orphaned by the batch-2 FlatCompat → native flat config migration).
+
+**Remaining react-doctor findings (9) — all previously verified intentional or false positives:** B4 user-menu (superseded by `queryClient.clear()`), B10 session-guard re-subscribe (stable `useCallback`), B11 prompt-form preventDefault (authenticated SPA dialog), mentions-citations index-suffixed key (deliberate: backend rows aren't unique per `kind-name-offset`), url-detail prop-adjust effect (the rerun-polling latch, verified in the critical pass), and 4× P7 chained `.filter().map()` (skipped: negligible on these list sizes).
+
+**Remaining fallow notes:** `lib/api/index.ts` unused-file finding is the intentional no-transport compat facade (required by `check-frontend-architecture.mjs`); the 17 "unused" `schemas.ts` exports are schema building blocks referenced by `z.infer` type aliases; 3 residual small clone groups (login/register page shells around the shared hook, url-detail pager block) are below extraction value.
