@@ -33,20 +33,17 @@ import hashlib
 import logging
 import time
 import uuid
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.analysis.site_health.parser import extract_page_facts
 from app.analysis.site_health.rules import RuleEvaluation, evaluate_all
 from app.analysis.site_health.scoring import (
-    AnalysisScoreInput,
-    aggregate_scores,
     score_analysis,
 )
 from app.connectors.web_evidence.contracts import (
@@ -124,6 +121,7 @@ from app.domain.site_health.selection import (
     evaluate_task_guard,
     lease_is_owned,
 )
+from app.domain.site_health.snapshot import persist_crawl_snapshot
 from app.domain.site_health.state_events import (
     apply_analysis_status,
     apply_crawl_status,
@@ -136,7 +134,6 @@ from app.models.site_health import (
     SiteCrawlTask,
     SiteFetchArtifact,
     SiteFetchAttempt,
-    SiteHealthSnapshot,
     SiteIssue,
     SiteLinkReference,
     SitePageAnalysis,
@@ -1878,137 +1875,14 @@ class SiteHealthWorker:
     ) -> None:
         """Compute + persist the crawl aggregate snapshot (unique per crawl).
 
-        Aggregates only the LATEST completed analyses for ACTIVE monitored URLs
-        (ignoring missing/errored URLs — never a fabricated zero), rolls up the
-        issue severity/category counts, and writes both the immutable
-        ``SiteHealthSnapshot`` and the crawl's rolled-up ``score_summary``.
+        Delegates to the canonical ``persist_crawl_snapshot`` domain helper so
+        the worker and ``service.cancel_crawl`` share ONE aggregation algorithm
+        (no duplicate scoring/rollup logic). ``persist_empty=True`` because a
+        clean terminalization (including an empty analysis plan) must always
+        write a canonical snapshot — an empty/null-score one when nothing was
+        aggregated — unlike a cancel, which leaves ``score_summary`` null.
         """
-        # Exactly one latest completed analysis per ACTIVE monitored URL in
-        # this crawl. Rank by the full timestamp, then UUID for a deterministic
-        # tie-break (never truncate timestamps to whole seconds).
-        ranked = (
-            select(
-                SitePageAnalysis.id.label("id"),
-                SitePageAnalysis.site_url_id.label("site_url_id"),
-                SitePageAnalysis.artifact_id.label("artifact_id"),
-                SitePageAnalysis.technical_score.label("technical_score"),
-                SitePageAnalysis.aeo_score.label("aeo_score"),
-                SitePageAnalysis.overall_score.label("overall_score"),
-                func.row_number()
-                .over(
-                    partition_by=SitePageAnalysis.site_url_id,
-                    order_by=(
-                        SitePageAnalysis.created_at.desc(),
-                        SitePageAnalysis.id.desc(),
-                    ),
-                )
-                .label("latest_rank"),
-            )
-            .join(
-                MonitoredSiteUrl,
-                MonitoredSiteUrl.site_url_id == SitePageAnalysis.site_url_id,
-            )
-            .where(
-                SitePageAnalysis.crawl_id == crawl.id,
-                SitePageAnalysis.status == PAGE_ANALYSIS_STATUS_COMPLETED,
-                MonitoredSiteUrl.project_id == crawl.project_id,
-                MonitoredSiteUrl.active.is_(True),
-            )
-            .subquery()
-        )
-        rows = (
-            await session.execute(
-                select(
-                    ranked.c.id,
-                    ranked.c.site_url_id,
-                    ranked.c.artifact_id,
-                    ranked.c.technical_score,
-                    ranked.c.aeo_score,
-                    ranked.c.overall_score,
-                ).where(ranked.c.latest_rank == 1)
-            )
-        ).all()
-
-        inputs: list[AnalysisScoreInput] = []
-        analysis_ids: list[uuid.UUID] = []
-        artifact_ids: list[uuid.UUID] = []
-        for row in rows:
-            analysis_ids.append(row.id)
-            artifact_ids.append(row.artifact_id)
-            inputs.append(
-                AnalysisScoreInput(
-                    url_key=str(row.site_url_id),
-                    ordinal=0,
-                    technical_score=row.technical_score,
-                    aeo_score=row.aeo_score,
-                    overall_score=row.overall_score,
-                )
-            )
-        aggregate = aggregate_scores(inputs)
-
-        # Issue severity/category rollups for this crawl.
-        severity_counts: dict[str, int] = {}
-        category_counts: dict[str, int] = {}
-        issue_total = 0
-        evaluation_ids: list[uuid.UUID] = []
-        issue_rows: Sequence[Row[tuple[str, str, uuid.UUID]]] = []
-        if analysis_ids:
-            issue_rows = (
-                await session.execute(
-                    select(
-                        SiteIssue.severity,
-                        SiteIssue.category,
-                        SiteIssue.evaluation_id,
-                    ).where(SiteIssue.analysis_id.in_(analysis_ids))
-                )
-            ).all()
-        for severity, category, evaluation_id in issue_rows:
-            issue_total += 1
-            severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            category_counts[category] = category_counts.get(category, 0) + 1
-            evaluation_ids.append(evaluation_id)
-
-        selected_url_count = int(
-            await session.scalar(
-                select(func.count())
-                .select_from(MonitoredSiteUrl)
-                .where(
-                    MonitoredSiteUrl.project_id == crawl.project_id,
-                    MonitoredSiteUrl.active.is_(True),
-                )
-            )
-            or 0
-        )
-
-        session.add(
-            SiteHealthSnapshot(
-                workspace_id=crawl.workspace_id,
-                project_id=crawl.project_id,
-                crawl_id=crawl.id,
-                selected_url_count=selected_url_count,
-                analyzed_url_count=aggregate.analyzed_url_count,
-                technical_score=aggregate.technical_score,
-                aeo_score=aggregate.aeo_score,
-                overall_score=aggregate.overall_score,
-                issue_count=issue_total,
-                severity_counts=severity_counts,
-                category_counts=category_counts,
-                source_analysis_ids=analysis_ids,
-                source_artifact_ids=artifact_ids,
-                source_evaluation_ids=evaluation_ids,
-                analyzer_version=crawl.analyzer_version or ANALYZER_VERSION,
-                scoring_version=crawl.scoring_version or SCORING_VERSION,
-            )
-        )
-        crawl.score_summary = {
-            "technical_score": aggregate.technical_score,
-            "aeo_score": aggregate.aeo_score,
-            "overall_score": aggregate.overall_score,
-            "analyzed_url_count": aggregate.analyzed_url_count,
-            "selected_count": selected_url_count,
-            "issue_count": issue_total,
-            "scoring_version": aggregate.scoring_version,
-        }
+        await persist_crawl_snapshot(session, crawl=crawl, persist_empty=True)
 
 
 def main() -> None:  # pragma: no cover - process entrypoint

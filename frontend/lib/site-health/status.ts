@@ -133,30 +133,110 @@ export type SiteHealthPhase =
   | 'dashboard'
   | 'terminal';
 
+/** True when the crawl produced score data (a dashboard-worthy summary). */
+export function hasScoreData(crawl: Pick<SiteCrawl, 'score_summary'>): boolean {
+  return crawl.score_summary != null;
+}
+
 /**
- * Resolve the screen phase for the active crawl (discovery → selection →
- * analysis → dashboard). Terminal failures/cancellations WITHOUT score data get
- * an explicit 'terminal' phase — otherwise they would fall through to
- * 'selection'/'analyzing' and render an active-looking progress view (and
- * another Cancel button) for a crawl that has already stopped.
+ * Resolve the screen phase for the active crawl with an EXPLICIT, deterministic
+ * precedence. The order below is the single source of truth — each clause is
+ * mutually exclusive and evaluated top-to-bottom, so there is exactly one
+ * outcome per crawl shape (no duplicated local flags in the components):
+ *
+ *   1. no crawl                       → 'empty'
+ *   2. completed / partially_completed → 'dashboard'
+ *   3. cancelled WITH score data       → 'dashboard' (labelled Cancelled, keeps
+ *      partial scores + inventory, offers Recrawl)
+ *   4. any other crawl WITH score data → 'dashboard' (results already exist)
+ *   5. failed WITHOUT data             → 'terminal'
+ *   6. cancelled WITHOUT data:
+ *        - Starter + discovered URLs   → 'selection' (inventory persists through
+ *          a cancel; the user stages a monitored set and re-crawls)
+ *        - otherwise                   → 'terminal' (nothing to show)
+ *   7. discovery still running         → 'discovering'
+ *   8. analysis running                → 'analyzing'
+ *   9. Starter + analysis pending      → 'selection'
+ *  10. otherwise (Free auto-analysis)  → 'analyzing'
  */
 export function resolveSiteHealthPhase(
-  crawl: Pick<SiteCrawl, 'status' | 'discovery_status' | 'analysis_status' | 'score_summary'> | null,
+  crawl:
+    | Pick<
+        SiteCrawl,
+        'status' | 'discovery_status' | 'analysis_status' | 'score_summary' | 'visible_url_count'
+      >
+    | null,
   plan: SiteHealthEntitlement['plan_key'],
 ): SiteHealthPhase {
+  // 1. Nothing yet.
   if (!crawl) return 'empty';
-  // Terminal crawls with score data → completed dashboard (even mid-analysis).
-  if (['completed', 'partially_completed'].includes(crawl.status) || crawl.score_summary) {
-    return 'dashboard';
+
+  // 2–4. Any crawl that produced score data renders the dashboard — including a
+  // cancelled-with-data run (labelled Cancelled by the dashboard itself) and a
+  // still-running crawl once a projection lands. Completed always qualifies.
+  if (crawl.status === 'completed' || crawl.status === 'partially_completed') return 'dashboard';
+  if (hasScoreData(crawl)) return 'dashboard';
+
+  // 5. Failed with no data — explicit stopped card, never an active-looking view.
+  if (crawl.status === 'failed') return 'terminal';
+
+  // 6. Cancelled with no data: Starter keeps the discovered inventory (selection
+  // survives a cancel and re-seeds the next crawl); everyone else dead-ends.
+  if (crawl.status === 'cancelled') {
+    return plan === 'starter' && crawl.visible_url_count > 0 ? 'selection' : 'terminal';
   }
-  if (crawl.status === 'failed' || crawl.status === 'cancelled') return 'terminal';
-  // Discovery still running.
+
+  // 7. Discovery still running.
   if (!TERMINAL_DISCOVERY.has(crawl.discovery_status)) return 'discovering';
-  // Discovery done. Free auto-analyzes its sample (no manual selection); Starter
-  // stages a monitored set unless analysis has already started.
+
+  // 8–10. Discovery done. Free auto-analyzes its sample (no manual selection);
+  // Starter stages a monitored set unless analysis has already started.
   if (crawl.analysis_status === 'running') return 'analyzing';
   if (plan === 'starter' && crawl.analysis_status === 'pending') return 'selection';
   return 'analyzing';
+}
+
+/**
+ * Dashboard run-outcome notice for a crawl whose results are shown but whose run
+ * did NOT complete cleanly. Returns `null` for a completed crawl (no notice),
+ * otherwise a text-labelled badge value + tone + message so the dashboard can
+ * explicitly say "Cancelled" / "Partial" (never color-only) while still showing
+ * the scores/inventory that already landed. Recrawl is offered by the header.
+ */
+export type DashboardRunNotice = {
+  badge: RunStatusValue;
+  tone: 'info' | 'warning';
+  message: string;
+} | null;
+
+export function dashboardRunNotice(
+  crawl: Pick<SiteCrawl, 'status'>,
+): DashboardRunNotice {
+  switch (crawl.status) {
+    case 'cancelled':
+      return {
+        badge: 'cancelled',
+        tone: 'info',
+        message:
+          'This run was cancelled — showing the pages analyzed so far. Re-crawl to complete the analysis.',
+      };
+    case 'partially_completed':
+      return {
+        badge: 'partial',
+        tone: 'warning',
+        message:
+          'Some pages could not be analyzed — showing partial results. Re-crawl to retry the remaining pages.',
+      };
+    case 'failed':
+      return {
+        badge: 'failed',
+        tone: 'warning',
+        message:
+          'The run failed before finishing — showing the pages analyzed so far. Re-crawl to try again.',
+      };
+    default:
+      return null;
+  }
 }
 
 /** Map an overall crawl status onto a run-status badge value. */

@@ -518,6 +518,7 @@ async def test_remove_mid_fetch_guard_blocks_persistence(
             .scalars()
             .first()
         )
+        assert task is not None
         task.status = TASK_STATUS_RUNNING
         task.lease_owner = "worker-1"
         await session.commit()

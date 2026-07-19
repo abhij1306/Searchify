@@ -174,6 +174,7 @@ async def test_create_and_cancel_crawl_lifecycle(
         # has no registrable domain, so ``create_crawl`` would reject it (422).
         # Point the project at a real registrable domain for the create path.
         project = await session.get(Project, scn.project_id)
+        assert project is not None
         project.website_url = "https://example.com/"
         await session.commit()
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
@@ -215,6 +216,7 @@ async def test_create_and_cancel_crawl_lifecycle(
         user = await session.scalar(
             select(User).where(User.email == "lifecycle@example.com")
         )
+        assert user is not None
         session.add(
             WorkspaceMember(workspace_id=other.id, user_id=user.id, role="owner")
         )
@@ -312,6 +314,7 @@ async def test_partial_error_crawl_surfaces_failed_pages(
                 SiteHealthProfile.project_id == scn.project_id
             )
         )
+        assert profile is not None
         crawl = SiteCrawl(
             workspace_id=scn.workspace_id,
             project_id=scn.project_id,
@@ -333,6 +336,7 @@ async def test_partial_error_crawl_surfaces_failed_pages(
                 SiteUrl.normalized_url == "https://acme.test/a",
             )
         )
+        assert url is not None
         session.add(
             SiteUrlObservation(
                 workspace_id=scn.workspace_id,

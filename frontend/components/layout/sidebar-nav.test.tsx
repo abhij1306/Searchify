@@ -61,6 +61,7 @@ describe('SidebarNav', () => {
     expect(liveLabels).toEqual([
       'Visibility',
       'Your Prompts',
+      'Prompt Research',
       'Runs',
       'Providers',
       'Setup',

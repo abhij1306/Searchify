@@ -23,6 +23,11 @@ export const promptKeys = {
   list: (promptSetId: string) => ['prompts', 'list', promptSetId] as const,
 };
 
+export const topicKeys = {
+  all: ['topics'] as const,
+  list: (projectId: string) => ['topics', 'list', projectId] as const,
+};
+
 export const providerKeys = {
   all: ['providers'] as const,
   connections: () => ['providers', 'connections'] as const,

@@ -128,6 +128,7 @@ async def _configure_crawl(
 ) -> None:
     """Freeze the minimal worker-facing configuration onto a seeded crawl."""
     crawl = await session.get(SiteCrawl, crawl_id)
+    assert crawl is not None
     crawl.sample_mode = sample_mode
     # The planner drives discovery -> running when queuing the crawl; mirror
     # that so the worker's sample_completed/completed transitions are valid.
@@ -206,6 +207,7 @@ async def test_starter_discover_admits_children_and_completes(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.status == CRAWL_STATUS_COMPLETED
         assert crawl.discovery_status == DISCOVERY_STATUS_COMPLETED
         assert crawl.inventory_complete is True
@@ -364,6 +366,7 @@ async def test_inventory_rows_present_before_crawl_terminalizes(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         # Crawl is still active (children pending) but inventory already exists.
         assert crawl.status == CRAWL_STATUS_RUNNING
         admitted = await session.scalar(
@@ -371,6 +374,7 @@ async def test_inventory_rows_present_before_crawl_terminalizes(
             .select_from(SiteUrl)
             .where(SiteUrl.project_id == seed.project_id)
         )
+        assert admitted is not None
         assert admitted >= 3  # root + 2 children admitted during discovery
         pending_children = await session.scalar(
             select(func.count())
@@ -569,7 +573,10 @@ async def test_free_sample_stops_at_ten_across_two_projects(
 
         # At least one crawl reached the Free cap terminal state.
         crawl_a = await session.get(SiteCrawl, seed_a.crawl_id)
-        crawl_b = await session.get(SiteCrawl, crawl_b_id)
+        assert crawl_a is not None
+        _crawl_b = await session.get(SiteCrawl, crawl_b_id)
+        assert _crawl_b is not None
+        crawl_b = _crawl_b
         assert crawl_a.status == CRAWL_STATUS_COMPLETED
         assert crawl_b.status == CRAWL_STATUS_COMPLETED
         assert DISCOVERY_STATUS_SAMPLE_COMPLETED in (
@@ -627,6 +634,7 @@ async def test_fully_failed_root_terminalizes_crawl_as_failed(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.discovered_url_count == 0
         assert crawl.failed_url_count >= 1
         assert crawl.status == CRAWL_STATUS_FAILED
@@ -648,6 +656,7 @@ async def test_partial_failure_terminalizes_crawl_as_partially_completed(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.discovered_url_count >= 1  # root succeeded
         assert crawl.failed_url_count >= 1  # child 404
         assert crawl.status == CRAWL_STATUS_PARTIALLY_COMPLETED
@@ -712,6 +721,7 @@ async def test_stolen_lease_does_not_terminalize_crawl(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.status == CRAWL_STATUS_RUNNING
         assert crawl.inventory_complete is False
 
@@ -768,6 +778,7 @@ async def _seed_analyze_ready(
         await session.commit()
         # Discovery already finished; analysis is pending with one analyze task.
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.discovery_status = DISCOVERY_STATUS_COMPLETED
         crawl.discovered_url_count = 1
         crawl.inventory_complete = True
@@ -879,6 +890,7 @@ async def test_analyze_guard_blocks_live_entitlement_downgrade_before_io(
 
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
+        assert task is not None
         artifact_count = await session.scalar(
             select(func.count())
             .select_from(SiteFetchArtifact)
@@ -888,6 +900,7 @@ async def test_analyze_guard_blocks_live_entitlement_downgrade_before_io(
         assert task.status == TASK_STATUS_CANCELLED
         assert artifact_count == 0
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.analysis_status == ANALYSIS_STATUS_CANCELLED
         assert crawl.status == CRAWL_STATUS_COMPLETED
 
@@ -949,8 +962,12 @@ async def test_cancelled_user_analysis_does_not_penalize_applicable_free_sample(
 
     async with session_factory() as session:
         user_task = await session.get(SiteCrawlTask, user_task_id)
-        sample_task = await session.get(SiteCrawlTask, sample_task_id)
+        assert user_task is not None
+        _sample_task = await session.get(SiteCrawlTask, sample_task_id)
+        assert _sample_task is not None
+        sample_task = _sample_task
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         snapshot = (
             await session.execute(
                 select(SiteHealthSnapshot).where(
@@ -1001,6 +1018,7 @@ async def test_analyze_guard_discards_result_when_membership_removed_mid_fetch(
 
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
+        assert task is not None
         artifact_count = await session.scalar(
             select(func.count())
             .select_from(SiteFetchArtifact)
@@ -1016,6 +1034,7 @@ async def test_analyze_guard_discards_result_when_membership_removed_mid_fetch(
         assert artifact_count == 0
         assert analysis_count == 0
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.analysis_status == ANALYSIS_STATUS_CANCELLED
         assert crawl.status == CRAWL_STATUS_COMPLETED
 
@@ -1040,6 +1059,7 @@ async def test_reclaimed_analyze_acknowledges_already_persisted_analysis(
 
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
+        assert task is not None
         assert task.status == TASK_STATUS_RUNNING
         await session.execute(
             update(SiteCrawlTask)
@@ -1068,6 +1088,7 @@ async def test_reclaimed_analyze_acknowledges_already_persisted_analysis(
 
     async with session_factory() as session:
         task = await session.get(SiteCrawlTask, task_id)
+        assert task is not None
         artifacts = await session.scalar(
             select(func.count())
             .select_from(SiteFetchArtifact)
@@ -1148,6 +1169,7 @@ async def test_analyze_task_persists_analysis_evaluations_issues_scores(
         assert artifact.normalized_facts.get("title") == "Rich Page"
 
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.status == CRAWL_STATUS_COMPLETED
         assert crawl.analysis_status == ANALYSIS_STATUS_COMPLETED
         assert crawl.analyzed_url_count == 1
@@ -1207,6 +1229,7 @@ async def test_crawl_not_completed_while_analyze_queued(
         await set_entitlement(session, seed.workspace_id, CAPABILITY_STARTER)
         await session.commit()
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.discovery_status = DISCOVERY_STATUS_RUNNING
         crawl.configuration = {
             "root_registrable_domain": "example.com",
@@ -1280,6 +1303,7 @@ async def test_crawl_not_completed_while_analyze_queued(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         # Discovery drained but the queued analyze keeps the crawl RUNNING.
         assert crawl.status == CRAWL_STATUS_RUNNING
 
@@ -1302,6 +1326,7 @@ async def test_partial_analysis_failure_partially_completes(
         await set_entitlement(session, seed.workspace_id, CAPABILITY_STARTER)
         await session.commit()
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.discovery_status = DISCOVERY_STATUS_COMPLETED
         crawl.discovered_url_count = 2
         crawl.inventory_complete = True
@@ -1361,6 +1386,7 @@ async def test_partial_analysis_failure_partially_completes(
 
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         assert crawl.status == CRAWL_STATUS_PARTIALLY_COMPLETED
         assert crawl.analysis_status == ANALYSIS_STATUS_PARTIALLY_COMPLETED
         # Exactly one analysis succeeded; the snapshot aggregates only it and
@@ -1375,6 +1401,423 @@ async def test_partial_analysis_failure_partially_completes(
         assert snapshot.analyzed_url_count == 1
         assert snapshot.overall_score is not None
         assert snapshot.overall_score > 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_crawl_persists_partial_snapshot_from_completed_analyses(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Cancelling a run with completed analyses persists a partial snapshot.
+
+    The dashboard requires a non-null ``score_summary``; cancellation must roll
+    the already-completed analyses into the SAME canonical snapshot the worker
+    writes on clean terminalization, so a partial cancel keeps its scores +
+    inventory instead of hiding the dashboard behind a null summary.
+    """
+    from app.core.config.site_health import (
+        CRAWL_STATUS_CANCELLED,
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        # One analyze task already succeeded and produced a completed analysis;
+        # a second URL is still queued (the not-yet-analyzed remainder).
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        assert first_task is not None
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        # A still-queued analyze task for a second monitored URL — the run is
+        # mid-flight when the user cancels.
+        second_url = "https://example.com/pending"
+        canonical, url_hash = canonical_identity(second_url)
+        second_site_url = SiteUrl(
+            workspace_id=seed.workspace_id,
+            project_id=seed.project_id,
+            normalized_url=canonical,
+            url_hash=url_hash,
+            display_url=canonical,
+            host="example.com",
+            depth=0,
+        )
+        session.add(second_site_url)
+        await session.flush()
+        session.add(
+            MonitoredSiteUrl(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                profile_id=seed.profile_id,
+                site_url_id=second_site_url.id,
+                active=True,
+                selection_source="user",
+            )
+        )
+        session.add(
+            SiteCrawlTask(
+                crawl_id=seed.crawl_id,
+                workspace_id=seed.workspace_id,
+                site_url_id=second_site_url.id,
+                task_kind=TASK_KIND_ANALYZE,
+                requested_url=second_url,
+                url_hash=url_hash,
+                generation=0,
+                idempotency_key=f"{seed.crawl_id}:{TASK_KIND_ANALYZE}:{url_hash}:0",
+                status=TASK_STATUS_QUEUED,
+                priority=1,
+                randomized_position=1,
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    # The returned DTO carries the partial score_summary (dashboard-ready).
+    summary = dto["score_summary"]
+    assert summary is not None
+    assert summary["overall_score"] is not None
+    assert summary["overall_score"] > 0
+    assert summary["analyzed_count"] == 1
+    assert summary["selected_count"] == 2
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        # Only the one completed analysis is aggregated; the queued URL is never
+        # fabricated as a zero.
+        assert snapshot.analyzed_url_count == 1
+        assert snapshot.selected_url_count == 2
+        assert snapshot.overall_score is not None
+        assert snapshot.overall_score > 0
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        assert crawl.status == CRAWL_STATUS_CANCELLED
+        # The still-queued analyze task was cancelled by terminalization.
+        queued = await session.scalar(
+            select(func.count())
+            .select_from(SiteCrawlTask)
+            .where(
+                SiteCrawlTask.crawl_id == seed.crawl_id,
+                SiteCrawlTask.status == TASK_STATUS_QUEUED,
+            )
+        )
+        assert queued == 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_crawl_without_completed_analyses_leaves_summary_null(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Cancelling before any analysis completes leaves score_summary null.
+
+    With no completed analyses there is nothing to project — the summary stays
+    null (never a fabricated zero) so the UI shows its terminal/selection state.
+    """
+    from app.core.config.site_health import CRAWL_STATUS_CANCELLED
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+    assert dto["score_summary"] is None
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_crawl_with_only_deactivated_completed_analyses_skips_snapshot(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A completed analysis whose monitored URL was deactivated is not aggregable.
+
+    ``persist_crawl_snapshot`` aggregates only ACTIVE monitored URLs, so a cancel
+    whose only completed analysis belongs to a since-deactivated URL must NOT
+    write a snapshot or a non-null ``score_summary`` — otherwise the dashboard
+    renders empty (zero aggregated rows). The precheck shares the persist
+    helper's active-membership predicate to enforce this.
+    """
+    from app.core.config.site_health import (
+        CRAWL_STATUS_CANCELLED,
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.service import cancel_crawl
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        # One analysis completed, then its monitored URL was deactivated.
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        assert first_task is not None
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        # Deactivate the monitored URL — no ACTIVE monitored row remains.
+        monitored = (
+            await session.execute(
+                select(MonitoredSiteUrl).where(
+                    MonitoredSiteUrl.site_url_id == site_url_id
+                )
+            )
+        ).scalar_one()
+        monitored.active = False
+        await session.commit()
+
+    async with session_factory() as session:
+        dto = await cancel_crawl(
+            session, workspace_id=seed.workspace_id, crawl_id=seed.crawl_id
+        )
+
+    assert dto["status"] == CRAWL_STATUS_CANCELLED
+    assert dto["score_summary"] is None
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
+async def test_persist_crawl_snapshot_returns_false_and_writes_nothing_when_empty(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Empty aggregate row set => skip persistence, return False (cancel path).
+
+    ``persist_crawl_snapshot`` decides from its single fetched aggregate row set
+    (no separate TOCTOU precheck): with zero aggregatable active completed
+    analyses and the default ``persist_empty=False`` it writes NEITHER the
+    snapshot NOR the ``score_summary`` projection and returns ``False``.
+    """
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+
+    assert persisted is False
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one_or_none()
+        assert snapshot is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        assert crawl.score_summary is None
+
+
+@pytest.mark.asyncio
+async def test_persist_crawl_snapshot_persist_empty_writes_null_score_snapshot(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """``persist_empty=True`` forces a canonical empty/null-score snapshot.
+
+    The worker's clean terminalization (including an empty analysis plan) must
+    always write a snapshot. With no aggregatable rows and ``persist_empty=True``
+    the helper writes the explicit zeroed/null-score snapshot + projection and
+    returns ``True``.
+    """
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        persisted = await persist_crawl_snapshot(
+            session, crawl=crawl, persist_empty=True
+        )
+        await session.commit()
+
+    assert persisted is True
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        assert snapshot.analyzed_url_count == 0
+        assert snapshot.overall_score is None
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        assert crawl.score_summary is not None
+        assert crawl.score_summary["overall_score"] is None
+
+
+@pytest.mark.asyncio
+async def test_persist_crawl_snapshot_returns_true_when_active_rows_present(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A completed analysis for an ACTIVE URL persists and returns True.
+
+    Regression for membership: the same call returns ``False`` once its only
+    completed analysis's monitored URL is deactivated (no active rows), proving
+    the decision derives from the single fetched aggregate row set rather than a
+    precheck.
+    """
+    from app.core.config.site_health import (
+        FETCH_PURPOSE_ANALYZE,
+        PAGE_ANALYSIS_STATUS_COMPLETED,
+    )
+    from app.domain.site_health.snapshot import persist_crawl_snapshot
+
+    seed, site_url_id, first_task_id = await _seed_analyze_ready(session_factory)
+
+    async with session_factory() as session:
+        first_task = await session.get(SiteCrawlTask, first_task_id)
+        assert first_task is not None
+        first_task.status = TASK_STATUS_SUCCEEDED
+        artifact = SiteFetchArtifact(
+            task_id=first_task.id,
+            crawl_id=seed.crawl_id,
+            workspace_id=seed.workspace_id,
+            fetch_purpose=FETCH_PURPOSE_ANALYZE,
+            requested_url=first_task.requested_url,
+            final_url=first_task.requested_url,
+        )
+        session.add(artifact)
+        await session.flush()
+        session.add(
+            SitePageAnalysis(
+                workspace_id=seed.workspace_id,
+                project_id=seed.project_id,
+                crawl_id=seed.crawl_id,
+                site_url_id=site_url_id,
+                artifact_id=artifact.id,
+                status=PAGE_ANALYSIS_STATUS_COMPLETED,
+                technical_score=72.0,
+                aeo_score=68.0,
+                overall_score=70.0,
+            )
+        )
+        await session.commit()
+
+    # Active membership present -> persists + returns True.
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+    assert persisted is True
+
+    async with session_factory() as session:
+        snapshot = (
+            await session.execute(
+                select(SiteHealthSnapshot).where(
+                    SiteHealthSnapshot.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        assert snapshot.analyzed_url_count == 1
+
+    # Deactivate the monitored URL: the (idempotent) snapshot row survives, but a
+    # fresh call now sees zero active rows and reports no persistence occurred.
+    async with session_factory() as session:
+        monitored = (
+            await session.execute(
+                select(MonitoredSiteUrl).where(
+                    MonitoredSiteUrl.site_url_id == site_url_id
+                )
+            )
+        ).scalar_one()
+        monitored.active = False
+        await session.commit()
+
+    async with session_factory() as session:
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        persisted = await persist_crawl_snapshot(session, crawl=crawl)
+        await session.commit()
+    assert persisted is False
 
 
 @pytest.mark.asyncio
@@ -1395,6 +1838,7 @@ async def test_snapshot_uses_only_latest_completed_analysis_and_issues(
 
     async with session_factory() as session:
         first_task = await session.get(SiteCrawlTask, first_task_id)
+        assert first_task is not None
         first_task.status = TASK_STATUS_SUCCEEDED
         second_task = SiteCrawlTask(
             crawl_id=seed.crawl_id,
@@ -1480,6 +1924,7 @@ async def test_snapshot_uses_only_latest_completed_analysis_and_issues(
             )
 
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         worker = _worker(session_factory, {}, owner="snapshot-latest")
         await worker._persist_snapshot(session, crawl=crawl)
         latest_artifact_id = artifacts[1].id
@@ -1563,6 +2008,7 @@ async def test_link_check_resolves_relative_targets_and_records_probe_provenance
         assert link_task is not None
         link_task_id = link_task.id
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.status = CRAWL_STATUS_RUNNING
         await session.commit()
 
@@ -1701,6 +2147,7 @@ async def test_reclaimed_link_check_does_not_reprobe(
             )
         )
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.status = CRAWL_STATUS_RUNNING
         await session.commit()
 
@@ -1715,6 +2162,7 @@ async def test_reclaimed_link_check_does_not_reprobe(
 
     async with session_factory() as session:
         link_task = await session.get(SiteCrawlTask, link_task_id)
+        assert link_task is not None
         refs_after_reclaim = await session.scalar(
             select(func.count())
             .select_from(SiteLinkReference)
@@ -1752,6 +2200,7 @@ async def test_rerun_from_completed_crawl_worker_analyzes_only_reran_url(
     # already analyzed, mirroring the "re-audit from a completed crawl" case.
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         crawl.status = CRAWL_STATUS_COMPLETED
         crawl.analysis_status = ANALYSIS_STATUS_COMPLETED
         # The seeded analyze task is already accounted for by the source crawl.
@@ -1837,6 +2286,7 @@ async def test_rerun_from_completed_crawl_worker_analyzes_only_reran_url(
         assert analyses[0].status == ANALYSIS_STATUS_COMPLETED
 
         new_crawl = await session.get(SiteCrawl, new_crawl_id)
+        assert new_crawl is not None
         # The rerun crawl terminalizes cleanly.
         assert new_crawl.status in (
             CRAWL_STATUS_COMPLETED,
@@ -1905,6 +2355,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # allowance is consumed (one active sample row).
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
@@ -1913,6 +2364,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # unchanged (the WHERE-guarded upsert is a no-op, no decrement).
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
@@ -1937,6 +2389,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
     # consume one allowance unit again.
     async with session_factory() as session:
         crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
         await admit_candidates(session, crawl=crawl, candidates=[candidate])
         await session.commit()
         assert await _sample_count(session, seed.workspace_id) == 1
@@ -1945,6 +2398,7 @@ async def test_free_recrawl_allowance_only_decrements_on_new_activation(
                 MonitoredSiteUrl.workspace_id == seed.workspace_id
             )
         )
+        assert membership is not None
         assert membership.active is True
         assert membership.deselected_at is None
         assert membership.selection_source == SELECTION_SOURCE_FREE_SAMPLE

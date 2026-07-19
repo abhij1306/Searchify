@@ -15,6 +15,7 @@ import {
   projectKeys,
   promptKeys,
   providerKeys,
+  topicKeys,
   workspaceKeys,
 } from './query-keys/core';
 import { runKeys, visibilityKeys } from './query-keys/runs';
@@ -25,6 +26,7 @@ export const queryKeys = {
   workspaces: workspaceKeys,
   projects: projectKeys,
   prompts: promptKeys,
+  topics: topicKeys,
   providers: providerKeys,
   runs: runKeys,
   visibility: visibilityKeys,

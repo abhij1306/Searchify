@@ -1,7 +1,36 @@
 # Roadmap — AI-suggested prompt generation (`/generate`)
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
-> an engineer (or agent) can start building without re-deriving the architecture. It follows
+> **Status: IMPLEMENTED (July 2026) — with deliberate design changes from this spec.**
+> The shipped feature is **topic-driven controlled generation** and diverges from the original
+> design below in three ways (per product direction during implementation):
+>
+> 1. **Model source.** Generation uses the **app-level default agent** configured in `.env`
+>    (`DEFAULT_AGENT_API_KEY` / `DEFAULT_AGENT_BASE_URL` / `DEFAULT_AGENT_MODEL`, owned by
+>    `app/core/config/agent.py`), **not** the BYOK `DiscoveryModelConfig` described in §2/§3.
+>    The measurement/discovery boundary still holds: brand/competitor evidence goes only to
+>    this agent, behind a backend-enforced `confirm_send_evidence` gate, and measurement
+>    engines are never used for generation.
+> 2. **Topics are first-class.** A `Topic` table (`app/models/prompt.py`,
+>    `app/domain/prompts/topics.py`) groups prompts per project; generation produces topics
+>    **and** prompts in one call, or can be scoped to a single existing topic.
+> 3. **Review lifecycle via `status`, not `review_status`/`enabled`.** Prompts carry
+>    `status ∈ {proposed, active, archived}`; generation fills a set-wide pool of
+>    `GENERATION_ACTIVE_THRESHOLD` (default 20) `active` prompts from the earliest
+>    generated rows (promoted atomically under a prompt-set advisory lock), and prompts
+>    beyond the pool land `proposed` until a user promotes them. Only `active` + `enabled`
+>    prompts are audit/scheduled-run eligible. Existing manual/active rows count toward the
+>    pool; archived rows are never auto-reactivated.
+>
+> As-built code: `app/domain/prompts/generation.py`, `app/connectors/agent/client.py`,
+> `app/domain/prompts/topics.py`, `app/core/config/prompts.py` (count caps, system prompt,
+> normalization/dedupe rules). Tests: `backend/tests/unit/test_prompt_generation.py`,
+> `backend/tests/component/test_prompt_generation_api.py`,
+> `frontend/app/(app)/prompts/page.test.tsx`. Still-accurate sections of this spec: the
+> conflict-safe dedupe design (§3), provenance requirements (§4), guard order and
+> backend-enforced confirmation (§6), config-ownership rules (§7). Not built (still open):
+> the queued path for large counts / web evidence (§5) and `include_web_evidence`/`seed`.
+>
+> Original spec follows, unchanged, for historical context. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
 > [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule

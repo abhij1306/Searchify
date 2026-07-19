@@ -78,22 +78,56 @@ export const promptIntentSchema = z.enum([
   'local',
 ]);
 
+// Review lifecycle for a prompt: AI suggestions land `proposed`; only human
+// acceptance makes them `active` (audit-eligible); `archived` keeps history.
+export const promptStatusSchema = z.enum(['proposed', 'active', 'archived']);
+
 // Backend `PromptResponse.theme` is a non-null string (empty when unset), so
 // the wire value is always a string — never null.
 export const promptSchema = z
   .object({
     id: uuid(),
     prompt_set_id: uuid(),
+    topic_id: uuid().nullable().optional(),
     text: z.string(),
     theme: z.string(),
     intent: promptIntentSchema,
     branded: z.boolean(),
     enabled: z.boolean(),
+    status: promptStatusSchema,
     origin: z.enum(['manual', 'imported', 'generated']),
-    // Evidence for a future AI-generated prompt (B-4 roadmap); null at MVP.
+    // Provenance for AI-generated prompts (model identity, run id, hashes) —
+    // never contains credentials. Null for manual/imported prompts.
     generation_evidence: z.record(z.string(), z.unknown()).nullable().optional(),
     created_at: z.string().optional(),
     updated_at: z.string().optional(),
+  })
+  .strict();
+
+// A topical category grouping prompts within a project (first-class resource;
+// counts are per-status projections for the topics rail).
+export const topicSchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    name: z.string(),
+    description: z.string(),
+    origin: z.enum(['manual', 'generated']),
+    active_count: z.number().int(),
+    proposed_count: z.number().int(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+// `POST /prompt-sets/{id}/generate` result: inserted suggestions, the topics
+// they landed in (with refreshed counts), and how many duplicates the DB
+// conflict-safe dedupe dropped.
+export const promptGenerateResponseSchema = z
+  .object({
+    generated: z.array(promptSchema),
+    topics: z.array(topicSchema),
+    dropped_duplicates: z.number().int(),
   })
   .strict();
 

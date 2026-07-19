@@ -28,8 +28,8 @@ export function PhasePanel({
     active,
     dashboardQuery,
     pagesQuery,
-    discoveryPreviewQuery,
     projectSelectedTotal,
+    projectSelectedError,
     createMutation,
     cancelMutation,
     startCrawl,
@@ -47,20 +47,36 @@ export function PhasePanel({
         <DiscoveryProgress
           crawl={crawl}
           entitlement={entitlement}
-          previewRows={discoveryPreviewQuery.data?.items ?? []}
+          active={active}
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />
       );
     case 'selection':
       return (
-        <InventorySelection crawl={crawl} entitlement={entitlement} projectId={projectId} />
+        <InventorySelection
+          crawl={crawl}
+          entitlement={entitlement}
+          projectId={projectId}
+          // A cancelled crawl keeps its discovered inventory but can no longer
+          // run analysis itself — selections persist, and "Start analysis"
+          // launches a fresh crawl that seeds them as analyze tasks.
+          crawlInactive={!active}
+          onStartAnalysis={startCrawl}
+          startPending={createMutation.isPending}
+        />
       );
     case 'analyzing':
       return (
         <AnalysisProgress
           crawl={crawl}
           pages={pagesQuery.data?.items ?? []}
+          // Surface the page-window fetch state so a failed/loading query does
+          // not masquerade as a valid empty "no pages" table. React Query keeps
+          // the prior `data` during a refetch, so existing rows stay visible;
+          // these flags only drive an error alert / initial loading hint.
+          pagesError={pagesQuery.isError}
+          pagesLoading={pagesQuery.isLoading}
           // Per-project active monitored count — the server-side "selected"
           // total for THIS project's crawl (the workspace-wide dashboard
           // quota would overcount in multi-project workspaces). Null until
@@ -68,6 +84,7 @@ export function PhasePanel({
           // terminal score_summary.selected_count takes precedence once
           // written.
           selectedTotal={projectSelectedTotal}
+          selectedError={projectSelectedError}
           onCancel={cancelCrawl}
           cancelPending={cancelMutation.isPending}
         />

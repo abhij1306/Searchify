@@ -59,3 +59,10 @@ files = ["app"]
 plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
 warn_redundant_casts = true
+
+[dependency-groups]
+dev = [
+    "asyncpg-stubs>=0.31.3",
+    "lxml-stubs>=0.5.1",
+    "types-defusedxml>=0.7.0.20260504",
+]

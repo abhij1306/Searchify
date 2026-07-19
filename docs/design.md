@@ -319,7 +319,7 @@ Below: a link toggling login/register. No sidebar/top-bar. Theme toggle in a cor
 **Left sidebar (240px, `bg-sidebar`)**: top = project-switcher (brand avatar + name, dropdown).
 A "Getting Started N of 6" progress card. Grouped nav sections — **Analytics** (Visibility =
 live; LLM Analytics, Traffic = disabled "soon"), **Prompts** (Your Prompts = live; Prompt
-Research = disabled), **Actions** (Content, Opportunities = disabled), **On Page** (Site Health,
+Research = live), **Actions** (Content, Opportunities = disabled), **On Page** (Site Health,
 Issues = live; Knowledge Base = disabled). Bottom = user-menu (avatar + email). **Top bar (52px)**:
 left = "Find anything…" search placeholder; right = Export hook, Learn link, theme-toggle.
 Active nav item uses accent-subtle bg + accent-text; disabled items are muted with a "soon"
@@ -336,11 +336,20 @@ segmented (consumer_like / controlled_localized / forced_grounded) + default rep
 stepper. Sticky footer with Cancel + primary Save/Create. Create sets active project → routes
 to `/visibility`. react-hook-form + zod; inline field errors.
 
-### 9.4 Prompt library (`/prompts`)
-Two-pane. **Left rail (280px)**: Topics list with counts + "Add topic"; "All topics" at top.
+### 9.4 Prompt library (`/prompts` Your Prompts + `/prompt-research` Prompt Research)
+**Your Prompts (`/prompts`)** — read-only, score-annotated view of the active configuration:
+a summary banner ("N visibility prompts across M topics" + "Go to Prompt Research" button),
+search, and a dense table grouped by topic with expandable group rows. Columns: expander,
+Prompt, Visibility Score (mono %, score-band color, derived from persisted audit evidence),
+Avg Position (`—` at MVP), Sentiment (`—`), Topic (badge), Branded (badge). Topic group rows
+show the prompt count and the mean of measured prompt scores.
+
+**Prompt Research (`/prompt-research`)** — the management workspace. Two-pane. **Left rail
+(280px)**: Topics list with counts + "Add topic"; "All topics" at top.
 **Main**: toolbar (Columns, Filter, search prompts, "Bulk upload" = CSV import, "Add Prompts",
-and a disabled "Generate Prompts & Topics" with a "coming soon" tooltip → the B3 `/generate`
-stub). Below the toolbar, segmented tabs: **Active / Proposed / Archived** with counts. Dense
+and "Generate Prompts & Topics" (opens the AI-generation dialog: count, optional target topic,
+and an explicit consent checkbox before brand evidence is sent to the default agent; results
+land in the Proposed tab for review). Below the toolbar, segmented tabs: **Active / Proposed / Archived** with counts. Dense
 `table`: checkbox, Prompt text, Visibility Score (mono %, score-band badge), Avg Position
 (mono, `—` placeholder at MVP), Sentiment (mono, `—` placeholder), Topic (badge), Branded
 (badge), Enabled toggle. Row actions: edit, delete, enable/disable. CSV import opens a dialog

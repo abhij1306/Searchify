@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { setActiveWorkspaceId } from '@/lib/api/client';
@@ -13,6 +13,7 @@ import PromptsPage from './page';
 const WORKSPACE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PROJECT_ID = '11111111-1111-4111-8111-111111111111';
 const SET_ID = '22222222-2222-4222-8222-222222222222';
+const TOPIC_ID = '55555555-5555-4555-8555-555555555555';
 
 function makePrompt(overrides: Record<string, unknown> = {}) {
   return {
@@ -23,8 +24,60 @@ function makePrompt(overrides: Record<string, unknown> = {}) {
     intent: 'discovery',
     branded: false,
     enabled: true,
+    status: 'active',
     origin: 'manual',
     ...overrides,
+  };
+}
+
+function makeTopic(overrides: Record<string, unknown> = {}) {
+  return {
+    id: TOPIC_ID,
+    project_id: PROJECT_ID,
+    name: 'Footwear',
+    description: '',
+    origin: 'manual',
+    active_count: 1,
+    proposed_count: 0,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function makeEvidenceItem(promptId: string, brandMentioned: boolean, taskId: string) {
+  return {
+    audit_id: '99999999-9999-4999-8999-999999999999',
+    task_id: taskId,
+    analysis_id: taskId,
+    artifact_id: null,
+    prompt_snapshot_id: taskId,
+    prompt_id: promptId,
+    prompt_index: 0,
+    prompt_text: 'Best running shoes?',
+    repetition: 1,
+    completed_at: '2026-01-02T00:00:00Z',
+    logical_engine: 'chatgpt',
+    transport_provider: 'openai',
+    transport_model: 'gpt-test',
+    search_used: false,
+    search_query_count: 0,
+    query_text_available: false,
+    state: 'count_only',
+    search_events: [],
+    event_source: 'none',
+    mentions: brandMentioned
+      ? [
+          {
+            kind: 'brand',
+            name: 'Searchify',
+            first_offset: 0,
+            artifact_id: null,
+            analyzer_version: 'v1',
+          },
+        ]
+      : [],
+    citations: [],
   };
 }
 
@@ -62,22 +115,28 @@ function makeProject(promptSets: unknown[]) {
   };
 }
 
+function baseHandlers(
+  prompts: unknown[],
+  topics: unknown[] = [],
+  evidenceItems: unknown[] = [],
+) {
+  const set = makeSet(prompts);
+  mswServer.use(
+    http.get('/api/v1/projects', () => HttpResponse.json([makeProject([set])])),
+    http.get('/api/v1/prompt-sets', () => HttpResponse.json([set])),
+    http.get(`/api/v1/projects/${PROJECT_ID}/topics`, () => HttpResponse.json(topics)),
+    http.get(`/api/v1/projects/${PROJECT_ID}/visibility/evidence`, () =>
+      HttpResponse.json({ items: evidenceItems, truncated: false }),
+    ),
+  );
+}
+
 function renderPage() {
   return renderWithProviders(
     <ProjectProvider>
       <PromptsPage />
     </ProjectProvider>,
   );
-}
-
-/** Register the base handlers: project list + prompt-set list. */
-function baseHandlers(prompts: unknown[]) {
-  const set = makeSet(prompts);
-  mswServer.use(
-    http.get('/api/v1/projects', () => HttpResponse.json([makeProject([set])])),
-    http.get('/api/v1/prompt-sets', () => HttpResponse.json([set])),
-  );
-  return set;
 }
 
 beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
@@ -88,38 +147,88 @@ beforeEach(() => {
 afterEach(() => mswServer.resetHandlers());
 afterAll(() => mswServer.close());
 
-describe('PromptsPage', () => {
-  it('renders the prompt table with a row per prompt', async () => {
-    baseHandlers([makePrompt(), makePrompt({ id: '44444444-4444-4444-8444-444444444444', text: 'Nike vs Adidas', intent: 'comparison' })]);
-    renderPage();
-
-    expect(await screen.findByText('Best running shoes?', undefined, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText('Nike vs Adidas')).toBeInTheDocument();
-  });
-
-  it('shows the empty state when the set has no prompts', async () => {
-    baseHandlers([]);
-    renderPage();
-
-    expect(await screen.findByText('No prompts yet', undefined, { timeout: 5000 })).toBeInTheDocument();
-    // Both the toolbar and the empty-state card expose an "Add prompt" action.
-    expect(screen.getAllByRole('button', { name: 'Add prompt' }).length).toBeGreaterThan(0);
-  });
-
-  it('renders the AI-suggest panel in its not-yet-enabled state', async () => {
-    baseHandlers([makePrompt()]);
+describe('PromptsPage (Your Prompts)', () => {
+  it('groups active prompts by topic with a summary banner and Prompt Research link', async () => {
+    baseHandlers(
+      [
+        makePrompt({ topic_id: TOPIC_ID }),
+        makePrompt({
+          id: '44444444-4444-4444-8444-444444444444',
+          text: 'Ungrouped prompt',
+        }),
+        // Proposed prompts never appear on Your Prompts.
+        makePrompt({
+          id: '66666666-6666-4666-8666-666666666666',
+          text: 'Proposed prompt',
+          status: 'proposed',
+        }),
+      ],
+      [makeTopic()],
+    );
     renderPage();
 
     expect(
-      await screen.findByText('Generate prompts & topics', undefined, { timeout: 5000 }),
+      await screen.findByText('Best running shoes?', undefined, { timeout: 5000 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Coming soon')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled();
+    // Banner counts only active prompts (2) and topics with prompts (1).
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to Prompt Research' })).toHaveAttribute(
+      'href',
+      '/prompt-research',
+    );
+    // Topic group header + ungrouped bucket.
+    expect(screen.getAllByText('Footwear').length).toBeGreaterThan(0);
+    expect(screen.getByText('Ungrouped')).toBeInTheDocument();
+    expect(screen.queryByText('Proposed prompt')).not.toBeInTheDocument();
   });
 
-  it('filters by search', async () => {
+  it('collapses a topic group when its expander is toggled', async () => {
     const user = userEvent.setup();
-    baseHandlers([makePrompt(), makePrompt({ id: '44444444-4444-4444-8444-444444444444', text: 'Nike vs Adidas', intent: 'comparison' })]);
+    baseHandlers([makePrompt({ topic_id: TOPIC_ID })], [makeTopic()]);
+    renderPage();
+
+    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
+    await user.click(screen.getByRole('button', { name: 'Collapse topic Footwear' }));
+    expect(screen.queryByText('Best running shoes?')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Expand topic Footwear' }));
+    expect(screen.getByText('Best running shoes?')).toBeInTheDocument();
+  });
+
+  it('derives per-prompt visibility scores from persisted evidence', async () => {
+    const promptId = '33333333-3333-4333-8333-333333333333';
+    baseHandlers(
+      [makePrompt({ topic_id: TOPIC_ID })],
+      [makeTopic()],
+      [
+        makeEvidenceItem(promptId, true, 'bbbbbbbb-0000-4000-8000-000000000001'),
+        makeEvidenceItem(promptId, true, 'bbbbbbbb-0000-4000-8000-000000000002'),
+        makeEvidenceItem(promptId, false, 'bbbbbbbb-0000-4000-8000-000000000003'),
+      ],
+    );
+    renderPage();
+
+    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
+    // 2 of 3 executions mentioned the brand → 67%, on both the prompt row and
+    // the single-prompt topic group row.
+    expect(await screen.findAllByText('67%')).toHaveLength(2);
+  });
+
+  it('shows the empty state pointing to Prompt Research when no active prompts exist', async () => {
+    baseHandlers([]);
+    renderPage();
+
+    expect(
+      await screen.findByText('No active prompts yet', undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Prompt Research/ }).length).toBeGreaterThan(0);
+  });
+
+  it('filters prompts by search', async () => {
+    const user = userEvent.setup();
+    baseHandlers([
+      makePrompt(),
+      makePrompt({ id: '44444444-4444-4444-8444-444444444444', text: 'Nike vs Adidas' }),
+    ]);
     renderPage();
 
     await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
@@ -127,104 +236,5 @@ describe('PromptsPage', () => {
 
     expect(screen.queryByText('Best running shoes?')).not.toBeInTheDocument();
     expect(screen.getByText('Nike vs Adidas')).toBeInTheDocument();
-  });
-
-  it('creates a prompt through the add dialog', async () => {
-    const user = userEvent.setup();
-    baseHandlers([]);
-    let created: Record<string, unknown> | null = null;
-    mswServer.use(
-      http.post(`/api/v1/prompt-sets/${SET_ID}/prompts`, async ({ request }) => {
-        created = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json(makePrompt({ text: created.text as string }), { status: 201 });
-      }),
-    );
-
-    renderPage();
-    await screen.findByText('No prompts yet', undefined, { timeout: 5000 });
-    // The toolbar action is the first "Add prompt" button.
-    await user.click(screen.getAllByRole('button', { name: 'Add prompt' })[0]);
-
-    const dialog = await screen.findByRole('dialog');
-    await user.type(within(dialog).getByLabelText(/Prompt text/), 'Fresh prompt');
-    await user.click(within(dialog).getByRole('button', { name: 'Add prompt' }));
-
-    await waitFor(() => expect(created).not.toBeNull());
-    expect(created).toMatchObject({ text: 'Fresh prompt', enabled: true });
-  });
-
-  it('toggles enabled via the row switch', async () => {
-    const user = userEvent.setup();
-    baseHandlers([makePrompt({ enabled: true })]);
-    let patched: Record<string, unknown> | null = null;
-    mswServer.use(
-      http.patch('/api/v1/prompts/:id', async ({ request }) => {
-        patched = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json(makePrompt({ enabled: false }));
-      }),
-    );
-
-    renderPage();
-    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
-    await user.click(screen.getByRole('switch', { name: /disable prompt/i }));
-
-    await waitFor(() => expect(patched).toEqual({ enabled: false }));
-  });
-
-  it('deletes a prompt via the row menu', async () => {
-    const user = userEvent.setup();
-    baseHandlers([makePrompt()]);
-    let deleted = false;
-    mswServer.use(
-      http.delete('/api/v1/prompts/:id', () => {
-        deleted = true;
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
-
-    renderPage();
-    await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });
-    await user.click(screen.getByRole('button', { name: 'Prompt actions' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-
-    await waitFor(() => expect(deleted).toBe(true));
-  });
-
-  it('parses, previews, and persists a CSV import', async () => {
-    const user = userEvent.setup();
-    baseHandlers([]);
-    let imported: { prompts: unknown[] } | null = null;
-    mswServer.use(
-      http.post(`/api/v1/prompt-sets/${SET_ID}/import`, async ({ request }) => {
-        imported = (await request.json()) as { prompts: unknown[] };
-        return HttpResponse.json(makeSet([makePrompt({ origin: 'imported' })]), { status: 201 });
-      }),
-    );
-
-    renderPage();
-    await screen.findByText('No prompts yet', undefined, { timeout: 5000 });
-    await user.click(screen.getByRole('button', { name: 'Import CSV' }));
-
-    const dialog = await screen.findByRole('dialog');
-    const file = new File(
-      ['text,theme,intent\nBest shoes?,Comfort,discovery\n,MissingText,purchase\n'],
-      'prompts.csv',
-      { type: 'text/csv' },
-    );
-    await user.upload(within(dialog).getByLabelText('CSV file'), file);
-
-    // Preview renders both rows; one is flagged invalid (empty text).
-    expect(await within(dialog).findByText('Best shoes?')).toBeInTheDocument();
-    expect(within(dialog).getByText(/1 skipped/)).toBeInTheDocument();
-
-    // Only the valid row is importable.
-    await user.click(within(dialog).getByRole('button', { name: /Import 1 prompt/ }));
-
-    await waitFor(() => expect(imported).not.toBeNull());
-    const payload = imported as { prompts: unknown[] } | null;
-    if (!payload) throw new Error('import payload was not captured');
-    const rows = payload.prompts;
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ text: 'Best shoes?', intent: 'discovery' });
   });
 });

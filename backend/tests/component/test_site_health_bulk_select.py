@@ -84,6 +84,7 @@ async def test_bulk_select_first_n_matches_inventory_order(
             projects=[{"name": "a", "url_count": 12, "with_active_crawl": True}],
         )
         proj = seed.projects[0]
+        assert proj.crawl_id is not None
         await _admit_urls(session, seed=seed, proj=proj)
         await session.commit()
 
@@ -128,6 +129,7 @@ async def test_bulk_select_all_then_clear(
             projects=[{"name": "a", "url_count": 7, "with_active_crawl": True}],
         )
         proj = seed.projects[0]
+        assert proj.crawl_id is not None
         await _admit_urls(session, seed=seed, proj=proj)
         await session.commit()
 
@@ -180,6 +182,7 @@ async def test_bulk_select_all_over_quota_rejected(
             projects=[{"name": "a", "url_count": 60, "with_active_crawl": True}],
         )
         proj = seed.projects[0]
+        assert proj.crawl_id is not None
         await _admit_urls(session, seed=seed, proj=proj)
         await session.commit()
 
@@ -221,6 +224,7 @@ async def test_bulk_select_validation_and_stale_version(
             projects=[{"name": "a", "url_count": 3, "with_active_crawl": True}],
         )
         proj = seed.projects[0]
+        assert proj.crawl_id is not None
         await _admit_urls(session, seed=seed, proj=proj)
         await session.commit()
 
@@ -279,6 +283,7 @@ async def test_bulk_select_scoped_to_crawl_admission(
             projects=[{"name": "a", "url_count": 6, "with_active_crawl": True}],
         )
         proj = seed.projects[0]
+        assert proj.crawl_id is not None
         # Admit only the first 4 URLs to the crawl; 2 remain unadmitted.
         await _admit_urls(session, seed=seed, proj=proj, only_first=4)
         await session.commit()

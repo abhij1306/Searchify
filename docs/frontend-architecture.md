@@ -26,7 +26,8 @@
 | `/login`, `/register` | Auth | **MVP** |
 | `(app)/layout.tsx` | App shell (sidebar + top bar + project switcher) | **MVP** |
 | `/setup` | Brand/Project setup | **MVP** |
-| `/prompts` | Prompt library (manual + CSV import; AI-suggest = coming-soon) | **MVP** |
+| `/prompts` | Your Prompts — read-only active prompts grouped by topic with measured visibility; links to Prompt Research | **MVP** |
+| `/prompt-research` | Prompt Research — manage prompts (manual + CSV import + AI generation; Topics rail, Active/Proposed/Archived review tabs) | **MVP** |
 | `/providers` | BYOK Provider Settings | **MVP** |
 | `/visibility` | Visibility workspace (four tabs: Overview, Trends, Mentions & Citations, Query Fanout) | **MVP** |
 | `/runs`, `/runs/[runId]`, `/runs/[runId]/executions/[executionId]` | Run/Executions explorer | **MVP** |
@@ -36,7 +37,7 @@
 | `/opportunities` | Opportunities | Roadmap |
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
-| `/topics` | Topics | Roadmap |
+| `/topics` | Dedicated Topics page (topic management already lives in the `/prompt-research` rail) | Roadmap |
 | `/writing` (Tone/Style, Memory), Knowledge Base | Writing suite | Roadmap |
 | Settings → Integrations (GSC/GA4/Bing), Agent, MCP | Integrations / Agent | Roadmap |
 
@@ -48,7 +49,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 |---|---|---|
 | Auth + workspace + project switch | ✅ | |
 | Brand/project setup (aliases, owned/unintended domains, competitors, benchmark_mode) | ✅ | rich Brand/E-E-A-T profile |
-| Prompts: manual entry + CSV import | ✅ | AI-suggested generation (`/generate` stub) |
+| Prompts: manual entry + CSV import + AI-generated topics/prompts (proposed → accept/archive review) | ✅ | |
 | BYOK providers + connection test (direct OpenAI/Anthropic/Google, one route per engine) | ✅ | |
 | Launch audit (multi-engine, repetitions) + cancel | ✅ | recurring schedules |
 | Visibility workspace | four tabs — Overview (selected-run score + per-engine + rankings), Trends (cross-run), Mentions & Citations + Query Fanout (persisted evidence) | Sources / Topics / Sentiment tabs (**not built**) |
@@ -63,7 +64,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Shell + auth | `(auth)/*`, `(app)/layout.tsx`, `session-guard.tsx`, `app-shell`, `sidebar-nav`, `top-bar`, `project-switcher` | Session, guard, nav, project context |
 | API contract layer | `lib/api/{client,errors,query-client,query-keys,schemas,types,index}.ts` + per-domain modules | Transport, zod contracts, retry policy |
 | Setup | `/setup` + `lib/api/projects.ts` | Brand/project create + edit |
-| Prompts | `/prompts` + `lib/api/prompts.ts` | Prompt CRUD, CSV import, AI-suggest coming-soon |
+| Prompts | `/prompts` (Your Prompts) + `/prompt-research` + `lib/api/prompts.ts` + `lib/api/topics.ts` | Your Prompts: topic-grouped read-only view with evidence-derived visibility scores. Prompt Research: prompt CRUD, CSV import, topic rail (create/delete/filter), AI generation dialog (consent-gated), proposed/active/archived status tabs with accept/archive actions |
 | Providers | `/providers` + `lib/api/providers.ts` | BYOK cards, connection test. One **direct** transport per engine (ChatGPT/OpenAI, Gemini/Google, Claude/Anthropic) — the old route toggle and the reserved "Direct OpenAI — coming soon" option are removed. |
 | Visibility | `/visibility` + `lib/api/visibility.ts` | Four-tab workspace with a shared filter bar (§7) |
 | Runs / executions | `/runs/*` + `lib/api/runs.ts` | Launch, progress, cancel, evidence, export |
@@ -81,7 +82,8 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   - Shell/switcher → `/workspaces`, `/projects`
   - Setup → `/projects` (+ `/projects/{id}`)
   - Prompts → `/prompt-sets`, `/prompts/{id}`, `/prompt-sets/{id}/import` (CSV),
-    `/prompt-sets/{id}/generate` (stub → coming-soon UI)
+    `/prompt-sets/{id}/generate` (AI generation), `/prompt-sets/{id}/prompts/bulk-status`
+    (accept-all), `/projects/{id}/topics` + `/topics/{id}` (topic CRUD)
   - Providers → `/provider-connections`, `/provider-connections/{id}/test`, `/provider-catalog`
   - Visibility → `GET /projects/{id}/visibility?audit_id=` (Overview),
     `GET /projects/{id}/visibility/trends` (Trends),

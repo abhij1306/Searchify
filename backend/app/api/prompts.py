@@ -1,11 +1,14 @@
-# Prompts router: prompt-set + prompt CRUD, CSV import, and /generate stub.
+# Prompts router: prompt-set + prompt CRUD, CSV import, topics, /generate.
 #
 # Workspace-scoped through the parent project (invariant 5); the active
-# workspace is resolved by ``require_active_workspace``. The MVP surface:
+# workspace is resolved by ``require_active_workspace``. The surface:
 #   - GET/POST /prompt-sets, GET/PATCH/DELETE /prompt-sets/{id}
 #   - GET/POST /prompt-sets/{id}/prompts, PATCH/DELETE /prompts/{id}
 #   - POST /prompt-sets/{id}/import  -> MVP CSV bulk-create
-#   - POST /prompt-sets/{id}/generate -> roadmap stub (501, B-4)
+#   - POST /prompt-sets/{id}/generate -> AI topic/prompt generation
+#     (default agent, config/agent.py; suggestions land as status='proposed')
+#   - POST /prompt-sets/{id}/prompts/bulk-status -> review transitions
+#   - GET/POST /projects/{id}/topics, PATCH/DELETE /topics/{id}
 from __future__ import annotations
 
 import uuid
@@ -22,10 +25,25 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
+from app.connectors.agent.client import AgentNotConfiguredError, DefaultAgentClient
+from app.connectors.answer_engines.errors import ProviderError
 from app.domain.prompts.csv_import import parse_prompt_csv
-from app.domain.prompts.mappers import prompt_set_to_response, prompt_to_response
+from app.domain.prompts.generation import (
+    GenerationOutputError,
+    GenerationValidationError,
+    generate_prompts,
+    validate_generation_request,
+)
+from app.domain.prompts.mappers import (
+    prompt_set_to_response,
+    prompt_to_response,
+    topic_to_response,
+)
 from app.domain.prompts.schemas import (
+    PromptBulkStatusRequest,
     PromptCreate,
+    PromptGenerateRequest,
+    PromptGenerateResponse,
     PromptImport,
     PromptInput,
     PromptResponse,
@@ -33,10 +51,15 @@ from app.domain.prompts.schemas import (
     PromptSetResponse,
     PromptSetUpdate,
     PromptUpdate,
+    TopicCreate,
+    TopicResponse,
+    TopicUpdate,
 )
 from app.domain.prompts.service import (
+    DuplicatePromptError,
     PromptNotFoundError,
     PromptSetNotFoundError,
+    bulk_set_status,
     create_prompt,
     create_prompt_set,
     delete_prompt,
@@ -48,6 +71,18 @@ from app.domain.prompts.service import (
     update_prompt,
     update_prompt_set,
 )
+from app.domain.prompts.service import (
+    TopicNotFoundError as PromptTopicNotFoundError,
+)
+from app.domain.prompts.topics import (
+    DuplicateTopicError,
+    TopicNotFoundError,
+    create_topic,
+    delete_topic,
+    list_topics,
+    topic_status_counts,
+    update_topic,
+)
 
 router = APIRouter(tags=["prompts"])
 
@@ -57,6 +92,10 @@ _SessionDep = Annotated[AsyncSession, Depends(get_db)]
 
 def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+
+def _conflict(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
 # --------------------------------------------------------------------------
@@ -172,6 +211,8 @@ async def create_prompt_endpoint(
         )
     except PromptSetNotFoundError as exc:
         raise _not_found("Prompt set not found") from exc
+    except DuplicatePromptError as exc:
+        raise _conflict(str(exc)) from exc
     return prompt_to_response(prompt)
 
 
@@ -191,6 +232,10 @@ async def update_prompt_endpoint(
         )
     except PromptNotFoundError as exc:
         raise _not_found("Prompt not found") from exc
+    except PromptTopicNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    except DuplicatePromptError as exc:
+        raise _conflict(str(exc)) from exc
     return prompt_to_response(prompt)
 
 
@@ -255,29 +300,186 @@ async def import_prompts_endpoint(
     return prompt_set_to_response(prompt_set)
 
 
-@router.post("/prompt-sets/{prompt_set_id}/generate")
+@router.post(
+    "/prompt-sets/{prompt_set_id}/generate",
+    response_model=PromptGenerateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def generate_prompts_endpoint(
-    prompt_set_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
-) -> None:
-    """AI-suggested prompt generation — roadmap (B-4).
+    prompt_set_id: uuid.UUID,
+    payload: PromptGenerateRequest,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> PromptGenerateResponse:
+    """AI topic/prompt generation via the app-level default agent.
 
-    Returns 501 with a structured ``not_implemented`` code so the UI can show a
-    coming-soon state. The prompt-set is validated for workspace scope first so
-    an unauthorized caller still gets a 404, not a 501.
+    Guard order: workspace scope (foreign set -> 404) before anything runs,
+    then confirmation/bounds/topic ownership (422), then agent configuration
+    (503) — an invalid payload is rejected as invalid even when no agent is
+    configured, and the backend enforces ``confirm_send_evidence``, never
+    just the UI. Suggestions land as ``status='proposed'`` and are
+    audit-ineligible until a human accepts them.
     """
     try:
-        await get_prompt_set(
-            session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
+        prompt_set = await validate_generation_request(
+            session,
+            workspace_id=ctx.workspace_id,
+            prompt_set_id=prompt_set_id,
+            payload=payload,
         )
     except PromptSetNotFoundError as exc:
         raise _not_found("Prompt set not found") from exc
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail={
-            "code": "not_implemented",
-            "message": (
-                "AI-suggested prompt generation is on the roadmap and not "
-                "available at MVP."
-            ),
-        },
+    except GenerationValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "generation_invalid", "message": str(exc)},
+        ) from exc
+    try:
+        agent = DefaultAgentClient()
+    except AgentNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "agent_not_configured",
+                "message": (
+                    "No default agent is configured. Set DEFAULT_AGENT_API_KEY "
+                    "(or MISTRALAI_API_KEY) in the backend environment."
+                ),
+            },
+        ) from exc
+    try:
+        generated, topics, dropped = await generate_prompts(
+            session,
+            workspace_id=ctx.workspace_id,
+            prompt_set_id=prompt_set_id,
+            payload=payload,
+            agent=agent,
+            prompt_set=prompt_set,
+        )
+    except PromptSetNotFoundError as exc:
+        raise _not_found("Prompt set not found") from exc
+    except GenerationValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "generation_invalid", "message": str(exc)},
+        ) from exc
+    except GenerationOutputError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "generation_unparseable", "message": str(exc)},
+        ) from exc
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "agent_call_failed", "message": str(exc)},
+        ) from exc
+    counts = (
+        await topic_status_counts(session, project_id=topics[0].project_id)
+        if topics
+        else {}
     )
+    return PromptGenerateResponse(
+        generated=[prompt_to_response(p) for p in generated],
+        topics=[topic_to_response(t, counts) for t in topics],
+        dropped_duplicates=dropped,
+    )
+
+
+@router.post(
+    "/prompt-sets/{prompt_set_id}/prompts/bulk-status",
+    response_model=PromptSetResponse,
+)
+async def bulk_status_endpoint(
+    prompt_set_id: uuid.UUID,
+    payload: PromptBulkStatusRequest,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> PromptSetResponse:
+    """Bulk review transition (accept-all / archive-selected)."""
+    try:
+        prompt_set = await bulk_set_status(
+            session,
+            workspace_id=ctx.workspace_id,
+            prompt_set_id=prompt_set_id,
+            prompt_ids=payload.prompt_ids,
+            status=payload.status,
+        )
+    except PromptSetNotFoundError as exc:
+        raise _not_found("Prompt set not found") from exc
+    except PromptNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    return prompt_set_to_response(prompt_set)
+
+
+# --------------------------------------------------------------------------
+# Topics
+# --------------------------------------------------------------------------
+@router.get("/projects/{project_id}/topics", response_model=list[TopicResponse])
+async def list_topics_endpoint(
+    project_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> list[TopicResponse]:
+    try:
+        topics = await list_topics(
+            session, workspace_id=ctx.workspace_id, project_id=project_id
+        )
+    except TopicNotFoundError as exc:
+        raise _not_found("Project not found") from exc
+    counts = await topic_status_counts(session, project_id=project_id)
+    return [topic_to_response(t, counts) for t in topics]
+
+
+@router.post(
+    "/projects/{project_id}/topics",
+    response_model=TopicResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_topic_endpoint(
+    project_id: uuid.UUID,
+    payload: TopicCreate,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> TopicResponse:
+    try:
+        topic = await create_topic(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            payload=payload,
+        )
+    except TopicNotFoundError as exc:
+        raise _not_found("Project not found") from exc
+    except DuplicateTopicError as exc:
+        raise _conflict(str(exc)) from exc
+    return topic_to_response(topic)
+
+
+@router.patch("/topics/{topic_id}", response_model=TopicResponse)
+async def update_topic_endpoint(
+    topic_id: uuid.UUID,
+    payload: TopicUpdate,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> TopicResponse:
+    try:
+        topic = await update_topic(
+            session,
+            workspace_id=ctx.workspace_id,
+            topic_id=topic_id,
+            payload=payload,
+        )
+    except TopicNotFoundError as exc:
+        raise _not_found("Topic not found") from exc
+    except DuplicateTopicError as exc:
+        raise _conflict(str(exc)) from exc
+    counts = await topic_status_counts(session, project_id=topic.project_id)
+    return topic_to_response(topic, counts)
+
+
+@router.delete("/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic_endpoint(
+    topic_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> None:
+    try:
+        await delete_topic(session, workspace_id=ctx.workspace_id, topic_id=topic_id)
+    except TopicNotFoundError as exc:
+        raise _not_found("Topic not found") from exc

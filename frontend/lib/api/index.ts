@@ -12,6 +12,7 @@ import { promptsApi } from './prompts';
 import { providersApi } from './providers';
 import { runsApi } from './runs';
 import { siteHealthApi } from './site-health';
+import { topicsApi } from './topics';
 import { visibilityApi } from './visibility';
 
 export const api = {
@@ -21,12 +22,14 @@ export const api = {
   ...providersApi,
   ...runsApi,
   ...siteHealthApi,
+  ...topicsApi,
   ...visibilityApi,
 };
 
 export { authApi } from './auth';
 export { projectsApi } from './projects';
 export { promptsApi } from './prompts';
+export { topicsApi } from './topics';
 export { providersApi } from './providers';
 export { runsApi } from './runs';
 export { siteHealthApi, siteHealthQueries, siteHealthMutations } from './site-health';

@@ -98,6 +98,7 @@ async def test_endpoints_serve_projections_over_http(
         from app.models.user import User
 
         user = await session.scalar(select(User).where(User.email == email))
+        assert user is not None
         session.add(
             WorkspaceMember(
                 workspace_id=seed.workspace_id, user_id=user.id, role="owner"

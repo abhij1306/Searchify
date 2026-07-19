@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Archive, Check, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,25 +19,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { Prompt } from '@/lib/api/types';
+import type { Prompt, PromptStatus } from '@/lib/api/types';
 import { intentLabels } from '@/lib/prompts/forms';
 
 /**
  * Prompt table (F7). Dense analytics table with columns text / theme / intent /
- * branded / enabled and per-row actions (edit, delete, enable/disable toggle).
- * Purely presentational — CRUD is delegated to callbacks owned by the page.
+ * branded / enabled and per-row actions (edit, delete, enable/disable toggle,
+ * and — when `onSetStatus` is wired — review transitions: accept a proposed
+ * prompt, archive, or restore an archived one). Purely presentational — CRUD
+ * is delegated to callbacks owned by the page.
  */
 export function PromptTable({
   prompts,
   onEdit,
   onDelete,
   onToggleEnabled,
+  onSetStatus,
   busyId,
 }: Readonly<{
   prompts: Prompt[];
   onEdit: (prompt: Prompt) => void;
   onDelete: (prompt: Prompt) => void;
   onToggleEnabled: (prompt: Prompt) => void;
+  onSetStatus?: (prompt: Prompt, status: PromptStatus) => void;
   busyId?: string | null;
 }>) {
   return (
@@ -99,10 +103,28 @@ export function PromptTable({
                     </Button>
                   </DropdownTrigger>
                   <DropdownContent align="end">
+                    {onSetStatus && prompt.status === 'proposed' ? (
+                      <DropdownItem onSelect={() => onSetStatus(prompt, 'active')}>
+                        <Check className="size-4" aria-hidden />
+                        Accept
+                      </DropdownItem>
+                    ) : null}
+                    {onSetStatus && prompt.status === 'archived' ? (
+                      <DropdownItem onSelect={() => onSetStatus(prompt, 'active')}>
+                        <Check className="size-4" aria-hidden />
+                        Restore
+                      </DropdownItem>
+                    ) : null}
                     <DropdownItem onSelect={() => onEdit(prompt)}>
                       <Pencil className="size-4" aria-hidden />
                       Edit
                     </DropdownItem>
+                    {onSetStatus && prompt.status !== 'archived' ? (
+                      <DropdownItem onSelect={() => onSetStatus(prompt, 'archived')}>
+                        <Archive className="size-4" aria-hidden />
+                        Archive
+                      </DropdownItem>
+                    ) : null}
                     <DropdownSeparator className="my-1 h-px bg-border-subtle" />
                     <DropdownItem
                       onSelect={() => onDelete(prompt)}

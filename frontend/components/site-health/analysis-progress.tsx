@@ -1,12 +1,13 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label, Metric } from '@/components/ui/typography';
 import { PagesTable } from '@/components/site-health/pages-table';
 import type { PageSummary, SiteCrawl } from '@/lib/api/types';
-import { crawlBadgeValue, formatScore, statusLabel } from '@/lib/site-health/status';
+import { PLACEHOLDER, crawlBadgeValue, formatScore, statusLabel } from '@/lib/site-health/status';
 
 /**
  * Live analysis-progress view (Slice 7, mockup 712).
@@ -29,6 +30,9 @@ export function AnalysisProgress({
   crawl,
   pages,
   selectedTotal,
+  selectedError = false,
+  pagesError = false,
+  pagesLoading = false,
   onCancel,
   cancelPending,
 }: Readonly<{
@@ -36,6 +40,12 @@ export function AnalysisProgress({
   pages: PageSummary[];
   /** This project's active monitored (selected) URL count; null until loaded. */
   selectedTotal: number | null;
+  /** True when the monitored-count fetch failed (counts fall back, noted in UI). */
+  selectedError?: boolean;
+  /** True when the per-page window fetch failed (an empty table would be misleading). */
+  pagesError?: boolean;
+  /** True while the per-page window is loading for the first time (no rows yet). */
+  pagesLoading?: boolean;
   onCancel: () => void;
   cancelPending: boolean;
 }>) {
@@ -63,18 +73,36 @@ export function AnalysisProgress({
   // window (no server counter exists for it), and `queued` is the arithmetic
   // remainder — clamped at 0 so a transiently-stale mix of counters can never
   // render a negative count.
+  //
+  // The "selected total" is not known until the terminal `score_summary` lands
+  // or the per-project monitored count resolves. Until then, showing `Queued: 0`
+  // is misleading (it reads as "nothing left to do" when in fact the total is
+  // simply unknown). `countsKnown` gates the Queued cell so it renders `—`
+  // during that initial window rather than a false zero.
+  const countsKnown = summary != null || selectedTotal != null;
   const running = pages.filter((p) => p.analysis_status === 'running').length;
   const completed = analyzed;
   const failed = crawl.failed_count;
-  const queued = Math.max(0, selected - completed - failed - running);
+  const queued = countsKnown ? Math.max(0, selected - completed - failed - running) : null;
 
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <ScoreCell label="Site Health" value={overall} sub={`based on ${analyzed} of ${selected} pages`} />
+        <ScoreCell
+          label="Site Health"
+          value={overall}
+          sub={countsKnown ? `based on ${analyzed} of ${selected} pages` : `based on ${analyzed} pages so far`}
+        />
         <ScoreCell label="Technical" value={technical} />
         <ScoreCell label="AEO" value={aeo} />
       </div>
+
+      {selectedError ? (
+        <Alert tone="warning">
+          Could not load the selected-page count — progress totals may be approximate until it
+          refreshes.
+        </Alert>
+      ) : null}
 
       <Card>
         <CardContent className="grid gap-5">
@@ -93,7 +121,7 @@ export function AnalysisProgress({
           </div>
 
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <CountCell label="Total pages" value={selected} />
+            <CountCell label="Total pages" value={countsKnown ? selected : null} />
             <CountCell label="Completed" value={completed} className="text-run-completed" />
             <CountCell label="In progress" value={running} className="text-run-running" />
             <CountCell label="Queued" value={queued} className="text-muted" />
@@ -103,7 +131,27 @@ export function AnalysisProgress({
 
       <Card>
         <CardContent className="p-0">
-          <PagesTable pages={pages} crawlId={crawl.id} />
+          {pagesError ? (
+            <div className="p-4">
+              <Alert tone="warning">
+                Could not load the per-page audit table
+                {pages.length > 0 ? ' — showing the last loaded results.' : '.'} It will refresh
+                automatically.
+              </Alert>
+            </div>
+          ) : null}
+          {pages.length === 0 && !pagesError && pagesLoading ? (
+            <p className="p-4 text-sm text-muted" aria-live="polite">
+              Loading audited pages…
+            </p>
+          ) : null}
+          {/* Render the table only when there are rows to show, or the query
+              resolved successfully with a genuine empty result. A failed or
+              still-loading fetch with no cached rows must not render bare
+              table headers that read as a valid "no pages" outcome. */}
+          {pages.length > 0 || (!pagesError && !pagesLoading) ? (
+            <PagesTable pages={pages} crawlId={crawl.id} />
+          ) : null}
         </CardContent>
       </Card>
     </div>
@@ -154,11 +202,11 @@ function CountCell({
   label,
   value,
   className,
-}: Readonly<{ label: string; value: number; className?: string }>) {
+}: Readonly<{ label: string; value: number | null; className?: string }>) {
   return (
     <div className="grid gap-1">
       <Label>{label}</Label>
-      <Metric className={`text-xl ${className ?? ''}`}>{value}</Metric>
+      <Metric className={`text-xl ${className ?? ''}`}>{value === null ? PLACEHOLDER : value}</Metric>
     </div>
   );
 }

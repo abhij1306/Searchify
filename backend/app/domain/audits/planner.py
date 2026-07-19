@@ -43,6 +43,7 @@ from app.core.config.projects import (
     MAX_REPETITIONS,
     MIN_REPETITIONS,
 )
+from app.core.config.prompts import PROMPT_STATUS_ACTIVE
 from app.core.config.provider_catalog import (
     LOGICAL_ENGINES,
     is_route_approved,
@@ -130,7 +131,7 @@ async def _resolve_prompts(
     prompt_set_id: uuid.UUID | None,
     prompt_ids: list[uuid.UUID],
 ) -> list[Prompt]:
-    """Resolve enabled prompts from a set or explicit ids, workspace-scoped."""
+    """Resolve active, enabled prompts from a set or explicit ids, workspace-scoped."""
     stmt = (
         select(Prompt)
         .join(PromptSet, PromptSet.id == Prompt.prompt_set_id)
@@ -139,6 +140,9 @@ async def _resolve_prompts(
             Project.workspace_id == workspace_id,
             Project.id == project_id,
             Prompt.enabled.is_(True),
+            # Proposed (unreviewed AI suggestions) and archived prompts are
+            # never audit-eligible — only human-accepted active prompts run.
+            Prompt.status == PROMPT_STATUS_ACTIVE,
         )
         .order_by(Prompt.created_at.asc())
     )
@@ -159,7 +163,8 @@ async def _resolve_prompts(
         if unavailable:
             missing = ", ".join(str(pid) for pid in sorted(map(str, unavailable)))
             raise AuditValidationError(
-                f"Prompt(s) not found, disabled, or not in this project: {missing}"
+                f"Prompt(s) not found, disabled, not active, or not in this "
+                f"project: {missing}"
             )
     if not prompts:
         raise AuditValidationError("No enabled prompts to audit")

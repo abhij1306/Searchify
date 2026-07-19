@@ -1,13 +1,19 @@
 /**
  * Prompts domain endpoints (F2/F7): prompt-set CRUD, individual prompt edits,
- * CSV import (raw file or browser-parsed rows), and the AI-suggest `/generate`
- * stub (coming-soon UI). Every response passes through `strictValidate`.
+ * CSV import (raw file or browser-parsed rows), AI generation via the
+ * app-level default agent, and bulk review-status transitions. Every response
+ * passes through `strictValidate`.
  */
 import { z } from 'zod';
 
 import { apiClient, type ApiRequestOptions } from './client';
-import { promptSchema, promptSetSchema, strictValidate } from './schemas';
-import type { Prompt, PromptSet } from './types';
+import {
+  promptGenerateResponseSchema,
+  promptSchema,
+  promptSetSchema,
+  strictValidate,
+} from './schemas';
+import type { Prompt, PromptGenerateResponse, PromptSet, PromptStatus } from './types';
 
 const promptSetListSchema = z.array(promptSetSchema);
 
@@ -19,6 +25,22 @@ export type PromptInput = {
   intent: Prompt['intent'];
   branded: boolean;
   enabled: boolean;
+};
+
+export type PromptUpdateInput = Partial<PromptInput> & {
+  status?: PromptStatus;
+  // Explicit null detaches the prompt from its topic.
+  topic_id?: string | null;
+};
+
+export type PromptGenerateInput = {
+  count?: number;
+  // Scope generation to one existing topic; omitted = model proposes topics.
+  topic_id?: string;
+  intents?: Prompt['intent'][];
+  // Backend-enforced consent gate: brand evidence is only sent to the default
+  // agent when this is true (422 otherwise).
+  confirm_send_evidence: boolean;
 };
 
 export const promptsApi = {
@@ -46,7 +68,7 @@ export const promptsApi = {
   },
   updatePrompt: async (
     promptId: string,
-    input: Partial<PromptInput>,
+    input: PromptUpdateInput,
     options?: ApiRequestOptions,
   ) => {
     const res = await apiClient.patch<Prompt>(`/prompts/${promptId}`, input, options);
@@ -82,10 +104,35 @@ export const promptsApi = {
     return strictValidate(promptSetSchema, res, 'prompts.importRows');
   },
   /**
-   * AI-suggest stub (B-4). The backend returns 501 `not_implemented`, so this
-   * call is expected to throw an `ApiError`; the coming-soon UI does not invoke
-   * it eagerly. Kept here so the panel can wire a probe when the roadmap lands.
+   * AI topic/prompt generation via the app-level default agent. Suggestions
+   * land as `proposed` (never audit-eligible until accepted). The caller must
+   * set `confirm_send_evidence: true` after user consent — the backend
+   * enforces it. Errors: 422 invalid, 502 agent/output failure, 503 when no
+   * default agent is configured in the backend environment.
    */
-  generate: (promptSetId: string, options?: ApiRequestOptions) =>
-    apiClient.post<void>(`/prompt-sets/${promptSetId}/generate`, undefined, options),
+  generate: async (
+    promptSetId: string,
+    input: PromptGenerateInput,
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.post<PromptGenerateResponse>(
+      `/prompt-sets/${promptSetId}/generate`,
+      input,
+      options,
+    );
+    return strictValidate(promptGenerateResponseSchema, res, 'prompts.generate');
+  },
+  /** Bulk review transition (accept-all / archive-selected). */
+  bulkStatus: async (
+    promptSetId: string,
+    input: { prompt_ids: string[]; status: PromptStatus },
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.post<PromptSet>(
+      `/prompt-sets/${promptSetId}/prompts/bulk-status`,
+      input,
+      options,
+    );
+    return strictValidate(promptSetSchema, res, 'prompts.bulkStatus');
+  },
 };

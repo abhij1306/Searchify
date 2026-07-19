@@ -63,6 +63,7 @@ from app.domain.site_health.normalization import (
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
+from app.domain.site_health.snapshot import persist_crawl_snapshot
 from app.domain.site_health.state_events import (
     apply_analysis_status,
     apply_crawl_status,
@@ -440,6 +441,21 @@ async def cancel_crawl(
             error_code="cancelled",
         )
     )
+
+    # Cancellation-time snapshot: if the run already produced completed
+    # analyses for ACTIVE monitored URLs, roll them up into the SAME canonical
+    # crawl snapshot the worker writes on clean terminalization (one shared
+    # algorithm, no duplication). This makes ``score_summary`` non-null so the
+    # frontend keeps the dashboard (partial scores + inventory), labels the run
+    # Cancelled, and offers Recrawl — instead of hiding results behind a null
+    # summary. ``persist_crawl_snapshot`` decides from its single fetched
+    # aggregate row set: when nothing aggregable exists (no active completed
+    # analyses — including a completed analysis whose monitored URL was since
+    # deactivated) it writes neither the snapshot nor the projection and returns
+    # ``False``, so the summary stays null (never a fabricated zero) and the UI
+    # shows its terminal / selection state. No separate precheck — that would be
+    # a TOCTOU race against membership/analysis changes.
+    await persist_crawl_snapshot(session, crawl=crawl)
 
     record_crawl_event(
         session,
@@ -1231,9 +1247,7 @@ def _issue_filter_clause(
             # The catalog UI exposes a three-tier vocabulary (high/medium/low);
             # ``critical`` folds into ``high`` so the High filter matches the
             # rows its chip count includes.
-            clauses.append(
-                SiteIssue.severity.in_([SEVERITY_HIGH, SEVERITY_CRITICAL])
-            )
+            clauses.append(SiteIssue.severity.in_([SEVERITY_HIGH, SEVERITY_CRITICAL]))
         else:
             clauses.append(SiteIssue.severity == severity)
     if category:

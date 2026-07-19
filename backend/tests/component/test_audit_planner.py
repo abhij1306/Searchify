@@ -247,6 +247,7 @@ async def test_create_audit_rejects_unknown_or_disabled_prompt_ids(
     async with session_factory() as session:
         disabled_id = seed.prompt_ids[0]
         prompt = await session.get(Prompt, disabled_id)
+        assert prompt is not None
         prompt.enabled = False
         await session.commit()
 

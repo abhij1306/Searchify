@@ -203,11 +203,11 @@ async def test_gemini_adapter_executes_and_records_provenance() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    gemini_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    gemini_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         result = await adapter.execute(request)
     finally:
-        gemini_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        gemini_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     assert result.transport_provider == "google"
     assert result.logical_engine == "gemini"
     assert result.search_used is True
@@ -224,7 +224,7 @@ async def test_gemini_adapter_maps_http_error() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    gemini_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    gemini_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         with pytest.raises(ProviderError) as excinfo:
             await adapter.execute(
@@ -236,7 +236,7 @@ async def test_gemini_adapter_maps_http_error() -> None:
                 )
             )
     finally:
-        gemini_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        gemini_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     assert excinfo.value.error_code == "rate_limit"
     assert excinfo.value.retryable is True
 
@@ -379,7 +379,7 @@ async def test_anthropic_adapter_executes_and_records_provenance() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    anthropic_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    anthropic_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         result = await adapter.execute(
             AnswerEngineRequest(
@@ -390,7 +390,7 @@ async def test_anthropic_adapter_executes_and_records_provenance() -> None:
             )
         )
     finally:
-        anthropic_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        anthropic_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     assert result.transport_provider == "anthropic"
     assert result.logical_engine == "claude"
     assert result.transport_model == "claude-sonnet-4-6"
@@ -578,7 +578,7 @@ async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() ->
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         result = await adapter.execute(
             AnswerEngineRequest(
@@ -589,7 +589,7 @@ async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() ->
             )
         )
     finally:
-        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     # BYOK key travels only in the Authorization header, never the body.
     assert captured["auth"] == "Bearer secret-openai-key"
     body = captured["body"]
@@ -612,7 +612,7 @@ async def test_openai_adapter_maps_http_status_to_error_code() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         with pytest.raises(ProviderError) as excinfo:
             await adapter.execute(
@@ -624,7 +624,7 @@ async def test_openai_adapter_maps_http_status_to_error_code() -> None:
                 )
             )
     finally:
-        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     assert excinfo.value.error_code == "rate_limit"
     assert excinfo.value.retryable is True
 
@@ -643,7 +643,7 @@ async def test_openai_adapter_maps_timeout() -> None:
         kwargs["transport"] = transport
         return orig(*args, **kwargs)
 
-    openai_mod.httpx.AsyncClient = _client  # type: ignore[assignment]
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
     try:
         with pytest.raises(ProviderError) as excinfo:
             await adapter.execute(
@@ -655,7 +655,7 @@ async def test_openai_adapter_maps_timeout() -> None:
                 )
             )
     finally:
-        openai_mod.httpx.AsyncClient = orig  # type: ignore[assignment]
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     assert excinfo.value.error_code == "timeout"
     assert excinfo.value.retryable is True
 

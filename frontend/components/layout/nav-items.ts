@@ -47,7 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Prompts',
     items: [
       { label: 'Your Prompts', href: '/prompts', icon: MessageSquareText, live: true },
-      { label: 'Prompt Research', href: '/topics', icon: Sparkles, live: false },
+      { label: 'Prompt Research', href: '/prompt-research', icon: Sparkles, live: true },
     ],
   },
   {
