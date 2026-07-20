@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { Alert } from '@/components/ui/alert';
+import { ActiveRunBanner } from '@/components/visibility/active-run-banner';
 import { DashboardSkeleton } from '@/components/visibility/dashboard-skeleton';
 import { VisibilityEmptyState } from '@/components/visibility/empty-state';
 import { FanoutEvidence } from '@/components/visibility/fanout-evidence';
@@ -38,6 +39,7 @@ export function VisibilityDashboard() {
   const {
     auditsQuery,
     runOptions,
+    activeRun,
     activeRunId,
     hasRuns,
     visibilityQuery,
@@ -64,10 +66,16 @@ export function VisibilityDashboard() {
     );
   }
 
-  // Preserve the launch-your-first-audit empty state: a project with no
-  // completed runs has nothing to show in any tab.
+  // A project with no dashboard-ready runs has nothing to project — but a run
+  // that is still in progress must be visible here (the audits query keeps
+  // polling), not silently absent until it completes.
   if (!hasRuns) {
-    return <VisibilityEmptyState />;
+    return (
+      <div className="grid gap-5">
+        {activeRun ? <ActiveRunBanner run={activeRun} /> : null}
+        <VisibilityEmptyState hasActiveRun={Boolean(activeRun)} />
+      </div>
+    );
   }
 
   let panel: ReactNode;
@@ -99,6 +107,7 @@ export function VisibilityDashboard() {
 
   return (
     <div className="grid gap-5">
+      {activeRun ? <ActiveRunBanner run={activeRun} /> : null}
       <VisibilityToolbar
         activeTab={filters.activeTab}
         runs={runOptions}

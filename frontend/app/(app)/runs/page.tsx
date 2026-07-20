@@ -12,7 +12,11 @@ import { LaunchDialog } from '@/components/runs/launch-dialog';
 import { RunsTable } from '@/components/runs/runs-table';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
+import { shouldPollAudit } from '@/lib/runs/status';
 import { useActiveProject } from '@/lib/project/project-context';
+
+/** Poll interval (ms) for the runs list while any run is active. */
+const POLL_INTERVAL_MS = 3_000;
 
 /**
  * Runs list screen (F10, design.md §9.7).
@@ -32,6 +36,12 @@ export default function RunsPage() {
     queryKey: queryKeys.runs.list({ project_id: projectId ?? '' }),
     queryFn: ({ signal }) => runsApi.listAudits({ project_id: projectId as string }, { signal }),
     enabled: Boolean(projectId),
+    // Keep statuses/counts live while any run is progressing; stop once all
+    // runs are terminal.
+    refetchInterval: (query) => {
+      const audits = query.state.data;
+      return audits?.some((audit) => shouldPollAudit(audit.status)) ? POLL_INTERVAL_MS : false;
+    },
   });
 
   const audits = runsQuery.data ?? [];

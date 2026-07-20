@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Visibility } from '@/lib/api/types';
 import {
   PLACEHOLDER,
+  findActiveRun,
   formatRate,
   formatScore,
   isDashboardStatus,
@@ -59,6 +60,31 @@ describe('visibility dashboard helpers', () => {
     expect(isDashboardStatus('completed')).toBe(true);
     expect(isDashboardStatus('partially_completed')).toBe(true);
     expect(isDashboardStatus('running')).toBe(false);
+  });
+
+  it('finds the newest non-terminal run as the active run', () => {
+    expect(
+      findActiveRun([
+        {
+          id: AUDIT_A,
+          status: 'completed',
+          created_at: '2026-07-10T00:00:00Z',
+        },
+        { id: AUDIT_B, status: 'running', created_at: '2026-07-12T00:00:00Z' },
+        { id: AUDIT_C, status: 'queued', created_at: '2026-07-14T00:00:00Z' },
+      ]),
+    ).toEqual({ id: AUDIT_C, status: 'queued', createdAt: '2026-07-14T00:00:00Z' });
+  });
+
+  it('returns null when every run is terminal', () => {
+    expect(
+      findActiveRun([
+        { id: AUDIT_A, status: 'completed', created_at: '2026-07-10T00:00:00Z' },
+        { id: AUDIT_B, status: 'failed', created_at: '2026-07-12T00:00:00Z' },
+        { id: AUDIT_C, status: 'cancelled', created_at: '2026-07-14T00:00:00Z' },
+      ]),
+    ).toBeNull();
+    expect(findActiveRun([])).toBeNull();
   });
 
   it('formats rates and scores, falling back to the placeholder', () => {

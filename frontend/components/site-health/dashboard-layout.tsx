@@ -36,7 +36,6 @@ export function SiteHealthDashboardLayout({
     projectSelectedTotal,
     projectSelectedError,
     crawlStarting,
-    createMutation,
     cancelMutation,
     startCrawl,
   } = screen;
@@ -58,7 +57,11 @@ export function SiteHealthDashboardLayout({
         crawl={crawl}
         dashboard={dashboardQuery.data}
         pages={pagesQuery.data?.items ?? []}
-        analyzing={phase === 'analyzing'}
+        // Live running-mean fallback applies whenever analysis may still be
+        // producing scores — the analyzing phase, and an ACTIVE crawl already
+        // showing a mid-run dashboard projection (phase 'dashboard' via
+        // hasScoreData with null metric fields).
+        analyzing={phase === 'analyzing' || (phase === 'dashboard' && active)}
         selectedTotal={projectSelectedTotal}
       />
 
@@ -75,7 +78,10 @@ export function SiteHealthDashboardLayout({
         pagesError={pagesQuery.isError}
         pagesLoading={pagesQuery.isLoading}
         onStartAnalysis={startCrawl}
-        startPending={createMutation.isPending}
+        // Disabled for the FULL starting window (create in flight AND the
+        // post-success gap until the dashboard returns the new crawl) so a
+        // second click can never fire a duplicate create.
+        startPending={crawlStarting}
       />
     </div>
   );

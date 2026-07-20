@@ -8,12 +8,40 @@ OpenRouter) depends on the shared type rather than on a sibling adapter.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.core.config.provider_catalog import (
     ERROR_AUTH,
     ERROR_CLIENT,
     ERROR_RATE_LIMIT,
     ERROR_SERVER,
 )
+
+# Cap on the provider-supplied error message we surface (defensive: keeps the
+# ProviderError message short even if the provider returns a huge body).
+_ERROR_DETAIL_MAX_LEN = 240
+
+
+def safe_error_detail(payload: dict[str, Any]) -> str:
+    """Extract the error type + message from a provider error body.
+
+    Anthropic and OpenAI error bodies share the shape ``{"error": {"type":
+    "...", "message": "..."}}``. Only these two known fields are read (never
+    the full body), and the message is length-capped. The message names the
+    actual failure (e.g. a credit-balance problem behind a generic HTTP 400),
+    which is essential for the connection-test UI.
+    """
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return ""
+    parts = []
+    error_type = str(error.get("type") or "").strip()
+    if error_type:
+        parts.append(error_type)
+    message = str(error.get("message") or "").strip()
+    if message:
+        parts.append(message[:_ERROR_DETAIL_MAX_LEN])
+    return ": ".join(parts)
 
 
 class ProviderError(RuntimeError):

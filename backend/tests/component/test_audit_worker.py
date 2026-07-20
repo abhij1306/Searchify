@@ -12,6 +12,8 @@ claim/lease loop against a Postgres schema:
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -185,6 +187,59 @@ class _OpenAIStubAdapter(_StubAdapter):
 
     logical_engine = ENGINE_CHATGPT
     transport_provider = TRANSPORT_OPENAI
+
+
+class _ConcurrencyProbeAdapter(_StubAdapter):
+    """Stub that records how many executes overlap in flight."""
+
+    in_flight = 0
+    max_in_flight = 0
+
+    async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
+        cls = _ConcurrencyProbeAdapter
+        cls.in_flight += 1
+        cls.max_in_flight = max(cls.max_in_flight, cls.in_flight)
+        try:
+            # Yield so concurrently-running tasks can enter before we return;
+            # under serial execution max_in_flight would stay at 1.
+            await asyncio.sleep(0.05)
+            return await super().execute(request)
+        finally:
+            cls.in_flight -= 1
+
+
+@pytest.mark.asyncio
+async def test_worker_executes_claimed_batch_concurrently(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A claimed batch runs concurrently (asyncio.gather), so per-prompt provider
+    # latency doesn't stack linearly across the run's wall-clock time.
+    seed, audit = await _make_audit(session_factory, prompts=4, reps=1)  # 4 tasks
+
+    _ConcurrencyProbeAdapter.in_flight = 0
+    _ConcurrencyProbeAdapter.max_in_flight = 0
+    monkeypatch.setattr(
+        audit_worker, "build_adapter", lambda **_: _ConcurrencyProbeAdapter()
+    )
+    monkeypatch.setattr(audit_settings, "min_request_interval_seconds", 0.0)
+    monkeypatch.setattr(audit_settings, "heartbeat_interval_seconds", 3600.0)
+    monkeypatch.setattr(audit_settings, "worker_concurrency", 4)
+
+    worker = AuditWorker(session_factory=session_factory, owner="w-conc")
+    await worker.run_until_idle()
+
+    assert _ConcurrencyProbeAdapter.max_in_flight > 1
+
+    async with session_factory() as session:
+        tasks = await list_tasks(
+            session, workspace_id=seed.workspace_id, audit_id=audit.id
+        )
+        assert {t.status for t in tasks} == {"succeeded"}
+        refreshed = await session.get(Audit, audit.id)
+        assert refreshed is not None
+        assert refreshed.status == AUDIT_STATUS_COMPLETED
+        assert refreshed.completed_count == 4
 
 
 @pytest.mark.asyncio

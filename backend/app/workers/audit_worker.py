@@ -251,9 +251,13 @@ class AuditWorker:
     """Owns a claim/lease loop against ``PostgresTaskQueue``.
 
     A single worker claims up to ``worker_concurrency`` tasks per poll and runs
-    them serially inside its loop (each in its own short-lived session). Sharing
-    an async session across concurrent tasks corrupts session state, so a worker
-    never holds one open across a provider call.
+    them CONCURRENTLY (``asyncio.gather``), each task inside its own short-lived
+    sessions — a session is never shared across tasks (sharing an async session
+    across concurrent tasks corrupts session state) and never held open across a
+    provider call. Cross-task coordination happens in the database:
+    ``_lock_owned_running_task`` row-locks before any evidence write and
+    ``_finalize_audit`` is ``FOR UPDATE``-guarded, both already built for
+    multi-worker races.
     """
 
     def __init__(
@@ -267,14 +271,20 @@ class AuditWorker:
         self.owner = owner or f"worker-{uuid.uuid4().hex[:12]}"
 
     async def run_once(self) -> int:
-        """Sweep expired leases, claim a batch, execute it. Returns count run."""
+        """Sweep expired leases, claim a batch, execute it. Returns count run.
+
+        The claimed batch executes concurrently — per-prompt provider calls
+        take tens of seconds, so serial execution would make a run's wall-clock
+        time scale linearly with its task count. ``_execute_task`` never raises
+        (it records crashes itself), so ``gather`` cannot abort mid-batch.
+        """
         await self._queue.release_expired()
         tasks = await self._queue.claim(
             owner=self.owner,
             limit=max(1, audit_settings.worker_concurrency),
         )
-        for task in tasks:
-            await self._execute_task(task)
+        if tasks:
+            await asyncio.gather(*(self._execute_task(task) for task in tasks))
         return len(tasks)
 
     async def run_until_idle(self, *, max_batches: int = 1000) -> int:
@@ -315,7 +325,11 @@ class AuditWorker:
                 task = await session.get(AuditTask, task_id)
                 if task is None:
                     return
-                audit = await session.get(Audit, audit_id)
+                # Row-lock the audit: concurrent tasks of the same audit must
+                # serialize the QUEUED -> RUNNING transition (and the cancel /
+                # deadline checks) or both would record it. Held only across
+                # in-memory checks — no network I/O before the commit below.
+                audit = await session.get(Audit, audit_id, with_for_update=True)
                 if audit is None:
                     return
 

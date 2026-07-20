@@ -121,7 +121,9 @@ function DiscoveringInventory({
   const cursor = cursorStack.at(-1) ?? undefined;
   const inventoryQuery = useQuery({
     ...siteHealthQueries.inventory(crawl.id, { cursor, limit: PAGE_LIMIT }),
-    refetchInterval: active ? POLL_INTERVAL_MS : false,
+    // Only the FIRST page polls — deeper cursor pages stay static so the rows
+    // under review don't shift as new URLs are discovered.
+    refetchInterval: active && cursor === undefined ? POLL_INTERVAL_MS : false,
   });
   const rows = inventoryQuery.data?.items ?? [];
   const nextCursor = inventoryQuery.data?.next_cursor ?? null;

@@ -28,7 +28,7 @@ from app.connectors.answer_engines.anthropic_parser import (
     parse_anthropic_message,
 )
 from app.connectors.answer_engines.contracts import AnswerEngineRequest
-from app.connectors.answer_engines.errors import ProviderError
+from app.connectors.answer_engines.errors import ProviderError, safe_error_detail
 from app.connectors.answer_engines.gemini import GeminiAnswerEngineAdapter
 from app.connectors.answer_engines.gemini_parser import parse_interaction
 from app.connectors.answer_engines.openai import OpenAIAnswerEngineAdapter
@@ -331,6 +331,62 @@ def test_anthropic_parser_extracts_answer_citations_and_provenance() -> None:
     assert result.usage["web_search_requests"] == 1
 
 
+def test_anthropic_safe_error_detail_extracts_type_and_message() -> None:
+    body = {
+        "type": "error",
+        "error": {
+            "type": "invalid_request_error",
+            "message": "Your credit balance is too low to access the API.",
+        },
+    }
+    assert safe_error_detail(body) == (
+        "invalid_request_error: Your credit balance is too low to access the API."
+    )
+    # Malformed / empty bodies degrade to an empty string, never raise.
+    assert safe_error_detail({}) == ""
+    assert safe_error_detail({"error": "not-a-dict"}) == ""
+    # Oversized messages are length-capped.
+    long_body = {"error": {"type": "api_error", "message": "x" * 10_000}}
+    assert len(safe_error_detail(long_body)) < 300
+
+
+async def test_anthropic_http_error_surfaces_safe_detail() -> None:
+    error_body = {
+        "type": "error",
+        "error": {
+            "type": "invalid_request_error",
+            "message": "Your credit balance is too low to access the API.",
+        },
+    }
+    transport = _mock_transport(error_body, status_code=400)
+    adapter = AnthropicAnswerEngineAdapter(api_key="secret-anthropic-key")
+
+    import app.connectors.answer_engines.anthropic as anthropic_mod
+
+    orig = httpx.AsyncClient
+
+    def _client(*args, **kwargs):  # noqa: ANN002, ANN003
+        kwargs["transport"] = transport
+        return orig(*args, **kwargs)
+
+    anthropic_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
+    try:
+        with pytest.raises(ProviderError) as excinfo:
+            await adapter.execute(
+                AnswerEngineRequest(
+                    prompt="x",
+                    system_instruction="",
+                    model="claude-sonnet-4-6",
+                    timeout_seconds=5,
+                )
+            )
+    finally:
+        anthropic_mod.httpx.AsyncClient = orig  # type: ignore[misc]
+    assert "HTTP 400" in str(excinfo.value)
+    assert "credit balance is too low" in str(excinfo.value)
+    assert excinfo.value.retryable is False
+
+
 def test_anthropic_search_error_raises_only_for_retryable_codes() -> None:
     rate_limited = {
         "content": [
@@ -478,6 +534,42 @@ def test_openai_parser_no_search_fixture_is_valid_result() -> None:
     assert result.search_events == ()
     assert result.citations == ()
     assert result.answer_text == "From memory: options include A and B."
+
+
+async def test_openai_http_error_surfaces_safe_detail() -> None:
+    error_body = {
+        "error": {
+            "type": "insufficient_quota",
+            "message": "You exceeded your current quota, please check your plan.",
+        }
+    }
+    transport = _mock_transport(error_body, status_code=429)
+    adapter = OpenAIAnswerEngineAdapter(api_key="secret-openai-key")
+
+    import app.connectors.answer_engines.openai as openai_mod
+
+    orig = httpx.AsyncClient
+
+    def _client(*args, **kwargs):  # noqa: ANN002, ANN003
+        kwargs["transport"] = transport
+        return orig(*args, **kwargs)
+
+    openai_mod.httpx.AsyncClient = _client  # type: ignore[misc, assignment]
+    try:
+        with pytest.raises(ProviderError) as excinfo:
+            await adapter.execute(
+                AnswerEngineRequest(
+                    prompt="x",
+                    system_instruction="",
+                    model="gpt-5.4",
+                    timeout_seconds=5,
+                )
+            )
+    finally:
+        openai_mod.httpx.AsyncClient = orig  # type: ignore[misc]
+    assert "HTTP 429" in str(excinfo.value)
+    assert "exceeded your current quota" in str(excinfo.value)
+    assert excinfo.value.retryable is True
 
 
 def test_openai_parser_count_only_call_preserves_empty_query() -> None:
