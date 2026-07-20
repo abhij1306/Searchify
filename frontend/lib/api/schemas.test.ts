@@ -127,7 +127,7 @@ describe('contract schemas', () => {
     };
     expect(strictValidate(providerConnectionSchema, base, 'conn').active).toBe(true);
     expect(() =>
-      strictValidate(providerConnectionSchema, { ...base, api_key: 'sk-secret' }, 'conn'),
+      strictValidate(providerConnectionSchema, { ...base, api_key: 'sk-test-fake' }, 'conn'),
     ).toThrow();
   });
 

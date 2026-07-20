@@ -22,7 +22,7 @@ import pytest
 
 from app.core.security import decrypt_secret
 
-_SECRET = "sk-super-secret-byok-value-123456"
+_SECRET = "sk-test-fake-byok-value-123456"  # pragma: allowlist secret
 
 
 async def _register(client: httpx.AsyncClient, email: str) -> None:
@@ -185,7 +185,7 @@ async def test_update_rotates_key_without_exposing_it(
     )
     conn_id = created.json()["id"]
 
-    new_secret = "sk-rotated-key-987654321"
+    new_secret = "sk-test-fake-rotated-key-987654321"  # pragma: allowlist secret
     resp = await client.patch(
         f"/api/v1/provider-connections/{conn_id}",
         json={"label": "Renamed", "api_key": new_secret},

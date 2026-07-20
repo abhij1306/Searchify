@@ -546,12 +546,19 @@ class SiteHealthWorker:
         self, task_id: uuid.UUID
     ) -> None:  # pragma: no cover - timing loop
         interval = max(1.0, site_health_settings.heartbeat_interval_seconds)
-        try:
-            while True:
-                await asyncio.sleep(interval)
+        while True:
+            await asyncio.sleep(interval)
+            try:
                 await self._queue.heartbeat(task_id=task_id, owner=self.owner)
-        except asyncio.CancelledError:
-            raise
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A dead heartbeat loop silently expires the lease and lets the
+                # sweeper hand the task to another worker mid-fetch; keep
+                # beating through transient failures instead.
+                logger.exception(
+                    "heartbeat failed; retrying", extra={"task_id": str(task_id)}
+                )
 
     async def _lock_owned_running_task(
         self,
