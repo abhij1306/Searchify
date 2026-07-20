@@ -230,12 +230,20 @@ class ContentWorker:
         self, generation_id: uuid.UUID
     ) -> None:  # pragma: no cover - timing loop
         interval = max(1.0, content_settings.heartbeat_interval_seconds)
-        try:
-            while True:
-                await asyncio.sleep(interval)
+        while True:
+            await asyncio.sleep(interval)
+            try:
                 await self._queue.heartbeat(task_id=generation_id, owner=self.owner)
-        except asyncio.CancelledError:
-            raise
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A dead heartbeat loop silently expires the lease and lets the
+                # sweeper hand the generation to another worker mid-call; keep
+                # beating through transient failures instead.
+                logger.exception(
+                    "heartbeat failed; retrying",
+                    extra={"generation_id": str(generation_id)},
+                )
 
     # --- Atomic attempt + terminal accounting -----------------------------
 

@@ -569,7 +569,9 @@ async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() ->
         return httpx.Response(200, json=_load_fixture("openai_responses_grounded.json"))
 
     transport = httpx.MockTransport(handler)
-    adapter = OpenAIAnswerEngineAdapter(api_key="secret-openai-key", country_code="AU")
+    adapter = OpenAIAnswerEngineAdapter(
+        api_key="test-fake-openai-key", country_code="AU"
+    )
     import app.connectors.answer_engines.openai as openai_mod
 
     orig = httpx.AsyncClient
@@ -591,10 +593,10 @@ async def test_openai_adapter_sends_bearer_auth_only_and_records_provenance() ->
     finally:
         openai_mod.httpx.AsyncClient = orig  # type: ignore[misc]
     # BYOK key travels only in the Authorization header, never the body.
-    assert captured["auth"] == "Bearer secret-openai-key"
+    assert captured["auth"] == "Bearer test-fake-openai-key"
     body = captured["body"]
     assert isinstance(body, dict)
-    assert "secret-openai-key" not in json.dumps(body)
+    assert "test-fake-openai-key" not in json.dumps(body)
     assert body["tools"][0]["user_location"]["country"] == "AU"
     assert result.logical_engine == "chatgpt"
     assert result.transport_provider == "openai"
