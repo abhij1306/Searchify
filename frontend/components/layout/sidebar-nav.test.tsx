@@ -63,7 +63,6 @@ describe('SidebarNav', () => {
       'Your Prompts',
       'Prompt Research',
       'Runs',
-      'Providers',
       'Content',
       'Setup',
       'Site Health',

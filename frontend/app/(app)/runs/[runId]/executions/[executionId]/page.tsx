@@ -7,7 +7,6 @@ import { useParams } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageTitle } from '@/components/ui/typography';
 import { EvidenceCard } from '@/components/runs/evidence-card';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
@@ -51,9 +50,6 @@ export default function ExecutionEvidencePage() {
         >
           ← Back to run
         </Link>
-        <PageTitle kicker="Evidence" className="mt-2">
-          Execution evidence
-        </PageTitle>
       </div>
 
       {evidenceQuery.isError ? (

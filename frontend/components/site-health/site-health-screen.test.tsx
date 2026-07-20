@@ -197,7 +197,7 @@ describe('SiteHealthScreen — terminal phase', () => {
     renderScreen();
 
     // Wait for the screen to settle past the initial loading skeleton.
-    await waitFor(() => expect(screen.queryByText(/Discover and analyze/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/Discovering pages/)).toBeInTheDocument());
     // The header only renders "Re-crawl now" for the dashboard/terminal
     // phases; an active (discovering) crawl must not expose it, since the
     // dedicated in-flow Cancel button is the only control while active.

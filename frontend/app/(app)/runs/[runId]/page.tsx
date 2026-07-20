@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageTitle, SectionTitle } from '@/components/ui/typography';
+import { SectionTitle } from '@/components/ui/typography';
 import { ExecutionsTable } from '@/components/runs/executions-table';
 import { ProgressPanel } from '@/components/runs/progress-panel';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -73,9 +73,6 @@ export default function RunDetailPage() {
         <Link href="/runs" className="text-xs font-medium text-accent-text hover:underline">
           ← Back to runs
         </Link>
-        <PageTitle kicker="Run" className="mt-2">
-          Run detail
-        </PageTitle>
       </div>
 
       {auditQuery.isError ? (

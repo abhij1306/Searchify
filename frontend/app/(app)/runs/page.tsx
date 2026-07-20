@@ -8,7 +8,6 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageTitle } from '@/components/ui/typography';
 import { LaunchDialog } from '@/components/runs/launch-dialog';
 import { RunsTable } from '@/components/runs/runs-table';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -39,14 +38,7 @@ export default function RunsPage() {
 
   return (
     <div className="grid gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <PageTitle kicker="Runs">Audits</PageTitle>
-          <p className="mt-1 max-w-2xl text-sm text-secondary">
-            Each run asks your prompts across the selected AI engines and scores your brand&apos;s
-            visibility. Launch a run, then open it to watch progress and inspect the evidence.
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button onClick={() => setLaunchOpen(true)} disabled={!projectId}>
           Launch audit
         </Button>

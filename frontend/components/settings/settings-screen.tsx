@@ -1,18 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowRight,
-  ExternalLink,
-  Moon,
-  Plug,
-  Settings2,
-  Trash2,
-  User,
-} from 'lucide-react';
-import { useState, type ComponentType } from 'react';
+import { Trash2 } from 'lucide-react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { PageTitle } from '@/components/ui/typography';
+import { ProviderSettings } from '@/components/settings/provider-settings';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
 import { useSessionUser } from '@/lib/auth/session-guard';
@@ -63,74 +54,31 @@ function DetailRow({
   );
 }
 
-/** In-page sub-nav anchor (scrolls to a settings section). */
-function SubnavAnchor({
-  href,
-  icon: Icon,
-  active,
-  onSelect,
-  children,
-}: Readonly<{
-  href: string;
-  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean; strokeWidth?: number }>;
-  active: boolean;
-  onSelect: () => void;
-  children: React.ReactNode;
-}>) {
-  return (
-    <a
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      onClick={onSelect}
-      className={cn(
-        'focus-ring flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
-        active
-          ? 'bg-accent-subtle text-accent-text'
-          : 'text-secondary hover:bg-background-alt hover:text-foreground',
-      )}
-    >
-      <Icon className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-      <span className="truncate">{children}</span>
-    </a>
-  );
-}
+const SETTINGS_TABS = [
+  { id: 'account', label: 'Account' },
+  { id: 'providers', label: 'Provider Settings' },
+  { id: 'danger', label: 'Danger Zone' },
+] as const;
 
-/** Sub-nav link out to another route (Model providers / Project setup). */
-function SubnavLink({
-  href,
-  icon: Icon,
-  children,
-}: Readonly<{
-  href: string;
-  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean; strokeWidth?: number }>;
-  children: React.ReactNode;
-}>) {
-  return (
-    <Link
-      href={href}
-      className="focus-ring flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-secondary transition-colors hover:bg-background-alt hover:text-foreground"
-    >
-      <Icon className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-      <span className="truncate">{children}</span>
-      <ExternalLink className="ml-auto size-3.5 shrink-0 text-subtle" aria-hidden strokeWidth={2} />
-    </Link>
-  );
-}
+type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
+
+const TAB_ID = (tab: SettingsTab) => `settings-tab-${tab}`;
+const PANEL_ID = (tab: SettingsTab) => `settings-panel-${tab}`;
 
 /**
- * SettingsScreen — a basic, read-only account view for the authenticated user,
- * laid out as a two-column sub-navigation (Account, Appearance, Model providers)
- * beside stacked section cards. Collapses to a single column on narrow viewports.
+ * SettingsScreen — tabbed settings (Account / Provider Settings / Danger Zone),
+ * following the WAI-ARIA tabs idiom used by the Visibility workspace (roving
+ * tabindex, Arrow/Home/End navigation, `aria-selected`, labelled panels).
  *
- * All account fields come from the live session (`GET /auth/me` via
- * `useSessionUser`); there are no account-mutation endpoints, so nothing here is
- * editable. `role` is the ACCOUNT-level role (free-form, defaults to `"user"`)
- * and `created_at` is when the account was created — neither is a workspace
- * membership role. Provider/project configuration is surfaced as links only (no
- * fabricated per-provider status), pointing at the existing `/providers` and
- * `/setup` screens where those are actually managed. The one mutation here is
- * the Danger-zone card, which deletes the active project (backend cascades to
- * all child data) behind a confirmation dialog.
+ * - **Account**: read-only session details from `GET /auth/me` via
+ *   `useSessionUser` (no account-mutation endpoints exist) plus the
+ *   appearance/theme control. `role` is the ACCOUNT-level role (free-form,
+ *   defaults to `"user"`) and `created_at` is when the account was created —
+ *   neither is a workspace membership role.
+ * - **Provider Settings**: the BYOK provider configuration (formerly the
+ *   standalone `/providers` page), rendered by `ProviderSettings`.
+ * - **Danger Zone**: deletes the active project (backend cascades to all child
+ *   data) behind a confirmation dialog — the one mutation on this screen.
  */
 export function SettingsScreen() {
   const user = useSessionUser();
@@ -139,10 +87,9 @@ export function SettingsScreen() {
   const { activeProject, projects, setActiveProjectId } = useProjectContext();
   const createdLabel = formatTimestamp(user.created_at);
   const updatedLabel = formatTimestamp(user.updated_at);
-  const [activeSection, setActiveSection] = useState<'account' | 'appearance' | 'danger'>(
-    'account',
-  );
+  const [activeTab, setActiveTab] = useState<SettingsTab>('account');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const deleteMutation = useMutation({
     mutationFn: (projectId: string) => projectsApi.deleteProject(projectId),
@@ -161,201 +108,210 @@ export function SettingsScreen() {
     },
   });
 
+  const activeIndex = SETTINGS_TABS.findIndex((tab) => tab.id === activeTab);
+
+  function focusTab(index: number) {
+    const tab = SETTINGS_TABS[index];
+    if (!tab) return;
+    setActiveTab(tab.id);
+    // Move DOM focus to the newly selected tab (roving tabindex + focus xfer).
+    tabRefs.current[tab.id]?.focus();
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const last = SETTINGS_TABS.length - 1;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        focusTab(activeIndex >= last ? 0 : activeIndex + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        focusTab(activeIndex <= 0 ? last : activeIndex - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusTab(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusTab(last);
+        break;
+      default:
+        break;
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <PageTitle kicker="Account">Settings</PageTitle>
-      <p className="max-w-xl text-sm text-secondary">
-        Your Searchify account details and preferences. Account fields are read-only here and shown
-        for reference.
-      </p>
+    <div className="grid gap-5">
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        aria-orientation="horizontal"
+        className="flex flex-nowrap gap-0 overflow-x-auto border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {SETTINGS_TABS.map((tab) => {
+          const selected = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              ref={(node) => {
+                tabRefs.current[tab.id] = node;
+              }}
+              type="button"
+              role="tab"
+              id={TAB_ID(tab.id)}
+              aria-selected={selected}
+              aria-controls={PANEL_ID(tab.id)}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={onKeyDown}
+              className={cn(
+                'focus-ring -mb-0.5 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                selected
+                  ? 'border-accent font-semibold text-foreground'
+                  : 'border-transparent text-secondary hover:text-foreground',
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="grid items-start gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
-        {/* Sub-navigation */}
-        <nav aria-label="Settings" className="flex flex-col gap-4 lg:sticky lg:top-0">
-          <div className="flex flex-col gap-1">
-            <p className="px-2.5 text-2xs font-semibold uppercase tracking-wide text-muted">
-              Account
-            </p>
-            <SubnavAnchor
-              href="#account"
-              icon={User}
-              active={activeSection === 'account'}
-              onSelect={() => setActiveSection('account')}
-            >
-              Account
-            </SubnavAnchor>
-            <SubnavAnchor
-              href="#appearance"
-              icon={Moon}
-              active={activeSection === 'appearance'}
-              onSelect={() => setActiveSection('appearance')}
-            >
-              Appearance
-            </SubnavAnchor>
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="px-2.5 text-2xs font-semibold uppercase tracking-wide text-muted">
-              Configuration
-            </p>
-            <SubnavLink href="/providers" icon={Plug}>
-              Model providers
-            </SubnavLink>
-            <SubnavLink href="/setup" icon={Settings2}>
-              Project setup
-            </SubnavLink>
-          </div>
-          <div className="flex flex-col gap-1">
-            <p className="px-2.5 text-2xs font-semibold uppercase tracking-wide text-muted">
-              Project
-            </p>
-            <SubnavAnchor
-              href="#danger"
-              icon={Trash2}
-              active={activeSection === 'danger'}
-              onSelect={() => setActiveSection('danger')}
-            >
-              Danger zone
-            </SubnavAnchor>
-          </div>
-        </nav>
-
-        {/* Section cards */}
-        <div className="grid max-w-2xl gap-6">
-          <Card id="account" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle>Account</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3.5">
-                <span
-                  aria-hidden
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold uppercase text-accent-text"
-                >
-                  {emailInitials(user.email)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-foreground">{user.email}</div>
-                  <div className="mt-0.5 text-sm text-muted">
-                    Account role: <span className="capitalize">{user.role}</span>
+      <div
+        role="tabpanel"
+        id={PANEL_ID(activeTab)}
+        aria-labelledby={TAB_ID(activeTab)}
+        tabIndex={0}
+        className="focus-ring outline-none"
+      >
+        {activeTab === 'account' ? (
+          <div className="grid max-w-2xl gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account</CardTitle>
+                <CardDescription>
+                  Your Searchify account details. Account fields are read-only here and shown for
+                  reference.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3.5">
+                  <span
+                    aria-hidden
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold uppercase text-accent-text"
+                  >
+                    {emailInitials(user.email)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-foreground">{user.email}</div>
+                    <div className="mt-0.5 text-sm text-muted">
+                      Account role: <span className="capitalize">{user.role}</span>
+                    </div>
                   </div>
-                </div>
-                <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
-                  {user.is_active ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-
-              <dl className="mt-5 border-t border-border-subtle">
-                <DetailRow label="Email">{user.email}</DetailRow>
-                <DetailRow label="Account role">
-                  <Badge variant="neutral">{user.role}</Badge>
-                </DetailRow>
-                <DetailRow label="Account status">
                   <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </Badge>
-                </DetailRow>
-                {createdLabel ? (
-                  <DetailRow label="Account created" mono>
-                    {createdLabel}
-                  </DetailRow>
-                ) : null}
-                {updatedLabel ? (
-                  <DetailRow label="Last updated" mono>
-                    {updatedLabel}
-                  </DetailRow>
-                ) : null}
-                {user.id ? (
-                  <DetailRow label="User ID" mono>
-                    {user.id}
-                  </DetailRow>
-                ) : null}
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card id="appearance" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle>Appearance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between gap-6">
-                <div>
-                  <div className="text-sm font-medium text-secondary">Theme</div>
-                  <p className="mt-1 text-xs text-muted">
-                    Applies to this browser and syncs with the top-bar toggle.
-                  </p>
                 </div>
-                <ThemeToggle />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card id="providers" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle>Configuration</CardTitle>
-              <CardDescription>
-                Manage where Searchify runs from. Model provider keys are write-only — Searchify
-                never displays a stored secret.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-2">
-              <Button asChild variant="primary">
-                <Link href="/providers">
-                  Open Provider Settings
-                  <ArrowRight className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-                </Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/setup">
-                  Open Project Setup
-                  <ArrowRight className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card id="danger" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle>Danger zone</CardTitle>
-              <CardDescription>
-                Permanently delete the active project and everything inside it.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              {activeProject ? (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-foreground">
-                        {activeProject.name}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted">
-                        Brand: {activeProject.brand_name}
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      onClick={() => setConfirmOpen(true)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-                      Delete project
-                    </Button>
-                  </div>
-                  <Alert tone="danger">
-                    Deleting a project removes all of its prompts, topics, audits, visibility
-                    history, and generated content. This cannot be undone.
-                  </Alert>
-                  {deleteMutation.isError ? (
-                    <Alert tone="danger">{errorMessage(deleteMutation.error)}</Alert>
+                <dl className="mt-5 border-t border-border-subtle">
+                  <DetailRow label="Email">{user.email}</DetailRow>
+                  <DetailRow label="Account role">
+                    <Badge variant="neutral">{user.role}</Badge>
+                  </DetailRow>
+                  <DetailRow label="Account status">
+                    <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </DetailRow>
+                  {createdLabel ? (
+                    <DetailRow label="Account created" mono>
+                      {createdLabel}
+                    </DetailRow>
                   ) : null}
-                </>
-              ) : (
-                <p className="text-sm text-muted">No project selected.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  {updatedLabel ? (
+                    <DetailRow label="Last updated" mono>
+                      {updatedLabel}
+                    </DetailRow>
+                  ) : null}
+                  {user.id ? (
+                    <DetailRow label="User ID" mono>
+                      {user.id}
+                    </DetailRow>
+                  ) : null}
+                </dl>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Appearance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between gap-6">
+                  <div>
+                    <div className="text-sm font-medium text-secondary">Theme</div>
+                    <p className="mt-1 text-xs text-muted">
+                      Applies to this browser and syncs with the top-bar toggle.
+                    </p>
+                  </div>
+                  <ThemeToggle />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === 'providers' ? <ProviderSettings /> : null}
+
+        {activeTab === 'danger' ? (
+          <div className="grid max-w-2xl gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Danger zone</CardTitle>
+                <CardDescription>
+                  Permanently delete the active project and everything inside it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                {activeProject ? (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground">
+                          {activeProject.name}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted">
+                          Brand: {activeProject.brand_name}
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setConfirmOpen(true)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="size-4 shrink-0" aria-hidden strokeWidth={2} />
+                        Delete project
+                      </Button>
+                    </div>
+                    <Alert tone="danger">
+                      Deleting a project removes all of its prompts, topics, audits, visibility
+                      history, and generated content. This cannot be undone.
+                    </Alert>
+                    {deleteMutation.isError ? (
+                      <Alert tone="danger">{errorMessage(deleteMutation.error)}</Alert>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted">No project selected.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
       </div>
 
       <Dialog

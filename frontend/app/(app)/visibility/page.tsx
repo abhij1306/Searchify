@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react';
 
-import { PageTitle } from '@/components/ui/typography';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { DashboardSkeleton } from '@/components/visibility/dashboard-skeleton';
 import { VisibilityDashboard } from '@/components/visibility/visibility-dashboard';
@@ -27,21 +26,13 @@ import { VisibilityDashboard } from '@/components/visibility/visibility-dashboar
  * `GET /projects/{id}/visibility/evidence` dataset. Sentiment + Avg Position
  * stay the "—" not-yet-computed placeholder (decision B-2). There are no
  * Sources, Topics, or Sentiment tabs. All endpoints go through `visibility.ts`,
- * scoped to the active project from the F5 context.
+ * scoped to the active project from the F5 context. The page title renders in
+ * the top bar (F5), so there is no in-page header block.
  */
 export default function VisibilityPage() {
   return (
     <TooltipProvider>
       <div className="grid gap-6">
-        <div>
-          <PageTitle kicker="Analytics">Visibility</PageTitle>
-          <p className="mt-1 max-w-2xl text-sm text-secondary">
-            Your brand&apos;s visibility across AI answer engines. Switch between the Overview,
-            Trends, Mentions &amp; Citations, and Query Fanout tabs to inspect a single run, track
-            movement over time, and browse the persisted mention, citation, and search-query
-            evidence behind the scores.
-          </p>
-        </div>
         <Suspense fallback={<DashboardSkeleton />}>
           <VisibilityDashboard />
         </Suspense>

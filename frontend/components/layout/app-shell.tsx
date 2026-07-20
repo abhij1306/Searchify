@@ -38,7 +38,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
-          <main className="min-h-0 flex-1 overflow-y-auto">
+          <main className="content-scroll min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1440px] p-[var(--content-gutter)]">{children}</div>
           </main>
         </div>

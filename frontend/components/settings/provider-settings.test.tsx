@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { mswServer } from '@/test/msw-server';
 import { renderWithProviders } from '@/test/render';
 
-import ProvidersPage from './page';
+import { ProviderSettings } from './provider-settings';
 
 const CONNECTION_ID = '11111111-1111-4111-8111-111111111111';
 const WORKSPACE_ID = '22222222-2222-4222-8222-222222222222';
@@ -63,14 +63,14 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => mswServer.resetHandlers());
 afterAll(() => mswServer.close());
 
-describe('ProvidersPage', () => {
+describe('ProviderSettings', () => {
   it('renders a card for all three engines with unconfigured state', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
 
     expect(await screen.findByRole('heading', { name: 'ChatGPT' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Gemini' })).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('ProvidersPage', () => {
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
 
     const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
     const utils = within(chatgptCard);
@@ -98,13 +98,13 @@ describe('ProvidersPage', () => {
     expect(utils.queryByText(/coming soon/i)).toBeNull();
   });
 
-  it('never renders an OpenRouter control anywhere on the page', async () => {
+  it('never renders an OpenRouter control anywhere on the panel', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
     await screen.findByRole('heading', { name: 'ChatGPT' });
     expect(screen.queryByText(/openrouter/i)).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('ProvidersPage', () => {
       ),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
 
     const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
     const utils = within(chatgptCard);
@@ -175,7 +175,7 @@ describe('ProvidersPage', () => {
       ),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
 
     const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
     const utils = within(chatgptCard);
@@ -191,7 +191,7 @@ describe('ProvidersPage', () => {
       http.get('/api/v1/provider-connections', () => HttpResponse.json([connection()])),
     );
 
-    renderWithProviders(<ProvidersPage />);
+    renderWithProviders(<ProviderSettings />);
 
     const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
     const utils = within(chatgptCard);

@@ -1,6 +1,7 @@
 'use client';
 
-import { Download, ExternalLink, Search } from 'lucide-react';
+import { Download, ExternalLink } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -11,14 +12,52 @@ import { cn } from '@/lib/utils';
 const LEARN_URL = 'https://docs.searchify.example';
 
 /**
+ * Route → page title map. Exact paths first; dynamic segments are resolved by
+ * longest-prefix match in `resolveTitle`. Page headers live here (not on the
+ * pages themselves) so the top bar is the single title surface.
+ */
+const PAGE_TITLES: ReadonlyArray<readonly [prefix: string, title: string]> = [
+  ['/visibility', 'Visibility'],
+  ['/prompts', 'Your Prompts'],
+  ['/prompt-research', 'Prompt Research'],
+  ['/runs', 'Audits'],
+  ['/content', 'Content'],
+  ['/setup', 'Setup'],
+  ['/site-health', 'Site Health'],
+  ['/issues', 'Issues'],
+  ['/settings', 'Settings'],
+  ['/providers', 'Settings'],
+];
+
+/** Deeper-route overrides (checked before the prefix table). */
+const EXACT_OVERRIDES: ReadonlyArray<readonly [pattern: RegExp, title: string]> = [
+  [/^\/runs\/[^/]+\/executions\/[^/]+$/, 'Execution Evidence'],
+  [/^\/runs\/[^/]+$/, 'Run Detail'],
+];
+
+function resolveTitle(pathname: string): string {
+  for (const [pattern, title] of EXACT_OVERRIDES) {
+    if (pattern.test(pathname)) return title;
+  }
+  for (const [prefix, title] of PAGE_TITLES) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return title;
+  }
+  return 'Searchify';
+}
+
+/**
  * TopBar (F5) — 52px bar (docs/design.md §9.2).
  *
- * Left: a non-functional "Find anything…" search placeholder (MVP scope — no
- * search backend yet). Right: an Export hook (a disabled placeholder wired for
- * F10's run/report export), a Learn link (external docs), and the theme toggle.
- * The project switcher + user menu live in the sidebar per the design prose.
+ * Left: the current page's title (replaces the retired "Find anything…" search
+ * placeholder — pages no longer render their own header blocks). Right: an
+ * Export hook (a disabled placeholder wired for F10's run/report export), a
+ * Learn link (external docs), and the theme toggle. The project switcher +
+ * user menu live in the sidebar per the design prose.
  */
 export function TopBar({ className }: Readonly<{ className?: string }>) {
+  const pathname = usePathname();
+  const title = resolveTitle(pathname);
+
   return (
     <header
       className={cn(
@@ -26,16 +65,7 @@ export function TopBar({ className }: Readonly<{ className?: string }>) {
         className,
       )}
     >
-      <label className="flex min-w-0 flex-1 items-center gap-2 text-muted" aria-label="Search">
-        <Search className="size-4 shrink-0" aria-hidden />
-        <input
-          type="search"
-          placeholder="Find anything…"
-          disabled
-          aria-disabled="true"
-          className="w-full max-w-sm bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none disabled:cursor-not-allowed"
-        />
-      </label>
+      <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{title}</h1>
 
       <div className="flex items-center gap-1">
         {/* Export hook: placeholder disabled at MVP; wired for F10 report export. */}

@@ -7,7 +7,6 @@ import {
   ListChecks,
   type LucideIcon,
   MessageSquareText,
-  PlugZap,
   Route,
   Settings,
   ShieldCheck,
@@ -54,7 +53,6 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Actions',
     items: [
       { label: 'Runs', href: '/runs', icon: ListChecks, live: true },
-      { label: 'Providers', href: '/providers', icon: PlugZap, live: true },
       { label: 'Content', href: '/content', icon: FileText, live: true },
       { label: 'Opportunities', href: '/opportunities', icon: Lightbulb, live: false },
     ],

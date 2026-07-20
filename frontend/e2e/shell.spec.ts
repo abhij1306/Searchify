@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 /**
  * F5 shell smoke: with an authenticated session the `(app)` shell renders its
- * chrome — sidebar nav groups, the top-bar search placeholder, and the theme
+ * chrome — sidebar nav groups, the top-bar page title, and the theme
  * toggle. The backend `/auth/me` and `/projects` calls are stubbed at the
  * network layer so the spec does not need a live backend.
  *
@@ -49,8 +49,8 @@ test('authenticated shell renders sidebar groups and top bar', async ({ page }) 
   // Project switcher shows the active brand.
   await expect(page.getByText('Acme').first()).toBeVisible();
 
-  // Top-bar search placeholder + theme toggle are present.
-  await expect(page.getByPlaceholder('Find anything…')).toBeVisible();
+  // Top-bar page title + theme toggle are present.
+  await expect(page.getByRole('heading', { name: 'Visibility' })).toBeVisible();
   await expect(page.getByRole('button', { name: /toggle color theme/i })).toBeVisible();
 
   // A disabled roadmap item shows the "soon" affordance and is not a link.

@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation';
 
 import { Alert } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageTitle } from '@/components/ui/typography';
 import { SetupForm } from '@/components/setup/setup-form';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -33,13 +32,6 @@ export default function EditSetupPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="mb-6">
-        <PageTitle kicker="Setup">Edit brand project</PageTitle>
-        <p className="mt-1 text-sm text-secondary">
-          Update your brand profile, competitors, and audit defaults.
-        </p>
-      </div>
-
       {isLoading ? (
         <div className="grid gap-4" aria-hidden>
           <Skeleton className="h-40 w-full" />

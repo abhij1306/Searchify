@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageTitle } from '@/components/ui/typography';
 import type { SiteCrawl } from '@/lib/api/types';
 import { crawlBadgeValue, statusLabel } from '@/lib/site-health/status';
 
@@ -17,17 +16,8 @@ import { crawlBadgeValue, statusLabel } from '@/lib/site-health/status';
  */
 
 export function ScreenHeader({ actions }: Readonly<{ actions?: ReactNode }>) {
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <PageTitle kicker="On Page">Site Health</PageTitle>
-        <p className="mt-1 max-w-2xl text-sm text-secondary">
-          Discover and analyze your site&apos;s pages for AI search optimization.
-        </p>
-      </div>
-      {actions}
-    </div>
-  );
+  if (!actions) return null;
+  return <div className="flex flex-wrap items-center justify-end gap-3">{actions}</div>;
 }
 
 export function ScreenSkeleton() {

@@ -48,6 +48,13 @@ vi.mock('@/lib/api/projects', () => ({
   projectsApi: { deleteProject: (id: string) => deleteProject(id) },
 }));
 
+// The Provider Settings tab fetches the catalog/connections; stub the panel so
+// this suite stays focused on the tab shell (the panel has its own suite in
+// provider-settings.test.tsx).
+vi.mock('@/components/settings/provider-settings', () => ({
+  ProviderSettings: () => <div data-testid="provider-settings-panel">provider settings</div>,
+}));
+
 import { SettingsScreen } from './settings-screen';
 
 function renderScreen() {
@@ -63,6 +70,22 @@ describe('SettingsScreen', () => {
     deleteProject.mockClear();
     setActiveProjectId.mockClear();
   });
+
+  it('renders the three settings tabs with Account selected by default', () => {
+    renderScreen();
+    const tablist = screen.getByRole('tablist', { name: /settings sections/i });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Account',
+      'Provider Settings',
+      'Danger Zone',
+    ]);
+    expect(within(tablist).getByRole('tab', { name: 'Account' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
   it('renders the session email, account role, and initials avatar', () => {
     renderScreen();
 
@@ -88,59 +111,46 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Last updated')).toBeInTheDocument();
   });
 
-  it('renders a theme toggle', () => {
+  it('renders a theme toggle on the Account tab', () => {
     renderScreen();
     expect(screen.getByRole('button', { name: /toggle color theme/i })).toBeInTheDocument();
   });
 
-  it('renders a two-column sub-navigation (Account, Appearance, Model providers, Project setup)', () => {
+  it('shows the provider settings panel on the Provider Settings tab', async () => {
+    const ue = userEvent.setup();
     renderScreen();
-    const subnav = screen.getByRole('navigation', { name: /settings/i });
-    // In-page anchors for the two account sections.
-    expect(within(subnav).getByRole('link', { name: /^account$/i })).toHaveAttribute(
-      'href',
-      '#account',
+
+    expect(screen.queryByTestId('provider-settings-panel')).not.toBeInTheDocument();
+    await ue.click(screen.getByRole('tab', { name: 'Provider Settings' }));
+    expect(screen.getByTestId('provider-settings-panel')).toBeInTheDocument();
+    // Account content is unmounted while another tab is active.
+    expect(screen.queryByText('Account role')).not.toBeInTheDocument();
+  });
+
+  it('supports arrow-key navigation across tabs', async () => {
+    const ue = userEvent.setup();
+    renderScreen();
+
+    const account = screen.getByRole('tab', { name: 'Account' });
+    account.focus();
+    await ue.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Provider Settings' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
-    expect(within(subnav).getByRole('link', { name: /^appearance$/i })).toHaveAttribute(
-      'href',
-      '#appearance',
-    );
-    // Configuration group links out to the existing screens.
-    expect(within(subnav).getByRole('link', { name: /model providers/i })).toHaveAttribute(
-      'href',
-      '/providers',
-    );
-    expect(within(subnav).getByRole('link', { name: /project setup/i })).toHaveAttribute(
-      'href',
-      '/setup',
-    );
-    // Danger-zone anchor.
-    expect(within(subnav).getByRole('link', { name: /danger zone/i })).toHaveAttribute(
-      'href',
-      '#danger',
+    await ue.keyboard('{End}');
+    expect(screen.getByRole('tab', { name: 'Danger Zone' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
   });
 
-  it('surfaces configuration as links only (no fabricated provider status)', () => {
+  it('shows the danger zone with the active project name on the Danger Zone tab', async () => {
+    const ue = userEvent.setup();
     renderScreen();
-    // Links-only actions to the real screens.
-    expect(screen.getByRole('link', { name: /open provider settings/i })).toHaveAttribute(
-      'href',
-      '/providers',
-    );
-    expect(screen.getByRole('link', { name: /open project setup/i })).toHaveAttribute(
-      'href',
-      '/setup',
-    );
-    // No fabricated per-provider configured/not-configured status.
-    expect(screen.queryByText(/not configured/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/chatgpt|gemini|claude/i)).not.toBeInTheDocument();
-  });
 
-  it('shows the danger zone with the active project name', () => {
-    renderScreen();
-    // Appears in both the subnav anchor and the card title.
-    expect(screen.getAllByText('Danger zone').length).toBeGreaterThanOrEqual(2);
+    await ue.click(screen.getByRole('tab', { name: 'Danger Zone' }));
+    expect(screen.getByText('Danger zone')).toBeInTheDocument();
     expect(screen.getByText('Acme Storage')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /delete project/i })).toBeInTheDocument();
   });
@@ -149,6 +159,7 @@ describe('SettingsScreen', () => {
     const ue = userEvent.setup();
     renderScreen();
 
+    await ue.click(screen.getByRole('tab', { name: 'Danger Zone' }));
     await ue.click(screen.getByRole('button', { name: /delete project/i }));
 
     const dialog = await screen.findByRole('dialog');
@@ -163,6 +174,7 @@ describe('SettingsScreen', () => {
     const ue = userEvent.setup();
     renderScreen();
 
+    await ue.click(screen.getByRole('tab', { name: 'Danger Zone' }));
     await ue.click(screen.getByRole('button', { name: /delete project/i }));
     const dialog = await screen.findByRole('dialog');
     await ue.click(within(dialog).getByRole('button', { name: /cancel/i }));
