@@ -70,8 +70,8 @@ export function VisibilityTrends({
     return isFiltered ? (
       <Card>
         <CardContent className="grid justify-items-center gap-2 py-12 text-center">
-          <h2 className="text-lg font-semibold text-foreground">No runs match these filters</h2>
-          <p className="max-w-md text-sm text-secondary">
+          <h2 className="text-foreground text-lg font-semibold">No runs match these filters</h2>
+          <p className="text-secondary max-w-md text-sm">
             No completed audits fall inside the selected engine and date range. Widen the range or
             clear the engine filter to see more history.
           </p>
@@ -81,8 +81,8 @@ export function VisibilityTrends({
       <Card>
         <CardContent className="grid justify-items-center gap-4 py-12 text-center">
           <div className="grid gap-1">
-            <h2 className="text-lg font-semibold text-foreground">No trend history yet</h2>
-            <p className="max-w-md text-sm text-secondary">
+            <h2 className="text-foreground text-lg font-semibold">No trend history yet</h2>
+            <p className="text-secondary max-w-md text-sm">
               {hasRuns
                 ? 'This project has runs but no dashboard-ready snapshots to plot yet. Once more audits complete, their history shows up here.'
                 : 'Launch audits over time to see how your Visibility Score and Share of Voice move across runs.'}
@@ -135,10 +135,7 @@ export function VisibilityTrends({
         />
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <RankingHistoryCard
-            title="Rankings (Latest)"
-            point={rankingBookends(points).latest}
-          />
+          <RankingHistoryCard title="Rankings (Latest)" point={rankingBookends(points).latest} />
           <RankingHistoryCard
             title="Rankings (Start of Range)"
             point={rankingBookends(points).first}
@@ -161,7 +158,7 @@ function StatCard({ stat }: Readonly<{ stat: TrendStat }>) {
   return (
     <Card>
       <CardContent className="grid gap-1 p-4">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-muted">
+        <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
           {stat.label}
         </span>
         <span className={cn('mono text-2xl font-semibold', valueClass)}>{stat.value}</span>
@@ -197,13 +194,13 @@ function TrendCard({
       <CardHeader className="flex-row items-start justify-between gap-2">
         <div className="grid gap-1">
           <CardTitle>{title}</CardTitle>
-          <p className="text-sm text-secondary">{description}</p>
+          <p className="text-secondary text-sm">{description}</p>
         </div>
         {badge ? <Badge variant="neutral">{badge}</Badge> : null}
       </CardHeader>
       <CardContent className="grid gap-3">
         <div className="flex gap-3">
-          <div className="flex flex-col justify-between py-1 text-2xs text-muted" aria-hidden>
+          <div className="text-2xs text-muted flex flex-col justify-between py-1" aria-hidden>
             {yLabels.map((y) => (
               <span key={y}>{y}</span>
             ))}
@@ -217,7 +214,7 @@ function TrendCard({
               className="h-[180px] w-full"
             />
             {chartPoints.length > 1 ? (
-              <div className="mt-1 flex justify-between text-2xs text-muted" aria-hidden>
+              <div className="text-2xs text-muted mt-1 flex justify-between" aria-hidden>
                 <span>{firstLabel}</span>
                 <span>{lastLabel}</span>
               </div>
@@ -225,8 +222,8 @@ function TrendCard({
           </div>
         </div>
         {versionNote ? (
-          <div className="flex items-center gap-2 text-xs text-secondary">
-            <span className="size-2 rounded-full bg-warning" aria-hidden />
+          <div className="text-secondary flex items-center gap-2 text-xs">
+            <span className="bg-warning size-2 rounded-full" aria-hidden />
             <span>{versionNote}</span>
           </div>
         ) : null}
@@ -251,12 +248,12 @@ function RankingHistoryCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {point ? (
-          <p className="text-sm text-secondary">{formatPointDate(point.completed_at)}</p>
+          <p className="text-secondary text-sm">{formatPointDate(point.completed_at)}</p>
         ) : null}
       </CardHeader>
       <CardContent className="p-0">
         {!point || rows.length === 0 ? (
-          <p className="p-[var(--card-padding)] text-sm text-secondary">
+          <p className="text-secondary p-[var(--card-padding)] text-sm">
             {emptyNote ?? NO_RANKINGS_MESSAGE}
           </p>
         ) : (

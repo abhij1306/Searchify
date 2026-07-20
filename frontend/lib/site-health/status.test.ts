@@ -88,9 +88,14 @@ describe('discovery provisional / sample-mode copy', () => {
   });
 
   it('pluralizes a single page', () => {
-    expect(discoveryProgressLabel({ ...base, visible_url_count: 1, inventory_complete: true, discovery_status: 'completed' })).toBe(
-      '1 page discovered',
-    );
+    expect(
+      discoveryProgressLabel({
+        ...base,
+        visible_url_count: 1,
+        inventory_complete: true,
+        discovery_status: 'completed',
+      }),
+    ).toBe('1 page discovered');
   });
 });
 
@@ -144,9 +149,9 @@ describe('resolveSiteHealthPhase', () => {
   it('resolves the active flow phases', () => {
     expect(resolveSiteHealthPhase(null, 'starter')).toBe('empty');
     expect(resolveSiteHealthPhase(base, 'starter')).toBe('discovering');
-    expect(
-      resolveSiteHealthPhase({ ...base, discovery_status: 'completed' }, 'starter'),
-    ).toBe('selection');
+    expect(resolveSiteHealthPhase({ ...base, discovery_status: 'completed' }, 'starter')).toBe(
+      'selection',
+    );
     expect(
       resolveSiteHealthPhase(
         { ...base, discovery_status: 'completed', analysis_status: 'running' },
@@ -161,7 +166,12 @@ describe('resolveSiteHealthPhase', () => {
     // reachable so the user can select pages to analyze, not a dead-end card.
     expect(
       resolveSiteHealthPhase(
-        { ...base, status: 'cancelled', discovery_status: 'cancelled', analysis_status: 'cancelled' },
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+        },
         'starter',
       ),
     ).toBe('selection');
@@ -185,7 +195,12 @@ describe('resolveSiteHealthPhase', () => {
   it('is terminal for a cancelled Free crawl (no selection capability)', () => {
     expect(
       resolveSiteHealthPhase(
-        { ...base, status: 'cancelled', discovery_status: 'cancelled', analysis_status: 'cancelled' },
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+        },
         'free',
       ),
     ).toBe('terminal');
@@ -329,7 +344,8 @@ describe('dashboardRunNotice', () => {
   });
 });
 
-describe('badge mapping', () => {  it('maps overall crawl status to a run-status badge value', () => {
+describe('badge mapping', () => {
+  it('maps overall crawl status to a run-status badge value', () => {
     expect(crawlBadgeValue('validating')).toBe('queued');
     expect(crawlBadgeValue('partially_completed')).toBe('partial');
     expect(crawlBadgeValue('running')).toBe('running');

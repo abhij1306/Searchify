@@ -77,7 +77,7 @@ export function VisibilityTabs({
         role="tablist"
         aria-label="Visibility views"
         aria-orientation="horizontal"
-        className="flex flex-nowrap gap-0 overflow-x-auto border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="border-border flex [scrollbar-width:none] flex-nowrap gap-0 overflow-x-auto border-b-2 [&::-webkit-scrollbar]:hidden"
       >
         {VISIBILITY_TABS.map((tab) => {
           const selected = tab.id === activeTab;
@@ -96,10 +96,10 @@ export function VisibilityTabs({
               onClick={() => onSelectTab(tab.id)}
               onKeyDown={onKeyDown}
               className={cn(
-                'focus-ring -mb-0.5 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                'focus-ring -mb-0.5 shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
                 selected
-                  ? 'border-accent font-semibold text-foreground'
-                  : 'border-transparent text-secondary hover:text-foreground',
+                  ? 'border-accent text-foreground font-semibold'
+                  : 'text-secondary hover:text-foreground border-transparent',
               )}
             >
               {tab.label}

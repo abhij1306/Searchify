@@ -43,15 +43,15 @@ export function EngineComparison({
         </CardHeader>
         <CardContent>
           {engines.length === 0 ? (
-            <p className="text-sm text-secondary">No engine results match the current filter.</p>
+            <p className="text-secondary text-sm">No engine results match the current filter.</p>
           ) : (
             <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {engines.map((engine) => (
                 <li
                   key={engine.logical_engine}
-                  className="grid justify-items-center gap-3 rounded-md border border-border-subtle bg-background-alt p-4 text-center"
+                  className="border-border-subtle bg-background-alt grid justify-items-center gap-3 rounded-md border p-4 text-center"
                 >
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-foreground text-sm font-semibold">
                     {engineLabel(engine.logical_engine)}
                   </p>
                   <ScoreRing
@@ -60,12 +60,20 @@ export function EngineComparison({
                     strokeWidth={8}
                     showValue={engine.visibility_score !== null}
                     label={`${engineLabel(engine.logical_engine)} visibility score: ${
-                      engine.visibility_score === null ? 'not available' : Math.round(engine.visibility_score)
+                      engine.visibility_score === null
+                        ? 'not available'
+                        : Math.round(engine.visibility_score)
                     }%`}
                   />
                   <dl className="grid w-full gap-1 text-xs">
-                    <EngineStat label="Brand mentions" value={formatRate(engine.brand_mention_rate)} />
-                    <EngineStat label="Owned citations" value={formatRate(engine.owned_citation_rate)} />
+                    <EngineStat
+                      label="Brand mentions"
+                      value={formatRate(engine.brand_mention_rate)}
+                    />
+                    <EngineStat
+                      label="Owned citations"
+                      value={formatRate(engine.owned_citation_rate)}
+                    />
                     <EngineStat label="Search used" value={formatRate(engine.search_use_rate)} />
                     <EngineStat label="Responses" value={`${engine.total_completed}`} />
                   </dl>
@@ -85,7 +93,7 @@ function EngineStat({ label, value }: Readonly<{ label: string; value: string }>
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="text-secondary">{label}</dt>
-      <dd className="mono font-semibold text-foreground">{value}</dd>
+      <dd className="mono text-foreground font-semibold">{value}</dd>
     </div>
   );
 }
@@ -106,7 +114,7 @@ function ShareOfVoiceCard({ visibility }: Readonly<{ visibility: Visibility }>) 
       </CardHeader>
       <CardContent>
         {segments.length === 0 ? (
-          <p className="text-sm text-secondary">{PLACEHOLDER} No mentions recorded for this run.</p>
+          <p className="text-secondary text-sm">{PLACEHOLDER} No mentions recorded for this run.</p>
         ) : (
           <Donut segments={segments} label="Share of voice" size={132} strokeWidth={16} />
         )}

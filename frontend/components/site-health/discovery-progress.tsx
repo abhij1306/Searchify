@@ -82,7 +82,7 @@ export function DiscoveryProgress({
             <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
               {statusLabel(crawl.status)}
             </Badge>
-            <span className="text-sm text-secondary" aria-live="polite">
+            <span className="text-secondary text-sm" aria-live="polite">
               {cancelPending
                 ? 'Cancelling discovery — finishing the page in flight and stopping'
                 : `${discoveryProgressLabel(crawl)}${provisional ? ' — scanning continues in the background' : ''}`}
@@ -106,17 +106,17 @@ export function DiscoveryProgress({
           ) : null}
           <div className="grid gap-1">
             <Label>Discovery</Label>
-            <span className="text-sm text-secondary">{statusLabel(crawl.discovery_status)}</span>
+            <span className="text-secondary text-sm">{statusLabel(crawl.discovery_status)}</span>
           </div>
         </dl>
 
         {isFree ? (
-          <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning-text">
+          <div className="border-warning-border bg-warning-bg text-warning-text rounded-md border p-3 text-sm">
             <p className="font-medium">
               Free plan — we&apos;ll automatically analyze a {entitlement.sample_url_limit}-page
               sample of your site.
             </p>
-            <p className="mt-0.5 text-warning-text/90">
+            <p className="text-warning-text/90 mt-0.5">
               Upgrade to Starter to choose which pages to monitor.
             </p>
           </div>
@@ -127,7 +127,7 @@ export function DiscoveryProgress({
           {inventoryQuery.isError ? (
             <Alert tone="danger">Could not load the page inventory. Please refresh.</Alert>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-secondary">
+            <p className="text-secondary text-sm">
               Discovering pages — sitemaps and internal links are being scanned.
             </p>
           ) : (
@@ -142,9 +142,9 @@ export function DiscoveryProgress({
                 {rows.map((row) => (
                   <TableRow key={row.site_url_id}>
                     <TableCell>
-                      <span className="mono text-xs text-foreground">{row.display_url}</span>
+                      <span className="mono text-foreground text-xs">{row.display_url}</span>
                     </TableCell>
-                    <TableCell className="text-xs text-secondary">
+                    <TableCell className="text-secondary text-xs">
                       {row.source ? statusLabel(row.source) : '—'}
                     </TableCell>
                   </TableRow>
@@ -154,7 +154,7 @@ export function DiscoveryProgress({
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             {crawl.status === 'running' || crawl.status === 'queued' ? (
-              <p className="text-xs text-muted">More URLs appear as discovery continues.</p>
+              <p className="text-muted text-xs">More URLs appear as discovery continues.</p>
             ) : (
               <span />
             )}

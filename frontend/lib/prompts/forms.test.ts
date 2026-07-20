@@ -11,9 +11,7 @@ import {
 describe('promptFormSchema', () => {
   it('requires non-empty text', () => {
     expect(promptFormSchema.safeParse({ ...emptyPromptForm }).success).toBe(false);
-    expect(
-      promptFormSchema.safeParse({ ...emptyPromptForm, text: 'Hello' }).success,
-    ).toBe(true);
+    expect(promptFormSchema.safeParse({ ...emptyPromptForm, text: 'Hello' }).success).toBe(true);
   });
 });
 

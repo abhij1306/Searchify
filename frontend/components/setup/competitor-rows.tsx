@@ -34,15 +34,18 @@ export function CompetitorRows({
   return (
     <div className="grid gap-4">
       {fields.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="text-muted text-sm">
           No competitors yet. Add the brands you want to benchmark against.
         </p>
       ) : null}
 
       {fields.map((field, index) => (
-        <div key={field.id} className="grid gap-4 rounded-md border border-border-subtle bg-well p-4">
+        <div
+          key={field.id}
+          className="border-border-subtle bg-well grid gap-4 rounded-md border p-4"
+        >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-2xs font-semibold uppercase tracking-wide text-muted">
+            <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
               Competitor {index + 1}
             </span>
             <Button

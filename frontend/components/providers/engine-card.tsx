@@ -101,8 +101,8 @@ export function EngineCard({
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
         <div className="grid gap-0.5">
-          <h3 className="text-base font-semibold text-foreground">{model.label}</h3>
-          <p className="text-xs text-secondary">
+          <h3 className="text-foreground text-base font-semibold">{model.label}</h3>
+          <p className="text-secondary text-xs">
             {transport ? `via ${TRANSPORT_LABELS[transport]}` : 'No route available'}
           </p>
         </div>
@@ -118,8 +118,8 @@ export function EngineCard({
       <CardContent className="grid gap-4">
         {route ? (
           <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-secondary">Route</span>
-            <span className="text-sm text-foreground">{route.label}</span>
+            <span className="text-secondary text-xs font-medium">Route</span>
+            <span className="text-foreground text-sm">{route.label}</span>
             {route.default_model ? (
               <span className="text-2xs text-muted">Model: {route.default_model}</span>
             ) : null}
@@ -148,7 +148,9 @@ export function EngineCard({
         ) : null}
 
         {testResult ? (
-          <Alert tone={testResult.status === 'ok' ? 'success' : 'danger'}>{testResult.message}</Alert>
+          <Alert tone={testResult.status === 'ok' ? 'success' : 'danger'}>
+            {testResult.message}
+          </Alert>
         ) : null}
 
         <div className="flex items-center gap-2">

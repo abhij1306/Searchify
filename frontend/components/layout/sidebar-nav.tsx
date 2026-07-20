@@ -46,11 +46,11 @@ function DisabledItem({ item }: Readonly<{ item: NavItem }>) {
     <Tooltip content={`${item.label} is coming soon`} side="right">
       <span
         aria-disabled="true"
-        className="flex cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-subtle"
+        className="text-subtle flex cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium"
       >
         <Icon className="size-4 shrink-0" aria-hidden strokeWidth={2} />
         <span className="truncate">{item.label}</span>
-        <span className="ml-auto rounded-full bg-neutral-bg px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-muted">
+        <span className="bg-neutral-bg text-2xs text-muted ml-auto rounded-full px-1.5 py-0.5 font-semibold tracking-wide uppercase">
           soon
         </span>
       </span>
@@ -65,7 +65,7 @@ export function SidebarNav({ className }: Readonly<{ className?: string }>) {
     <nav aria-label="Primary" className={cn('flex flex-col gap-5', className)}>
       {NAV_GROUPS.map((group) => (
         <div key={group.title} className="flex flex-col gap-1">
-          <p className="px-2.5 text-2xs font-semibold uppercase tracking-wide text-muted">
+          <p className="text-2xs text-muted px-2.5 font-semibold tracking-wide uppercase">
             {group.title}
           </p>
           <ul className="flex flex-col gap-0.5">

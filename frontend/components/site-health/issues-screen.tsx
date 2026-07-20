@@ -42,7 +42,7 @@ export function IssuesScreen() {
         <Alert tone="danger">Could not load Site Health. Please refresh.</Alert>
       ) : !crawl ? (
         <Card>
-          <CardContent className="text-sm text-secondary">
+          <CardContent className="text-secondary text-sm">
             No Site Health crawl has run for this project yet. Run Site Health to discover and
             analyze pages, then issues will appear here.
           </CardContent>

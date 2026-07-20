@@ -38,9 +38,19 @@ function makeVisibility(overrides: Partial<Visibility> = {}): Visibility {
 describe('visibility dashboard helpers', () => {
   it('keeps only dashboard-ready statuses, newest first', () => {
     const options = toRunOptions([
-      { id: AUDIT_A, status: 'completed', completed_at: '2026-07-10T00:00:00Z', created_at: '2026-07-10T00:00:00Z' },
+      {
+        id: AUDIT_A,
+        status: 'completed',
+        completed_at: '2026-07-10T00:00:00Z',
+        created_at: '2026-07-10T00:00:00Z',
+      },
       { id: AUDIT_B, status: 'running', completed_at: null, created_at: '2026-07-12T00:00:00Z' },
-      { id: AUDIT_C, status: 'partially_completed', completed_at: '2026-07-14T00:00:00Z', created_at: '2026-07-14T00:00:00Z' },
+      {
+        id: AUDIT_C,
+        status: 'partially_completed',
+        completed_at: '2026-07-14T00:00:00Z',
+        created_at: '2026-07-14T00:00:00Z',
+      },
     ]);
     expect(options.map((o) => o.id)).toEqual([AUDIT_C, AUDIT_A]);
   });
@@ -61,19 +71,54 @@ describe('visibility dashboard helpers', () => {
   it('orders engines by canonical order and applies the engine filter', () => {
     const visibility = makeVisibility({
       per_engine: [
-        { logical_engine: 'claude', total_completed: 2, brand_mention_rate: 0.5, owned_citation_rate: null, search_use_rate: null, visibility_score: 50 },
-        { logical_engine: 'chatgpt', total_completed: 2, brand_mention_rate: 0.8, owned_citation_rate: null, search_use_rate: null, visibility_score: 80 },
+        {
+          logical_engine: 'claude',
+          total_completed: 2,
+          brand_mention_rate: 0.5,
+          owned_citation_rate: null,
+          search_use_rate: null,
+          visibility_score: 50,
+        },
+        {
+          logical_engine: 'chatgpt',
+          total_completed: 2,
+          brand_mention_rate: 0.8,
+          owned_citation_rate: null,
+          search_use_rate: null,
+          visibility_score: 80,
+        },
       ],
     });
-    expect(visibleEngines(visibility, 'all').map((e) => e.logical_engine)).toEqual(['chatgpt', 'claude']);
+    expect(visibleEngines(visibility, 'all').map((e) => e.logical_engine)).toEqual([
+      'chatgpt',
+      'claude',
+    ]);
     expect(visibleEngines(visibility, 'claude').map((e) => e.logical_engine)).toEqual(['claude']);
     expect(presentEngines(visibility)).toEqual(['chatgpt', 'claude']);
   });
 
   it('sorts rankings by share-of-voice descending', () => {
     const rows = sortedRankings([
-      { name: 'Comp', is_brand: false, mention_rate: 0.2, citation_rate: null, share_of_voice: 0.2, mention_count: 1, sentiment: null, avg_position: null },
-      { name: 'Acme', is_brand: true, mention_rate: 0.6, citation_rate: null, share_of_voice: 0.6, mention_count: 3, sentiment: null, avg_position: null },
+      {
+        name: 'Comp',
+        is_brand: false,
+        mention_rate: 0.2,
+        citation_rate: null,
+        share_of_voice: 0.2,
+        mention_count: 1,
+        sentiment: null,
+        avg_position: null,
+      },
+      {
+        name: 'Acme',
+        is_brand: true,
+        mention_rate: 0.6,
+        citation_rate: null,
+        share_of_voice: 0.6,
+        mention_count: 3,
+        sentiment: null,
+        avg_position: null,
+      },
     ]);
     expect(rows.map((r) => r.name)).toEqual(['Acme', 'Comp']);
   });

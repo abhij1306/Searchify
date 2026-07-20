@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.content import (
     CONTENT_GENERATOR_VERSION,
+    CONTENT_KNOWN_PROVIDERS,
     CONTENT_LIST_MAX_LIMIT,
     CONTEXT_STATUS_DISABLED,
     content_settings,
@@ -164,6 +165,13 @@ async def _insert_generation(
 
 
 def _require_provider_configured() -> None:
+    # Readiness is provider-aware: an unknown provider name is just as
+    # unconfigured as a missing key, and each known provider is checked for
+    # the key it actually uses (only Mistral exists today).
+    if content_settings.provider not in CONTENT_KNOWN_PROVIDERS:
+        raise ProviderNotConfiguredError(
+            f"unknown content provider: {content_settings.provider}"
+        )
     if not content_settings.mistral_api_key.get_secret_value():
         raise ProviderNotConfiguredError(
             "content provider is not configured (missing API key)"
@@ -190,7 +198,6 @@ async def enqueue_generation(
     await _project_in_workspace(
         session, workspace_id=workspace_id, project_id=project_id
     )
-    _require_provider_configured()
 
     fingerprint = request_fingerprint(
         project_id=project_id,
@@ -202,6 +209,9 @@ async def enqueue_generation(
     # always satisfied and keyless requests never collide with each other.
     key = idempotency_key or str(uuid.uuid4())
 
+    # Replay before the provider-config check: a retry of an already-accepted
+    # request must stay retrievable even if the provider was unconfigured (or
+    # broken) in between.
     if idempotency_key:
         existing = await session.scalar(
             select(ContentGeneration).where(
@@ -215,6 +225,8 @@ async def enqueue_generation(
             raise IdempotencyConflictError(
                 "idempotency key was already used with a different request"
             )
+
+    _require_provider_configured()
 
     if website_context_enabled:
         website_context = await build_website_context(

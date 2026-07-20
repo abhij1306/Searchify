@@ -7,11 +7,7 @@ import { useMemo, useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  promptsApi,
-  type PromptGenerateInput,
-  type PromptInput,
-} from '@/lib/api/prompts';
+import { promptsApi, type PromptGenerateInput, type PromptInput } from '@/lib/api/prompts';
 import { queryKeys } from '@/lib/api/query-keys';
 import { topicsApi } from '@/lib/api/topics';
 import type {
@@ -78,7 +74,8 @@ export function PromptLibrary() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.prompts.sets(projectId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.topics.list(projectId) });
     }
-    if (promptSet) await queryClient.invalidateQueries({ queryKey: queryKeys.prompts.set(promptSet.id) });
+    if (promptSet)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.prompts.set(promptSet.id) });
   };
 
   const createMutation = useMutation({
@@ -195,7 +192,10 @@ export function PromptLibrary() {
         : byStatus.filter((prompt) => prompt.topic_id === selectedTopicId),
     [byStatus, selectedTopicId],
   );
-  const visible = useMemo(() => filterPrompts(byTopic, search, filters), [byTopic, search, filters]);
+  const visible = useMemo(
+    () => filterPrompts(byTopic, search, filters),
+    [byTopic, search, filters],
+  );
 
   const statusCounts = useMemo(() => {
     const counts: Record<PromptStatus, number> = { active: 0, proposed: 0, archived: 0 };
@@ -271,7 +271,7 @@ export function PromptLibrary() {
         />
 
         <div className="grid min-w-0 content-start gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border">
+          <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b-2">
             <div role="tablist" aria-label="Prompt status" className="flex gap-0">
               {STATUS_TABS.map((tab) => {
                 const selected = tab.id === statusTab;
@@ -286,12 +286,12 @@ export function PromptLibrary() {
                     className={cn(
                       'focus-ring -mb-0.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
                       selected
-                        ? 'border-accent font-semibold text-foreground'
-                        : 'border-transparent text-secondary hover:text-foreground',
+                        ? 'border-accent text-foreground font-semibold'
+                        : 'text-secondary hover:text-foreground border-transparent',
                     )}
                   >
                     {tab.label}
-                    {count > 0 ? <span className="ml-1 text-xs text-muted">({count})</span> : null}
+                    {count > 0 ? <span className="text-muted ml-1 text-xs">({count})</span> : null}
                   </button>
                 );
               })}
@@ -334,7 +334,7 @@ export function PromptLibrary() {
           {!hasPrompts ? (
             <PromptEmptyState onAdd={openAdd} onImport={() => setImportOpen(true)} />
           ) : visible.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-panel px-6 py-12 text-center text-sm text-secondary">
+            <div className="border-border bg-panel text-secondary rounded-lg border border-dashed px-6 py-12 text-center text-sm">
               {statusTab === 'proposed'
                 ? 'No proposed prompts. Use "Generate prompts & topics" to draft suggestions.'
                 : 'No prompts match your search or filters.'}

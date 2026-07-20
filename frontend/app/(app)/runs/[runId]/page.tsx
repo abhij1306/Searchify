@@ -70,7 +70,7 @@ export default function RunDetailPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <Link href="/runs" className="text-xs font-medium text-accent-text hover:underline">
+        <Link href="/runs" className="text-accent-text text-xs font-medium hover:underline">
           ← Back to runs
         </Link>
       </div>
@@ -106,7 +106,7 @@ export default function RunDetailPage() {
           </Card>
         ) : executions.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-sm text-secondary">
+            <CardContent className="text-secondary py-8 text-center text-sm">
               No executions yet. They appear as the run is planned and processed.
             </CardContent>
           </Card>

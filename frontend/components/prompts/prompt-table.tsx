@@ -46,7 +46,7 @@ export function PromptTable({
   busyId?: string | null;
 }>) {
   return (
-    <div className="rounded-lg border border-border">
+    <div className="border-border rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -61,9 +61,9 @@ export function PromptTable({
         <TableBody>
           {prompts.map((prompt) => (
             <TableRow key={prompt.id}>
-              <TableCell className="min-w-[240px] max-w-[520px]">
+              <TableCell className="max-w-[520px] min-w-[240px]">
                 <Tooltip content={prompt.text}>
-                  <span className="line-clamp-2 block text-foreground">{prompt.text}</span>
+                  <span className="text-foreground line-clamp-2 block">{prompt.text}</span>
                 </Tooltip>
               </TableCell>
               <TableCell className="max-w-[180px]">
@@ -95,9 +95,9 @@ export function PromptTable({
                   aria-label={`${prompt.enabled ? 'Disable' : 'Enable'} prompt`}
                   disabled={busyId === prompt.id}
                   onClick={() => onToggleEnabled(prompt)}
-                  className="focus-ring inline-flex h-5 w-9 items-center rounded-full border border-border-strong bg-background-alt px-0.5 transition-colors aria-checked:justify-end aria-checked:border-accent aria-checked:bg-accent disabled:opacity-50"
+                  className="focus-ring border-border-strong bg-background-alt aria-checked:border-accent aria-checked:bg-accent inline-flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors disabled:opacity-50 aria-checked:justify-end"
                 >
-                  <span className="size-4 rounded-full bg-panel shadow-sm" aria-hidden />
+                  <span className="bg-panel size-4 rounded-full shadow-sm" aria-hidden />
                 </button>
               </TableCell>
               <TableCell className="text-right">
@@ -130,7 +130,7 @@ export function PromptTable({
                         Archive
                       </DropdownItem>
                     ) : null}
-                    <DropdownSeparator className="my-1 h-px bg-border-subtle" />
+                    <DropdownSeparator className="bg-border-subtle my-1 h-px" />
                     <DropdownItem
                       onSelect={() => onDelete(prompt)}
                       className="text-danger-text data-[highlighted]:bg-danger-bg"

@@ -9,7 +9,11 @@
  * position stay the not-yet-computed placeholder (decision B-2 / invariant 9).
  */
 import type { TrendPoint } from '@/components/ui/trend-chart';
-import type { LogicalEngine, VisibilityTrendPoint, VisibilityTrendRankingRow } from '@/lib/api/types';
+import type {
+  LogicalEngine,
+  VisibilityTrendPoint,
+  VisibilityTrendRankingRow,
+} from '@/lib/api/types';
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
 
 /** Trend granularity — mirrors the backend `granularity=run|week|month`. */
@@ -92,7 +96,10 @@ function metricValue(point: VisibilityTrendPoint, metric: TrendMetric): number |
  * from the previous point's, or it spans a boundary) carries a `versionChange`
  * marker so the chart can flag it (invariant 4 / version continuity).
  */
-export function toChartPoints(points: readonly VisibilityTrendPoint[], metric: TrendMetric): TrendPoint[] {
+export function toChartPoints(
+  points: readonly VisibilityTrendPoint[],
+  metric: TrendMetric,
+): TrendPoint[] {
   let prevVersions: string | null = null;
   return points.map((point) => {
     const value = metricValue(point, metric);
@@ -105,9 +112,7 @@ export function toChartPoints(points: readonly VisibilityTrendPoint[], metric: T
       label: formatPointLabel(point.completed_at),
       value: value === null ? null : Math.round(value),
       versionChange:
-        changed || point.spans_version_boundary
-          ? { note: versionChangeNote(point) }
-          : null,
+        changed || point.spans_version_boundary ? { note: versionChangeNote(point) } : null,
     };
   });
 }
@@ -279,10 +284,14 @@ export function trendStats(points: readonly VisibilityTrendPoint[]): TrendStat[]
 }
 
 /** Ranking rows for a point, kept SOV-sorted (rows already arrive sorted). */
-export function sortedTrendRankings(rows: readonly VisibilityTrendRankingRow[]): VisibilityTrendRankingRow[] {
+export function sortedTrendRankings(
+  rows: readonly VisibilityTrendRankingRow[],
+): VisibilityTrendRankingRow[] {
   return rows
     .slice()
-    .sort((a, b) => (b.share_of_voice ?? 0) - (a.share_of_voice ?? 0) || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) => (b.share_of_voice ?? 0) - (a.share_of_voice ?? 0) || a.name.localeCompare(b.name),
+    );
 }
 
 /** Latest + first-in-range points for the side-by-side ranking comparison. */

@@ -140,13 +140,13 @@ export function LaunchDialog({
         <Field label="Prompt set" required>
           {(props) =>
             noPromptSets ? (
-              <p className="text-sm text-muted">
+              <p className="text-muted text-sm">
                 No prompt set yet. Add prompts on the Prompts screen first.
               </p>
             ) : (
               <select
                 {...props}
-                className="focus-ring h-[var(--control-height)] w-full rounded-md border border-border-strong bg-panel px-2.5 text-sm text-foreground"
+                className="focus-ring border-border-strong bg-panel text-foreground h-[var(--control-height)] w-full rounded-md border px-2.5 text-sm"
                 value={effectivePromptSetId ?? ''}
                 onChange={(event) => setPromptSetId(event.target.value)}
               >
@@ -162,11 +162,11 @@ export function LaunchDialog({
         </Field>
 
         <fieldset className="grid gap-2">
-          <legend className="text-xs font-medium text-secondary">
+          <legend className="text-secondary text-xs font-medium">
             Engines <span className="text-danger">*</span>
           </legend>
           {noEngines ? (
-            <p className="text-sm text-muted">
+            <p className="text-muted text-sm">
               No configured engines. Add a provider key on the Providers screen first.
             </p>
           ) : (
@@ -182,8 +182,8 @@ export function LaunchDialog({
                     onClick={() => setEngines((prev) => toggleEngine(prev, engine))}
                     className={
                       selected
-                        ? 'focus-ring rounded-md border border-transparent bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg'
-                        : 'focus-ring rounded-md border border-border-strong bg-panel px-3 py-1.5 text-sm font-medium text-foreground hover:border-accent-border'
+                        ? 'focus-ring bg-accent text-accent-fg rounded-md border border-transparent px-3 py-1.5 text-sm font-medium'
+                        : 'focus-ring border-border-strong bg-panel text-foreground hover:border-accent-border rounded-md border px-3 py-1.5 text-sm font-medium'
                     }
                   >
                     {ENGINE_LABELS[engine]}

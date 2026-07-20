@@ -177,9 +177,7 @@ describe('SiteHealthScreen — terminal phase', () => {
       await screen.findByText(/Discovery was cancelled — the pages found so far are kept/),
     ).toBeInTheDocument();
     // The persisted inventory row itself is visible and selectable.
-    expect(
-      await screen.findByLabelText('Monitor https://acme.com/pricing'),
-    ).toBeInTheDocument();
+    expect(await screen.findByLabelText('Monitor https://acme.com/pricing')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start analysis' })).toBeInTheDocument();
     expect(
       screen.queryByText('This crawl was cancelled before it produced results.'),

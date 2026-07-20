@@ -39,14 +39,15 @@ export default function ExecutionEvidencePage() {
     queryKey: queryKeys.runs.executions(runId),
     queryFn: ({ signal }) => runsApi.listExecutions(runId, { signal }),
   });
-  const answerText = executionsQuery.data?.find((row) => row.id === executionId)?.answer_text ?? null;
+  const answerText =
+    executionsQuery.data?.find((row) => row.id === executionId)?.answer_text ?? null;
 
   return (
     <div className="grid gap-6">
       <div>
         <Link
           href={`/runs/${runId}`}
-          className="text-xs font-medium text-accent-text hover:underline"
+          className="text-accent-text text-xs font-medium hover:underline"
         >
           ← Back to run
         </Link>

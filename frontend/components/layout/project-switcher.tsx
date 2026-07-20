@@ -37,28 +37,30 @@ export function ProjectSwitcher({ className }: Readonly<{ className?: string }>)
     <Dropdown>
       <DropdownTrigger
         className={cn(
-          'focus-ring flex w-full items-center gap-2.5 rounded-md border border-border bg-panel px-2.5 py-1.5 text-left transition-colors hover:bg-background-alt disabled:pointer-events-none disabled:opacity-50',
+          'focus-ring border-border bg-panel hover:bg-background-alt flex w-full items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-left transition-colors disabled:pointer-events-none disabled:opacity-50',
           className,
         )}
         disabled={isLoading || projects.length === 0}
       >
         <span
           aria-hidden
-          className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-2xs font-bold uppercase text-accent-text"
+          className="bg-accent-soft text-2xs text-accent-text flex size-7 shrink-0 items-center justify-center rounded-md font-bold uppercase"
         >
           {avatar}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-foreground">{label}</span>
-          <span className="block truncate text-2xs text-muted">
-            {isLoading ? 'Loading…' : `${projects.length} project${projects.length === 1 ? '' : 's'}`}
+          <span className="text-foreground block truncate text-sm font-semibold">{label}</span>
+          <span className="text-2xs text-muted block truncate">
+            {isLoading
+              ? 'Loading…'
+              : `${projects.length} project${projects.length === 1 ? '' : 's'}`}
           </span>
         </span>
-        <ChevronsUpDown className="size-4 shrink-0 text-muted" aria-hidden />
+        <ChevronsUpDown className="text-muted size-4 shrink-0" aria-hidden />
       </DropdownTrigger>
       <DropdownContent align="start" className="w-[calc(240px-2rem)]">
         <DropdownLabel>Projects</DropdownLabel>
-        <DropdownSeparator className="my-1 h-px bg-border-subtle" />
+        <DropdownSeparator className="bg-border-subtle my-1 h-px" />
         {projects.map((project) => {
           const selected = project.id === activeProjectId;
           return (
@@ -69,12 +71,12 @@ export function ProjectSwitcher({ className }: Readonly<{ className?: string }>)
             >
               <span
                 aria-hidden
-                className="flex size-6 shrink-0 items-center justify-center rounded bg-accent-soft text-2xs font-bold uppercase text-accent-text"
+                className="bg-accent-soft text-2xs text-accent-text flex size-6 shrink-0 items-center justify-center rounded font-bold uppercase"
               >
                 {initials(project.brand_name || project.name)}
               </span>
               <span className="min-w-0 flex-1 truncate">{project.brand_name || project.name}</span>
-              {selected ? <Check className="size-4 shrink-0 text-accent" aria-hidden /> : null}
+              {selected ? <Check className="text-accent size-4 shrink-0" aria-hidden /> : null}
             </DropdownItem>
           );
         })}

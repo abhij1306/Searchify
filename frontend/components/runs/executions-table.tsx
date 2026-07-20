@@ -41,14 +41,14 @@ export function ExecutionsTable({
         {executions.map((execution) => (
           <TableRow key={execution.id}>
             <TableCell>
-              <span className="text-sm text-foreground">#{execution.prompt_index + 1}</span>
-              <span className="ml-2 text-xs text-muted">rep {execution.repetition}</span>
+              <span className="text-foreground text-sm">#{execution.prompt_index + 1}</span>
+              <span className="text-muted ml-2 text-xs">rep {execution.repetition}</span>
             </TableCell>
             <TableCell>
-              <span className="text-sm text-foreground">
+              <span className="text-foreground text-sm">
                 {engineLabel(execution.logical_engine)}
               </span>
-              <span className="ml-1.5 text-xs text-muted">
+              <span className="text-muted ml-1.5 text-xs">
                 {transportLabel(execution.transport_provider)}
               </span>
             </TableCell>
@@ -64,12 +64,12 @@ export function ExecutionsTable({
               {execution.status === 'succeeded' ? (
                 <Link
                   href={`/runs/${auditId}/executions/${execution.id}`}
-                  className="text-sm font-medium text-accent-text hover:underline"
+                  className="text-accent-text text-sm font-medium hover:underline"
                 >
                   Evidence
                 </Link>
               ) : (
-                <span className="text-sm text-subtle">—</span>
+                <span className="text-subtle text-sm">—</span>
               )}
             </TableCell>
           </TableRow>

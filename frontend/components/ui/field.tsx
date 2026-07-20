@@ -31,14 +31,13 @@ export function Field({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy =
-    [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') ||
-    undefined;
+    [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className={cn('grid gap-1.5', className)}>
-      <label htmlFor={id} className="text-xs font-medium text-secondary">
+      <label htmlFor={id} className="text-secondary text-xs font-medium">
         {label}
-        {required ? <span className="ml-0.5 text-danger">*</span> : null}
+        {required ? <span className="text-danger ml-0.5">*</span> : null}
       </label>
       {children({
         id,
@@ -46,12 +45,12 @@ export function Field({
         'aria-describedby': describedBy,
       })}
       {hint && !error ? (
-        <span id={hintId} className="text-xs text-muted">
+        <span id={hintId} className="text-muted text-xs">
           {hint}
         </span>
       ) : null}
       {error ? (
-        <span id={errorId} role="alert" className="text-xs text-danger-text">
+        <span id={errorId} role="alert" className="text-danger-text text-xs">
           {error}
         </span>
       ) : null}

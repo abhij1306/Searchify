@@ -100,9 +100,7 @@ export function PromptFormDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Theme" error={errors.theme?.message} hint="Optional topic / category">
-            {(props) => (
-              <Input {...props} {...register('theme')} placeholder="Comfort" />
-            )}
+            {(props) => <Input {...props} {...register('theme')} placeholder="Comfort" />}
           </Field>
           <Field label="Intent" error={errors.intent?.message}>
             {(props) => (
@@ -122,12 +120,12 @@ export function PromptFormDialog({
             control={control}
             name="branded"
             render={({ field }) => (
-              <label className="flex items-center gap-2 text-sm text-foreground">
+              <label className="text-foreground flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={field.value}
                   onChange={(event) => field.onChange(event.target.checked)}
-                  className="focus-ring size-4 rounded border-border-strong"
+                  className="focus-ring border-border-strong size-4 rounded"
                 />
                 Branded
               </label>
@@ -137,12 +135,12 @@ export function PromptFormDialog({
             control={control}
             name="enabled"
             render={({ field }) => (
-              <label className="flex items-center gap-2 text-sm text-foreground">
+              <label className="text-foreground flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={field.value}
                   onChange={(event) => field.onChange(event.target.checked)}
-                  className="focus-ring size-4 rounded border-border-strong"
+                  className="focus-ring border-border-strong size-4 rounded"
                 />
                 Enabled
               </label>

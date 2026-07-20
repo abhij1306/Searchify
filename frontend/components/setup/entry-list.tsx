@@ -49,7 +49,7 @@ export function EntryList({
 
   return (
     <fieldset className="grid gap-1.5">
-      <legend className="text-xs font-medium text-secondary">{label}</legend>
+      <legend className="text-secondary text-xs font-medium">{label}</legend>
       {fields.length > 0 ? (
         <ul className="grid gap-2">
           {fields.map((field, index) => {
@@ -74,7 +74,7 @@ export function EntryList({
                   </Button>
                 </div>
                 {message ? (
-                  <span role="alert" className={cn('text-xs text-danger-text')}>
+                  <span role="alert" className={cn('text-danger-text text-xs')}>
                     {message}
                   </span>
                 ) : null}
@@ -84,12 +84,7 @@ export function EntryList({
         </ul>
       ) : null}
       <div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={() => append({ value: '' })}
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={() => append({ value: '' })}>
           {addLabel}
         </Button>
       </div>

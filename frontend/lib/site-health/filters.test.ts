@@ -38,7 +38,10 @@ describe('inventory filter serialization (cursor round-trip)', () => {
   });
 
   it('serializes unmonitored as monitored=false', () => {
-    const params = serializeInventoryFilters({ ...emptyInventoryFilters, monitored: 'unmonitored' });
+    const params = serializeInventoryFilters({
+      ...emptyInventoryFilters,
+      monitored: 'unmonitored',
+    });
     expect(params.get('monitored')).toBe('false');
     expect(parseInventoryFilters(params).monitored).toBe('unmonitored');
   });
@@ -56,7 +59,13 @@ describe('toInventoryParams', () => {
       'C1',
       200,
     );
-    expect(params).toEqual({ cursor: 'C1', limit: 200, query: 'foo', status: 'ok', monitored: false });
+    expect(params).toEqual({
+      cursor: 'C1',
+      limit: 200,
+      query: 'foo',
+      status: 'ok',
+      monitored: false,
+    });
   });
 
   it('drops empty query/status and "all" monitored to undefined', () => {
@@ -137,6 +146,8 @@ describe('issue filter serialization', () => {
     const { cursor } = changeIssueFilters(emptyIssueFilters, { severity: 'high' });
     expect(cursor).toBeNull();
     expect(issueFiltersEqual(emptyIssueFilters, emptyIssueFilters)).toBe(true);
-    expect(issueFiltersEqual(emptyIssueFilters, { ...emptyIssueFilters, severity: 'x' })).toBe(false);
+    expect(issueFiltersEqual(emptyIssueFilters, { ...emptyIssueFilters, severity: 'x' })).toBe(
+      false,
+    );
   });
 });

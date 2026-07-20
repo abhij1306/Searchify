@@ -36,13 +36,11 @@ export default function RegisterPage() {
   return (
     <div className="grid gap-5">
       <div className="grid gap-1">
-        <h1 className="text-lg font-semibold text-foreground">Create your account</h1>
-        <p className="text-sm text-secondary">Start measuring your AI search visibility.</p>
+        <h1 className="text-foreground text-lg font-semibold">Create your account</h1>
+        <p className="text-secondary text-sm">Start measuring your AI search visibility.</p>
       </div>
 
-      {mutation.isError ? (
-        <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert>
-      ) : null}
+      {mutation.isError ? <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert> : null}
 
       <form noValidate onSubmit={onSubmit} className="grid gap-4">
         <Field label="Email" required error={errors.email?.message}>
@@ -86,9 +84,9 @@ export default function RegisterPage() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-secondary">
+      <p className="text-secondary text-center text-sm">
         Already have an account?{' '}
-        <Link href="/login" className="focus-ring rounded-sm text-accent-text">
+        <Link href="/login" className="focus-ring text-accent-text rounded-sm">
           Sign in
         </Link>
       </p>

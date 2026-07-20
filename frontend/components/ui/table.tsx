@@ -1,10 +1,4 @@
-import type {
-  HTMLAttributes,
-  ReactNode,
-  Ref,
-  TdHTMLAttributes,
-  ThHTMLAttributes,
-} from 'react';
+import type { HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -28,15 +22,9 @@ export function Table({
   wrapperRef?: Ref<HTMLDivElement>;
 }>) {
   return (
-    <div
-      ref={wrapperRef}
-      className={cn('relative w-full overflow-auto', wrapperClassName)}
-    >
+    <div ref={wrapperRef} className={cn('relative w-full overflow-auto', wrapperClassName)}>
       <table
-        className={cn(
-          'w-full border-collapse text-[length:var(--table-font-size)]',
-          className,
-        )}
+        className={cn('w-full border-collapse text-[length:var(--table-font-size)]', className)}
       >
         {children}
       </table>
@@ -77,7 +65,7 @@ export function TableRow({
     <tr
       {...props}
       className={cn(
-        'h-[var(--table-row-height)] border-b border-border-subtle bg-panel transition-colors hover:bg-accent-soft',
+        'border-border-subtle bg-panel hover:bg-accent-soft h-[var(--table-row-height)] border-b transition-colors',
         className,
       )}
     >
@@ -91,14 +79,12 @@ export function TableHead({
   className,
   numeric,
   ...props
-}: Readonly<
-  ThHTMLAttributes<HTMLTableCellElement> & { numeric?: boolean }
->) {
+}: Readonly<ThHTMLAttributes<HTMLTableCellElement> & { numeric?: boolean }>) {
   return (
     <th
       {...props}
       className={cn(
-        'sticky top-0 z-10 h-[var(--table-header-height)] border-b border-border bg-background-alt px-3 align-middle text-[length:var(--table-header-font-size)] font-semibold uppercase tracking-wide text-muted',
+        'border-border bg-background-alt text-muted sticky top-0 z-10 h-[var(--table-header-height)] border-b px-3 align-middle text-[length:var(--table-header-font-size)] font-semibold tracking-wide uppercase',
         numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}
@@ -113,14 +99,12 @@ export function TableCell({
   className,
   numeric,
   ...props
-}: Readonly<
-  TdHTMLAttributes<HTMLTableCellElement> & { numeric?: boolean }
->) {
+}: Readonly<TdHTMLAttributes<HTMLTableCellElement> & { numeric?: boolean }>) {
   return (
     <td
       {...props}
       className={cn(
-        'px-3 py-0 align-middle text-foreground',
+        'text-foreground px-3 py-0 align-middle',
         numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}

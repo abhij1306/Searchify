@@ -11,11 +11,9 @@ export function PageTitle({
   return (
     <div className={cn('space-y-1', className)}>
       {kicker ? (
-        <p className="text-2xs font-semibold uppercase tracking-wider text-accent-text">
-          {kicker}
-        </p>
+        <p className="text-2xs text-accent-text font-semibold tracking-wider uppercase">{kicker}</p>
       ) : null}
-      <h1 className="text-xl font-bold text-foreground">{children}</h1>
+      <h1 className="text-foreground text-xl font-bold">{children}</h1>
     </div>
   );
 }
@@ -27,7 +25,7 @@ export function SectionTitle({
   ...props
 }: Readonly<ComponentPropsWithoutRef<'h2'>>) {
   return (
-    <h2 {...props} className={cn('text-lg font-semibold text-foreground', className)}>
+    <h2 {...props} className={cn('text-foreground text-lg font-semibold', className)}>
       {children}
     </h2>
   );
@@ -42,7 +40,7 @@ export function Label({
   return (
     <span
       {...props}
-      className={cn('text-2xs font-semibold uppercase tracking-wide text-muted', className)}
+      className={cn('text-2xs text-muted font-semibold tracking-wide uppercase', className)}
     >
       {children}
     </span>

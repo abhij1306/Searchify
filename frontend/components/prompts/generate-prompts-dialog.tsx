@@ -101,7 +101,7 @@ export function GeneratePromptsDialog({
         {result && !error ? <GenerateResultAlert result={result} /> : null}
 
         <label className="grid gap-1.5">
-          <span className="text-xs font-medium text-secondary">Number of prompts (1–20)</span>
+          <span className="text-secondary text-xs font-medium">Number of prompts (1–20)</span>
           <Input
             type="number"
             min={1}
@@ -114,12 +114,12 @@ export function GeneratePromptsDialog({
         </label>
 
         <label className="grid gap-1.5">
-          <span className="text-xs font-medium text-secondary">Topic</span>
+          <span className="text-secondary text-xs font-medium">Topic</span>
           <select
             value={topicId}
             onChange={(event) => setTopicId(event.target.value)}
             aria-label="Topic"
-            className="focus-ring block w-full rounded-md border border-border-strong bg-panel px-2.5 py-1.5 text-sm text-foreground"
+            className="focus-ring border-border-strong bg-panel text-foreground block w-full rounded-md border px-2.5 py-1.5 text-sm"
           >
             <option value="">Let AI propose topics</option>
             {topics.map((topic) => (
@@ -130,13 +130,13 @@ export function GeneratePromptsDialog({
           </select>
         </label>
 
-        <label className="flex items-start gap-2 rounded-md border border-border bg-background-alt px-3 py-2.5 text-sm">
+        <label className="border-border bg-background-alt flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm">
           <input
             type="checkbox"
             checked={confirmed}
             onChange={(event) => setConfirmed(event.target.checked)}
             aria-label="Confirm sending brand details to the AI provider"
-            className="focus-ring mt-0.5 size-4 shrink-0 accent-accent"
+            className="focus-ring accent-accent mt-0.5 size-4 shrink-0"
           />
           <span className="text-secondary">
             I understand my brand profile (brand name, aliases, competitors, and market) will be
@@ -163,9 +163,7 @@ function GenerateResultAlert({ result }: Readonly<{ result: PromptGenerateRespon
   // touched (`result.topics` also includes topics whose only change was a
   // dropped duplicate, so it can overstate where rows landed).
   const topicCount = new Set(
-    result.generated
-      .map((prompt) => prompt.topic_id)
-      .filter((id): id is string => id != null),
+    result.generated.map((prompt) => prompt.topic_id).filter((id): id is string => id != null),
   ).size;
 
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -206,6 +204,8 @@ function GenerateErrorAlert({ error }: Readonly<{ error: unknown }>) {
     );
   }
   const message =
-    error instanceof Error && error.message ? error.message : 'Generation failed. Please try again.';
+    error instanceof Error && error.message
+      ? error.message
+      : 'Generation failed. Please try again.';
   return <Alert tone="danger">{message}</Alert>;
 }

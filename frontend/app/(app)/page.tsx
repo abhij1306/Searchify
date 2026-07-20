@@ -39,7 +39,7 @@ function LandingRedirect() {
 
   if (isError) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+      <main className="bg-background flex min-h-dvh items-center justify-center p-6">
         <div className="grid w-full max-w-md gap-3">
           <Alert tone="danger">Could not load your workspace. Please try again.</Alert>
           <Button variant="secondary" onClick={() => refetch()}>
@@ -59,7 +59,7 @@ function LandingRedirect() {
 
 function LandingSplash() {
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+    <main className="bg-background flex min-h-dvh items-center justify-center p-6">
       <div className="grid w-full max-w-[280px] gap-3" aria-hidden>
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-4 w-full" />

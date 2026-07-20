@@ -38,11 +38,7 @@ test.beforeEach(() => {
 const PROMPT_BOX = /describe the website content/i;
 
 /** Register (auto-login via HttpOnly cookie) + create a project via the real API. */
-async function seedAccount(
-  page: Page,
-  email: string,
-  projectName: string,
-): Promise<string> {
+async function seedAccount(page: Page, email: string, projectName: string): Promise<string> {
   const register = await page.request.post('/api/v1/auth/register', {
     data: { email, password: 'password123' },
   });
@@ -67,9 +63,7 @@ async function generateFromComposer(page: Page, prompt: string): Promise<void> {
   await page.getByRole('button', { name: 'Generate' }).click();
 }
 
-test('enqueue → worker → sanitised markdown result, persisted across reload', async ({
-  page,
-}) => {
+test('enqueue → worker → sanitised markdown result, persisted across reload', async ({ page }) => {
   await seedAccount(page, 'e2e-happy@example.com', 'Acme');
   await page.goto('/content');
 
@@ -95,7 +89,9 @@ test('enqueue → worker → sanitised markdown result, persisted across reload'
   expect(badHref ?? '').not.toContain('javascript:');
 
   // Provenance from the real round trip.
-  await expect(page.getByText(new RegExp(`returned model: ${MOCK_RETURNED_MODEL}`, 'i'))).toBeVisible();
+  await expect(
+    page.getByText(new RegExp(`returned model: ${MOCK_RETURNED_MODEL}`, 'i')),
+  ).toBeVisible();
 
   // The env-held key reached the provider (and only the provider): the real
   // connector sent it, and no DTO ever carries it.
@@ -166,9 +162,7 @@ test('cancel during a slow provider call ends cancelled with no output', async (
   expect(detail.output_text).toBeNull();
 });
 
-test('regenerate and try-again create new records; originals are untouched', async ({
-  page,
-}) => {
+test('regenerate and try-again create new records; originals are untouched', async ({ page }) => {
   await seedAccount(page, 'e2e-regen@example.com', 'RegenCo');
   const projectId = await activeProjectId(page);
   await page.goto('/content');
@@ -186,10 +180,9 @@ test('regenerate and try-again create new records; originals are untouched', asy
   // Regenerate from the result card creates a second record...
   await page.getByRole('button', { name: 'Regenerate' }).click();
   await expect
-    .poll(
-      async () => ((await (await page.request.get(listUrl)).json()) as unknown[]).length,
-      { timeout: 30_000 },
-    )
+    .poll(async () => ((await (await page.request.get(listUrl)).json()) as unknown[]).length, {
+      timeout: 30_000,
+    })
     .toBe(2);
 
   // ...which also runs to success against the real worker.
@@ -206,9 +199,7 @@ test('regenerate and try-again create new records; originals are untouched', asy
     .toBe(true);
 
   // Try-again via the API surface (the UI button only shows on failures).
-  const tryAgain = await page.request.post(
-    `/api/v1/content/generations/${originalId}/try-again`,
-  );
+  const tryAgain = await page.request.post(`/api/v1/content/generations/${originalId}/try-again`);
   expect(tryAgain.status(), await tryAgain.text()).toBe(201);
   const clone = (await tryAgain.json()) as { id: string };
   expect(clone.id).not.toBe(originalId);

@@ -45,15 +45,11 @@ export function InventoryTable({
             </TableCell>
             <TableCell>
               <span className="flex flex-col">
-                <span className="font-medium text-foreground">
-                  {row.title ?? row.display_url}
-                </span>
+                <span className="text-foreground font-medium">{row.title ?? row.display_url}</span>
                 <span className="mono text-2xs text-muted">{row.display_url}</span>
               </span>
             </TableCell>
-            <TableCell className="text-xs text-secondary">
-              {row.content_type ?? '—'}
-            </TableCell>
+            <TableCell className="text-secondary text-xs">{row.content_type ?? '—'}</TableCell>
           </TableRow>
         ))}
       </TableBody>

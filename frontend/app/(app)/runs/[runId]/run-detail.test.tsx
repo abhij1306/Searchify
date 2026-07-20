@@ -71,9 +71,7 @@ describe('RunDetailPage', () => {
   it('renders the progress panel counts + status and the executions table', async () => {
     mswServer.use(
       http.get(`/api/v1/audits/${AUDIT_ID}`, () => HttpResponse.json(audit())),
-      http.get(`/api/v1/audits/${AUDIT_ID}/executions`, () =>
-        HttpResponse.json([execution()]),
-      ),
+      http.get(`/api/v1/audits/${AUDIT_ID}/executions`, () => HttpResponse.json([execution()])),
     );
 
     renderWithProviders(<RunDetailPage />);
@@ -101,7 +99,9 @@ describe('RunDetailPage', () => {
       http.get(`/api/v1/audits/${AUDIT_ID}/executions`, () => HttpResponse.json([execution()])),
       http.post(`/api/v1/audits/${AUDIT_ID}/cancel`, () => {
         cancelled = true;
-        return HttpResponse.json(audit({ status: 'cancelled', completed_at: '2026-07-15T00:05:00Z' }));
+        return HttpResponse.json(
+          audit({ status: 'cancelled', completed_at: '2026-07-15T00:05:00Z' }),
+        );
       }),
     );
 
@@ -112,14 +112,14 @@ describe('RunDetailPage', () => {
 
     // The run flips to cancelled and the cancel button becomes disabled (terminal).
     expect(await screen.findByText('Cancelled')).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /cancel run/i })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: /cancel run/i })).toBeDisabled());
   });
 
   it('exposes CSV/MD export links', async () => {
     mswServer.use(
-      http.get(`/api/v1/audits/${AUDIT_ID}`, () => HttpResponse.json(audit({ status: 'completed' }))),
+      http.get(`/api/v1/audits/${AUDIT_ID}`, () =>
+        HttpResponse.json(audit({ status: 'completed' })),
+      ),
       http.get(`/api/v1/audits/${AUDIT_ID}/executions`, () => HttpResponse.json([execution()])),
     );
 

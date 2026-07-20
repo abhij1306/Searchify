@@ -115,11 +115,7 @@ function makeProject(promptSets: unknown[]) {
   };
 }
 
-function baseHandlers(
-  prompts: unknown[],
-  topics: unknown[] = [],
-  evidenceItems: unknown[] = [],
-) {
+function baseHandlers(prompts: unknown[], topics: unknown[] = [], evidenceItems: unknown[] = []) {
   const set = makeSet(prompts);
   mswServer.use(
     http.get('/api/v1/projects', () => HttpResponse.json([makeProject([set])])),

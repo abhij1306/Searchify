@@ -23,9 +23,7 @@ describe('safeUrlTransform', () => {
 describe('ContentMarkdown', () => {
   it('renders headings, lists, and GFM tables', () => {
     render(
-      <ContentMarkdown
-        markdown={'# Title\n\n- one\n- two\n\n| A | B |\n| - | - |\n| 1 | 2 |'}
-      />,
+      <ContentMarkdown markdown={'# Title\n\n- one\n- two\n\n| A | B |\n| - | - |\n| 1 | 2 |'} />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Title' })).toBeInTheDocument();
     expect(screen.getByText('one')).toBeInTheDocument();
@@ -43,9 +41,7 @@ describe('ContentMarkdown', () => {
 
   it('neutralises javascript: links and hardens external ones', () => {
     render(
-      <ContentMarkdown
-        markdown={'[bad](javascript:alert(1)) and [good](https://example.com)'}
-      />,
+      <ContentMarkdown markdown={'[bad](javascript:alert(1)) and [good](https://example.com)'} />,
     );
     const good = screen.getByRole('link', { name: 'good' });
     expect(good).toHaveAttribute('href', 'https://example.com');

@@ -49,7 +49,7 @@ export function ProgressPanel({
               {auditStatusLabel(audit.status)}
             </Badge>
             {polling ? (
-              <span className="text-xs text-muted" aria-live="polite">
+              <span className="text-muted text-xs" aria-live="polite">
                 Updating…
               </span>
             ) : null}
@@ -83,22 +83,22 @@ export function ProgressPanel({
           </div>
           <div className="grid gap-1">
             <Label>Completed</Label>
-            <Metric className="text-xl text-run-completed">{audit.completed_count}</Metric>
+            <Metric className="text-run-completed text-xl">{audit.completed_count}</Metric>
           </div>
           <div className="grid gap-1">
             <Label>Failed</Label>
-            <Metric className="text-xl text-run-failed">{audit.failed_count}</Metric>
+            <Metric className="text-run-failed text-xl">{audit.failed_count}</Metric>
           </div>
           <div className="grid gap-1">
             <Label>Created</Label>
-            <span className="text-sm text-secondary">{formatDateTime(audit.created_at)}</span>
+            <span className="text-secondary text-sm">{formatDateTime(audit.created_at)}</span>
           </div>
         </dl>
 
         {audit.error_message ? (
-          <p className="text-sm text-danger-text">{audit.error_message}</p>
+          <p className="text-danger-text text-sm">{audit.error_message}</p>
         ) : null}
-        {cancelError ? <p className="text-sm text-danger-text">{cancelError}</p> : null}
+        {cancelError ? <p className="text-danger-text text-sm">{cancelError}</p> : null}
       </CardContent>
     </Card>
   );

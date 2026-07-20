@@ -122,7 +122,7 @@ export function UrlDetail({
 
   return (
     <div className="grid gap-6">
-      <nav className="text-xs text-muted" aria-label="Breadcrumb">
+      <nav className="text-muted text-xs" aria-label="Breadcrumb">
         <Link href="/site-health" className="hover:text-accent">
           Site Health
         </Link>
@@ -189,7 +189,11 @@ export function UrlDetail({
 
       <IssuesList issues={detail.issues} />
 
-      <IssueHistory key={`history:${crawlId}:${siteUrlId}`} crawlId={crawlId} siteUrlId={siteUrlId} />
+      <IssueHistory
+        key={`history:${crawlId}:${siteUrlId}`}
+        crawlId={crawlId}
+        siteUrlId={siteUrlId}
+      />
     </div>
   );
 }
@@ -234,7 +238,7 @@ function HeaderCard({
       <CardContent className="grid gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
-            <h1 className="text-xl font-semibold text-foreground">
+            <h1 className="text-foreground text-xl font-semibold">
               {detail.title ?? detail.display_url}
             </h1>
           </div>
@@ -246,10 +250,14 @@ function HeaderCard({
             }}
             disabled={rerun.isPending}
           >
-            {rerun.isPending ? 'Re-auditing…' : reaudited ? 'Re-audit queued' : 'Re-audit this page'}
+            {rerun.isPending
+              ? 'Re-auditing…'
+              : reaudited
+                ? 'Re-audit queued'
+                : 'Re-audit this page'}
           </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-secondary">
+        <div className="text-secondary flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
           <span className="flex items-center gap-1.5">
             <Label>URL</Label>
             <a
@@ -282,7 +290,7 @@ function ScoreTile({ label, value }: Readonly<{ label: string; value: number | n
     <Card>
       <CardContent className="flex flex-col items-center gap-2 py-6">
         {value === null ? (
-          <div className="mono flex size-[64px] items-center justify-center rounded-full border border-border-subtle text-lg text-muted">
+          <div className="mono border-border-subtle text-muted flex size-[64px] items-center justify-center rounded-full border text-lg">
             {PLACEHOLDER}
           </div>
         ) : (
@@ -297,9 +305,15 @@ function ScoreTile({ label, value }: Readonly<{ label: string; value: number | n
 /** Persisted HTTP delivery facts (mockup 711 "Delivery Metrics"). */
 function DeliveryMetrics({ delivery }: Readonly<{ delivery: DeliveryFacts }>) {
   const items: Array<{ label: string; value: string }> = [
-    { label: 'TTFB', value: delivery.ttfb_ms === null ? PLACEHOLDER : `${Math.round(delivery.ttfb_ms)}ms` },
+    {
+      label: 'TTFB',
+      value: delivery.ttfb_ms === null ? PLACEHOLDER : `${Math.round(delivery.ttfb_ms)}ms`,
+    },
     { label: 'Response Size', value: formatBytes(delivery.decoded_bytes ?? delivery.html_bytes) },
-    { label: 'HTTP Status', value: delivery.status_code === null ? PLACEHOLDER : `${delivery.status_code}` },
+    {
+      label: 'HTTP Status',
+      value: delivery.status_code === null ? PLACEHOLDER : `${delivery.status_code}`,
+    },
     { label: 'Compression', value: delivery.compression ?? 'none' },
     { label: 'HTTP Version', value: delivery.http_version ?? PLACEHOLDER },
     { label: 'Cache-Control', value: delivery.cache_control ?? PLACEHOLDER },
@@ -316,7 +330,7 @@ function DeliveryMetrics({ delivery }: Readonly<{ delivery: DeliveryFacts }>) {
     <Card>
       <CardContent className="grid gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Delivery Metrics</h2>
+          <h2 className="text-foreground text-base font-semibold">Delivery Metrics</h2>
           <span className="text-2xs text-muted">
             Static HTTP-level measurements (not browser-rendered Core Web Vitals)
           </span>
@@ -325,7 +339,7 @@ function DeliveryMetrics({ delivery }: Readonly<{ delivery: DeliveryFacts }>) {
           {items.map((item) => (
             <div key={item.label} className="grid gap-0.5">
               <Label>{item.label}</Label>
-              <dd className="mono text-sm font-semibold text-foreground">{item.value}</dd>
+              <dd className="mono text-foreground text-sm font-semibold">{item.value}</dd>
             </div>
           ))}
         </dl>
@@ -336,30 +350,23 @@ function DeliveryMetrics({ delivery }: Readonly<{ delivery: DeliveryFacts }>) {
 
 /** Current issues on the page, ordered by severity (mockup 711 "All Issues"). */
 function IssuesList({ issues }: Readonly<{ issues: SiteIssue[] }>) {
-  const ordered = [...issues].sort(
-    (a, b) => severityRank(a.severity) - severityRank(b.severity),
-  );
+  const ordered = [...issues].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
   return (
     <Card>
       <CardContent className="grid gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">
-            All Issues ({issues.length})
-          </h2>
+          <h2 className="text-foreground text-base font-semibold">All Issues ({issues.length})</h2>
           <span className="text-2xs text-muted">Sorted by severity</span>
         </div>
         {ordered.length === 0 ? (
-          <p className="text-sm text-secondary">No issues detected on this page.</p>
+          <p className="text-secondary text-sm">No issues detected on this page.</p>
         ) : (
-          <ol className="divide-y divide-border-subtle">
+          <ol className="divide-border-subtle divide-y">
             {ordered.map((issue, index) => (
-              <li
-                key={issue.id}
-                className="flex items-center justify-between gap-3 py-2.5"
-              >
+              <li key={issue.id} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="mono w-6 shrink-0 text-xs text-muted">{index + 1}</span>
-                  <span className="truncate text-sm text-foreground">{issueTitle(issue)}</span>
+                  <span className="mono text-muted w-6 shrink-0 text-xs">{index + 1}</span>
+                  <span className="text-foreground truncate text-sm">{issueTitle(issue)}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <Badge
@@ -381,10 +388,7 @@ function IssuesList({ issues }: Readonly<{ issues: SiteIssue[] }>) {
 }
 
 /** Paginated, crawl-bounded per-URL issue history (newest first). */
-function IssueHistory({
-  crawlId,
-  siteUrlId,
-}: Readonly<{ crawlId: string; siteUrlId: string }>) {
+function IssueHistory({ crawlId, siteUrlId }: Readonly<{ crawlId: string; siteUrlId: string }>) {
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const cursor = cursorStack.at(-1);
   const historyQuery = useQuery(
@@ -397,7 +401,7 @@ function IssueHistory({
   return (
     <Card>
       <CardContent className="grid gap-3">
-        <h2 className="text-base font-semibold text-foreground">Issue History</h2>
+        <h2 className="text-foreground text-base font-semibold">Issue History</h2>
         {historyQuery.isError ? (
           <Alert tone="danger">Could not load issue history.</Alert>
         ) : historyQuery.isLoading ? (
@@ -406,19 +410,17 @@ function IssueHistory({
             <Skeleton className="h-6 w-full" />
           </div>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-secondary">No prior issue records for this page.</p>
+          <p className="text-secondary text-sm">No prior issue records for this page.</p>
         ) : (
-          <ul className="divide-y divide-border-subtle">
+          <ul className="divide-border-subtle divide-y">
             {rows.map((row) => (
               <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm text-foreground">{issueTitle(row)}</span>
+                  <span className="text-foreground truncate text-sm">{issueTitle(row)}</span>
                   <span className="text-2xs text-muted">{formatAudited(row.created_at)}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <Badge
-                    className={cn(row.dimension === 'aeo' ? 'text-accent' : 'text-info-text')}
-                  >
+                  <Badge className={cn(row.dimension === 'aeo' ? 'text-accent' : 'text-info-text')}>
                     {dimensionLabel(row.dimension)}
                   </Badge>
                   <Badge variant="status" value={severityBadgeValue(row.severity)}>

@@ -2,12 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { Dialog } from './dialog';
-import {
-  Dropdown,
-  DropdownContent,
-  DropdownItem,
-  DropdownTrigger,
-} from './dropdown';
+import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from './dropdown';
 import { HistoryDrawer } from './history-drawer';
 import { Tooltip, TooltipProvider } from './tooltip';
 
@@ -99,9 +94,7 @@ describe('HistoryDrawer', () => {
   });
 
   it('shows an empty state when there is no history', () => {
-    render(
-      <HistoryDrawer open onOpenChange={() => {}} onSelect={() => {}} items={[]} />,
-    );
+    render(<HistoryDrawer open onOpenChange={() => {}} onSelect={() => {}} items={[]} />);
     expect(screen.getByText('No history found.')).toBeInTheDocument();
   });
 });

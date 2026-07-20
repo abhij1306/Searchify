@@ -14,12 +14,12 @@ export function VisibilityEmptyState() {
   return (
     <Card>
       <CardContent className="grid justify-items-center gap-4 py-12 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-accent-subtle text-accent-text">
+        <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
           <Rocket className="size-6" aria-hidden />
         </span>
         <div className="grid gap-1">
-          <h2 className="text-lg font-semibold text-foreground">No completed runs yet</h2>
-          <p className="max-w-md text-sm text-secondary">
+          <h2 className="text-foreground text-lg font-semibold">No completed runs yet</h2>
+          <p className="text-secondary max-w-md text-sm">
             Launch an audit to see how AI answer engines talk about your brand. Once a run
             completes, its Visibility Score, per-engine comparison and rankings show up here.
           </p>

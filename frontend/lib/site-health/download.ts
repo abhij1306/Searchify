@@ -20,15 +20,9 @@ export type ExportView = 'inventory' | 'pages' | 'issues';
 export type ExportFormat = 'csv' | 'md';
 
 /** Build a stable download filename for a crawl export. */
-export function exportFilename(
-  crawlId: string,
-  format: ExportFormat,
-  view: ExportView,
-): string {
+export function exportFilename(crawlId: string, format: ExportFormat, view: ExportView): string {
   const shortId = crawlId.slice(0, 8);
-  return format === 'csv'
-    ? `site-health-${view}-${shortId}.csv`
-    : `site-health-${shortId}.md`;
+  return format === 'csv' ? `site-health-${view}-${shortId}.csv` : `site-health-${shortId}.md`;
 }
 
 /**

@@ -1,0 +1,10 @@
+# Build output + generated artifacts (never hand-formatted).
+.next/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+# Prettier's CSS re-wrap inflates this past the architecture guard's
+# 700-line owner limit (check-frontend-architecture.mjs); keep hand-formatted.
+app/globals.css

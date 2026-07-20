@@ -218,9 +218,7 @@ describe('ContentScreen — generate flow', () => {
       ),
       http.get(`/api/v1/content/generations/${GEN}`, () =>
         HttpResponse.json(
-          cancelled
-            ? generation({ status: 'cancelled', error_code: 'cancelled' })
-            : generation(),
+          cancelled ? generation({ status: 'cancelled', error_code: 'cancelled' }) : generation(),
         ),
       ),
       http.post(`/api/v1/content/generations/${GEN}/cancel`, () => {
@@ -279,16 +277,13 @@ describe('ContentScreen — error state', () => {
         HttpResponse.json(generation(), { status: 201 }),
       ),
       http.get(`/api/v1/content/generations/${GEN}`, () =>
-        HttpResponse.json(
-          generation({ status: 'failed', error_code: 'auth_failure' }),
-        ),
+        HttpResponse.json(generation({ status: 'failed', error_code: 'auth_failure' })),
       ),
       http.post(`/api/v1/content/generations/${GEN}/try-again`, () => {
         retried = true;
-        return HttpResponse.json(
-          generation({ id: '55555555-5555-4555-8555-555555555555' }),
-          { status: 201 },
-        );
+        return HttpResponse.json(generation({ id: '55555555-5555-4555-8555-555555555555' }), {
+          status: 201,
+        });
       }),
       http.get('/api/v1/content/generations/55555555-5555-4555-8555-555555555555', () =>
         HttpResponse.json(generation({ id: '55555555-5555-4555-8555-555555555555' })),

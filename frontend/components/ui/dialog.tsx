@@ -31,20 +31,20 @@ export function Dialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-overlay-scrim" />
+        <DialogPrimitive.Overlay className="bg-overlay-scrim fixed inset-0 z-[100]" />
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-[101] flex max-h-[85vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-elevated shadow-modal-value focus:outline-none',
+            'border-border bg-elevated shadow-modal-value fixed top-1/2 left-1/2 z-[101] flex max-h-[85vh] w-[640px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border focus:outline-none',
             className,
           )}
         >
-          <header className="flex items-start justify-between gap-4 border-b border-border-subtle px-5 py-4">
+          <header className="border-border-subtle flex items-start justify-between gap-4 border-b px-5 py-4">
             <div className="min-w-0">
-              <DialogPrimitive.Title className="text-lg font-semibold text-foreground">
+              <DialogPrimitive.Title className="text-foreground text-lg font-semibold">
                 {title}
               </DialogPrimitive.Title>
               {description ? (
-                <DialogPrimitive.Description className="mt-1 text-sm text-secondary">
+                <DialogPrimitive.Description className="text-secondary mt-1 text-sm">
                   {description}
                 </DialogPrimitive.Description>
               ) : null}
@@ -57,7 +57,7 @@ export function Dialog({
           </header>
           <div className="min-h-0 flex-1 overflow-auto px-5 py-4">{children}</div>
           {footer ? (
-            <footer className="flex items-center justify-end gap-2 border-t border-border-subtle px-5 py-4">
+            <footer className="border-border-subtle flex items-center justify-end gap-2 border-t px-5 py-4">
               {footer}
             </footer>
           ) : null}

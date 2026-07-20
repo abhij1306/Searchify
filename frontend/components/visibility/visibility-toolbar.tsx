@@ -87,7 +87,7 @@ export function VisibilityToolbar({
   const activeRun = runs.find((run) => run.id === activeRunId) ?? null;
   const engineText = engine === 'all' ? 'All engines' : engineLabel(engine);
   const activePrompt = promptOptions.find((option) => option.id === promptId) ?? null;
-  const promptText = promptId === null ? 'All prompts' : activePrompt?.label ?? 'All prompts';
+  const promptText = promptId === null ? 'All prompts' : (activePrompt?.label ?? 'All prompts');
 
   return (
     <div className="flex flex-wrap items-center gap-3" data-testid="visibility-toolbar">
@@ -226,7 +226,7 @@ export function VisibilityToolbar({
           >
             <span className="text-muted">Prompts:</span>
             <span className="font-medium">All prompts</span>
-            <span className="ml-1 text-2xs text-muted">— coming soon</span>
+            <span className="text-2xs text-muted ml-1">— coming soon</span>
             <ChevronDown className="size-4" aria-hidden />
           </Button>
         </Tooltip>

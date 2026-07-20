@@ -107,10 +107,19 @@ afterAll(() => mswServer.close());
 
 describe('PromptResearchPage', () => {
   it('renders the prompt table with a row per prompt', async () => {
-    baseHandlers([makePrompt(), makePrompt({ id: '44444444-4444-4444-8444-444444444444', text: 'Nike vs Adidas', intent: 'comparison' })]);
+    baseHandlers([
+      makePrompt(),
+      makePrompt({
+        id: '44444444-4444-4444-8444-444444444444',
+        text: 'Nike vs Adidas',
+        intent: 'comparison',
+      }),
+    ]);
     renderPage();
 
-    expect(await screen.findByText('Best running shoes?', undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText('Best running shoes?', undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Nike vs Adidas')).toBeInTheDocument();
   });
 
@@ -118,7 +127,9 @@ describe('PromptResearchPage', () => {
     baseHandlers([]);
     renderPage();
 
-    expect(await screen.findByText('No prompts yet', undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText('No prompts yet', undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
     // Both the toolbar and the empty-state card expose an "Add prompt" action.
     expect(screen.getAllByRole('button', { name: 'Add prompt' }).length).toBeGreaterThan(0);
   });
@@ -172,10 +183,7 @@ describe('PromptResearchPage', () => {
     // Proposed tab with the new prompt.
     expect(await within(dialog).findByText(/1 prompt proposed for review/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('selects the Active tab and reports placement when generated prompts land active', async () => {
@@ -212,10 +220,7 @@ describe('PromptResearchPage', () => {
     // The Active tab (which holds the generated row) stays selected — the user
     // is not dumped on an empty Proposed tab.
     expect(screen.getByRole('tab', { name: /Active/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute(
-      'aria-selected',
-      'false',
-    );
+    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute('aria-selected', 'false');
   });
 
   it('shows a fresh error only, never a stale success summary, on a failed retry', async () => {
@@ -263,9 +268,7 @@ describe('PromptResearchPage', () => {
 
     // Retry fails: the stale success summary must be gone, only the error shows.
     await user.click(within(dialog).getByRole('button', { name: 'Generate' }));
-    expect(
-      await within(dialog).findByText(/The AI provider call failed/),
-    ).toBeInTheDocument();
+    expect(await within(dialog).findByText(/The AI provider call failed/)).toBeInTheDocument();
     expect(within(dialog).queryByText(/1 prompt proposed for review/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Generated 1 prompt/)).not.toBeInTheDocument();
   });
@@ -379,10 +382,7 @@ describe('PromptResearchPage', () => {
 
     // Topic filter reset to All topics + Proposed tab selected → the new row
     // is visible even though it landed in a topic the user was not viewing.
-    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('tab', { name: /Proposed/ })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText('Generated elsewhere prompt')).toBeInTheDocument();
   });
 
@@ -514,7 +514,14 @@ describe('PromptResearchPage', () => {
 
   it('filters by search', async () => {
     const user = userEvent.setup();
-    baseHandlers([makePrompt(), makePrompt({ id: '44444444-4444-4444-8444-444444444444', text: 'Nike vs Adidas', intent: 'comparison' })]);
+    baseHandlers([
+      makePrompt(),
+      makePrompt({
+        id: '44444444-4444-4444-8444-444444444444',
+        text: 'Nike vs Adidas',
+        intent: 'comparison',
+      }),
+    ]);
     renderPage();
 
     await screen.findByText('Best running shoes?', undefined, { timeout: 5000 });

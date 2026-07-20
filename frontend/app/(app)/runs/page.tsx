@@ -59,8 +59,8 @@ export default function RunsPage() {
       ) : audits.length === 0 ? (
         <Card>
           <CardContent className="grid gap-3 py-10 text-center">
-            <p className="text-base font-semibold text-foreground">No runs yet</p>
-            <p className="mx-auto max-w-md text-sm text-secondary">
+            <p className="text-foreground text-base font-semibold">No runs yet</p>
+            <p className="text-secondary mx-auto max-w-md text-sm">
               Launch your first audit to measure how AI engines answer questions about your brand.
             </p>
             <div className="mt-1 flex justify-center">

@@ -55,10 +55,7 @@ function filterParams(filter: FilterKey): Pick<IssuesParams, 'severity' | 'dimen
  * Per-chip occurrence count from the chip-independent summary. `high` folds in
  * `critical` so the chip agrees with the "High Severity" tile above it.
  */
-function filterCount(
-  filter: FilterKey,
-  summary: import('@/lib/api/types').IssuesSummary,
-): number {
+function filterCount(filter: FilterKey, summary: import('@/lib/api/types').IssuesSummary): number {
   switch (filter) {
     case 'high':
       return (summary.severity_counts.high ?? 0) + (summary.severity_counts.critical ?? 0);
@@ -162,9 +159,7 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
         </div>
       ) : rows.length === 0 ? (
         <Card>
-          <CardContent className="text-sm text-secondary">
-            No issues match this view.
-          </CardContent>
+          <CardContent className="text-secondary text-sm">No issues match this view.</CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
@@ -231,28 +226,24 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
             </Badge>
             <DimensionBadge dimension={issue.dimension} />
           </div>
-          <span className="whitespace-nowrap text-xs text-muted">
+          <span className="text-muted text-xs whitespace-nowrap">
             {issue.affected_url_count} {issue.affected_url_count === 1 ? 'page' : 'pages'} affected
           </span>
         </div>
 
         <div className="grid gap-1">
-          <h3 className="text-base font-semibold text-foreground">{issueTitle(issue)}</h3>
+          <h3 className="text-foreground text-base font-semibold">{issueTitle(issue)}</h3>
         </div>
 
         {issue.remediation ? (
-          <div className="rounded-md border border-border-subtle bg-background-alt p-3">
+          <div className="border-border-subtle bg-background-alt rounded-md border p-3">
             <Label className="mb-1 block">Remediation</Label>
-            <p className="whitespace-pre-line text-sm text-secondary">{issue.remediation}</p>
+            <p className="text-secondary text-sm whitespace-pre-line">{issue.remediation}</p>
           </div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            onClick={toggleExpanded}
-            aria-expanded={expanded}
-          >
+          <Button size="sm" onClick={toggleExpanded} aria-expanded={expanded}>
             {expanded ? 'Hide affected URLs' : 'View affected URLs'}
           </Button>
           <Button variant="secondary" size="sm" onClick={copyPrompt}>
@@ -261,7 +252,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
         </div>
 
         {expanded ? (
-          <div className="rounded-md border border-border-subtle">
+          <div className="border-border-subtle rounded-md border">
             {detailQuery.isError ? (
               <div className="p-3">
                 <Alert tone="danger">Could not load affected URLs.</Alert>
@@ -272,16 +263,16 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
                 <Skeleton className="h-6 w-full" />
               </div>
             ) : affected.length === 0 ? (
-              <p className="p-3 text-sm text-secondary">No affected URLs found.</p>
+              <p className="text-secondary p-3 text-sm">No affected URLs found.</p>
             ) : (
-              <ul className="divide-y divide-border-subtle">
+              <ul className="divide-border-subtle divide-y">
                 {affected.map((url) => (
                   <li key={url.site_url_id} className="px-3 py-2">
                     <Link
                       href={`/site-health/crawls/${crawlId}/pages/${url.site_url_id}`}
-                      className="flex flex-col gap-0.5 hover:text-accent"
+                      className="hover:text-accent flex flex-col gap-0.5"
                     >
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-foreground text-sm font-medium">
                         {url.title ?? url.display_url}
                       </span>
                       <span className="mono text-2xs text-muted">{url.display_url}</span>
@@ -291,7 +282,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
               </ul>
             )}
             {affected.length > 0 || canPrevAffected ? (
-              <div className="flex items-center justify-end gap-2 border-t border-border-subtle p-2">
+              <div className="border-border-subtle flex items-center justify-end gap-2 border-t p-2">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -300,7 +291,12 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
                 >
                   Previous
                 </Button>
-                <Button variant="secondary" size="sm" onClick={goNextAffected} disabled={!nextCursor}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={goNextAffected}
+                  disabled={!nextCursor}
+                >
                   Next
                 </Button>
               </div>
@@ -315,12 +311,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
 /** AEO / Technical dimension chip. Uses the neutral badge with tinted text. */
 function DimensionBadge({ dimension }: Readonly<{ dimension: IssueDimension }>) {
   return (
-    <Badge
-      className={cn(
-        'capitalize',
-        dimension === 'aeo' ? 'text-accent' : 'text-info-text',
-      )}
-    >
+    <Badge className={cn('capitalize', dimension === 'aeo' ? 'text-accent' : 'text-info-text')}>
       {dimensionLabel(dimension)}
     </Badge>
   );

@@ -74,10 +74,13 @@ export function ContentScreen() {
     return (
       <Card>
         <CardContent className="flex flex-col items-start gap-3 py-8">
-          <p className="text-sm text-secondary">
+          <p className="text-secondary text-sm">
             Create a project first — content generation needs a project and its website.
           </p>
-          <Link href="/setup" className="text-sm font-medium text-accent-text underline underline-offset-4">
+          <Link
+            href="/setup"
+            className="text-accent-text text-sm font-medium underline underline-offset-4"
+          >
             Go to Setup
           </Link>
         </CardContent>
@@ -175,7 +178,7 @@ function ProjectContentScreen({
       {/* Composer */}
       <Card data-component-id="content-prompt-box">
         <CardContent className="flex flex-col gap-3 py-5">
-          <h2 className="text-lg font-semibold text-foreground">What can I help you create?</h2>
+          <h2 className="text-foreground text-lg font-semibold">What can I help you create?</h2>
           <Textarea
             ref={promptRef}
             value={prompt}
@@ -226,8 +229,8 @@ function ProjectContentScreen({
         <Card data-component-id="content-generating-panel">
           <CardContent className="flex items-center gap-4 py-6">
             <div role="status" aria-label="Generating content" className="flex items-center gap-3">
-              <Loader2 className="size-5 animate-spin text-accent" aria-hidden />
-              <span className="text-sm text-secondary">Generating your content…</span>
+              <Loader2 className="text-accent size-5 animate-spin" aria-hidden />
+              <span className="text-secondary text-sm">Generating your content…</span>
             </div>
             <div className="ml-auto">
               <Button
@@ -247,7 +250,7 @@ function ProjectContentScreen({
       {showErrorPanel ? (
         <Card data-component-id="content-error-panel">
           <CardContent className="flex flex-col gap-3 py-5">
-            <div role="alert" className="flex items-start gap-2 text-sm text-danger-text">
+            <div role="alert" className="text-danger-text flex items-start gap-2 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 {mutationError
@@ -294,12 +297,12 @@ function ProjectContentScreen({
             <div data-component-id="content-result-body">
               <ContentMarkdown markdown={detail.output_text} />
             </div>
-            <p data-component-id="content-ai-disclaimer" className="text-xs text-secondary">
+            <p data-component-id="content-ai-disclaimer" className="text-secondary text-xs">
               AI-generated content — review before publishing.
             </p>
             <div
               data-component-id="content-result-provenance"
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-secondary"
+              className="border-border text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs"
             >
               <span>Requested model: {detail.requested_model}</span>
               {detail.returned_model ? <span>Returned model: {detail.returned_model}</span> : null}
@@ -339,11 +342,11 @@ function ProjectContentScreen({
 
       {/* History */}
       <section data-component-id="content-history" className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-secondary">Recent generations</h2>
+        <h2 className="text-secondary text-sm font-semibold">Recent generations</h2>
         {listQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (listQuery.data ?? []).length === 0 ? (
-          <p className="text-sm text-secondary">No generations yet.</p>
+          <p className="text-secondary text-sm">No generations yet.</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {(listQuery.data ?? []).map((item) => (
@@ -352,13 +355,13 @@ function ProjectContentScreen({
                   type="button"
                   onClick={() => setSelectedId(item.id)}
                   className={cn(
-                    'focus-ring flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-background-alt',
+                    'focus-ring hover:bg-background-alt flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors',
                     item.id === selectedId
                       ? 'border-accent-border bg-background-alt'
                       : 'border-border',
                   )}
                 >
-                  <span className="min-w-0 flex-1 truncate text-foreground">
+                  <span className="text-foreground min-w-0 flex-1 truncate">
                     {historyLabel(item)}
                   </span>
                   <Badge variant="run-status" value={STATUS_BADGE[item.status]}>

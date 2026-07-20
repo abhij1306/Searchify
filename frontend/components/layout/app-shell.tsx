@@ -24,14 +24,14 @@ import { UserMenu } from './user-menu';
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <TooltipProvider>
-      <div className="flex h-dvh overflow-hidden bg-background">
-        <aside className="flex w-60 shrink-0 flex-col gap-4 border-r border-border bg-sidebar p-4">
+      <div className="bg-background flex h-dvh overflow-hidden">
+        <aside className="border-border bg-sidebar flex w-60 shrink-0 flex-col gap-4 border-r p-4">
           <ProjectSwitcher />
           <GettingStartedCard />
           <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto">
             <SidebarNav />
           </div>
-          <div className="border-t border-border-subtle pt-2">
+          <div className="border-border-subtle border-t pt-2">
             <UserMenu />
           </div>
         </aside>
@@ -39,7 +39,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
           <main className="content-scroll min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1440px] p-[var(--content-gutter)]">{children}</div>
+            <div className="mx-auto w-full max-w-[1440px] p-[var(--content-gutter)]">
+              {children}
+            </div>
           </main>
         </div>
       </div>

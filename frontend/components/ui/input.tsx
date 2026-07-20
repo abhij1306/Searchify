@@ -21,10 +21,6 @@ export function Textarea({
   className,
   ref,
   ...props
-}: Readonly<
-  ComponentPropsWithoutRef<'textarea'> & { ref?: Ref<HTMLTextAreaElement> }
->) {
-  return (
-    <textarea ref={ref} className={cn(textareaClasses, className)} {...props} />
-  );
+}: Readonly<ComponentPropsWithoutRef<'textarea'> & { ref?: Ref<HTMLTextAreaElement> }>) {
+  return <textarea ref={ref} className={cn(textareaClasses, className)} {...props} />;
 }

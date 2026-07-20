@@ -151,7 +151,12 @@ describe('SetupForm — edit', () => {
     brand: { aliases: ['Searchify AI'] },
     owned_domains: ['searchify.com'],
     competitors: [
-      { id: '77777777-7777-4777-8777-777777777777', name: 'Acme', aliases: [], domains: ['acme.com'] },
+      {
+        id: '77777777-7777-4777-8777-777777777777',
+        name: 'Acme',
+        aliases: [],
+        domains: ['acme.com'],
+      },
     ],
   };
 

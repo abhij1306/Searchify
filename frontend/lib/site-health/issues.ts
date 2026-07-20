@@ -78,10 +78,7 @@ export const SUMMARY_SEVERITIES: readonly IssueSeverity[] = ['high', 'medium', '
  * `critical` folds into `high` so the tiles match the three-tier catalog UI;
  * a missing key is 0 (never a fabricated total).
  */
-export function severityCount(
-  counts: Record<string, number>,
-  severity: IssueSeverity,
-): number {
+export function severityCount(counts: Record<string, number>, severity: IssueSeverity): number {
   if (severity === 'high') {
     return (counts.high ?? 0) + (counts.critical ?? 0);
   }

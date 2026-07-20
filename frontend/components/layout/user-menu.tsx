@@ -35,24 +35,24 @@ export function UserMenu({ className }: Readonly<{ className?: string }>) {
     <Dropdown>
       <DropdownTrigger
         className={cn(
-          'focus-ring flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-background-alt',
+          'focus-ring hover:bg-background-alt flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors',
           className,
         )}
       >
         <span
           aria-hidden
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-2xs font-bold uppercase text-accent-text"
+          className="bg-accent-soft text-2xs text-accent-text flex size-7 shrink-0 items-center justify-center rounded-full font-bold uppercase"
         >
           {emailInitials(user.email)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-foreground">{user.email}</span>
-          <span className="block truncate text-2xs capitalize text-muted">{user.role}</span>
+          <span className="text-foreground block truncate text-sm font-medium">{user.email}</span>
+          <span className="text-2xs text-muted block truncate capitalize">{user.role}</span>
         </span>
       </DropdownTrigger>
       <DropdownContent align="start" side="top" className="w-[calc(240px-2rem)]">
         <DropdownLabel>{user.email}</DropdownLabel>
-        <DropdownSeparator className="my-1 h-px bg-border-subtle" />
+        <DropdownSeparator className="bg-border-subtle my-1 h-px" />
         <DropdownItem asChild>
           <Link href="/settings">
             <Settings className="size-4 shrink-0" aria-hidden />

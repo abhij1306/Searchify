@@ -54,7 +54,5 @@ export function buildLaunchPayload(selection: LaunchSelection): LaunchAuditInput
 
 /** Toggle a logical engine in/out of the current selection (immutably). */
 export function toggleEngine(engines: LogicalEngine[], engine: LogicalEngine): LogicalEngine[] {
-  return engines.includes(engine)
-    ? engines.filter((e) => e !== engine)
-    : [...engines, engine];
+  return engines.includes(engine) ? engines.filter((e) => e !== engine) : [...engines, engine];
 }

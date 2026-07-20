@@ -70,9 +70,7 @@ describe('isTerminalContentStatus', () => {
 
 describe('useContentGenerations', () => {
   it('loads the history list for the project', async () => {
-    mswServer.use(
-      http.get('/api/v1/content/generations', () => HttpResponse.json([listItem])),
-    );
+    mswServer.use(http.get('/api/v1/content/generations', () => HttpResponse.json([listItem])));
     const { result } = setup();
     await waitFor(() => expect(result.current.listQuery.data).toHaveLength(1));
     expect(result.current.listQuery.data?.[0].id).toBe(GEN);
@@ -85,9 +83,7 @@ describe('useContentGenerations', () => {
         listCalls += 1;
         return HttpResponse.json(listCalls > 1 ? [listItem] : []);
       }),
-      http.post('/api/v1/content/generations', () =>
-        HttpResponse.json(detail, { status: 201 }),
-      ),
+      http.post('/api/v1/content/generations', () => HttpResponse.json(detail, { status: 201 })),
       // The primed detail is non-terminal, so the detail query still polls the
       // endpoint; serve it to keep onUnhandledRequest: 'error' quiet.
       http.get(`/api/v1/content/generations/${GEN}`, () => HttpResponse.json(detail)),

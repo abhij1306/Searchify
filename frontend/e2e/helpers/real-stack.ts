@@ -152,7 +152,12 @@ async def main() -> None:
 asyncio.run(main())
 `;
 
-function runPython(backendDir: string, script: string, args: string[], env: NodeJS.ProcessEnv): string {
+function runPython(
+  backendDir: string,
+  script: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+): string {
   const result = spawnSync('uv', ['run', 'python', '-c', script, ...args], {
     cwd: backendDir,
     env,
@@ -213,7 +218,12 @@ function killTree(proc: ManagedProcess): void {
   }
 }
 
-async function waitForHttp(url: string, timeoutMs: number, label: string, procs: ManagedProcess[]): Promise<void> {
+async function waitForHttp(
+  url: string,
+  timeoutMs: number,
+  label: string,
+  procs: ManagedProcess[],
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError = 'no attempt made';
   while (Date.now() < deadline) {

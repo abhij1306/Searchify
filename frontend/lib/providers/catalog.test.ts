@@ -14,7 +14,10 @@ import {
 const catalog: ProviderCatalog = {
   transports: ['openai', 'anthropic', 'google'],
   engines: [
-    { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }] },
+    {
+      logical_engine: 'chatgpt',
+      routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }],
+    },
     {
       logical_engine: 'gemini',
       routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],

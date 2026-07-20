@@ -26,11 +26,7 @@ function matchesTriState(value: boolean, filter: EnabledFilter): boolean {
 }
 
 /** Apply search + filters to a prompt list, preserving order. */
-export function filterPrompts(
-  prompts: Prompt[],
-  search: string,
-  filters: PromptFilters,
-): Prompt[] {
+export function filterPrompts(prompts: Prompt[], search: string, filters: PromptFilters): Prompt[] {
   const needle = search.trim().toLowerCase();
   const intentSet = new Set(filters.intents);
   return prompts.filter((prompt) => {

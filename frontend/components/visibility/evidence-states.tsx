@@ -56,13 +56,13 @@ export function EvidenceError({
       </CardHeader>
       <CardContent>
         <div className="grid justify-items-center gap-3 py-10 text-center">
-          <span className="flex size-10 items-center justify-center rounded-full bg-danger-bg text-danger-text">
+          <span className="bg-danger-bg text-danger-text flex size-10 items-center justify-center rounded-full">
             <AlertTriangle className="size-5" aria-hidden />
           </span>
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-foreground text-base font-semibold">
             Couldn&apos;t load this evidence
           </h3>
-          <p className="max-w-xs text-sm text-secondary">
+          <p className="text-secondary max-w-xs text-sm">
             The request failed or timed out. Your filters are unchanged.
           </p>
           <Button variant="primary" size="sm" onClick={onRetry}>
@@ -87,11 +87,11 @@ export function EvidenceEmpty({
       </CardHeader>
       <CardContent>
         <div className="grid justify-items-center gap-3 py-10 text-center">
-          <span className="flex size-10 items-center justify-center rounded-full bg-neutral-bg text-muted">
+          <span className="bg-neutral-bg text-muted flex size-10 items-center justify-center rounded-full">
             <Inbox className="size-5" aria-hidden />
           </span>
-          <h3 className="text-base font-semibold text-foreground">{heading}</h3>
-          <p className="max-w-sm text-sm text-secondary">{body}</p>
+          <h3 className="text-foreground text-base font-semibold">{heading}</h3>
+          <p className="text-secondary max-w-sm text-sm">{body}</p>
           <Button asChild variant="secondary" size="sm">
             <Link href="/runs">View Runs</Link>
           </Button>
@@ -113,13 +113,13 @@ export function EvidenceFilteredEmpty({
       </CardHeader>
       <CardContent>
         <div className="grid justify-items-center gap-3 py-10 text-center">
-          <span className="flex size-10 items-center justify-center rounded-full bg-neutral-bg text-muted">
+          <span className="bg-neutral-bg text-muted flex size-10 items-center justify-center rounded-full">
             <SearchX className="size-5" aria-hidden />
           </span>
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-foreground text-base font-semibold">
             No results match these filters
           </h3>
-          <p className="max-w-sm text-sm text-secondary">{body}</p>
+          <p className="text-secondary max-w-sm text-sm">{body}</p>
           {onClear ? (
             <Button variant="secondary" size="sm" onClick={onClear}>
               Clear filters
@@ -133,11 +133,9 @@ export function EvidenceFilteredEmpty({
 
 export function TruncationNotice({ limit }: Readonly<{ limit: number }>) {
   return (
-    <div className="flex items-center gap-2 border-t border-border-subtle px-4 py-2.5 text-xs text-muted">
+    <div className="border-border-subtle text-muted flex items-center gap-2 border-t px-4 py-2.5 text-xs">
       <Info className="size-3.5 shrink-0" aria-hidden />
-      <span>
-        Showing newest {limit} executions; refine filters to narrow results.
-      </span>
+      <span>Showing newest {limit} executions; refine filters to narrow results.</span>
     </div>
   );
 }

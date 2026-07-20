@@ -53,7 +53,12 @@ function promptScores(items: VisibilityExecutionEvidence[]): Map<string, number>
 function ScoreCell({ score }: Readonly<{ score: number | null }>) {
   if (score === null) return <span className="text-subtle">—</span>;
   return (
-    <span className={cn('font-mono text-sm font-semibold tabular-nums', scoreBandText[scoreBand(score)])}>
+    <span
+      className={cn(
+        'font-mono text-sm font-semibold tabular-nums',
+        scoreBandText[scoreBand(score)],
+      )}
+    >
       {score}%
     </span>
   );
@@ -89,7 +94,8 @@ function groupByTopic(
   for (const [topicId, bucket] of byTopicId) {
     if (topicId !== null && !knownTopicIds.has(topicId)) ungrouped.push(...bucket);
   }
-  if (ungrouped.length > 0) groups.push({ key: 'ungrouped', topic: null, prompts: ungrouped, score: null });
+  if (ungrouped.length > 0)
+    groups.push({ key: 'ungrouped', topic: null, prompts: ungrouped, score: null });
   for (const group of groups) {
     const measured = group.prompts
       .map((prompt) => scores.get(prompt.id))
@@ -122,8 +128,11 @@ export function YourPrompts() {
   // Latest-audit evidence window; a project with no completed audits returns
   // an empty list and every score renders as an em-dash.
   const evidenceQuery = useQuery({
-    queryKey: projectId ? queryKeys.visibility.evidence(projectId, {}) : ['visibility', 'evidence', 'none'],
-    queryFn: ({ signal }) => visibilityApi.getVisibilityEvidence(projectId as string, undefined, { signal }),
+    queryKey: projectId
+      ? queryKeys.visibility.evidence(projectId, {})
+      : ['visibility', 'evidence', 'none'],
+    queryFn: ({ signal }) =>
+      visibilityApi.getVisibilityEvidence(projectId as string, undefined, { signal }),
     enabled: Boolean(projectId),
     retry: false,
   });
@@ -138,10 +147,7 @@ export function YourPrompts() {
     return activePrompts.filter((prompt) => prompt.text.toLowerCase().includes(query));
   }, [activePrompts, search]);
 
-  const scores = useMemo(
-    () => promptScores(evidenceQuery.data?.items ?? []),
-    [evidenceQuery.data],
-  );
+  const scores = useMemo(() => promptScores(evidenceQuery.data?.items ?? []), [evidenceQuery.data]);
   const groups = useMemo(
     () => groupByTopic(visiblePrompts, topicsQuery.data ?? [], scores),
     [visiblePrompts, topicsQuery.data, scores],
@@ -189,22 +195,25 @@ export function YourPrompts() {
         <Alert tone="danger">Could not load prompts. Check your connection and try again.</Alert>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-panel px-4 py-3">
-        <p className="text-sm text-secondary">
+      <div className="border-border bg-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+        <p className="text-secondary text-sm">
           The {project?.brand_name ?? 'brand'} configuration includes{' '}
-          <span className="font-semibold text-foreground">{activePrompts.length}</span> visibility{' '}
+          <span className="text-foreground font-semibold">{activePrompts.length}</span> visibility{' '}
           {activePrompts.length === 1 ? 'prompt' : 'prompts'} across{' '}
-          <span className="font-semibold text-foreground">{topicCount}</span>{' '}
+          <span className="text-foreground font-semibold">{topicCount}</span>{' '}
           {topicCount === 1 ? 'topic' : 'topics'}, which are run on each audit.
         </p>
-        <Link href="/prompt-research" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
+        <Link
+          href="/prompt-research"
+          className={buttonVariants({ variant: 'primary', size: 'sm' })}
+        >
           Go to Prompt Research
         </Link>
       </div>
 
       <div className="relative max-w-sm">
         <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted"
+          className="text-muted pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
           aria-hidden
         />
         <Input
@@ -219,22 +228,25 @@ export function YourPrompts() {
       </div>
 
       {activePrompts.length === 0 ? (
-        <div className="grid place-items-center gap-3 rounded-lg border border-dashed border-border bg-panel px-6 py-16 text-center">
-          <p className="text-sm font-medium text-foreground">No active prompts yet</p>
-          <p className="max-w-md text-sm text-secondary">
+        <div className="border-border bg-panel grid place-items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
+          <p className="text-foreground text-sm font-medium">No active prompts yet</p>
+          <p className="text-secondary max-w-md text-sm">
             Head to Prompt Research to add prompts manually, import a CSV, or generate prompts and
             topics with AI.
           </p>
-          <Link href="/prompt-research" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+          <Link
+            href="/prompt-research"
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
             Go to Prompt Research
           </Link>
         </div>
       ) : visiblePrompts.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-panel px-6 py-12 text-center text-sm text-secondary">
+        <div className="border-border bg-panel text-secondary rounded-lg border border-dashed px-6 py-12 text-center text-sm">
           No prompts match your search.
         </div>
       ) : (
-        <div className="rounded-lg border border-border">
+        <div className="border-border rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -260,7 +272,7 @@ export function YourPrompts() {
                           aria-expanded={!isCollapsed}
                           aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} topic ${label}`}
                           onClick={() => toggleGroup(group.key)}
-                          className="focus-ring grid size-6 place-items-center rounded text-muted hover:text-foreground"
+                          className="focus-ring text-muted hover:text-foreground grid size-6 place-items-center rounded"
                         >
                           {isCollapsed ? (
                             <ChevronRight className="size-4" aria-hidden />
@@ -272,8 +284,9 @@ export function YourPrompts() {
                       <TableCell>
                         <span className="inline-flex items-center gap-2">
                           <Badge variant="neutral">{label}</Badge>
-                          <span className="text-xs text-muted">
-                            {group.prompts.length} {group.prompts.length === 1 ? 'prompt' : 'prompts'}
+                          <span className="text-muted text-xs">
+                            {group.prompts.length}{' '}
+                            {group.prompts.length === 1 ? 'prompt' : 'prompts'}
                           </span>
                         </span>
                       </TableCell>
@@ -294,7 +307,7 @@ export function YourPrompts() {
                           <TableRow key={prompt.id}>
                             <TableCell />
                             <TableCell className="max-w-[480px]">
-                              <span className="block truncate text-foreground" title={prompt.text}>
+                              <span className="text-foreground block truncate" title={prompt.text}>
                                 {prompt.text}
                               </span>
                             </TableCell>

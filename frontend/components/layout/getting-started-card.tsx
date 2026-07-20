@@ -41,30 +41,35 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
 
   return (
     <section
-      className={cn('rounded-lg border border-border bg-panel p-3 shadow-card', className)}
+      className={cn('border-border bg-panel shadow-card rounded-lg border p-3', className)}
       aria-label="Getting started progress"
     >
       <div className="flex items-center justify-between">
-        <span className="text-2xs font-semibold uppercase tracking-wide text-muted">Getting Started</span>
-        <span className="text-2xs font-semibold text-secondary">
+        <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
+          Getting Started
+        </span>
+        <span className="text-2xs text-secondary font-semibold">
           {completed} of {total}
         </span>
       </div>
 
       <div
-        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-bg"
+        className="bg-neutral-bg mt-2 h-1.5 w-full overflow-hidden rounded-full"
         role="progressbar"
         aria-valuenow={completed}
         aria-valuemin={0}
         aria-valuemax={total}
         aria-label={`${completed} of ${total} steps complete`}
       >
-        <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+        <div
+          className="bg-accent h-full rounded-full transition-[width]"
+          style={{ width: `${pct}%` }}
+        />
       </div>
 
       <Link
         href={nextStep.href}
-        className="mt-2.5 flex items-center gap-2 text-sm font-medium text-accent-text hover:underline"
+        className="text-accent-text mt-2.5 flex items-center gap-2 text-sm font-medium hover:underline"
       >
         {completed === total ? (
           <>

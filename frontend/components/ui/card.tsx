@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 /**
  * Card (§8) — bg-panel, border, --radius-lg, --card-padding, shadow-card.
  * Composed from header / title / description / content slots.
- */export function Card({
+ */ export function Card({
   children,
   className,
   ...props
@@ -13,10 +13,7 @@ import { cn } from '@/lib/utils';
   return (
     <section
       {...props}
-      className={cn(
-        'rounded-lg border border-border bg-panel shadow-card',
-        className,
-      )}
+      className={cn('border-border bg-panel shadow-card rounded-lg border', className)}
     >
       {children}
     </section>
@@ -32,7 +29,7 @@ export function CardHeader({
     <header
       {...props}
       className={cn(
-        'flex flex-col gap-1 border-b border-border-subtle p-[var(--card-padding)]',
+        'border-border-subtle flex flex-col gap-1 border-b p-[var(--card-padding)]',
         className,
       )}
     >
@@ -47,10 +44,7 @@ export function CardTitle({
   ...props
 }: Readonly<ComponentPropsWithoutRef<'h3'>>) {
   return (
-    <h3
-      {...props}
-      className={cn('text-lg font-semibold text-foreground', className)}
-    >
+    <h3 {...props} className={cn('text-foreground text-lg font-semibold', className)}>
       {children}
     </h3>
   );
@@ -62,7 +56,7 @@ export function CardDescription({
   ...props
 }: Readonly<ComponentPropsWithoutRef<'p'>>) {
   return (
-    <p {...props} className={cn('text-sm text-secondary', className)}>
+    <p {...props} className={cn('text-secondary text-sm', className)}>
       {children}
     </p>
   );

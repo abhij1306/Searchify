@@ -176,7 +176,11 @@ describe('quotaStatus (entitlement limit, not hard-coded 50)', () => {
 
   it('respects a limit other than 50 (proves no hard-coded value)', () => {
     let s = initStagedSelection(committed([]));
-    s = setManyStaged(s, Array.from({ length: 60 }, (_, i) => `u${i}`), true);
+    s = setManyStaged(
+      s,
+      Array.from({ length: 60 }, (_, i) => `u${i}`),
+      true,
+    );
     expect(quotaStatus(s, { monitored_url_limit: 100 }).overLimit).toBe(false);
   });
 });

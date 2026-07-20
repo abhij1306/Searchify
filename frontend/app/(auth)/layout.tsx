@@ -13,17 +13,17 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
  */
 export default function AuthLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-center gap-6 bg-background p-6">
-      <div className="absolute right-6 top-6">
+    <main className="bg-background relative flex min-h-dvh flex-col items-center justify-center gap-6 p-6">
+      <div className="absolute top-6 right-6">
         <ThemeToggle />
       </div>
       <Link
         href="/"
-        className="focus-ring rounded-md text-2xl font-bold tracking-tight text-foreground no-underline"
+        className="focus-ring text-foreground rounded-md text-2xl font-bold tracking-tight no-underline"
       >
         Searchify
       </Link>
-      <Card className="w-full max-w-[400px] p-6 shadow-card">{children}</Card>
+      <Card className="shadow-card w-full max-w-[400px] p-6">{children}</Card>
     </main>
   );
 }

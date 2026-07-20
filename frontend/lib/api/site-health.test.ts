@@ -95,7 +95,11 @@ describe('siteHealthEntitlementSchema (quota authority)', () => {
 
   it('rejects an unknown plan_key', () => {
     expect(() =>
-      strictValidate(siteHealthEntitlementSchema, { ...entitlement, plan_key: 'enterprise' }, 'ent'),
+      strictValidate(
+        siteHealthEntitlementSchema,
+        { ...entitlement, plan_key: 'enterprise' },
+        'ent',
+      ),
     ).toThrow();
   });
 });
@@ -260,9 +264,7 @@ describe('pageDetailSchema (field_cwv_available literal false)', () => {
   });
 
   it('rejects a leaked LCP field (strict)', () => {
-    expect(() =>
-      strictValidate(pageDetailSchema, { ...detail, lcp_ms: 1200 }, 'page'),
-    ).toThrow();
+    expect(() => strictValidate(pageDetailSchema, { ...detail, lcp_ms: 1200 }, 'page')).toThrow();
   });
 });
 

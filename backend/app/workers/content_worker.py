@@ -192,11 +192,11 @@ class ContentWorker:
         try:
             client = build_discovery_client(transport=self._transport)
         except ProviderError as exc:
-            await self.finalize_attempt(
-                generation_id=claimed.id,
-                owner=self.owner,
-                outcome=AttemptOutcome(response=None, error=exc),
-            )
+            # No HTTP call happened — a construction failure is pure
+            # misconfiguration, so it must not consume the retry budget or
+            # append an attempt row (finalize_attempt is reserved for actual
+            # provider calls).
+            await self._fail_without_attempt(generation_id=claimed.id, error=exc)
             return
 
         heartbeat = asyncio.create_task(self._heartbeat_loop(claimed.id))
@@ -238,6 +238,35 @@ class ContentWorker:
             raise
 
     # --- Atomic attempt + terminal accounting -----------------------------
+
+    async def _fail_without_attempt(
+        self, *, generation_id: uuid.UUID, error: ProviderError
+    ) -> None:
+        """Terminal failure with NO attempt accounting (no HTTP call ran).
+
+        Same lock + owner/status re-checks as ``finalize_attempt``, but no
+        ``ContentGenerationAttempt`` row and no ``attempt_count`` increment:
+        once the misconfiguration is fixed, a regenerate starts with the full
+        retry budget.
+        """
+        async with self._session_factory() as session:
+            row = await session.get(
+                ContentGeneration, generation_id, with_for_update=True
+            )
+            if (
+                row is None
+                or row.lease_owner != self.owner
+                or row.status in TASK_TERMINAL_STATUSES
+            ):
+                await session.commit()
+                return
+            row.status = TASK_STATUS_FAILED
+            row.completed_at = _utcnow()
+            row.error_code = error.error_code
+            row.error_detail = str(error)[:2000]
+            row.lease_owner = None
+            row.lease_expires_at = None
+            await session.commit()
 
     async def finalize_attempt(
         self,

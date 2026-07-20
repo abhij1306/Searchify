@@ -63,16 +63,13 @@ export function useCrawlEvents(
         const workspaceId = getActiveWorkspaceId();
         if (workspaceId) headers['X-Workspace-Id'] = workspaceId;
 
-        const response = await fetch(
-          `${API_BASE_URL}/site-crawls/${crawlId}/events?stream=true`,
-          {
-            method: 'GET',
-            headers,
-            credentials: 'include',
-            cache: 'no-store',
-            signal: controller.signal,
-          },
-        );
+        const response = await fetch(`${API_BASE_URL}/site-crawls/${crawlId}/events?stream=true`, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!response.ok || !response.body) return;
 
         const reader = response.body.getReader();

@@ -120,11 +120,12 @@ describe('SettingsScreen', () => {
     const ue = userEvent.setup();
     renderScreen();
 
-    expect(screen.queryByTestId('provider-settings-panel')).not.toBeInTheDocument();
+    // Panels stay mounted for stable aria-controls targets; inactive ones are hidden.
+    expect(screen.getByTestId('provider-settings-panel')).not.toBeVisible();
     await ue.click(screen.getByRole('tab', { name: 'Provider Settings' }));
-    expect(screen.getByTestId('provider-settings-panel')).toBeInTheDocument();
-    // Account content is unmounted while another tab is active.
-    expect(screen.queryByText('Account role')).not.toBeInTheDocument();
+    expect(screen.getByTestId('provider-settings-panel')).toBeVisible();
+    // Account content is hidden while another tab is active.
+    expect(screen.getByText('Account role')).not.toBeVisible();
   });
 
   it('supports arrow-key navigation across tabs', async () => {

@@ -15,11 +15,7 @@ import {
   toRunOptions,
   type VisibilityTab,
 } from '@/lib/visibility/dashboard';
-import {
-  rangeToFrom,
-  type TrendGranularity,
-  type TrendRange,
-} from '@/lib/visibility/trends';
+import { rangeToFrom, type TrendGranularity, type TrendRange } from '@/lib/visibility/trends';
 
 /** Newest-window size for the shared execution-evidence request (backend max 500). */
 export const EVIDENCE_LIMIT = 100;
@@ -160,7 +156,8 @@ function useEvidenceQueries(
       ...keyFilters,
       prompt_id: promptId ?? null,
     }),
-    queryFn: ({ signal }) => visibilityApi.getVisibilityEvidence(projectId!, evidenceParams, { signal }),
+    queryFn: ({ signal }) =>
+      visibilityApi.getVisibilityEvidence(projectId!, evidenceParams, { signal }),
     enabled,
   });
 

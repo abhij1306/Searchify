@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from app.core.config.content import (
     CONTENT_DEFAULT_OUTPUT_TYPE,
@@ -74,3 +74,26 @@ def test_retry_delay_prefers_retry_after_and_caps() -> None:
     cap = fresh.retry_max_delay_seconds
     assert fresh.retry_delay(0, retry_after_seconds=9999.0) == cap
     assert fresh.retry_delay(10) == cap
+
+
+def test_endpoint_requires_https_or_loopback_http(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The field reads env alias CONTENT_PROVIDER_ENDPOINT, so drive it there.
+    monkeypatch.delenv("CONTENT_PROVIDER_ENDPOINT", raising=False)
+    # Default (real Mistral endpoint) passes.
+    assert ContentSettings(_env_file=None).endpoint.startswith("https://")
+    # Explicit https passes; http is loopback-only (local mock servers).
+    monkeypatch.setenv("CONTENT_PROVIDER_ENDPOINT", "https://api.example.com/v1")
+    assert ContentSettings(_env_file=None).endpoint == "https://api.example.com/v1"
+    monkeypatch.setenv("CONTENT_PROVIDER_ENDPOINT", "http://localhost:8080/v1")
+    assert ContentSettings(_env_file=None).endpoint == "http://localhost:8080/v1"
+    for bad in (
+        "http://api.example.com/v1",  # plaintext to a real host
+        "ftp://api.example.com/v1",  # non-http scheme
+        "not-a-url",  # no host at all
+        "",
+    ):
+        monkeypatch.setenv("CONTENT_PROVIDER_ENDPOINT", bad)
+        with pytest.raises(ValidationError):
+            ContentSettings(_env_file=None)

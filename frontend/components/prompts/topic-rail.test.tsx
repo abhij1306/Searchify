@@ -57,8 +57,7 @@ describe('TopicRail layout containment', () => {
   });
 
   it('truncates long topic names inside the rail without expanding it', () => {
-    const longName =
-      'Best storage solutions for very small studio apartments in dense cities';
+    const longName = 'Best storage solutions for very small studio apartments in dense cities';
     renderRail({ topics: [makeTopic({ name: longName })] });
 
     // Scope to the rail nav — the narrow <select> also renders the name.

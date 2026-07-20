@@ -50,12 +50,12 @@ export function DiscoveryModelCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Discovery / analysis model</CardTitle>
-        <p className="text-xs text-secondary">
+        <p className="text-secondary text-xs">
           Used for prompt discovery and answer analysis. Stored for later — not invoked at MVP.
         </p>
       </CardHeader>
       <CardContent className="grid gap-1.5">
-        <label htmlFor="discovery-model" className="text-xs font-medium text-secondary">
+        <label htmlFor="discovery-model" className="text-secondary text-xs font-medium">
           Model
         </label>
         <select

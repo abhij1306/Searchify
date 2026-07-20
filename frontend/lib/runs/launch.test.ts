@@ -46,7 +46,9 @@ describe('canLaunch', () => {
 
 describe('buildLaunchPayload', () => {
   it('builds the POST /audits body from a launchable selection', () => {
-    const payload = buildLaunchPayload(selection({ engines: ['gemini', 'claude'], repetitions: 5 }));
+    const payload = buildLaunchPayload(
+      selection({ engines: ['gemini', 'claude'], repetitions: 5 }),
+    );
     expect(payload).toEqual({
       project_id: PROJECT_ID,
       prompt_set_id: SET_ID,

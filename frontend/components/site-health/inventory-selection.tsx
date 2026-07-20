@@ -141,9 +141,8 @@ export function InventorySelection({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-0.5">
             <Label>Page Inventory</Label>
-            <span className="text-sm text-secondary">
-              Select pages to include in your health analysis — selections persist across
-              re-crawls.
+            <span className="text-secondary text-sm">
+              Select pages to include in your health analysis — selections persist across re-crawls.
             </span>
           </div>
           {quota ? (
@@ -178,9 +177,7 @@ export function InventorySelection({
               variant="ghost"
               size="sm"
               onClick={() =>
-                setSelection(
-                  setManyStaged(effectiveSelection, visibleIds, !allVisibleStaged),
-                )
+                setSelection(setManyStaged(effectiveSelection, visibleIds, !allVisibleStaged))
               }
             >
               {allVisibleStaged ? 'Clear visible' : 'Select visible'}
@@ -213,7 +210,7 @@ export function InventorySelection({
           }
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
+        <div className="border-border-subtle flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <div className="flex items-center gap-2">
             <CursorPager
               canPrev={canPrev}
@@ -230,7 +227,7 @@ export function InventorySelection({
             />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-muted">
+            <span className="text-muted text-xs">
               Selections are saved and persist across re-crawls.
             </span>
             <Button

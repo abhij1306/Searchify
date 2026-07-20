@@ -163,7 +163,9 @@ describe('contentApi detail + actions', () => {
       http.post(`/api/v1/content/generations/${UUID}/${suffix}`, () => {
         seen.push(suffix);
         return HttpResponse.json(
-          suffix === 'cancel' ? { ...detail, status: 'cancelled', error_code: 'cancelled' } : detail,
+          suffix === 'cancel'
+            ? { ...detail, status: 'cancelled', error_code: 'cancelled' }
+            : detail,
           { status: suffix === 'cancel' ? 200 : 201 },
         );
       });

@@ -32,8 +32,8 @@ export function QuickSelectBar({
   })();
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border-subtle bg-background-alt px-3 py-2">
-      <span className="text-xs font-medium text-secondary">Quick select</span>
+    <div className="border-border-subtle bg-background-alt flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
+      <span className="text-secondary text-xs font-medium">Quick select</span>
       <Input
         type="number"
         min={1}
@@ -63,7 +63,7 @@ export function QuickSelectBar({
       </Button>
       {confirmClear ? (
         <>
-          <span className="text-xs text-secondary">Deselect every page?</span>
+          <span className="text-secondary text-xs">Deselect every page?</span>
           <Button
             type="button"
             variant="destructive"
@@ -91,7 +91,7 @@ export function QuickSelectBar({
           Clear all
         </Button>
       )}
-      {pending ? <span className="text-xs text-muted">Applying…</span> : null}
+      {pending ? <span className="text-muted text-xs">Applying…</span> : null}
     </div>
   );
 }

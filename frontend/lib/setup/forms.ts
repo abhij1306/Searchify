@@ -98,8 +98,7 @@ export const emptySetupForm: SetupFormValues = {
   competitors: [],
 };
 
-const toEntries = (values: string[]): { value: string }[] =>
-  values.map((value) => ({ value }));
+const toEntries = (values: string[]): { value: string }[] => values.map((value) => ({ value }));
 
 const fromEntries = (entries: { value: string }[]): string[] =>
   entries.map((entry) => entry.value.trim()).filter((value) => value.length > 0);

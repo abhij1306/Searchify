@@ -23,7 +23,12 @@ const project: Project = {
   owned_domains: ['searchify.com'],
   unintended_domains: ['searchify.net'],
   competitors: [
-    { id: '44444444-4444-4444-8444-444444444444', name: 'Acme', aliases: ['Acme Corp'], domains: ['acme.com'] },
+    {
+      id: '44444444-4444-4444-8444-444444444444',
+      name: 'Acme',
+      aliases: ['Acme Corp'],
+      domains: ['acme.com'],
+    },
   ],
   prompt_sets: [],
   created_at: '2026-01-01T00:00:00Z',

@@ -59,9 +59,7 @@ export function AnalysisProgress({
   // Live scores kick in per-field whenever a terminal score is missing —
   // including a summary written with null metrics (e.g. mid-run projection).
   const liveScores =
-    summary?.overall_score != null &&
-    summary.technical_score != null &&
-    summary.aeo_score != null
+    summary?.overall_score != null && summary.technical_score != null && summary.aeo_score != null
       ? null
       : computeLiveScores(pages);
   const overall = summary?.overall_score ?? liveScores?.overall ?? null;
@@ -91,7 +89,11 @@ export function AnalysisProgress({
         <ScoreCell
           label="Site Health"
           value={overall}
-          sub={countsKnown ? `based on ${analyzed} of ${selected} pages` : `based on ${analyzed} pages so far`}
+          sub={
+            countsKnown
+              ? `based on ${analyzed} of ${selected} pages`
+              : `based on ${analyzed} pages so far`
+          }
         />
         <ScoreCell label="Technical" value={technical} />
         <ScoreCell label="AEO" value={aeo} />
@@ -111,7 +113,7 @@ export function AnalysisProgress({
               <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
                 {statusLabel(crawl.status)}
               </Badge>
-              <span className="text-sm text-secondary" aria-live="polite">
+              <span className="text-secondary text-sm" aria-live="polite">
                 Auditing selected pages for technical and AEO health issues
               </span>
             </div>
@@ -141,7 +143,7 @@ export function AnalysisProgress({
             </div>
           ) : null}
           {pages.length === 0 && !pagesError && pagesLoading ? (
-            <p className="p-4 text-sm text-muted" aria-live="polite">
+            <p className="text-muted p-4 text-sm" aria-live="polite">
               Loading audited pages…
             </p>
           ) : null}
@@ -169,9 +171,7 @@ function computeLiveScores(
   const scored = pages.filter((p) => p.overall_score !== null);
   if (scored.length === 0) return null;
   const mean = (pick: (p: PageSummary) => number | null) => {
-    const values = scored
-      .map(pick)
-      .filter((v): v is number => v !== null);
+    const values = scored.map(pick).filter((v): v is number => v !== null);
     if (values.length === 0) return null;
     return values.reduce((sum, v) => sum + v, 0) / values.length;
   };
@@ -192,7 +192,7 @@ function ScoreCell({
       <CardContent className="grid gap-1">
         <Label>{label}</Label>
         <Metric className="text-2xl">{formatScore(value)}</Metric>
-        {sub ? <span className="text-xs text-muted">{sub}</span> : null}
+        {sub ? <span className="text-muted text-xs">{sub}</span> : null}
       </CardContent>
     </Card>
   );
@@ -206,7 +206,9 @@ function CountCell({
   return (
     <div className="grid gap-1">
       <Label>{label}</Label>
-      <Metric className={`text-xl ${className ?? ''}`}>{value === null ? PLACEHOLDER : value}</Metric>
+      <Metric className={`text-xl ${className ?? ''}`}>
+        {value === null ? PLACEHOLDER : value}
+      </Metric>
     </div>
   );
 }

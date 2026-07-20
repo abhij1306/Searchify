@@ -453,6 +453,44 @@ async def test_newest_usable_terminal_crawl_wins(
         assert [p["title"] for p in context.pages] == ["New partial"]
 
 
+async def test_empty_facts_object_falls_back_to_older_crawl(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A newer crawl whose only facts are ``{}`` is not usable: it must be
+    skipped at the SQL predicate (not selected then rejected in memory,
+    which would yield unavailable despite an older usable crawl)."""
+    async with session_factory() as session:
+        ws_id, project_id, profile_id = await _seed_project(session)
+        old = await _seed_crawl(
+            session,
+            workspace_id=ws_id,
+            project_id=project_id,
+            profile_id=profile_id,
+            status=CRAWL_STATUS_COMPLETED,
+            created_at=_BASE_TIME,
+        )
+        await _seed_page(
+            session, crawl=old, url=f"{_ROOT}old", facts=_facts(title="Old")
+        )
+        empty = await _seed_crawl(
+            session,
+            workspace_id=ws_id,
+            project_id=project_id,
+            profile_id=profile_id,
+            status=CRAWL_STATUS_COMPLETED,
+            created_at=_BASE_TIME + timedelta(hours=1),
+        )
+        await _seed_page(session, crawl=empty, url=f"{_ROOT}empty", facts={})
+        await session.commit()
+        context = await build_website_context(
+            session, workspace_id=ws_id, project_id=project_id
+        )
+        assert context.status == CONTEXT_STATUS_INCLUDED
+        assert context.summary is not None
+        assert context.summary["crawl_id"] == str(old.id)
+        assert [p["title"] for p in context.pages] == ["Old"]
+
+
 async def test_deterministic_snapshot_and_provenance(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

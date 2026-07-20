@@ -196,13 +196,31 @@ function makeEvidenceItem(overrides: Record<string, unknown> = {}) {
     query_text_available: true,
     state: 'queries_available',
     search_events: [
-      { sequence: 0, query: 'affordable family clothing Australia 2026', call_id: 'c1', call_sequence: 0, query_sequence: 0 },
-      { sequence: 1, query: 'best budget clothing shops families', call_id: 'c1', call_sequence: 0, query_sequence: 1 },
+      {
+        sequence: 0,
+        query: 'affordable family clothing Australia 2026',
+        call_id: 'c1',
+        call_sequence: 0,
+        query_sequence: 0,
+      },
+      {
+        sequence: 1,
+        query: 'best budget clothing shops families',
+        call_id: 'c1',
+        call_sequence: 0,
+        query_sequence: 1,
+      },
     ],
     event_source: 'raw_artifact',
     mentions: [
       { kind: 'brand', name: 'Acme', first_offset: 12, artifact_id: null, analyzer_version: 'v1' },
-      { kind: 'competitor', name: 'Globex', first_offset: null, artifact_id: null, analyzer_version: 'v1' },
+      {
+        kind: 'competitor',
+        name: 'Globex',
+        first_offset: null,
+        artifact_id: null,
+        analyzer_version: 'v1',
+      },
     ],
     citations: [makeCitation(1)],
     ...overrides,
@@ -423,7 +441,9 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
       http.get(`/api/v1/projects/${PROJECT_ID}/visibility`, ({ request }) => {
         const auditId = new URL(request.url).searchParams.get('audit_id');
         seen.push(auditId);
-        return HttpResponse.json(makeVisibility(auditId ?? AUDIT_LATEST, auditId === AUDIT_OLDER ? 42 : 67));
+        return HttpResponse.json(
+          makeVisibility(auditId ?? AUDIT_LATEST, auditId === AUDIT_OLDER ? 42 : 67),
+        );
       }),
     ]);
     // makeAudit sets status completed; override the base audits handler above.
@@ -472,7 +492,9 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
     await user.click(screen.getByRole('button', { name: 'Filter by engine' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Gemini' }));
 
-    await waitFor(() => expect(within(comparisonOf()).queryByText('Claude')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(comparisonOf()).queryByText('Claude')).not.toBeInTheDocument(),
+    );
     expect(within(comparisonOf()).getByText('Gemini')).toBeInTheDocument();
   });
 
@@ -484,7 +506,10 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
     renderPage();
 
     expect(await screen.findByText('No completed runs yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /launch your first audit/i })).toHaveAttribute('href', '/runs');
+    expect(screen.getByRole('link', { name: /launch your first audit/i })).toHaveAttribute(
+      'href',
+      '/runs',
+    );
     // No tablist is rendered in the empty state.
     expect(screen.queryByRole('tablist')).toBeNull();
   });
@@ -533,11 +558,15 @@ describe('VisibilityPage — per-tab query enablement + cache reuse', () => {
 
     await screen.findByRole('tab', { name: 'Overview' });
     await user.click(screen.getByRole('tab', { name: 'Mentions & Citations' }));
-    expect(await screen.findByText('Best affordable clothing stores in Australia?')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Best affordable clothing stores in Australia?'),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Query Fanout' }));
     // The Query Fanout panel renders from the same cached response.
-    expect(await screen.findByText('affordable family clothing Australia 2026')).toBeInTheDocument();
+    expect(
+      await screen.findByText('affordable family clothing Australia 2026'),
+    ).toBeInTheDocument();
 
     // One shared evidence request only — no duplicate fetch on tab switch.
     await waitFor(() => expect(evidenceCalls).toBe(1));
@@ -607,9 +636,7 @@ describe('VisibilityPage — Trends tab', () => {
     ]);
     renderPage();
 
-    expect(
-      await screen.findByText(/could not load the visibility trend/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/could not load the visibility trend/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });
@@ -624,7 +651,9 @@ describe('VisibilityPage — Mentions & Citations tab', () => {
     ]);
     renderPage();
 
-    expect(await screen.findByText('Best affordable clothing stores in Australia?')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Best affordable clothing stores in Australia?'),
+    ).toBeInTheDocument();
     // Mentions render as classification badges.
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByText('Globex')).toBeInTheDocument();
@@ -743,9 +772,13 @@ describe('VisibilityPage — Query Fanout tab', () => {
     renderPage();
 
     // Actual query text.
-    expect(await screen.findByText('affordable family clothing Australia 2026')).toBeInTheDocument();
+    expect(
+      await screen.findByText('affordable family clothing Australia 2026'),
+    ).toBeInTheDocument();
     // Count-only legacy explanation.
-    expect(screen.getByText('Query text unavailable; provider reported 1 search')).toBeInTheDocument();
+    expect(
+      screen.getByText('Query text unavailable; provider reported 1 search'),
+    ).toBeInTheDocument();
     // No-search state.
     expect(screen.getByText('No web searches performed for this execution')).toBeInTheDocument();
     // No duplicated citation browser here.
@@ -762,7 +795,9 @@ describe('VisibilityPage — Query Fanout tab', () => {
     renderPage();
 
     // The prompt heading appears once as the group header.
-    expect(await screen.findByRole('heading', { name: 'Best affordable clothing stores in Australia?' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Best affordable clothing stores in Australia?' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('1 prompt')).toBeInTheDocument();
   });
 });

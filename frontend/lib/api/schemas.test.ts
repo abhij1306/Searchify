@@ -187,7 +187,10 @@ describe('contract schemas', () => {
     const catalog = {
       transports: ['openai', 'anthropic', 'google'],
       engines: [
-        { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }] },
+        {
+          logical_engine: 'chatgpt',
+          routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }],
+        },
         {
           logical_engine: 'gemini',
           routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],
@@ -245,7 +248,11 @@ describe('contract schemas', () => {
       failed_count: 0,
       error_message: '',
       engine_snapshots: [
-        { logical_engine: 'gemini', transport_provider: 'google', transport_model: 'gemini-flash-latest' },
+        {
+          logical_engine: 'gemini',
+          transport_provider: 'google',
+          transport_model: 'gemini-flash-latest',
+        },
       ],
       created_at: '2026-07-15T00:00:00Z',
       updated_at: '2026-07-15T00:00:00Z',
@@ -406,13 +413,37 @@ describe('visibility evidence contract', () => {
       query_text_available: true,
       state: 'queries_available',
       search_events: [
-        { sequence: 0, query: 'affordable clothing Australia', call_id: 'c1', call_sequence: 0, query_sequence: 0 },
-        { sequence: 1, query: 'budget family shops', call_id: 'c1', call_sequence: 0, query_sequence: 1 },
+        {
+          sequence: 0,
+          query: 'affordable clothing Australia',
+          call_id: 'c1',
+          call_sequence: 0,
+          query_sequence: 0,
+        },
+        {
+          sequence: 1,
+          query: 'budget family shops',
+          call_id: 'c1',
+          call_sequence: 0,
+          query_sequence: 1,
+        },
       ],
       event_source: 'raw_artifact',
       mentions: [
-        { kind: 'brand', name: 'Acme', first_offset: 12, artifact_id: UUID2, analyzer_version: 'v1' },
-        { kind: 'competitor', name: 'Globex', first_offset: null, artifact_id: null, analyzer_version: 'v1' },
+        {
+          kind: 'brand',
+          name: 'Acme',
+          first_offset: 12,
+          artifact_id: UUID2,
+          analyzer_version: 'v1',
+        },
+        {
+          kind: 'competitor',
+          name: 'Globex',
+          first_offset: null,
+          artifact_id: null,
+          analyzer_version: 'v1',
+        },
       ],
       citations: [makeCitation()],
       ...overrides,
@@ -483,7 +514,9 @@ describe('visibility evidence contract', () => {
   it('preserves an empty query string in a search event (never invented)', () => {
     const item = makeItem({
       state: 'count_only',
-      search_events: [{ sequence: 0, query: '', call_id: 'c1', call_sequence: 0, query_sequence: 0 }],
+      search_events: [
+        { sequence: 0, query: '', call_id: 'c1', call_sequence: 0, query_sequence: 0 },
+      ],
     });
     const parsed = strictValidate(
       visibilityEvidenceResponseSchema,

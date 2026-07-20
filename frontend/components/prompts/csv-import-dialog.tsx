@@ -106,14 +106,14 @@ export function CsvImportDialog({
         {error ? <Alert tone="danger">{error}</Alert> : null}
 
         <label className="grid gap-1.5">
-          <span className="text-xs font-medium text-secondary">CSV file</span>
+          <span className="text-secondary text-xs font-medium">CSV file</span>
           <input
             ref={inputRef}
             type="file"
             accept=".csv,text/csv"
             aria-label="CSV file"
             onChange={(event) => void handleFile(event.target.files?.[0])}
-            className="focus-ring block w-full rounded-md border border-border-strong bg-panel px-2.5 py-1.5 text-sm text-foreground file:mr-3 file:rounded file:border-0 file:bg-background-alt file:px-2.5 file:py-1 file:text-sm file:text-foreground"
+            className="focus-ring border-border-strong bg-panel text-foreground file:bg-background-alt file:text-foreground block w-full rounded-md border px-2.5 py-1.5 text-sm file:mr-3 file:rounded file:border-0 file:px-2.5 file:py-1 file:text-sm"
           />
         </label>
 
@@ -123,7 +123,7 @@ export function CsvImportDialog({
 
         {parsed && parsed.rows.length > 0 ? (
           <div className="grid gap-2">
-            <div className="flex items-center gap-3 text-sm text-secondary">
+            <div className="text-secondary flex items-center gap-3 text-sm">
               <span>
                 Parsed <strong className="text-foreground">{parsed.rows.length}</strong> row
                 {parsed.rows.length === 1 ? '' : 's'}
@@ -136,7 +136,7 @@ export function CsvImportDialog({
               ) : null}
             </div>
 
-            <div className="max-h-[340px] overflow-auto rounded-md border border-border">
+            <div className="border-border max-h-[340px] overflow-auto rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -157,18 +157,22 @@ export function CsvImportDialog({
                         <TableCell numeric className="text-muted">
                           {row.line}
                         </TableCell>
-                        <TableCell className="max-w-[280px] truncate">{row.input.text || '—'}</TableCell>
+                        <TableCell className="max-w-[280px] truncate">
+                          {row.input.text || '—'}
+                        </TableCell>
                         <TableCell>{row.input.theme || '—'}</TableCell>
                         <TableCell>{intentLabels[row.input.intent]}</TableCell>
                         <TableCell>{row.input.branded ? 'Yes' : 'No'}</TableCell>
                         <TableCell>{row.input.enabled ? 'Yes' : 'No'}</TableCell>
                         <TableCell>
                           {invalid ? (
-                            <span className="text-xs text-danger-text">{row.errors.join(' ')}</span>
+                            <span className="text-danger-text text-xs">{row.errors.join(' ')}</span>
                           ) : row.warnings.length > 0 ? (
-                            <span className="text-xs text-warning-text">{row.warnings.join(' ')}</span>
+                            <span className="text-warning-text text-xs">
+                              {row.warnings.join(' ')}
+                            </span>
                           ) : (
-                            <span className="text-xs text-success-text">Ready</span>
+                            <span className="text-success-text text-xs">Ready</span>
                           )}
                         </TableCell>
                       </TableRow>

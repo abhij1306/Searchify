@@ -73,7 +73,7 @@ export function MentionsCitations({ query, isFiltered, onClearFilters, limit }: 
       <CardHeader className="flex-row items-start justify-between gap-3">
         <div className="grid gap-1">
           <CardTitle>{TITLE}</CardTitle>
-          <p className="text-sm text-secondary">
+          <p className="text-secondary text-sm">
             Persisted mentions and classified citations, grouped by execution.
           </p>
         </div>
@@ -93,32 +93,30 @@ export function MentionsCitations({ query, isFiltered, onClearFilters, limit }: 
   );
 }
 
-function ExecutionEvidenceRow({
-  item,
-}: Readonly<{ item: VisibilityExecutionEvidence }>) {
+function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) {
   return (
-    <li className="grid gap-3 rounded-md border border-border-subtle bg-background-alt p-4">
+    <li className="border-border-subtle bg-background-alt grid gap-3 rounded-md border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">
+          <p className="text-foreground truncate text-sm font-medium">
             {item.prompt_text || 'Untitled prompt'}
           </p>
-          <p className="text-xs text-muted">
+          <p className="text-muted text-xs">
             Execution #{item.prompt_index} · rep {item.repetition} ·{' '}
             {formatExecutionDate(item.completed_at)}
           </p>
         </div>
         <span className="flex items-center gap-2">
           <Badge variant="neutral">{engineLabel(item.logical_engine)}</Badge>
-          <span className="text-xs text-muted">{item.transport_model}</span>
+          <span className="text-muted text-xs">{item.transport_model}</span>
         </span>
       </div>
 
-      <p className="text-2xs uppercase tracking-wide text-muted">{provenanceSummary(item)}</p>
+      <p className="text-2xs text-muted tracking-wide uppercase">{provenanceSummary(item)}</p>
 
       {item.mentions.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-muted">Mentions</p>
+          <p className="text-2xs text-muted font-semibold tracking-wide uppercase">Mentions</p>
           <div className="flex flex-wrap gap-1.5">
             {item.mentions.map((mention, index) => (
               <Badge
@@ -135,14 +133,14 @@ function ExecutionEvidenceRow({
 
       {item.citations.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-muted">Citations</p>
+          <p className="text-2xs text-muted font-semibold tracking-wide uppercase">Citations</p>
           <ul className="grid gap-2">
             {item.citations.map((citation) => (
               <li
                 key={`${item.analysis_id}-${citation.ordinal}-${citation.url}`}
-                className="flex items-center justify-between gap-3 rounded-sm border border-border-subtle bg-panel px-3 py-2"
+                className="border-border-subtle bg-panel flex items-center justify-between gap-3 rounded-sm border px-3 py-2"
               >
-                <span className="min-w-0 truncate text-xs text-secondary">
+                <span className="text-secondary min-w-0 truncate text-xs">
                   {citation.title?.trim() || citation.domain || citation.url}
                 </span>
                 <Badge

@@ -54,7 +54,7 @@ export function EvidenceCard({
           </div>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+          <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
             {answerText?.trim() ? (
               answerText
             ) : (
@@ -71,19 +71,21 @@ export function EvidenceCard({
           </CardHeader>
           <CardContent className="grid gap-3">
             {evidence.citations.length === 0 ? (
-              <p className="text-sm text-muted">No citations were captured.</p>
+              <p className="text-muted text-sm">No citations were captured.</p>
             ) : (
               <ul className="grid gap-2.5">
                 {evidence.citations.map((citation) => (
                   <li
                     key={`${citation.ordinal}-${citation.url}`}
-                    className="flex items-start justify-between gap-3 border-b border-border-subtle pb-2.5 last:border-0 last:pb-0"
+                    className="border-border-subtle flex items-start justify-between gap-3 border-b pb-2.5 last:border-0 last:pb-0"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-foreground">
+                      <p className="text-foreground truncate text-sm">
                         {citation.title?.trim() || citation.domain || citation.url}
                       </p>
-                      <p className="truncate text-xs text-muted">{citation.domain || citation.url}</p>
+                      <p className="text-muted truncate text-xs">
+                        {citation.domain || citation.url}
+                      </p>
                     </div>
                     <Badge
                       variant="classification"
@@ -111,13 +113,13 @@ export function EvidenceCard({
                     Mentioned
                   </Badge>
                 ) : (
-                  <span className="text-sm text-muted">Not mentioned</span>
+                  <span className="text-muted text-sm">Not mentioned</span>
                 )}
               </div>
               <div className="grid gap-1.5">
                 <Label>Competitors</Label>
                 {evidence.competitors_mentioned.length === 0 ? (
-                  <span className="text-sm text-muted">None mentioned</span>
+                  <span className="text-muted text-sm">None mentioned</span>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {evidence.competitors_mentioned.map((name) => (
@@ -130,7 +132,7 @@ export function EvidenceCard({
               </div>
               <div className="grid gap-1.5">
                 <Label>Sentiment</Label>
-                <span className="mono text-sm text-muted">{evidence.sentiment ?? '—'}</span>
+                <span className="mono text-muted text-sm">{evidence.sentiment ?? '—'}</span>
               </div>
             </CardContent>
           </Card>
@@ -141,13 +143,13 @@ export function EvidenceCard({
             </CardHeader>
             <CardContent>
               {scoreEntries.length === 0 ? (
-                <p className="text-sm text-muted">No score recorded.</p>
+                <p className="text-muted text-sm">No score recorded.</p>
               ) : (
                 <dl className="grid gap-1.5">
                   {scoreEntries.map(([key, value]) => (
                     <div key={key} className="flex items-center justify-between gap-3">
-                      <dt className="mono text-xs text-secondary">{key}</dt>
-                      <dd className="mono text-xs text-foreground">{formatScoreValue(value)}</dd>
+                      <dt className="mono text-secondary text-xs">{key}</dt>
+                      <dd className="mono text-foreground text-xs">{formatScoreValue(value)}</dd>
                     </div>
                   ))}
                 </dl>

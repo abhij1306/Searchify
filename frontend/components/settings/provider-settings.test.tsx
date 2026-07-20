@@ -15,7 +15,10 @@ const WORKSPACE_ID = '22222222-2222-4222-8222-222222222222';
 const catalog = {
   transports: ['openai', 'anthropic', 'google'],
   engines: [
-    { logical_engine: 'chatgpt', routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }] },
+    {
+      logical_engine: 'chatgpt',
+      routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }],
+    },
     {
       logical_engine: 'gemini',
       routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],
@@ -87,7 +90,9 @@ describe('ProviderSettings', () => {
 
     renderWithProviders(<ProviderSettings />);
 
-    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest(
+      'section',
+    )!;
     const utils = within(chatgptCard);
     // Fixed direct route label; the OpenAI model is surfaced.
     expect(utils.getByText('Direct (OpenAI)')).toBeInTheDocument();
@@ -141,7 +146,9 @@ describe('ProviderSettings', () => {
 
     renderWithProviders(<ProviderSettings />);
 
-    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest(
+      'section',
+    )!;
     const utils = within(chatgptCard);
 
     await user.type(utils.getByPlaceholderText(/paste your api key/i), 'sk-test-key');
@@ -177,7 +184,9 @@ describe('ProviderSettings', () => {
 
     renderWithProviders(<ProviderSettings />);
 
-    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest(
+      'section',
+    )!;
     const utils = within(chatgptCard);
     expect(utils.getByText('Configured')).toBeInTheDocument();
 
@@ -193,7 +202,9 @@ describe('ProviderSettings', () => {
 
     renderWithProviders(<ProviderSettings />);
 
-    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest('section')!;
+    const chatgptCard = (await screen.findByRole('heading', { name: 'ChatGPT' })).closest(
+      'section',
+    )!;
     const utils = within(chatgptCard);
     const keyInput = utils.getByPlaceholderText(/stored/i) as HTMLInputElement;
     expect(keyInput).toHaveAttribute('type', 'password');

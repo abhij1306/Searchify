@@ -61,11 +61,11 @@ export function TopBar({ className }: Readonly<{ className?: string }>) {
   return (
     <header
       className={cn(
-        'flex h-[52px] shrink-0 items-center gap-3 border-b border-border bg-panel px-4',
+        'border-border bg-panel flex h-[52px] shrink-0 items-center gap-3 border-b px-4',
         className,
       )}
     >
-      <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{title}</h1>
+      <h1 className="text-foreground min-w-0 flex-1 truncate text-sm font-semibold">{title}</h1>
 
       <div className="flex items-center gap-1">
         {/* Export hook: placeholder disabled at MVP; wired for F10 report export. */}

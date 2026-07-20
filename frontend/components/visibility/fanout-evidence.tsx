@@ -75,9 +75,7 @@ export function FanoutEvidence({ query, isFiltered, onClearFilters, limit }: Evi
       <CardHeader className="flex-row items-start justify-between gap-3">
         <div className="grid gap-1">
           <CardTitle>{TITLE}</CardTitle>
-          <p className="text-sm text-secondary">
-            Per-execution search queries grouped by prompt.
-          </p>
+          <p className="text-secondary text-sm">Per-execution search queries grouped by prompt.</p>
         </div>
         <Badge variant="neutral">
           {groups.length} {groups.length === 1 ? 'prompt' : 'prompts'}
@@ -98,7 +96,7 @@ export function FanoutEvidence({ query, isFiltered, onClearFilters, limit }: Evi
 function PromptGroupBlock({ group }: Readonly<{ group: PromptGroup }>) {
   return (
     <section className="grid gap-2.5">
-      <h3 className="text-sm font-semibold text-foreground">{group.promptText}</h3>
+      <h3 className="text-foreground text-sm font-semibold">{group.promptText}</h3>
       <ul className="grid gap-2.5">
         {group.executions.map((item) => (
           <ExecutionRow key={item.analysis_id} item={item} />
@@ -110,22 +108,22 @@ function PromptGroupBlock({ group }: Readonly<{ group: PromptGroup }>) {
 
 function ExecutionRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) {
   return (
-    <li className="grid gap-2 rounded-md border border-border-subtle bg-background-alt p-4">
+    <li className="border-border-subtle bg-background-alt grid gap-2 rounded-md border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">
+        <p className="text-muted text-xs">
           Execution #{item.prompt_index} · rep {item.repetition} ·{' '}
           {formatExecutionDate(item.completed_at)}
         </p>
         <span className="flex items-center gap-2">
           <Badge variant="neutral">{engineLabel(item.logical_engine)}</Badge>
-          <span className="text-xs text-muted">{item.transport_model}</span>
-          <span className="mono text-xs text-secondary">
+          <span className="text-muted text-xs">{item.transport_model}</span>
+          <span className="mono text-secondary text-xs">
             {item.search_query_count} {item.search_query_count === 1 ? 'search' : 'searches'}
           </span>
         </span>
       </div>
 
-      <p className="text-2xs uppercase tracking-wide text-muted">{provenanceSummary(item)}</p>
+      <p className="text-2xs text-muted tracking-wide uppercase">{provenanceSummary(item)}</p>
 
       <QueryDetail item={item} />
     </li>
@@ -140,7 +138,7 @@ function QueryDetail({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) 
         {queries.map((query, index) => (
           <li
             key={`${index}-${query}`}
-            className="rounded-sm border border-border-subtle bg-panel px-3 py-2 text-xs text-secondary"
+            className="border-border-subtle bg-panel text-secondary rounded-sm border px-3 py-2 text-xs"
           >
             {query}
           </li>
@@ -151,14 +149,14 @@ function QueryDetail({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) 
 
   if (item.state === 'count_only') {
     return (
-      <div className="rounded-sm border border-border-subtle bg-panel px-3 py-2 text-xs text-muted">
+      <div className="border-border-subtle bg-panel text-muted rounded-sm border px-3 py-2 text-xs">
         {countOnlyExplanation(item)}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-sm border border-border-subtle bg-panel px-3 py-2.5 text-xs text-muted">
+    <div className="border-border-subtle bg-panel text-muted flex items-center gap-2 rounded-sm border px-3 py-2.5 text-xs">
       <MinusCircle className="size-3.5 shrink-0" aria-hidden />
       <span>No web searches performed for this execution</span>
     </div>

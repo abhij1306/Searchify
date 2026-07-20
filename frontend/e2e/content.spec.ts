@@ -155,7 +155,5 @@ test('cancel during generation returns the screen to a non-generating state', as
     timeout: 10_000,
   });
   // Composer is editable again.
-  await expect(
-    page.getByRole('textbox', { name: /describe the website content/i }),
-  ).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: /describe the website content/i })).toBeEnabled();
 });

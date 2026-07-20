@@ -38,9 +38,7 @@ export function Donut({
 
   const summary =
     total > 0
-      ? segments
-          .map((s) => `${s.label} ${Math.round((s.value / total) * 100)}%`)
-          .join(', ')
+      ? segments.map((s) => `${s.label} ${Math.round((s.value / total) * 100)}%`).join(', ')
       : 'No data';
   const ariaLabel = label ? `${label}: ${summary}` : summary;
 
@@ -93,7 +91,7 @@ export function Donut({
         {centerLabel ? (
           <span
             aria-hidden
-            className="mono absolute inset-0 flex items-center justify-center text-sm font-semibold text-foreground"
+            className="mono text-foreground absolute inset-0 flex items-center justify-center text-sm font-semibold"
           >
             {centerLabel}
           </span>
@@ -102,11 +100,18 @@ export function Donut({
       {showLegend ? (
         <ul className="flex flex-col gap-1.5">
           {segments.map((segment) => (
-            <li key={segment.label} className="flex items-center gap-2 text-xs text-secondary">
+            <li key={segment.label} className="text-secondary flex items-center gap-2 text-xs">
               <svg aria-hidden width={10} height={10} viewBox="0 0 10 10">
                 {/* Swatch reuses the segment's bridged stroke token (no raw hex,
                     and no runtime class string that Tailwind can't detect). */}
-                <circle cx={5} cy={5} r={4} fill="none" strokeWidth={2} className={segment.colorClass} />
+                <circle
+                  cx={5}
+                  cy={5}
+                  r={4}
+                  fill="none"
+                  strokeWidth={2}
+                  className={segment.colorClass}
+                />
               </svg>
               <span className="text-foreground">{segment.label}</span>
               <span className="mono text-muted">

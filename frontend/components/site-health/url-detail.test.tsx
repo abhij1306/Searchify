@@ -118,9 +118,7 @@ afterAll(() => mswServer.close());
 
 function handlers(pageDetail: PageDetail) {
   return [
-    http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}`, () =>
-      HttpResponse.json(pageDetail),
-    ),
+    http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}`, () => HttpResponse.json(pageDetail)),
     http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/issue-history`, () =>
       HttpResponse.json({ items: [], next_cursor: null }),
     ),
@@ -133,7 +131,9 @@ describe('UrlDetail', () => {
 
     renderWithProviders(<UrlDetail crawlId={CRAWL} siteUrlId={URL_ID} />);
 
-    expect(await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 }),
+    ).toBeInTheDocument();
     // Delivery metric: TTFB rendered with ms suffix.
     expect(screen.getByText('840ms')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();
@@ -147,7 +147,9 @@ describe('UrlDetail', () => {
   });
 
   it('renders the "—" placeholder for a missing score, never a zero', async () => {
-    mswServer.use(...handlers(detail({ technical_score: null, aeo_score: null, overall_score: null })));
+    mswServer.use(
+      ...handlers(detail({ technical_score: null, aeo_score: null, overall_score: null })),
+    );
 
     renderWithProviders(<UrlDetail crawlId={CRAWL} siteUrlId={URL_ID} />);
 
@@ -182,98 +184,90 @@ describe('UrlDetail', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
-  it(
-    'same-active-crawl rerun: polls in place through completed → pending → running → completed without navigating',
-    async () => {
-      // The rerun response points at the SAME crawl/URL (created_new_crawl
-      // false), so the component must poll in place — never navigate.
-      //
-      // Sequence of `analysis_status` snapshots the GET handler serves on
-      // each successive request. The first GET (initial render) sees
-      // 'completed'. The rerun POST enqueues a fresh task, after which the
-      // *next* GETs must walk through 'pending' then 'running' before
-      // landing on a new 'completed' — proving polling doesn't stop on the
-      // stale cached terminal status right after the mutation resolves.
-      const statuses: PageDetail['analysis_status'][] = [
-        'completed',
-        'pending',
-        'running',
-        'completed',
-      ];
-      let getCallCount = 0;
+  it('same-active-crawl rerun: polls in place through completed → pending → running → completed without navigating', async () => {
+    // The rerun response points at the SAME crawl/URL (created_new_crawl
+    // false), so the component must poll in place — never navigate.
+    //
+    // Sequence of `analysis_status` snapshots the GET handler serves on
+    // each successive request. The first GET (initial render) sees
+    // 'completed'. The rerun POST enqueues a fresh task, after which the
+    // *next* GETs must walk through 'pending' then 'running' before
+    // landing on a new 'completed' — proving polling doesn't stop on the
+    // stale cached terminal status right after the mutation resolves.
+    const statuses: PageDetail['analysis_status'][] = [
+      'completed',
+      'pending',
+      'running',
+      'completed',
+    ];
+    let getCallCount = 0;
 
-      mswServer.use(
-        http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}`, async () => {
-          const status = statuses[Math.min(getCallCount, statuses.length - 1)];
-          getCallCount += 1;
-          // Small artificial network delay so the mutation's own
-          // `invalidateQueries` refetch (triggered inside `onSuccess`) does
-          // not resolve synchronously before the next render — this
-          // reproduces the real race where React re-renders with
-          // `rerunPolling` newly `true` while the query cache still holds
-          // the *previous* terminal snapshot.
-          await new Promise((resolve) => setTimeout(resolve, 15));
-          return HttpResponse.json(detail({ analysis_status: status }));
-        }),
-        http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/issue-history`, () =>
-          HttpResponse.json({ items: [], next_cursor: null }),
+    mswServer.use(
+      http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}`, async () => {
+        const status = statuses[Math.min(getCallCount, statuses.length - 1)];
+        getCallCount += 1;
+        // Small artificial network delay so the mutation's own
+        // `invalidateQueries` refetch (triggered inside `onSuccess`) does
+        // not resolve synchronously before the next render — this
+        // reproduces the real race where React re-renders with
+        // `rerunPolling` newly `true` while the query cache still holds
+        // the *previous* terminal snapshot.
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        return HttpResponse.json(detail({ analysis_status: status }));
+      }),
+      http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/issue-history`, () =>
+        HttpResponse.json({ items: [], next_cursor: null }),
+      ),
+      http.post(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/rerun`, () =>
+        HttpResponse.json(
+          {
+            crawl_id: CRAWL,
+            site_url_id: URL_ID,
+            task_id: TASK_ID,
+            created_new_crawl: false,
+            analysis_status: 'pending',
+          },
+          { status: 202 },
         ),
-        http.post(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/rerun`, () =>
-          HttpResponse.json(
-            {
-              crawl_id: CRAWL,
-              site_url_id: URL_ID,
-              task_id: TASK_ID,
-              created_new_crawl: false,
-              analysis_status: 'pending',
-            },
-            { status: 202 },
-          ),
-        ),
-      );
+      ),
+    );
 
-      const user = userEvent.setup();
-      renderWithProviders(<UrlDetail crawlId={CRAWL} siteUrlId={URL_ID} />);
+    const user = userEvent.setup();
+    renderWithProviders(<UrlDetail crawlId={CRAWL} siteUrlId={URL_ID} />);
 
-      // Initial fetch observes the prior run's terminal 'completed' snapshot.
-      await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 });
-      expect(screen.getByRole('button', { name: 'Re-audit this page' })).toBeInTheDocument();
-      expect(screen.getByText('Completed')).toBeInTheDocument();
+    // Initial fetch observes the prior run's terminal 'completed' snapshot.
+    await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 });
+    expect(screen.getByRole('button', { name: 'Re-audit this page' })).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Re-audit this page' }));
+    await user.click(screen.getByRole('button', { name: 'Re-audit this page' }));
 
-      // The status badge must actually be observed to reach 'Running' at
-      // some point (not just eventually land back on 'Completed', which the
-      // stale pre-rerun cache would already show without ever polling
-      // further).
-      await waitFor(
-        () => expect(screen.getByText('Running')).toBeInTheDocument(),
-        { timeout: 15_000 },
-      );
+    // The status badge must actually be observed to reach 'Running' at
+    // some point (not just eventually land back on 'Completed', which the
+    // stale pre-rerun cache would already show without ever polling
+    // further).
+    await waitFor(() => expect(screen.getByText('Running')).toBeInTheDocument(), {
+      timeout: 15_000,
+    });
 
-      // Polling continues past 'running' until the freshly-enqueued task
-      // reaches its own terminal 'completed' snapshot.
-      await waitFor(
-        () => expect(screen.getByText('Completed')).toBeInTheDocument(),
-        { timeout: 15_000 },
-      );
+    // Polling continues past 'running' until the freshly-enqueued task
+    // reaches its own terminal 'completed' snapshot.
+    await waitFor(() => expect(screen.getByText('Completed')).toBeInTheDocument(), {
+      timeout: 15_000,
+    });
 
-      await waitFor(
-        () => expect(getCallCount).toBeGreaterThanOrEqual(statuses.length),
-        { timeout: 15_000 },
-      );
+    await waitFor(() => expect(getCallCount).toBeGreaterThanOrEqual(statuses.length), {
+      timeout: 15_000,
+    });
 
-      await waitFor(
-        () =>
-          expect(screen.getByRole('button', { name: 'Re-audit queued' })).toBeInTheDocument(),
-        { timeout: 15_000 },
-      );
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Re-audit queued' })).toBeInTheDocument(),
+      { timeout: 15_000 },
+    );
 
-      // A same-crawl rerun never navigates.
-      expect(push).not.toHaveBeenCalled();
-    },
-    20_000,
-  );
+    // A same-crawl rerun never navigates.
+    expect(push).not.toHaveBeenCalled();
+  }, 20_000);
 
   it('created_new_crawl rerun: navigates to the fresh crawl identity detail route with ?rerun=1', async () => {
     mswServer.use(
@@ -302,9 +296,7 @@ describe('UrlDetail', () => {
     // identity's canonical detail route (with ?rerun=1 to auto-start polling
     // on the new mount) rather than continuing to poll the terminal source.
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith(
-        `/site-health/crawls/${NEW_CRAWL}/pages/${URL_ID}?rerun=1`,
-      ),
+      expect(push).toHaveBeenCalledWith(`/site-health/crawls/${NEW_CRAWL}/pages/${URL_ID}?rerun=1`),
     );
     expect(push).toHaveBeenCalledTimes(1);
   });
@@ -313,10 +305,7 @@ describe('UrlDetail', () => {
     mswServer.use(
       ...handlers(detail({ analysis_status: 'completed' })),
       http.post(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/rerun`, () =>
-        HttpResponse.json(
-          { detail: 'rerun_not_allowed' },
-          { status: 409 },
-        ),
+        HttpResponse.json({ detail: 'rerun_not_allowed' }, { status: 409 }),
       ),
     );
 
@@ -334,9 +323,7 @@ describe('UrlDetail', () => {
     );
   });
 
-  it(
-    'landing on a fresh rerun crawl with ?rerun=1 begins polling immediately',
-    async () => {
+  it('landing on a fresh rerun crawl with ?rerun=1 begins polling immediately', async () => {
     searchParamsValue = new URLSearchParams('rerun=1');
 
     const statuses: PageDetail['analysis_status'][] = ['pending', 'running', 'completed'];
@@ -346,9 +333,7 @@ describe('UrlDetail', () => {
       http.get(`/api/v1/site-crawls/${NEW_CRAWL}/pages/${URL_ID}`, () => {
         const status = statuses[Math.min(getCallCount, statuses.length - 1)];
         getCallCount += 1;
-        return HttpResponse.json(
-          detail({ crawl_id: NEW_CRAWL, analysis_status: status }),
-        );
+        return HttpResponse.json(detail({ crawl_id: NEW_CRAWL, analysis_status: status }));
       }),
       http.get(`/api/v1/site-crawls/${NEW_CRAWL}/pages/${URL_ID}/issue-history`, () =>
         HttpResponse.json({ items: [], next_cursor: null }),
@@ -364,7 +349,5 @@ describe('UrlDetail', () => {
       timeout: 15_000,
     });
     expect(getCallCount).toBeGreaterThanOrEqual(statuses.length);
-    },
-    20_000,
-  );
+  }, 20_000);
 });

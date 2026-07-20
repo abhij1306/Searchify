@@ -25,6 +25,7 @@ from app.connectors.discovery_models.contracts import (
     DiscoveryRequest,
     DiscoveryResponse,
 )
+from app.core.config.content import CONTENT_PROVIDER_MISTRAL
 from app.core.config.provider_catalog import (
     ERROR_AUTH,
     ERROR_CONNECTION,
@@ -34,7 +35,7 @@ from app.core.config.provider_catalog import (
 
 logger = logging.getLogger(__name__)
 
-PROVIDER_MISTRAL = "mistral"
+PROVIDER_MISTRAL = CONTENT_PROVIDER_MISTRAL
 
 
 class MistralDiscoveryClient:

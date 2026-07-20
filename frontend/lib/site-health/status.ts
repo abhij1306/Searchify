@@ -100,7 +100,10 @@ export function isSampleMode(crawl: Pick<SiteCrawl, 'sample_mode'>): boolean {
  * far" until discovery terminalizes, then the settled "discovered".
  */
 export function discoveryProgressLabel(
-  crawl: Pick<SiteCrawl, 'sample_mode' | 'discovery_status' | 'inventory_complete' | 'visible_url_count'>,
+  crawl: Pick<
+    SiteCrawl,
+    'sample_mode' | 'discovery_status' | 'inventory_complete' | 'visible_url_count'
+  >,
 ): string {
   const n = crawl.visible_url_count;
   if (crawl.sample_mode) {
@@ -121,17 +124,14 @@ export function canShowDiscoveredTotal(
   entitlement: Pick<SiteHealthEntitlement, 'can_view_discovered_total'>,
   crawl: Pick<SiteCrawl, 'sample_mode' | 'total_url_count'>,
 ): boolean {
-  return entitlement.can_view_discovered_total && !crawl.sample_mode && crawl.total_url_count !== null;
+  return (
+    entitlement.can_view_discovered_total && !crawl.sample_mode && crawl.total_url_count !== null
+  );
 }
 
 /** Which phase of the Site Health flow to render for the active crawl. */
 export type SiteHealthPhase =
-  | 'empty'
-  | 'discovering'
-  | 'selection'
-  | 'analyzing'
-  | 'dashboard'
-  | 'terminal';
+  'empty' | 'discovering' | 'selection' | 'analyzing' | 'dashboard' | 'terminal';
 
 /** True when the crawl produced score data (a dashboard-worthy summary). */
 export function hasScoreData(crawl: Pick<SiteCrawl, 'score_summary'>): boolean {
@@ -160,12 +160,10 @@ export function hasScoreData(crawl: Pick<SiteCrawl, 'score_summary'>): boolean {
  *  10. otherwise (Free auto-analysis)  → 'analyzing'
  */
 export function resolveSiteHealthPhase(
-  crawl:
-    | Pick<
-        SiteCrawl,
-        'status' | 'discovery_status' | 'analysis_status' | 'score_summary' | 'visible_url_count'
-      >
-    | null,
+  crawl: Pick<
+    SiteCrawl,
+    'status' | 'discovery_status' | 'analysis_status' | 'score_summary' | 'visible_url_count'
+  > | null,
   plan: SiteHealthEntitlement['plan_key'],
 ): SiteHealthPhase {
   // 1. Nothing yet.
@@ -209,9 +207,7 @@ export type DashboardRunNotice = {
   message: string;
 } | null;
 
-export function dashboardRunNotice(
-  crawl: Pick<SiteCrawl, 'status'>,
-): DashboardRunNotice {
+export function dashboardRunNotice(crawl: Pick<SiteCrawl, 'status'>): DashboardRunNotice {
   switch (crawl.status) {
     case 'cancelled':
       return {

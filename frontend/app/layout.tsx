@@ -23,9 +23,7 @@ export const metadata: Metadata = {
   description: 'AI visibility analytics — see how LLMs represent your brand.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable}`}>
       <head>

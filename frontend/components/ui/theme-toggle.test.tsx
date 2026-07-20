@@ -24,9 +24,7 @@ describe('ThemeToggle', () => {
 
     // The toggle reads theme via an async MutationObserver; wait for the
     // internal store to reflect "dark" before toggling back.
-    await waitFor(() =>
-      expect(button.getAttribute('title')).toMatch(/switch to light mode/i),
-    );
+    await waitFor(() => expect(button.getAttribute('title')).toMatch(/switch to light mode/i));
 
     fireEvent.click(button);
     expect(document.documentElement.dataset.theme).toBe('light');

@@ -48,7 +48,7 @@ export function RunsTable({ audits }: Readonly<{ audits: Audit[] }>) {
             <TableCell>
               <Link
                 href={`/runs/${audit.id}`}
-                className="text-sm font-medium text-accent-text hover:underline"
+                className="text-accent-text text-sm font-medium hover:underline"
               >
                 View
               </Link>

@@ -125,17 +125,16 @@ export function visibleEngines(
   visibility: Visibility,
   filter: VisibilityFilters['engine'],
 ): VisibilityEngine[] {
-  const rows = filter === 'all'
-    ? visibility.per_engine
-    : visibility.per_engine.filter((engine) => engine.logical_engine === filter);
+  const rows =
+    filter === 'all'
+      ? visibility.per_engine
+      : visibility.per_engine.filter((engine) => engine.logical_engine === filter);
   const order = new Map(ENGINE_ORDER.map((engine, index) => [engine as string, index]));
-  return rows
-    .slice()
-    .sort((a, b) => {
-      const ai = order.get(a.logical_engine) ?? Number.MAX_SAFE_INTEGER;
-      const bi = order.get(b.logical_engine) ?? Number.MAX_SAFE_INTEGER;
-      return ai - bi || a.logical_engine.localeCompare(b.logical_engine);
-    });
+  return rows.slice().sort((a, b) => {
+    const ai = order.get(a.logical_engine) ?? Number.MAX_SAFE_INTEGER;
+    const bi = order.get(b.logical_engine) ?? Number.MAX_SAFE_INTEGER;
+    return ai - bi || a.logical_engine.localeCompare(b.logical_engine);
+  });
 }
 
 /** Engines actually present in a projection (for the engine-filter options). */
@@ -180,9 +179,7 @@ export type PromptOption = {
  * under "All prompts"), labelled by their frozen prompt text, kept in a stable
  * (first-seen, newest-first) order.
  */
-export function toPromptOptions(
-  items: readonly VisibilityExecutionEvidence[],
-): PromptOption[] {
+export function toPromptOptions(items: readonly VisibilityExecutionEvidence[]): PromptOption[] {
   const seen = new Map<string, string>();
   for (const item of items) {
     if (item.prompt_id && !seen.has(item.prompt_id)) {
@@ -196,5 +193,7 @@ export function toPromptOptions(
 export function sortedRankings(rankings: readonly RankingRow[]): RankingRow[] {
   return rankings
     .slice()
-    .sort((a, b) => (b.share_of_voice ?? 0) - (a.share_of_voice ?? 0) || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) => (b.share_of_voice ?? 0) - (a.share_of_voice ?? 0) || a.name.localeCompare(b.name),
+    );
 }

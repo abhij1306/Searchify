@@ -14,13 +14,13 @@ export function PromptEmptyState({
   onImport,
 }: Readonly<{ onAdd: () => void; onImport: () => void }>) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-panel px-6 py-16 text-center">
-      <span className="flex size-12 items-center justify-center rounded-full bg-accent-subtle text-accent-text">
+    <div className="border-border bg-panel flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed px-6 py-16 text-center">
+      <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
         <MessageSquarePlus className="size-6" aria-hidden />
       </span>
       <div className="max-w-sm">
-        <h3 className="text-base font-semibold text-foreground">No prompts yet</h3>
-        <p className="mt-1 text-sm text-secondary">
+        <h3 className="text-foreground text-base font-semibold">No prompts yet</h3>
+        <p className="text-secondary mt-1 text-sm">
           Add the questions you want to track across AI engines. Enter them one at a time or import
           a CSV.
         </p>

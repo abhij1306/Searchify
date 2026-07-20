@@ -19,9 +19,29 @@ function prompt(overrides: Partial<Prompt> = {}): Prompt {
 }
 
 const prompts: Prompt[] = [
-  prompt({ id: 'a', text: 'Best running shoes?', intent: 'discovery', enabled: true, branded: false }),
-  prompt({ id: 'b', text: 'Nike vs Adidas', intent: 'comparison', enabled: false, branded: true, theme: 'Rivals' }),
-  prompt({ id: 'c', text: 'Where to buy trainers', intent: 'purchase', enabled: true, branded: false, theme: '' }),
+  prompt({
+    id: 'a',
+    text: 'Best running shoes?',
+    intent: 'discovery',
+    enabled: true,
+    branded: false,
+  }),
+  prompt({
+    id: 'b',
+    text: 'Nike vs Adidas',
+    intent: 'comparison',
+    enabled: false,
+    branded: true,
+    theme: 'Rivals',
+  }),
+  prompt({
+    id: 'c',
+    text: 'Where to buy trainers',
+    intent: 'purchase',
+    enabled: true,
+    branded: false,
+    theme: '',
+  }),
 ];
 
 describe('filterPrompts', () => {
@@ -35,23 +55,25 @@ describe('filterPrompts', () => {
   });
 
   it('filters by intent', () => {
-    const result = filterPrompts(prompts, '', { ...emptyFilters, intents: ['comparison', 'purchase'] });
+    const result = filterPrompts(prompts, '', {
+      ...emptyFilters,
+      intents: ['comparison', 'purchase'],
+    });
     expect(result.map((p) => p.id)).toEqual(['b', 'c']);
   });
 
   it('filters by enabled tri-state', () => {
-    expect(filterPrompts(prompts, '', { ...emptyFilters, enabled: 'enabled' }).map((p) => p.id)).toEqual([
-      'a',
-      'c',
-    ]);
-    expect(filterPrompts(prompts, '', { ...emptyFilters, enabled: 'disabled' }).map((p) => p.id)).toEqual([
-      'b',
-    ]);
+    expect(
+      filterPrompts(prompts, '', { ...emptyFilters, enabled: 'enabled' }).map((p) => p.id),
+    ).toEqual(['a', 'c']);
+    expect(
+      filterPrompts(prompts, '', { ...emptyFilters, enabled: 'disabled' }).map((p) => p.id),
+    ).toEqual(['b']);
   });
 
   it('filters by branded tri-state', () => {
-    expect(filterPrompts(prompts, '', { ...emptyFilters, branded: 'enabled' }).map((p) => p.id)).toEqual([
-      'b',
-    ]);
+    expect(
+      filterPrompts(prompts, '', { ...emptyFilters, branded: 'enabled' }).map((p) => p.id),
+    ).toEqual(['b']);
   });
 });

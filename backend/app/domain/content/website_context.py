@@ -15,7 +15,8 @@ import re
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, and_, cast, func, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.content import (
@@ -38,8 +39,9 @@ from app.models.site_health import (
     SiteUrl,
 )
 
-# Control/non-printable chars stripped from every emitted string (keep \n in
-# body text via the whitespace collapse instead).
+# Control/non-printable chars stripped from every emitted string; the
+# whitespace collapse in ``_clean`` then folds ALL whitespace (newlines
+# included) to single spaces.
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 _WHITESPACE = re.compile(r"\s+")
 
@@ -50,9 +52,16 @@ def _facts_usable() -> ColumnElement[bool]:
     An explicit Python ``None`` persists as JSON ``null`` (not SQL NULL) in a
     JSONB column, so an ``IS NOT NULL`` check alone would treat factless
     artifacts as usable. ``jsonb_typeof`` is NULL for SQL NULL and ``'null'``
-    for JSON null, so one comparison covers both.
+    for JSON null, so one comparison covers both. ``{}`` must also be
+    excluded here — the in-memory page filter drops empty facts, so a crawl
+    admitted on ``{}`` alone would be selected and then yield zero pages
+    instead of falling back to an older usable crawl.
     """
-    return func.jsonb_typeof(SiteFetchArtifact.normalized_facts) == "object"
+    facts = SiteFetchArtifact.normalized_facts
+    return and_(
+        func.jsonb_typeof(facts) == "object",
+        facts != cast({}, JSONB),
+    )
 
 
 @dataclass(frozen=True)

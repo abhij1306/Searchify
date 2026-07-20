@@ -37,13 +37,11 @@ export default function LoginPage() {
   return (
     <div className="grid gap-5">
       <div className="grid gap-1">
-        <h1 className="text-lg font-semibold text-foreground">Sign in</h1>
-        <p className="text-sm text-secondary">Welcome back — sign in to your workspace.</p>
+        <h1 className="text-foreground text-lg font-semibold">Sign in</h1>
+        <p className="text-secondary text-sm">Welcome back — sign in to your workspace.</p>
       </div>
 
-      {mutation.isError ? (
-        <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert>
-      ) : null}
+      {mutation.isError ? <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert> : null}
 
       <form noValidate onSubmit={onSubmit} className="grid gap-4">
         <Field label="Email" required error={errors.email?.message}>
@@ -75,9 +73,9 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-secondary">
+      <p className="text-secondary text-center text-sm">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="focus-ring rounded-sm text-accent-text">
+        <Link href="/register" className="focus-ring text-accent-text rounded-sm">
           Create one
         </Link>
       </p>

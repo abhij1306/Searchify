@@ -127,7 +127,11 @@ export const siteHealthApi = {
     return strictValidate(siteCrawlSchema, res, 'siteHealth.getCrawl');
   },
   cancelCrawl: async (crawlId: string, options?: ApiRequestOptions) => {
-    const res = await apiClient.post<SiteCrawl>(`/site-crawls/${crawlId}/cancel`, undefined, options);
+    const res = await apiClient.post<SiteCrawl>(
+      `/site-crawls/${crawlId}/cancel`,
+      undefined,
+      options,
+    );
     return strictValidate(siteCrawlSchema, res, 'siteHealth.cancelCrawl');
   },
   getInventory: async (crawlId: string, params?: InventoryParams, options?: ApiRequestOptions) => {
@@ -321,7 +325,8 @@ export const siteHealthQueries = {
         cursor: params?.cursor ?? null,
         limit: params?.limit ?? null,
       }),
-      queryFn: ({ signal }) => siteHealthApi.getIssueHistory(crawlId, siteUrlId, params, { signal }),
+      queryFn: ({ signal }) =>
+        siteHealthApi.getIssueHistory(crawlId, siteUrlId, params, { signal }),
     }),
 };
 

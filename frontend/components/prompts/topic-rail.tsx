@@ -86,10 +86,10 @@ export function TopicRail({
           so nothing from the right pane can overlap it. */}
       <nav
         aria-label="Topics"
-        className="hidden min-w-0 content-start gap-1 overflow-hidden rounded-lg border border-border bg-panel p-2 md:grid md:sticky md:top-4"
+        className="border-border bg-panel hidden min-w-0 content-start gap-1 overflow-hidden rounded-lg border p-2 md:sticky md:top-4 md:grid"
       >
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-secondary">Topics</h3>
+          <h3 className="text-secondary text-xs font-semibold tracking-wide uppercase">Topics</h3>
           <Button
             variant="ghost"
             size="icon"
@@ -177,7 +177,7 @@ function TopicSelect({
   const labelId = useId();
   return (
     <div className="mb-1 grid gap-1.5 md:hidden">
-      <span id={labelId} className="text-xs font-semibold uppercase tracking-wide text-secondary">
+      <span id={labelId} className="text-secondary text-xs font-semibold tracking-wide uppercase">
         Topics
       </span>
       <div className="relative">
@@ -185,7 +185,7 @@ function TopicSelect({
           aria-labelledby={labelId}
           value={selectedTopicId ?? ''}
           onChange={(event) => onSelect(event.target.value === '' ? null : event.target.value)}
-          className="focus-ring block h-[var(--control-height)] w-full appearance-none rounded-md border border-border-strong bg-panel px-2.5 pr-9 text-sm text-foreground"
+          className="focus-ring border-border-strong bg-panel text-foreground block h-[var(--control-height)] w-full appearance-none rounded-md border px-2.5 pr-9 text-sm"
         >
           <option value="">All topics</option>
           {topics.map((topic) => (
@@ -195,7 +195,7 @@ function TopicSelect({
           ))}
         </select>
         <ChevronDown
-          className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted"
+          className="text-muted pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2"
           aria-hidden
         />
       </div>
@@ -234,14 +234,14 @@ function TopicItem({
         aria-current={selected ? 'true' : undefined}
         className={cn(
           'focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
-          selected ? 'font-medium text-accent-text' : 'text-foreground',
+          selected ? 'text-accent-text font-medium' : 'text-foreground',
         )}
       >
         <Tooltip content={label}>
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </Tooltip>
         {typeof activeCount === 'number' ? (
-          <span className="shrink-0 text-xs tabular-nums text-secondary">
+          <span className="text-secondary shrink-0 text-xs tabular-nums">
             {activeCount}
             {proposedCount ? (
               <span className="text-accent-text" title={`${proposedCount} proposed`}>
@@ -257,7 +257,7 @@ function TopicItem({
           type="button"
           aria-label={`Delete topic ${label}`}
           onClick={onDelete}
-          className="focus-ring shrink-0 rounded p-1 text-muted opacity-0 transition-opacity hover:text-danger-text focus-visible:opacity-100 group-hover:opacity-100"
+          className="focus-ring text-muted hover:text-danger-text shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         >
           <Trash2 className="size-3.5" aria-hidden />
         </button>

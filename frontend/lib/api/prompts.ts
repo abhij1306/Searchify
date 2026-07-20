@@ -66,11 +66,7 @@ export const promptsApi = {
     const res = await apiClient.post<Prompt>(`/prompt-sets/${promptSetId}/prompts`, input, options);
     return strictValidate(promptSchema, res, 'prompts.createPrompt');
   },
-  updatePrompt: async (
-    promptId: string,
-    input: PromptUpdateInput,
-    options?: ApiRequestOptions,
-  ) => {
+  updatePrompt: async (promptId: string, input: PromptUpdateInput, options?: ApiRequestOptions) => {
     const res = await apiClient.patch<Prompt>(`/prompts/${promptId}`, input, options);
     return strictValidate(promptSchema, res, 'prompts.updatePrompt');
   },
@@ -91,11 +87,7 @@ export const promptsApi = {
    * backend accepts a JSON body of `{ prompts: [...] }` (rows already parsed +
    * previewed in the browser) and bulk-creates them with `origin='imported'`.
    */
-  importRows: async (
-    promptSetId: string,
-    rows: PromptInput[],
-    options?: ApiRequestOptions,
-  ) => {
+  importRows: async (promptSetId: string, rows: PromptInput[], options?: ApiRequestOptions) => {
     const res = await apiClient.post<PromptSet>(
       `/prompt-sets/${promptSetId}/import`,
       { prompts: rows },

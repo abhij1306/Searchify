@@ -98,7 +98,9 @@ describe('SessionGuard', () => {
     // (an expired cookie mid-session) — the guard's watchdog must clear + bounce.
     mswServer.use(
       http.get('/api/v1/auth/me', () => HttpResponse.json({ user: sessionUser })),
-      http.get('/api/v1/audits', () => HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 })),
+      http.get('/api/v1/audits', () =>
+        HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 }),
+      ),
     );
 
     function ChildQuery() {

@@ -10,16 +10,13 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary:
-          'border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
+        primary: 'border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
         secondary:
           'border-border-strong bg-panel text-foreground hover:bg-background-alt hover:border-border-strong',
-        neutral:
-          'border-border bg-background-alt text-foreground hover:bg-well',
+        neutral: 'border-border bg-background-alt text-foreground hover:bg-well',
         ghost:
           'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground',
-        destructive:
-          'border-transparent bg-danger text-accent-fg hover:opacity-90',
+        destructive: 'border-transparent bg-danger text-accent-fg hover:opacity-90',
         topbar:
           'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground',
       },

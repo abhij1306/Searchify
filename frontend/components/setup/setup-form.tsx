@@ -83,9 +83,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
   return (
     <form noValidate onSubmit={onSubmit} className="grid gap-6 pb-24">
       {mutation.isError ? <Alert tone="danger">{setupErrorMessage(mutation.error)}</Alert> : null}
-      {isEdit && mutation.isSuccess ? (
-        <Alert tone="success">Project saved.</Alert>
-      ) : null}
+      {isEdit && mutation.isSuccess ? <Alert tone="success">Project saved.</Alert> : null}
 
       <Card>
         <CardHeader>
@@ -94,14 +92,10 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
         <CardContent className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Brand name" required error={errors.brand_name?.message}>
-              {(props) => (
-                <Input {...props} {...register('brand_name')} placeholder="Searchify" />
-              )}
+              {(props) => <Input {...props} {...register('brand_name')} placeholder="Searchify" />}
             </Field>
             <Field label="Project name" required error={errors.name?.message}>
-              {(props) => (
-                <Input {...props} {...register('name')} placeholder="Searchify — US" />
-              )}
+              {(props) => <Input {...props} {...register('name')} placeholder="Searchify — US" />}
             </Field>
           </div>
           <Field
@@ -234,7 +228,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
         </CardContent>
       </Card>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-panel/95 px-4 py-3 backdrop-blur sm:px-8">
+      <div className="border-border bg-panel/95 fixed inset-x-0 bottom-0 z-20 border-t px-4 py-3 backdrop-blur sm:px-8">
         <div className="mx-auto flex max-w-3xl items-center justify-end gap-2">
           <Button
             type="button"

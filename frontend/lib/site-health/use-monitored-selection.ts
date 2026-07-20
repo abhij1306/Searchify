@@ -147,7 +147,11 @@ export function useMonitoredSelection({
     const error = bulkSelectMutation.error;
     if (!(error instanceof ApiError)) return null;
     try {
-      const detail = (JSON.parse(error.body) as { detail?: { code?: string; limit?: number; currently_used?: number } }).detail;
+      const detail = (
+        JSON.parse(error.body) as {
+          detail?: { code?: string; limit?: number; currently_used?: number };
+        }
+      ).detail;
       if (detail?.code === 'site_health_quota_exceeded') {
         return `That selection exceeds your monitored-URL limit (${detail.limit}). Try "Select first ${detail.limit}" instead.`;
       }

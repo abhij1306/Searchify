@@ -53,11 +53,7 @@ export function VisibilityDashboard() {
   }
 
   if (!projectId) {
-    return (
-      <Alert tone="info">
-        Select or create a project to see its AI-visibility results.
-      </Alert>
-    );
+    return <Alert tone="info">Select or create a project to see its AI-visibility results.</Alert>;
   }
 
   if (auditsQuery.isError) {

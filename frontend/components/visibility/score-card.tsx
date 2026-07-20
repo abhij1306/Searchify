@@ -27,7 +27,7 @@ export function VisibilityScoreCard({ visibility }: Readonly<{ visibility: Visib
       <CardContent className="grid justify-items-center gap-4 text-center">
         <ScoreRing value={visibility.visibility_score} size={128} strokeWidth={10} />
         <div className="grid gap-1">
-          <p className="text-sm text-secondary">
+          <p className="text-secondary text-sm">
             Your brand&apos;s visibility across LLMs for this run
           </p>
           <div className="flex items-center justify-center gap-2">
@@ -36,18 +36,16 @@ export function VisibilityScoreCard({ visibility }: Readonly<{ visibility: Visib
             </Badge>
           </div>
         </div>
-        <dl className="grid w-full grid-cols-2 gap-3 border-t border-border-subtle pt-4 text-center">
+        <dl className="border-border-subtle grid w-full grid-cols-2 gap-3 border-t pt-4 text-center">
           <div>
-            <dt className="text-2xs font-semibold uppercase tracking-wide text-muted">
-              Completed
-            </dt>
-            <dd className="mono text-lg font-semibold text-foreground">
+            <dt className="text-2xs text-muted font-semibold tracking-wide uppercase">Completed</dt>
+            <dd className="mono text-foreground text-lg font-semibold">
               {visibility.total_completed}
             </dd>
           </div>
           <div>
-            <dt className="text-2xs font-semibold uppercase tracking-wide text-muted">Failed</dt>
-            <dd className="mono text-lg font-semibold text-foreground">
+            <dt className="text-2xs text-muted font-semibold tracking-wide uppercase">Failed</dt>
+            <dd className="mono text-foreground text-lg font-semibold">
               {visibility.total_failed}
             </dd>
           </div>

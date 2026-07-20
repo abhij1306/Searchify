@@ -95,6 +95,10 @@ export const visibilityApi = {
   ): Promise<VisibilityEvidenceResponse> => {
     const path = withQuery(`/projects/${projectId}/visibility/evidence`, definedQuery(params));
     const res = await apiClient.get<VisibilityEvidenceResponse>(path, options);
-    return strictValidate(visibilityEvidenceResponseSchema, res, 'visibility.getVisibilityEvidence');
+    return strictValidate(
+      visibilityEvidenceResponseSchema,
+      res,
+      'visibility.getVisibilityEvidence',
+    );
   },
 };

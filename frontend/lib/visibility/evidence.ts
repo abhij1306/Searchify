@@ -28,9 +28,7 @@ export type PromptGroup = {
  * execution order inside a group is preserved. This never claims a global
  * prompt total or an average over the truncated window.
  */
-export function groupByPrompt(
-  items: readonly VisibilityExecutionEvidence[],
-): PromptGroup[] {
+export function groupByPrompt(items: readonly VisibilityExecutionEvidence[]): PromptGroup[] {
   const order: string[] = [];
   const groups = new Map<string, PromptGroup>();
   for (const item of items) {

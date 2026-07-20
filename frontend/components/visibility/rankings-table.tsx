@@ -18,7 +18,7 @@ export function RankingsTable({ visibility }: Readonly<{ visibility: Visibility 
       </CardHeader>
       <CardContent className="p-0">
         {rows.length === 0 ? (
-          <p className="p-[var(--card-padding)] text-sm text-secondary">{NO_RANKINGS_MESSAGE}</p>
+          <p className="text-secondary p-[var(--card-padding)] text-sm">{NO_RANKINGS_MESSAGE}</p>
         ) : (
           <RankingRowsTable rows={rows} />
         )}

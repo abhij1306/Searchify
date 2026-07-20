@@ -159,7 +159,9 @@ test('direct-only provider settings: three engines, no OpenRouter, save + test a
   await expect(page.getByText(/direct openai — coming soon/i)).toHaveCount(0);
 
   // Exercise the ChatGPT card: fill the key, save, then test the connection.
-  const chatgptCard = page.locator('section', { has: page.getByRole('heading', { name: 'ChatGPT' }) });
+  const chatgptCard = page.locator('section', {
+    has: page.getByRole('heading', { name: 'ChatGPT' }),
+  });
   await expect(chatgptCard.getByText('Not configured')).toBeVisible();
 
   await chatgptCard.getByPlaceholder(/paste your api key/i).fill('sk-test-key');

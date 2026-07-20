@@ -68,7 +68,10 @@ describe('InventorySelection', () => {
         }),
       ),
       http.get(`/api/v1/site-crawls/${crawl.id}/inventory`, () =>
-        HttpResponse.json({ items: [row(URL_A, 'https://acme.com/a'), row(URL_B, 'https://acme.com/b')], next_cursor: null }),
+        HttpResponse.json({
+          items: [row(URL_A, 'https://acme.com/a'), row(URL_B, 'https://acme.com/b')],
+          next_cursor: null,
+        }),
       ),
       http.put(`/api/v1/projects/${PROJECT}/monitored-urls`, async ({ request }) => {
         const json = (await request.json()) as Record<string, unknown>;
@@ -141,7 +144,9 @@ describe('InventorySelection', () => {
     await user.click(screen.getByRole('button', { name: /analyze 1 of 50 pages/i }));
 
     // The stale notice appears and the user's edit is preserved for resubmit.
-    expect(await screen.findByText(/merged your edits onto the latest version/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/merged your edits onto the latest version/i),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /analyze 1 of 50 pages/i })).toBeEnabled();
   });
 });

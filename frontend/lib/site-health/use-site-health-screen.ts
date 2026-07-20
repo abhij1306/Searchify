@@ -6,7 +6,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/api/query-keys';
 import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
 import type { SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
-import { downloadCrawlExport, type ExportFormat, type ExportView } from '@/lib/site-health/download';
+import {
+  downloadCrawlExport,
+  type ExportFormat,
+  type ExportView,
+} from '@/lib/site-health/download';
 import { useCrawlEvents } from '@/lib/site-health/use-crawl-events';
 import {
   resolveSiteHealthPhase,
@@ -62,10 +66,7 @@ export function useSiteHealthScreen(projectId: string | null) {
     refetchInterval: active ? POLL_INTERVAL_MS : false,
   });
 
-  const phase: SiteHealthPhase = useMemo(
-    () => resolveSiteHealthPhase(crawl, plan),
-    [crawl, plan],
-  );
+  const phase: SiteHealthPhase = useMemo(() => resolveSiteHealthPhase(crawl, plan), [crawl, plan]);
 
   // Per-PROJECT selected total for the analysis progress bar. The dashboard
   // quota `used` is workspace-wide, so a multi-project workspace would
@@ -114,7 +115,8 @@ export function useSiteHealthScreen(projectId: string | null) {
   // content (dashboard, partial scores, inventory) behind a starting notice
   // rather than blanking it until the new crawl's first projection lands.
   const recrawlStarting =
-    createMutation.isPending && (phase === 'dashboard' || phase === 'terminal' || phase === 'selection');
+    createMutation.isPending &&
+    (phase === 'dashboard' || phase === 'terminal' || phase === 'selection');
 
   const runExport = async (format: ExportFormat, view: ExportView) => {
     if (!crawl) return;

@@ -36,8 +36,8 @@ export function SelectionNotices({
       ) : null}
       {staleNotice ? (
         <Alert tone="info">
-          The monitored set changed since you started. We merged your edits onto the latest
-          version — review and resubmit.
+          The monitored set changed since you started. We merged your edits onto the latest version
+          — review and resubmit.
         </Alert>
       ) : null}
       {replaceError && !staleNotice ? (

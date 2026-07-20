@@ -209,7 +209,5 @@ export function missingMonitored(
   response: MonitoredUrlsResponse,
   inventoryIds: ReadonlySet<string>,
 ): MonitoredUrl[] {
-  return response.monitored_urls.filter(
-    (row) => row.active && !inventoryIds.has(row.site_url_id),
-  );
+  return response.monitored_urls.filter((row) => row.active && !inventoryIds.has(row.site_url_id));
 }

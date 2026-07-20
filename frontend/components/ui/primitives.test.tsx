@@ -11,14 +11,7 @@ import { Field } from './field';
 import { Input } from './input';
 import { ScoreRing } from './score-ring';
 import { Skeleton } from './skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from './table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 import { TrendChart } from './trend-chart';
 import { scoreBand } from './score-band';
 
@@ -87,9 +80,7 @@ describe('Badge', () => {
         Negative
       </Badge>,
     );
-    expect(screen.getByText('Negative').className).toContain(
-      'bg-sentiment-negative-bg',
-    );
+    expect(screen.getByText('Negative').className).toContain('bg-sentiment-negative-bg');
   });
 
   it('maps classification variant to citation tokens', () => {
@@ -305,7 +296,9 @@ describe('TrendChart (cross-run Visibility trend)', () => {
     const marker = chart.querySelector('[data-version-marker]');
     expect(marker).not.toBeNull();
     // The change is announced via a <title>, not conveyed by color alone.
-    expect(within(chart as unknown as HTMLElement).getByText(/Scoring rule scoring-v2 applied/)).toBeInTheDocument();
+    expect(
+      within(chart as unknown as HTMLElement).getByText(/Scoring rule scoring-v2 applied/),
+    ).toBeInTheDocument();
     // The dashed marker line uses the warning token (bridged), not raw hex.
     expect(chart.querySelector('.stroke-warning')).not.toBeNull();
   });

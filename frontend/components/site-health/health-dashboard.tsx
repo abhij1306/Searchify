@@ -14,7 +14,12 @@ import { PagesTable } from '@/components/site-health/pages-table';
 import { siteHealthQueries, type PagesParams } from '@/lib/api/site-health';
 import type { SiteCrawl, SiteHealthDashboard } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
-import { PLACEHOLDER, dashboardRunNotice, formatScore, statusLabel } from '@/lib/site-health/status';
+import {
+  PLACEHOLDER,
+  dashboardRunNotice,
+  formatScore,
+  statusLabel,
+} from '@/lib/site-health/status';
 
 /** The three server-backed page tabs (design mockup 713). */
 type TabKey = 'monitored' | 'all' | 'errors';
@@ -73,8 +78,7 @@ export function HealthDashboard({
     if (!nextCursor) return;
     setCursorStack((prev) => ({ ...prev, [tab]: [...prev[tab], nextCursor] }));
   };
-  const goPrev = () =>
-    setCursorStack((prev) => ({ ...prev, [tab]: prev[tab].slice(0, -1) }));
+  const goPrev = () => setCursorStack((prev) => ({ ...prev, [tab]: prev[tab].slice(0, -1) }));
 
   // A dashboard shown for a crawl that did not complete cleanly (cancelled with
   // partial data, partially_completed, or failed-with-data) gets an explicit,
@@ -96,14 +100,26 @@ export function HealthDashboard({
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <ScoreCard label="Site Health" value={summary?.overall_score ?? null} sub={coverageSub(summary)} />
-        <ScoreCard label="Technical" value={summary?.technical_score ?? null} sub="Response codes, headers, delivery" />
-        <ScoreCard label="AEO" value={summary?.aeo_score ?? null} sub="Schema, structured data, AI-readiness" />
+        <ScoreCard
+          label="Site Health"
+          value={summary?.overall_score ?? null}
+          sub={coverageSub(summary)}
+        />
+        <ScoreCard
+          label="Technical"
+          value={summary?.technical_score ?? null}
+          sub="Response codes, headers, delivery"
+        />
+        <ScoreCard
+          label="AEO"
+          value={summary?.aeo_score ?? null}
+          sub="Schema, structured data, AI-readiness"
+        />
       </div>
 
       <Card>
         <CardContent className="grid gap-4 p-0">
-          <div className="flex flex-wrap items-center gap-1 border-b border-border-subtle px-[var(--card-padding)] pt-[var(--card-padding)]">
+          <div className="border-border-subtle flex flex-wrap items-center gap-1 border-b px-[var(--card-padding)] pt-[var(--card-padding)]">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -114,7 +130,7 @@ export function HealthDashboard({
                   'rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                   t.key === tab
                     ? 'border-accent text-foreground'
-                    : 'border-transparent text-secondary hover:text-foreground',
+                    : 'text-secondary hover:text-foreground border-transparent',
                 )}
               >
                 {t.label}
@@ -133,14 +149,12 @@ export function HealthDashboard({
               <Skeleton className="h-8 w-full" />
             </div>
           ) : rows.length === 0 ? (
-            <p className="p-[var(--card-padding)] text-sm text-secondary">
-              No pages in this view.
-            </p>
+            <p className="text-secondary p-[var(--card-padding)] text-sm">No pages in this view.</p>
           ) : (
             <PagesTable pages={rows} crawlId={crawl.id} />
           )}
 
-          <div className="flex items-center justify-end gap-2 border-t border-border-subtle px-[var(--card-padding)] py-3">
+          <div className="border-border-subtle flex items-center justify-end gap-2 border-t px-[var(--card-padding)] py-3">
             <Button variant="secondary" size="sm" onClick={goPrev} disabled={!canPrev}>
               Previous
             </Button>
@@ -168,7 +182,7 @@ function ScoreCard({
     <Card>
       <CardContent className="flex items-center gap-4">
         {value === null ? (
-          <div className="flex size-[72px] items-center justify-center rounded-full border border-border-subtle text-lg text-muted mono">
+          <div className="border-border-subtle text-muted mono flex size-[72px] items-center justify-center rounded-full border text-lg">
             {PLACEHOLDER}
           </div>
         ) : (
@@ -176,10 +190,10 @@ function ScoreCard({
         )}
         <div className="grid gap-0.5">
           <Label>{label}</Label>
-          <span className="mono text-lg font-semibold text-foreground">
+          <span className="mono text-foreground text-lg font-semibold">
             {value === null ? PLACEHOLDER : `${formatScore(value)} / 100`}
           </span>
-          <span className="text-xs text-muted">{sub}</span>
+          <span className="text-muted text-xs">{sub}</span>
         </div>
       </CardContent>
     </Card>

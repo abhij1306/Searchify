@@ -7,11 +7,7 @@
 import { z } from 'zod';
 
 import { apiClient, type ApiRequestOptions } from './client';
-import {
-  providerCatalogSchema,
-  providerConnectionSchema,
-  strictValidate,
-} from './schemas';
+import { providerCatalogSchema, providerConnectionSchema, strictValidate } from './schemas';
 import type {
   LogicalEngine,
   ProviderCatalog,

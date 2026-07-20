@@ -33,7 +33,9 @@ describe('globals.css token set matches docs/design.md', () => {
       const re = new RegExp(`--${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*:`);
       if (!re.test(css)) missing.push(name);
     }
-    expect(missing, `Tokens in design.md missing from globals.css: ${missing.join(', ')}`).toEqual([]);
+    expect(missing, `Tokens in design.md missing from globals.css: ${missing.join(', ')}`).toEqual(
+      [],
+    );
   });
 
   it('keeps the teal-green accent (not the reference blue-violet)', () => {

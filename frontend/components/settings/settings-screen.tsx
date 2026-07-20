@@ -47,9 +47,11 @@ function DetailRow({
   mono = false,
 }: Readonly<{ label: string; children: React.ReactNode; mono?: boolean }>) {
   return (
-    <div className="grid grid-cols-[minmax(0,180px)_1fr] items-center gap-4 border-b border-border-subtle py-3.5 last:border-b-0 last:pb-0">
-      <dt className="text-sm font-medium text-secondary">{label}</dt>
-      <dd className={mono ? 'mono text-xs text-secondary' : 'text-sm text-foreground'}>{children}</dd>
+    <div className="border-border-subtle grid grid-cols-[minmax(0,180px)_1fr] items-center gap-4 border-b py-3.5 last:border-b-0 last:pb-0">
+      <dt className="text-secondary text-sm font-medium">{label}</dt>
+      <dd className={mono ? 'mono text-secondary text-xs' : 'text-foreground text-sm'}>
+        {children}
+      </dd>
     </div>
   );
 }
@@ -150,7 +152,7 @@ export function SettingsScreen() {
         role="tablist"
         aria-label="Settings sections"
         aria-orientation="horizontal"
-        className="flex flex-nowrap gap-0 overflow-x-auto border-b-2 border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="border-border flex [scrollbar-width:none] flex-nowrap gap-0 overflow-x-auto border-b-2 [&::-webkit-scrollbar]:hidden"
       >
         {SETTINGS_TABS.map((tab) => {
           const selected = tab.id === activeTab;
@@ -169,10 +171,10 @@ export function SettingsScreen() {
               onClick={() => setActiveTab(tab.id)}
               onKeyDown={onKeyDown}
               className={cn(
-                'focus-ring -mb-0.5 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                'focus-ring -mb-0.5 shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
                 selected
-                  ? 'border-accent font-semibold text-foreground'
-                  : 'border-transparent text-secondary hover:text-foreground',
+                  ? 'border-accent text-foreground font-semibold'
+                  : 'text-secondary hover:text-foreground border-transparent',
               )}
             >
               {tab.label}
@@ -181,137 +183,152 @@ export function SettingsScreen() {
         })}
       </div>
 
+      {/* All panels stay mounted (hidden when inactive) so every tab's
+          aria-controls resolves and panel state survives tab switches. */}
       <div
         role="tabpanel"
-        id={PANEL_ID(activeTab)}
-        aria-labelledby={TAB_ID(activeTab)}
+        id={PANEL_ID('account')}
+        aria-labelledby={TAB_ID('account')}
+        hidden={activeTab !== 'account'}
         tabIndex={0}
         className="focus-ring outline-none"
       >
-        {activeTab === 'account' ? (
-          <div className="grid max-w-2xl gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account</CardTitle>
-                <CardDescription>
-                  Your Searchify account details. Account fields are read-only here and shown for
-                  reference.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3.5">
-                  <span
-                    aria-hidden
-                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold uppercase text-accent-text"
-                  >
-                    {emailInitials(user.email)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-foreground">{user.email}</div>
-                    <div className="mt-0.5 text-sm text-muted">
-                      Account role: <span className="capitalize">{user.role}</span>
-                    </div>
+        <div className="grid max-w-2xl gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Account</CardTitle>
+              <CardDescription>
+                Your Searchify account details. Account fields are read-only here and shown for
+                reference.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3.5">
+                <span
+                  aria-hidden
+                  className="bg-accent-soft text-accent-text flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold uppercase"
+                >
+                  {emailInitials(user.email)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-foreground truncate text-sm font-semibold">{user.email}</div>
+                  <div className="text-muted mt-0.5 text-sm">
+                    Account role: <span className="capitalize">{user.role}</span>
                   </div>
+                </div>
+                <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
+                  {user.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+
+              <dl className="border-border-subtle mt-5 border-t">
+                <DetailRow label="Email">{user.email}</DetailRow>
+                <DetailRow label="Account role">
+                  <Badge variant="neutral">{user.role}</Badge>
+                </DetailRow>
+                <DetailRow label="Account status">
                   <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </Badge>
-                </div>
-
-                <dl className="mt-5 border-t border-border-subtle">
-                  <DetailRow label="Email">{user.email}</DetailRow>
-                  <DetailRow label="Account role">
-                    <Badge variant="neutral">{user.role}</Badge>
+                </DetailRow>
+                {createdLabel ? (
+                  <DetailRow label="Account created" mono>
+                    {createdLabel}
                   </DetailRow>
-                  <DetailRow label="Account status">
-                    <Badge variant="status" value={user.is_active ? 'success' : 'danger'}>
-                      {user.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
+                ) : null}
+                {updatedLabel ? (
+                  <DetailRow label="Last updated" mono>
+                    {updatedLabel}
                   </DetailRow>
-                  {createdLabel ? (
-                    <DetailRow label="Account created" mono>
-                      {createdLabel}
-                    </DetailRow>
-                  ) : null}
-                  {updatedLabel ? (
-                    <DetailRow label="Last updated" mono>
-                      {updatedLabel}
-                    </DetailRow>
-                  ) : null}
-                  {user.id ? (
-                    <DetailRow label="User ID" mono>
-                      {user.id}
-                    </DetailRow>
-                  ) : null}
-                </dl>
-              </CardContent>
-            </Card>
+                ) : null}
+                {user.id ? (
+                  <DetailRow label="User ID" mono>
+                    {user.id}
+                  </DetailRow>
+                ) : null}
+              </dl>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between gap-6">
-                  <div>
-                    <div className="text-sm font-medium text-secondary">Theme</div>
-                    <p className="mt-1 text-xs text-muted">
-                      Applies to this browser and syncs with the top-bar toggle.
-                    </p>
-                  </div>
-                  <ThemeToggle />
+          <Card>
+            <CardHeader>
+              <CardTitle>Appearance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <div className="text-secondary text-sm font-medium">Theme</div>
+                  <p className="text-muted mt-1 text-xs">
+                    Applies to this browser and syncs with the top-bar toggle.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
+                <ThemeToggle />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        {activeTab === 'providers' ? <ProviderSettings /> : null}
+      <div
+        role="tabpanel"
+        id={PANEL_ID('providers')}
+        aria-labelledby={TAB_ID('providers')}
+        hidden={activeTab !== 'providers'}
+        tabIndex={0}
+        className="focus-ring outline-none"
+      >
+        <ProviderSettings />
+      </div>
 
-        {activeTab === 'danger' ? (
-          <div className="grid max-w-2xl gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Danger zone</CardTitle>
-                <CardDescription>
-                  Permanently delete the active project and everything inside it.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                {activeProject ? (
-                  <>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-foreground">
-                          {activeProject.name}
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted">
-                          Brand: {activeProject.brand_name}
-                        </p>
+      <div
+        role="tabpanel"
+        id={PANEL_ID('danger')}
+        aria-labelledby={TAB_ID('danger')}
+        hidden={activeTab !== 'danger'}
+        tabIndex={0}
+        className="focus-ring outline-none"
+      >
+        <div className="grid max-w-2xl gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Danger zone</CardTitle>
+              <CardDescription>
+                Permanently delete the active project and everything inside it.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {activeProject ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-foreground truncate text-sm font-semibold">
+                        {activeProject.name}
                       </div>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setConfirmOpen(true)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-                        Delete project
-                      </Button>
+                      <p className="text-muted mt-0.5 text-xs">Brand: {activeProject.brand_name}</p>
                     </div>
-                    <Alert tone="danger">
-                      Deleting a project removes all of its prompts, topics, audits, visibility
-                      history, and generated content. This cannot be undone.
-                    </Alert>
-                    {deleteMutation.isError ? (
-                      <Alert tone="danger">{errorMessage(deleteMutation.error)}</Alert>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-sm text-muted">No project selected.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
+                    <Button
+                      variant="destructive"
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="size-4 shrink-0" aria-hidden strokeWidth={2} />
+                      Delete project
+                    </Button>
+                  </div>
+                  <Alert tone="danger">
+                    Deleting a project removes all of its prompts, topics, audits, visibility
+                    history, and generated content. This cannot be undone.
+                  </Alert>
+                  {deleteMutation.isError ? (
+                    <Alert tone="danger">{errorMessage(deleteMutation.error)}</Alert>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-muted text-sm">No project selected.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Dialog
@@ -340,7 +357,7 @@ export function SettingsScreen() {
           </>
         }
       >
-        <p className="text-sm text-secondary">
+        <p className="text-secondary text-sm">
           This permanently deletes the project and all of its prompts, topics, audits, visibility
           history, and generated content. This cannot be undone.
         </p>

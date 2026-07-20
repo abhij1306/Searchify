@@ -79,7 +79,8 @@ export function serializeInventoryFilters(
   const query = filters.query.trim();
   if (query) params.set('query', query);
   if (filters.status) params.set('status', filters.status);
-  if (filters.monitored !== 'all') params.set('monitored', String(monitoredToParam(filters.monitored)));
+  if (filters.monitored !== 'all')
+    params.set('monitored', String(monitoredToParam(filters.monitored)));
   if (cursor) params.set('cursor', cursor);
   return params;
 }

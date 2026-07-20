@@ -37,7 +37,8 @@ export function RankingRowsTable({ rows }: Readonly<{ rows: readonly RankingRow[
       </TableHeader>
       <TableBody>
         {rows.map((row, index) => {
-          const visibilityPct = row.mention_rate === null ? null : Math.round(row.mention_rate * 100);
+          const visibilityPct =
+            row.mention_rate === null ? null : Math.round(row.mention_rate * 100);
           const bandClass =
             visibilityPct === null ? 'text-muted' : scoreBandText[scoreBand(visibilityPct)];
           return (
@@ -47,7 +48,7 @@ export function RankingRowsTable({ rows }: Readonly<{ rows: readonly RankingRow[
               </TableCell>
               <TableCell>
                 <span className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{row.name}</span>
+                  <span className="text-foreground font-medium">{row.name}</span>
                   {row.is_brand ? (
                     <Badge variant="neutral" className="normal-case">
                       You

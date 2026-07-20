@@ -39,16 +39,16 @@ export function HistoryDrawer({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-overlay-scrim" />
+        <DialogPrimitive.Overlay className="bg-overlay-scrim fixed inset-0 z-[100]" />
         <DialogPrimitive.Content
           className={cn(
-            'fixed right-0 top-0 z-[101] flex h-full w-[380px] max-w-full flex-col border-l border-border bg-elevated shadow-modal-value focus:outline-none',
+            'border-border bg-elevated shadow-modal-value fixed top-0 right-0 z-[101] flex h-full w-[380px] max-w-full flex-col border-l focus:outline-none',
           )}
         >
-          <header className="flex items-center justify-between gap-2 border-b border-border-subtle px-4 py-3">
+          <header className="border-border-subtle flex items-center justify-between gap-2 border-b px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
-              <History className="size-4 shrink-0 text-muted" aria-hidden />
-              <DialogPrimitive.Title className="truncate text-base font-semibold text-foreground">
+              <History className="text-muted size-4 shrink-0" aria-hidden />
+              <DialogPrimitive.Title className="text-foreground truncate text-base font-semibold">
                 {title}
               </DialogPrimitive.Title>
             </div>
@@ -60,24 +60,24 @@ export function HistoryDrawer({
           </header>
           <div className="min-h-0 flex-1 overflow-auto">
             {items.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-muted">
+              <div className="text-muted flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
                 <History className="size-8 opacity-20" aria-hidden />
                 <p className="text-xs">No history found.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-border-subtle">
+              <ul className="divide-border-subtle divide-y">
                 {items.map((item) => (
                   <li key={item.id}>
                     <button
                       type="button"
                       onClick={() => onSelect(item.id)}
                       className={cn(
-                        'flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors hover:bg-background-alt',
+                        'hover:bg-background-alt flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors',
                         activeId === item.id && 'bg-background-alt',
                       )}
                     >
                       <div className="flex w-full items-center justify-between gap-2">
-                        <span className="mono text-xs font-medium text-accent-text">
+                        <span className="mono text-accent-text text-xs font-medium">
                           #{item.id.slice(0, 8)}
                         </span>
                         <Badge variant="run-status" value={item.status}>
@@ -85,11 +85,11 @@ export function HistoryDrawer({
                         </Badge>
                       </div>
                       {item.label ? (
-                        <div className="truncate text-sm font-medium text-foreground">
+                        <div className="text-foreground truncate text-sm font-medium">
                           {item.label}
                         </div>
                       ) : null}
-                      <div className="flex w-full items-center justify-between text-xs text-muted">
+                      <div className="text-muted flex w-full items-center justify-between text-xs">
                         <span>{item.meta ?? 'No details'}</span>
                         <ShortDate value={item.createdAt} />
                       </div>

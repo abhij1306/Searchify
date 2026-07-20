@@ -233,6 +233,47 @@ async def test_idempotency_replay_and_conflict(
     assert conflict.json()["detail"] == "idempotency_conflict"
 
 
+async def test_idempotent_replay_survives_unconfigured_provider(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Replay is resolved before the provider-config check: a retry of an
+    accepted request stays retrievable even if the key was cleared since."""
+    await _register(client, "c6b@example.com")
+    project_id = await _create_project(client)
+    headers = {"Idempotency-Key": "replay-key-1"}
+    first = await _enqueue(client, project_id, headers=headers)
+    assert first.status_code == 201
+    monkeypatch.setattr(content_settings, "mistral_api_key", SecretStr(""))
+    replay = await _enqueue(client, project_id, headers=headers)
+    assert replay.status_code == 201
+    assert replay.json()["id"] == first.json()["id"]
+    # A NEW request (no key match) still hits the 409.
+    fresh = await _enqueue(client, project_id, prompt="Another prompt.")
+    assert fresh.status_code == 409
+
+
+async def test_overlong_idempotency_key_422(client: httpx.AsyncClient) -> None:
+    """A key longer than the DB column is rejected at the boundary (422),
+    never a DataError-driven 500 at insert time."""
+    await _register(client, "c6c@example.com")
+    project_id = await _create_project(client)
+    headers = {"Idempotency-Key": "k" * 129}
+    resp = await _enqueue(client, project_id, headers=headers)
+    assert resp.status_code == 422
+
+
+async def test_enqueue_unknown_provider_409(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unrecognised provider name is as unconfigured as a missing key."""
+    await _register(client, "c6d@example.com")
+    project_id = await _create_project(client)
+    monkeypatch.setattr(content_settings, "provider", "nonexistent")
+    resp = await _enqueue(client, project_id)
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "provider_not_configured"
+
+
 async def test_keyless_requests_never_collide(
     client: httpx.AsyncClient,
 ) -> None:
@@ -423,6 +464,37 @@ async def test_worker_auth_failure_terminal(
     async with session_factory() as session:
         row = await _get_generation(session, uuid.UUID(created["id"]))
     assert row.attempt_count == 1
+
+
+async def test_worker_client_build_failure_no_attempt(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A client-construction failure (misconfigured provider between enqueue
+    and claim) is terminal but consumes NO attempt: no HTTP call ran, so no
+    attempt row and no counter increment."""
+    await _register(client, "w3b@example.com")
+    project_id = await _create_project(client)
+    created = (await _enqueue(client, project_id)).json()
+    monkeypatch.setattr(content_settings, "provider", "nonexistent")
+    worker = _worker(session_factory, _mock_transport())
+    await worker.run_until_idle()
+    detail = (await client.get(f"/api/v1/content/generations/{created['id']}")).json()
+    assert detail["status"] == TASK_STATUS_FAILED
+    assert detail["error_code"] == "invalid_surface"
+    async with session_factory() as session:
+        row = await _get_generation(session, uuid.UUID(created["id"]))
+        attempts = (
+            await session.scalars(
+                select(ContentGenerationAttempt).where(
+                    ContentGenerationAttempt.content_generation_id == row.id
+                )
+            )
+        ).all()
+    assert row.attempt_count == 0
+    assert attempts == []
+    assert row.lease_owner is None
 
 
 async def test_worker_empty_output_retries_then_recovers(

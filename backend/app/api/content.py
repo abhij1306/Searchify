@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
 from app.core.config.content import (
+    CONTENT_IDEMPOTENCY_KEY_MAX_LEN,
     CONTENT_LIST_DEFAULT_LIMIT,
     CONTENT_LIST_MAX_LIMIT,
     ERROR_CANCEL_NOT_ALLOWED,
@@ -89,7 +90,12 @@ async def enqueue_generation_endpoint(
     payload: ContentGenerationCreate,
     ctx: _WorkspaceDep,
     session: _SessionDep,
-    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    # Cap matches the DB column width so an overlong header fails 422 here
+    # instead of a DataError at insert time.
+    idempotency_key: Annotated[
+        str | None,
+        Header(alias="Idempotency-Key", max_length=CONTENT_IDEMPOTENCY_KEY_MAX_LEN),
+    ] = None,
 ) -> ContentGenerationDetail:
     try:
         row, _created = await enqueue_generation(

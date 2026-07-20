@@ -192,13 +192,31 @@ function evidenceItem(overrides: Record<string, unknown> = {}) {
     query_text_available: true,
     state: 'queries_available',
     search_events: [
-      { sequence: 0, query: 'affordable family clothing Australia 2026', call_id: 'c1', call_sequence: 0, query_sequence: 0 },
-      { sequence: 1, query: 'best budget clothing shops families', call_id: 'c1', call_sequence: 0, query_sequence: 1 },
+      {
+        sequence: 0,
+        query: 'affordable family clothing Australia 2026',
+        call_id: 'c1',
+        call_sequence: 0,
+        query_sequence: 0,
+      },
+      {
+        sequence: 1,
+        query: 'best budget clothing shops families',
+        call_id: 'c1',
+        call_sequence: 0,
+        query_sequence: 1,
+      },
     ],
     event_source: 'raw_artifact',
     mentions: [
       { kind: 'brand', name: 'Acme', first_offset: 12, artifact_id: null, analyzer_version: 'v1' },
-      { kind: 'competitor', name: 'Globex', first_offset: null, artifact_id: null, analyzer_version: 'v1' },
+      {
+        kind: 'competitor',
+        name: 'Globex',
+        first_offset: null,
+        artifact_id: null,
+        analyzer_version: 'v1',
+      },
     ],
     citations: [citation(1)],
     ...overrides,
@@ -322,7 +340,10 @@ test('four tabs in order, no Sources/Topics/Sentiment, Overview by default, one 
   await expect(tablist.getByRole('tab', { name: 'Sentiment' })).toHaveCount(0);
 
   // Overview is selected by default and its content is present.
-  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('img', { name: 'Visibility score: 67%' })).toBeVisible();
 
   // Exactly one panel is rendered at a time.
@@ -380,7 +401,10 @@ test('keyboard navigation moves selection with focus transfer (WAI-ARIA)', async
 
   // Wraps forward from the last tab back to the first.
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 
   await page.keyboard.press('End');
   await page.keyboard.press('ArrowLeft');
@@ -390,7 +414,10 @@ test('keyboard navigation moves selection with focus transfer (WAI-ARIA)', async
   );
 
   await page.keyboard.press('Home');
-  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('tab', { name: 'Overview' })).toBeFocused();
 });
 
@@ -425,9 +452,7 @@ test('Query Fanout renders queries_available, count_only, and no_search states',
   // queries_available → the actual stored query text.
   await expect(page.getByText('affordable family clothing Australia 2026')).toBeVisible();
   // count_only → the legacy count explanation.
-  await expect(
-    page.getByText('Query text unavailable; provider reported 1 search'),
-  ).toBeVisible();
+  await expect(page.getByText('Query text unavailable; provider reported 1 search')).toBeVisible();
   // no_search → the no-search state.
   await expect(page.getByText('No web searches performed for this execution')).toBeVisible();
   // The citation browser is NOT duplicated on Query Fanout.

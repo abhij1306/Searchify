@@ -42,15 +42,18 @@ test('authenticated shell renders sidebar groups and top bar', async ({ page }) 
 
   await page.goto('/visibility');
 
-  // Sidebar groups + a live nav item.
-  await expect(page.getByText('Analytics')).toBeVisible();
+  // Sidebar groups + a live nav item. Exact match: "LLM Analytics" also
+  // contains "Analytics" and would trip strict mode otherwise.
+  await expect(page.getByText('Analytics', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /visibility/i })).toBeVisible();
 
   // Project switcher shows the active brand.
   await expect(page.getByText('Acme').first()).toBeVisible();
 
-  // Top-bar page title + theme toggle are present.
-  await expect(page.getByRole('heading', { name: 'Visibility' })).toBeVisible();
+  // Top-bar page title + theme toggle are present. Scope the heading to the
+  // top bar (the shell's <header> banner) so a same-named heading elsewhere on
+  // the page can't satisfy the assertion.
+  await expect(page.getByRole('banner').getByRole('heading', { name: 'Visibility' })).toBeVisible();
   await expect(page.getByRole('button', { name: /toggle color theme/i })).toBeVisible();
 
   // A disabled roadmap item shows the "soon" affordance and is not a link.

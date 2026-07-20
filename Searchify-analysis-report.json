@@ -2,18 +2,27 @@
   "metadata": {
     "repository": "abhij1306/Searchify",
     "branch": "main",
-    "analysis_date": "20 Jul 2026, 07:27",
+    "analysis_date": "20 Jul 2026, 09:19",
     "scan_summary": {
       "files_included": "",
       "files_excluded": "",
-      "lines_analyzed": "7524"
+      "lines_analyzed": "10782"
     }
   },
   "summary": {
-    "secrets": {
-      "total_detected": 0,
-      "confidence_distribution": {
+    "sast": {
+      "total_issues": 0,
+      "false_positives": 23,
+      "severity_distribution": {
         "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0
+      }
+    },
+    "secrets": {
+      "total_detected": 4,
+      "confidence_distribution": {
+        "HIGH": 4,
         "MEDIUM": 0,
         "LOW": 0
       }
@@ -27,905 +36,1375 @@
       }
     },
     "antipatterns": {
-      "total_issues": 129
+      "total_issues": 139
     },
     "complex_functions": {
-      "total_complex_functions": 36
+      "total_complex_functions": 40
     },
     "duplicate_code": {
-      "total_groups": 93
+      "total_groups": 105
     },
     "dead_code": {
-      "total_issues": 36
+      "total_issues": 37
     }
   },
   "results": {
-    "secrets": [],
+    "sast": [],
+    "sast_false_positives": [
+      {
+        "title": "Detected a logger that logs user input without properly neutralizing the output. The log message could contain characters like ` ` and ` ` and cause an attacker to forge log entries or include malicious content into the logs. Use proper input validation and/or output encoding to prevent log entries from being forged.",
+        "description": "Detected a logger that logs user input without properly neutralizing the output. The log message could contain characters like ` ` and ` ` and cause an attacker to forge log entries or include malicious content into the logs. Use proper input validation and/or output encoding to prevent log entries from being forged.",
+        "file_path": "backend/app/api/auth.py",
+        "line_number": 93,
+        "severity": "MEDIUM",
+        "cwe": [
+          "CWE-117: Improper Output Neutralization for Logs"
+        ],
+        "owasp": [
+          "A09:2021 - Security Logging and Monitoring Failures"
+        ],
+        "epss_score": "0.30%",
+        "epss_percentile": "21.73%",
+        "false_positive_reasoning": "The log statement uses a constant message and only logs a server-side user id in structured metadata, not attacker-controlled text."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/app/domain/prompts/service.py",
+        "line_number": 389,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The flagged line is a safe SQLAlchemy update in Python, not an unsafe pointer write or any memory-corruption sink."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/component/test_prompt_generation_api.py",
+        "line_number": 599,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The finding is on a Python test file and the flagged line is not a native memory write, so the memory-safety CWE does not apply."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/component/test_prompt_generation_api.py",
+        "line_number": 666,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "This is memory-safe Python test code with no native pointer write, so the reported out-of-bounds write cannot occur."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/component/test_prompt_generation_api.py",
+        "line_number": 739,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The flagged line is ordinary Python object wiring in a test, not a memory write, so the pointer-write CWE is inapplicable."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/component/test_prompt_generation_api.py",
+        "line_number": 812,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The line only instantiates and passes a Python mock object; there is no unsafe pointer write, so the CWE is not applicable."
+      },
+      {
+        "title": "sqlalchemy.text passes the constructed SQL statement to the database mostly unchanged. This means that the usual SQL injection protections are not applied and this function is vulnerable to SQL injection if user input can reach here. Use normal SQLAlchemy operators (such as `or_()`, `and_()`, etc.) to construct SQL.",
+        "description": "sqlalchemy.text passes the constructed SQL statement to the database mostly unchanged. This means that the usual SQL injection protections are not applied and this function is vulnerable to SQL injection if user input can reach here. Use normal SQLAlchemy operators (such as `or_()`, `and_()`, etc.) to construct SQL.",
+        "file_path": "backend/tests/conftest.py",
+        "line_number": 117,
+        "severity": "LOW",
+        "cwe": [
+          "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+        ],
+        "owasp": [
+          "A01:2017 - Injection",
+          "A03:2021 - Injection",
+          "A05:2025 - Injection"
+        ],
+        "epss_score": "-",
+        "epss_percentile": "-",
+        "false_positive_reasoning": "The SQL text call is in test-only code and uses internally generated, sanitized schema names rather than attacker-controlled input."
+      },
+      {
+        "title": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "description": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "file_path": "backend/tests/unit/test_answer_engine_adapters.py",
+        "line_number": 567,
+        "severity": "HIGH",
+        "cwe": [
+          "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+        ],
+        "owasp": [
+          "A03:2021 - Injection"
+        ],
+        "epss_score": "1.66%",
+        "epss_percentile": "74.07%",
+        "false_positive_reasoning": "This is unit test code that only reads a request header into a local variable; it does not set any HTTP response header, so the CRLF injection finding is not applicable."
+      },
+      {
+        "title": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "description": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "file_path": "backend/tests/unit/test_answer_engine_adapters.py",
+        "line_number": 568,
+        "severity": "HIGH",
+        "cwe": [
+          "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+        ],
+        "owasp": [
+          "A03:2021 - Injection"
+        ],
+        "epss_score": "1.66%",
+        "epss_percentile": "74.07%",
+        "false_positive_reasoning": "Line 568 only stores the decoded request body for test assertions; it does not write any HTTP response header, so the reported CRLF/header injection is a false positive."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_prompt_locks.py",
+        "line_number": 46,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "This is a Python unit test with no native memory access, so an unsafe pointer write/CWE-787-style finding is inapplicable and non-exploitable."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 132,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "Python test code with no native memory operations cannot cause an unsafe pointer write."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 134,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The cited line is only a test argument construction in Python, not an unsafe memory write."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 144,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "A Python type cast in a unit test cannot produce an out-of-bounds pointer write."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 159,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The code only passes a SimpleNamespace-like test object; no unsafe pointer write exists."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 169,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "This is pure Python test data, so the unsafe pointer write CWE does not apply."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 180,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "No pointer or buffer write occurs; this is just Python test fixture setup."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 190,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "A high-level Python function call in a test cannot cause an unsafe pointer write."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 200,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "The cited line is just a Python function argument, not a memory write."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_site_health_service_pure.py",
+        "line_number": 209,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "There is no unsafe pointer or buffer write in this Python unit test line."
+      },
+      {
+        "title": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "description": "Unsafe pointer write operation detected without bounds checking. Using ctypes functions like memmove or memset, or cffi operations, can write to arbitrary memory locations, potentially causing out-of-bounds writes. Validate buffer sizes before performing memory write operations.",
+        "file_path": "backend/tests/unit/test_workspace_auth.py",
+        "line_number": 87,
+        "severity": "CRITICAL",
+        "cwe": [
+          "CWE-787: Out-of-bounds Write"
+        ],
+        "owasp": [
+          "A04:2021 - Insecure Design"
+        ],
+        "epss_score": "100.00%",
+        "epss_percentile": "100.00%",
+        "false_positive_reasoning": "This is Python test code with no native memory operations, so the reported out-of-bounds write CWE does not apply."
+      },
+      {
+        "title": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "description": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "file_path": "backend/app/main.py",
+        "line_number": 103,
+        "severity": "HIGH",
+        "cwe": [
+          "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+        ],
+        "owasp": [
+          "A03:2021 - Injection"
+        ],
+        "epss_score": "1.66%",
+        "epss_percentile": "74.07%",
+        "false_positive_reasoning": "The correlation id is strictly sanitized to an allowlist that excludes CR/LF before being echoed into the response header, so header injection is not possible."
+      },
+      {
+        "title": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "description": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "file_path": "backend/tests/unit/test_discovery_models_mistral.py",
+        "line_number": 51,
+        "severity": "HIGH",
+        "cwe": [
+          "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+        ],
+        "owasp": [
+          "A03:2021 - Injection"
+        ],
+        "epss_score": "1.66%",
+        "epss_percentile": "74.07%",
+        "false_positive_reasoning": "This is unit test code that only captures a request header in memory; it does not inject data into any HTTP response header or expose a CRLF issue."
+      },
+      {
+        "title": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "description": "User-controlled data is injected into HTTP response headers without newline sanitization. An attacker can inject CRLF characters to split the HTTP response, potentially leading to cache poisoning, XSS, or session fixation. Sanitize all user input by removing or encoding CR (\\\\r) and LF (\\\\n) characters before setting response headers.",
+        "file_path": "backend/tests/unit/test_discovery_models_mistral.py",
+        "line_number": 52,
+        "severity": "HIGH",
+        "cwe": [
+          "CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers"
+        ],
+        "owasp": [
+          "A03:2021 - Injection"
+        ],
+        "epss_score": "1.66%",
+        "epss_percentile": "74.07%",
+        "false_positive_reasoning": "The line only parses and stores mocked request JSON in memory for testing; it does not write to any response header or create a header injection path."
+      }
+    ],
+    "secrets": [
+      {
+        "type": "Secret Keyword",
+        "file_path": "backend/tests/component/test_provider_connections_api.py",
+        "line_number": 25,
+        "confidence": "HIGH"
+      },
+      {
+        "type": "Secret Keyword",
+        "file_path": "backend/tests/component/test_provider_connections_api.py",
+        "line_number": 188,
+        "confidence": "HIGH"
+      },
+      {
+        "type": "Bearer Token",
+        "file_path": "backend/tests/unit/test_answer_engine_adapters.py",
+        "line_number": 594,
+        "confidence": "HIGH"
+      },
+      {
+        "type": "Secret Keyword",
+        "file_path": "frontend/lib/api/schemas.test.ts",
+        "line_number": 130,
+        "confidence": "HIGH"
+      }
+    ],
     "infrastructure": [],
     "antipatterns": [
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/audits.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/audits.py/anti_patterns.json",
         "line_number": 123,
         "message": "Define a constant instead of duplicating this literal \"Audit not found\" 5 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/deps.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/deps.py/anti_patterns.json",
         "line_number": 94,
         "message": "Define a constant instead of duplicating this literal \"Workspace not found\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/deps.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/deps.py/anti_patterns.json",
         "line_number": 50,
         "message": "Remove this redundant Exception class; it derives from another which is already caught.",
         "symbol": "python:S5713"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/prompts.py/anti_patterns.json",
-        "line_number": 129,
-        "message": "Define a constant instead of duplicating this literal \"Project not found\" 3 times.",
-        "symbol": "python:S1192"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/prompts.py/anti_patterns.json",
-        "line_number": 142,
-        "message": "Define a constant instead of duplicating this literal \"Prompt set not found\" 9 times.",
-        "symbol": "python:S1192"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/api/projects.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/projects.py/anti_patterns.json",
         "line_number": 101,
         "message": "Define a constant instead of duplicating this literal \"Project not found\" 6 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/web_evidence/url_policy.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/prompts.py/anti_patterns.json",
+        "line_number": 129,
+        "message": "Define a constant instead of duplicating this literal \"Project not found\" 3 times.",
+        "symbol": "python:S1192"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/api/prompts.py/anti_patterns.json",
+        "line_number": 142,
+        "message": "Define a constant instead of duplicating this literal \"Prompt set not found\" 9 times.",
+        "symbol": "python:S1192"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/web_evidence/url_policy.py/anti_patterns.json",
         "line_number": 393,
         "message": "Merge this if statement with the enclosing one.",
         "symbol": "python:S1066"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/web_evidence/url_policy.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/web_evidence/url_policy.py/anti_patterns.json",
         "line_number": 92,
         "message": "Remove this redundant Exception class; it derives from another which is already caught.",
         "symbol": "python:S5713"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/analysis/service.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/analysis/service.py/anti_patterns.json",
         "line_number": 109,
         "message": "Define a constant instead of duplicating this literal \"Audit not found\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/analysis/service.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/analysis/service.py/anti_patterns.json",
         "line_number": 427,
         "message": "M is used before it is defined. Move the definition before.",
         "symbol": "python:S3827"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/projects/service.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/projects/service.py/anti_patterns.json",
         "line_number": 207,
         "message": "Extract this nested conditional expression into an independent statement.",
         "symbol": "python:S3358"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/projects/service.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/projects/service.py/anti_patterns.json",
         "line_number": 212,
         "message": "Extract this nested conditional expression into an independent statement.",
         "symbol": "python:S3358"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/anti_patterns.json",
         "line_number": 251,
         "message": "Define a constant instead of duplicating this literal \"Crawl not found\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 82,
         "message": "Define a constant instead of duplicating this literal \"SET NULL\" 4 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 70,
         "message": "Define a constant instead of duplicating this literal \"audits.id\" 5 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 161,
         "message": "Define a constant instead of duplicating this literal \"response_analyses.id\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 82,
         "message": "Define a constant instead of duplicating this literal \"raw_response_artifacts.id\" 4 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 65,
         "message": "Define a constant instead of duplicating this literal \"workspaces.id\" 5 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/analysis.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/analysis.py/anti_patterns.json",
         "line_number": 119,
         "message": "Define a constant instead of duplicating this literal \"all, delete-orphan\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/audit.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/audit.py/anti_patterns.json",
         "line_number": 159,
         "message": "Define a constant instead of duplicating this literal \"SET NULL\" 4 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/audit.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/audit.py/anti_patterns.json",
         "line_number": 152,
         "message": "Define a constant instead of duplicating this literal \"audits.id\" 6 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/audit.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/audit.py/anti_patterns.json",
         "line_number": 106,
         "message": "Define a constant instead of duplicating this literal \"all, delete-orphan\" 5 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/project.py/anti_patterns.json",
-        "line_number": 63,
-        "message": "Define a constant instead of duplicating this literal \"all, delete-orphan\" 6 times.",
-        "symbol": "python:S1192"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/brand.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/brand.py/anti_patterns.json",
         "line_number": 39,
         "message": "Define a constant instead of duplicating this literal \"projects.id\" 4 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/provider.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/project.py/anti_patterns.json",
+        "line_number": 63,
+        "message": "Define a constant instead of duplicating this literal \"all, delete-orphan\" 7 times.",
+        "symbol": "python:S1192"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/provider.py/anti_patterns.json",
         "line_number": 110,
         "message": "Define a constant instead of duplicating this literal \"provider_connections.id\" 3 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/models/provider.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/models/provider.py/anti_patterns.json",
         "line_number": 39,
         "message": "Define a constant instead of duplicating this literal \"workspaces.id\" 4 times.",
         "symbol": "python:S1192"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/workers/site_health_worker.py/anti_patterns.json",
-        "line_number": 554,
-        "message": "Add logic to this except clause or eliminate it and rethrow the exception automatically.",
-        "symbol": "python:S2737"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/workers/audit_worker.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/audit_worker.py/anti_patterns.json",
         "line_number": 515,
         "message": "Add logic to this except clause or eliminate it and rethrow the exception automatically.",
         "symbol": "python:S2737"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/content_worker.py/anti_patterns.json",
+        "line_number": 238,
+        "message": "Add logic to this except clause or eliminate it and rethrow the exception automatically.",
+        "symbol": "python:S2737"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/site_health_worker.py/anti_patterns.json",
+        "line_number": 554,
+        "message": "Add logic to this except clause or eliminate it and rethrow the exception automatically.",
+        "symbol": "python:S2737"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 81,
         "message": "Add a nested comment explaining why this method is empty, or complete the implementation.",
         "symbol": "python:S1186"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 176,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 188,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 192,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 453,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 617,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 618,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 619,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_api.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_api.py/anti_patterns.json",
         "line_number": 1018,
         "message": "Function \"_seed_evidence_execution\" has 22 parameters, which is greater than the 13 authorized.",
         "symbol": "python:S107"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_http.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_http.py/anti_patterns.json",
         "line_number": 45,
         "message": "Add a nested comment explaining why this method is empty, or complete the implementation.",
         "symbol": "python:S1186"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_http.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_http.py/anti_patterns.json",
         "line_number": 126,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_analysis_http.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_analysis_http.py/anti_patterns.json",
         "line_number": 277,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_audit_worker.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_audit_worker.py/anti_patterns.json",
         "line_number": 60,
         "message": "Add a nested comment explaining why this method is empty, or complete the implementation.",
         "symbol": "python:S1186"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_audit_worker.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_audit_worker.py/anti_patterns.json",
         "line_number": 171,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/conftest.py/anti_patterns.json",
-        "line_number": 111,
-        "message": "Use concise character class syntax '\\W' instead of '[^a-zA-Z0-9_]'.",
-        "symbol": "python:S6353"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/component/test_site_health_worker.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/component/test_site_health_worker.py/anti_patterns.json",
         "line_number": 1942,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_audit_guardrails.py/anti_patterns.json",
-        "line_number": 44,
-        "message": "Do not perform equality checks with floating point values.",
-        "symbol": "python:S1244"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/conftest.py/anti_patterns.json",
+        "line_number": 111,
+        "message": "Use concise character class syntax '\\W' instead of '[^a-zA-Z0-9_]'.",
+        "symbol": "python:S6353"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
         "line_number": 255,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
         "line_number": 259,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
         "line_number": 296,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
         "line_number": 338,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_analysis_scoring.py/anti_patterns.json",
         "line_number": 339,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_rules.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_audit_guardrails.py/anti_patterns.json",
+        "line_number": 44,
+        "message": "Do not perform equality checks with floating point values.",
+        "symbol": "python:S1244"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_content_config.py/anti_patterns.json",
+        "line_number": 73,
+        "message": "Do not perform equality checks with floating point values.",
+        "symbol": "python:S1244"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_discovery_models_mistral.py/anti_patterns.json",
+        "line_number": 95,
+        "message": "Do not perform equality checks with floating point values.",
+        "symbol": "python:S1244"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_rules.py/anti_patterns.json",
         "line_number": 68,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 40,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 51,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 61,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 62,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 74,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 92,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 97,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 102,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 119,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 120,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 121,
         "message": "Remove this commented out code.",
         "symbol": "python:S125"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 122,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 133,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 135,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 147,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 148,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 149,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 160,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 174,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 175,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_site_health_scoring.py/anti_patterns.json",
         "line_number": 176,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_visibility_projection_helpers.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_visibility_projection_helpers.py/anti_patterns.json",
         "line_number": 46,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/tests/unit/test_visibility_projection_helpers.py/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/tests/unit/test_visibility_projection_helpers.py/anti_patterns.json",
         "line_number": 50,
         "message": "Do not perform equality checks with floating point values.",
         "symbol": "python:S1244"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/app/(app)/runs/[runId]/page.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/app/(app)/runs/[runId]/page.tsx/anti_patterns.json",
         "line_number": 36,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/app/(app)/setup/[projectId]/page.tsx/anti_patterns.json",
-        "line_number": 22,
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/app/(app)/setup/[projectId]/page.tsx/anti_patterns.json",
+        "line_number": 21,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/app/globals.css/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/app/globals.css/anti_patterns.json",
         "line_number": 10,
         "message": "Unexpected unknown at-rule \"@custom-variant\"",
         "symbol": "css:S4662"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/app/globals.css/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/app/globals.css/anti_patterns.json",
         "line_number": 17,
         "message": "Unexpected unknown at-rule \"@theme\"",
         "symbol": "css:S4662"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/prompts/csv-import-dialog.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/prompts/csv-import-dialog.tsx/anti_patterns.json",
         "line_number": 22,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/prompts/generate-prompts-dialog.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/prompts/generate-prompts-dialog.tsx/anti_patterns.json",
         "line_number": 168,
         "message": "Use '===' to compare with null.",
         "symbol": "autofix/no-eq-null"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/prompts/generate-prompts-dialog.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/prompts/generate-prompts-dialog.tsx/anti_patterns.json",
         "line_number": 168,
         "message": "Expected '!==' and instead saw '!='.",
         "symbol": "autofix/eqeqeq"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/prompts/prompt-library.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/prompts/prompt-library.tsx/anti_patterns.json",
         "line_number": 192,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/providers/engine-card.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/providers/engine-card.tsx/anti_patterns.json",
         "line_number": 46,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/runs/executions-table.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/runs/executions-table.tsx/anti_patterns.json",
         "line_number": 61,
         "message": "Use '===' to compare with null.",
         "symbol": "autofix/no-eq-null"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/runs/executions-table.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/runs/executions-table.tsx/anti_patterns.json",
         "line_number": 61,
         "message": "Expected '===' and instead saw '=='.",
         "symbol": "autofix/eqeqeq"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/runs/launch-dialog.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/runs/launch-dialog.tsx/anti_patterns.json",
         "line_number": 141,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/setup/entry-list.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/setup/entry-list.tsx/anti_patterns.json",
         "line_number": 111,
         "message": "Use '===' to compare with null.",
         "symbol": "autofix/no-eq-null"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/setup/entry-list.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/setup/entry-list.tsx/anti_patterns.json",
         "line_number": 111,
         "message": "Expected '===' and instead saw '=='.",
         "symbol": "autofix/eqeqeq"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/setup/setup-form.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/setup/setup-form.tsx/anti_patterns.json",
         "line_number": 66,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 62,
-        "message": "Use '===' to compare with null.",
-        "symbol": "autofix/no-eq-null"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 62,
-        "message": "Expected '!==' and instead saw '!='.",
-        "symbol": "autofix/eqeqeq"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 63,
-        "message": "Use '===' to compare with null.",
-        "symbol": "autofix/no-eq-null"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 63,
-        "message": "Expected '!==' and instead saw '!='.",
-        "symbol": "autofix/eqeqeq"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 64,
-        "message": "Use '===' to compare with null.",
-        "symbol": "autofix/no-eq-null"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 64,
-        "message": "Expected '!==' and instead saw '!='.",
-        "symbol": "autofix/eqeqeq"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 82,
-        "message": "Use '===' to compare with null.",
-        "symbol": "autofix/no-eq-null"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 82,
-        "message": "Expected '!==' and instead saw '!='.",
-        "symbol": "autofix/eqeqeq"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 82,
-        "message": "Use '===' to compare with null.",
-        "symbol": "autofix/no-eq-null"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
-        "line_number": 82,
-        "message": "Expected '!==' and instead saw '!='.",
-        "symbol": "autofix/eqeqeq"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/discovery-progress.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/discovery-progress.tsx/anti_patterns.json",
         "line_number": 169,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/inventory-selection.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 62,
+        "message": "Use '===' to compare with null.",
+        "symbol": "autofix/no-eq-null"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 62,
+        "message": "Expected '!==' and instead saw '!='.",
+        "symbol": "autofix/eqeqeq"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 63,
+        "message": "Use '===' to compare with null.",
+        "symbol": "autofix/no-eq-null"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 63,
+        "message": "Expected '!==' and instead saw '!='.",
+        "symbol": "autofix/eqeqeq"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 64,
+        "message": "Use '===' to compare with null.",
+        "symbol": "autofix/no-eq-null"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 64,
+        "message": "Expected '!==' and instead saw '!='.",
+        "symbol": "autofix/eqeqeq"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 82,
+        "message": "Use '===' to compare with null.",
+        "symbol": "autofix/no-eq-null"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 82,
+        "message": "Expected '!==' and instead saw '!='.",
+        "symbol": "autofix/eqeqeq"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 82,
+        "message": "Use '===' to compare with null.",
+        "symbol": "autofix/no-eq-null"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/anti_patterns.json",
+        "line_number": 82,
+        "message": "Expected '!==' and instead saw '!='.",
+        "symbol": "autofix/eqeqeq"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/inventory-selection.tsx/anti_patterns.json",
         "line_number": 224,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/url-detail.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/url-detail.tsx/anti_patterns.json",
         "line_number": 169,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/url-detail.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/url-detail.tsx/anti_patterns.json",
         "line_number": 440,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/url-detail.test.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/url-detail.test.tsx/anti_patterns.json",
         "line_number": 215,
         "message": "Return values from promise executor functions cannot be read.",
         "symbol": "no-promise-executor-return"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/ui/primitives.test.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/ui/primitives.test.tsx/anti_patterns.json",
         "line_number": 167,
         "message": "Use array destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/ui/trend-chart.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/ui/trend-chart.tsx/anti_patterns.json",
         "line_number": 135,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/ui/trend-chart.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/ui/trend-chart.tsx/anti_patterns.json",
         "line_number": 155,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/e2e/providers.spec.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/helpers/real-stack.ts/anti_patterns.json",
+        "line_number": 87,
+        "message": "Return values from promise executor functions cannot be read.",
+        "symbol": "no-promise-executor-return"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/helpers/real-stack.ts/anti_patterns.json",
+        "line_number": 221,
+        "message": "Unexpected `await` inside a loop.",
+        "symbol": "no-await-in-loop"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/helpers/real-stack.ts/anti_patterns.json",
+        "line_number": 234,
+        "message": "Unexpected `await` inside a loop.",
+        "symbol": "no-await-in-loop"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/helpers/real-stack.ts/anti_patterns.json",
+        "line_number": 321,
+        "message": "Return values from promise executor functions cannot be read.",
+        "symbol": "no-promise-executor-return"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/content-integration.spec.ts/anti_patterns.json",
+        "line_number": 105,
+        "message": "Unexpected string concatenation.",
+        "symbol": "autofix/prefer-template"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/providers.spec.ts/anti_patterns.json",
         "line_number": 95,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/e2e/visibility.spec.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/e2e/visibility.spec.ts/anti_patterns.json",
         "line_number": 299,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/errors.ts/anti_patterns.json",
-        "line_number": 28,
-        "message": "Use object destructuring.",
-        "symbol": "autofix/prefer-destructuring"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/client.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/client.ts/anti_patterns.json",
         "line_number": 112,
         "message": "Unexpected `await` inside a loop.",
         "symbol": "no-await-in-loop"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/client.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/client.ts/anti_patterns.json",
         "line_number": 114,
         "message": "Unexpected `await` inside a loop.",
         "symbol": "no-await-in-loop"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/client.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/client.ts/anti_patterns.json",
         "line_number": 131,
         "message": "Unexpected `await` inside a loop.",
         "symbol": "no-await-in-loop"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/client.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/client.ts/anti_patterns.json",
         "line_number": 191,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/api/query-client.test.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/errors.ts/anti_patterns.json",
+        "line_number": 28,
+        "message": "Use object destructuring.",
+        "symbol": "autofix/prefer-destructuring"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/api/query-client.test.ts/anti_patterns.json",
         "line_number": 39,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/auth/session-guard.test.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/auth/session-guard.test.tsx/anti_patterns.json",
         "line_number": 70,
         "message": "Return values from promise executor functions cannot be read.",
         "symbol": "no-promise-executor-return"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/auth/session-guard.test.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/auth/session-guard.test.tsx/anti_patterns.json",
         "line_number": 92,
         "message": "Return values from promise executor functions cannot be read.",
         "symbol": "no-promise-executor-return"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/prompts/filter.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/prompts/filter.ts/anti_patterns.json",
         "line_number": 43,
         "message": "Replace this if-then-else flow by a single return statement.",
         "symbol": "sonarjs/prefer-single-boolean-return"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/prompts/use-prompt-set.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/prompts/use-prompt-set.ts/anti_patterns.json",
         "line_number": 44,
         "message": "Arrow function used ambiguously with a conditional expression.",
         "symbol": "autofix/no-confusing-arrow"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/providers/catalog.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/providers/catalog.ts/anti_patterns.json",
         "line_number": 82,
         "message": "Use array destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/providers/query-provider.tsx/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/providers/query-provider.tsx/anti_patterns.json",
         "line_number": 18,
         "message": "useState call is not destructured into value + setter pair",
         "symbol": "react/hook-use-state"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/runs/status.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/runs/status.ts/anti_patterns.json",
         "line_number": 102,
         "message": "Update this function so that its implementation is not identical to the one on line 73.",
         "symbol": "sonarjs/no-identical-functions"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/use-crawl-events.test.tsx/anti_patterns.json",
-        "line_number": 50,
-        "message": "Use array destructuring.",
-        "symbol": "autofix/prefer-destructuring"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/use-crawl-events.ts/anti_patterns.json",
-        "line_number": 85,
-        "message": "Unexpected `await` inside a loop.",
-        "symbol": "no-await-in-loop"
-      },
-      {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/status.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/status.ts/anti_patterns.json",
         "line_number": 138,
         "message": "Use '===' to compare with null.",
         "symbol": "autofix/no-eq-null"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/status.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/status.ts/anti_patterns.json",
         "line_number": 138,
         "message": "Expected '!==' and instead saw '!='.",
         "symbol": "autofix/eqeqeq"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/theme.test.ts/anti_patterns.json",
-        "line_number": 52,
-        "message": "Return values from promise executor functions cannot be read.",
-        "symbol": "no-promise-executor-return"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/use-crawl-events.test.tsx/anti_patterns.json",
+        "line_number": 50,
+        "message": "Use array destructuring.",
+        "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/use-monitored-selection.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/use-crawl-events.ts/anti_patterns.json",
+        "line_number": 85,
+        "message": "Unexpected `await` inside a loop.",
+        "symbol": "no-await-in-loop"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/use-monitored-selection.ts/anti_patterns.json",
         "line_number": 147,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/site-health/use-monitored-selection.ts/anti_patterns.json",
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/site-health/use-monitored-selection.ts/anti_patterns.json",
         "line_number": 150,
         "message": "Use object destructuring.",
         "symbol": "autofix/prefer-destructuring"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/theme.test.ts/anti_patterns.json",
+        "line_number": 52,
+        "message": "Return values from promise executor functions cannot be read.",
+        "symbol": "no-promise-executor-return"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/utils.test.ts/anti_patterns.json",
+        "line_number": 8,
+        "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+        "symbol": "no-constant-binary-expression"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/utils.test.ts/anti_patterns.json",
+        "line_number": 8,
+        "message": "Refactor the code to avoid using this boolean literal.",
+        "symbol": "sonarjs/no-redundant-boolean"
       }
     ],
     "complex_functions": [
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/analysis/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/analysis/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/analysis/site_health/parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/analysis/site_health/parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/analysis/site_health/parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/analysis/site_health/parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/analysis/site_health/structured_data.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/analysis/site_health/structured_data.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/anthropic_parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/anthropic_parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/gemini.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/gemini.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/gemini_parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/gemini_parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/gemini_parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/gemini_parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/openai_parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/openai_parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/answer_engines/openai_parser.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/answer_engines/openai_parser.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/web_evidence/fetcher.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/web_evidence/fetcher.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/connectors/web_evidence/sitemaps.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/connectors/web_evidence/sitemaps.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/audits/planner.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/audits/planner.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/projects/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/content/website_context.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/prompts/csv_import.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/projects/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/prompts/generation.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/prompts/csv_import.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/discovery.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/prompts/generation.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/discovery.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/discovery.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/selection.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/discovery.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/selection.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/domain/site_health/service.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/workers/site_health_worker.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/domain/site_health/service.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/workers/site_health_worker.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/content_worker.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/backend/app/workers/site_health_worker.py/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/site_health_worker.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/prompts/prompt-library.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/site_health_worker.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/providers/engine-card.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/backend/app/workers/site_health_worker.py/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/analysis-progress.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/content/content-screen.tsx/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/discovery-progress.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/prompts/prompt-library.tsx/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/inventory-selection.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/providers/engine-card.tsx/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/issues-catalog.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/settings/settings-screen.tsx/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/components/site-health/site-health-screen.tsx/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/discovery-progress.tsx/complex_functions.json"
       },
       {
-        "file_path": "2cf921e7fda284deeb46bb2473c7ef8ac01d60e5/frontend/lib/prompts/csv.ts/complex_functions.json"
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/analysis-progress.tsx/complex_functions.json"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/inventory-selection.tsx/complex_functions.json"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/issues-catalog.tsx/complex_functions.json"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/components/site-health/site-health-screen.tsx/complex_functions.json"
+      },
+      {
+        "file_path": "d759728eedfc3de0c2d591ff3f355803a32d4611/frontend/lib/prompts/csv.ts/complex_functions.json"
       }
     ],
     "duplicate_code": [
@@ -937,12 +1416,18 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 2,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -973,9 +1458,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -990,12 +1472,18 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 6,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1067,9 +1555,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1128,9 +1613,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1164,12 +1646,18 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 21,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1219,9 +1707,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1266,6 +1751,9 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
@@ -1299,27 +1787,12 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 33,
         "occurrences": [
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
           {
             "file_path": ""
           },
@@ -1358,9 +1831,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1378,21 +1848,21 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 38,
         "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1431,12 +1901,30 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 42,
         "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1497,9 +1985,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1517,15 +2002,6 @@
       {
         "group_id": 49,
         "occurrences": [
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
           {
             "file_path": ""
           },
@@ -1553,18 +2029,12 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 52,
         "occurrences": [
-          {
-            "file_path": ""
-          },
           {
             "file_path": ""
           },
@@ -1587,6 +2057,9 @@
       {
         "group_id": 54,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1617,15 +2090,18 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 57,
         "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1656,12 +2132,18 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 60,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1700,12 +2182,18 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 64,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1722,6 +2210,9 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
@@ -1733,21 +2224,12 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 67,
         "occurrences": [
-          {
-            "file_path": ""
-          },
           {
             "file_path": ""
           },
@@ -1819,9 +2301,6 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
@@ -1833,12 +2312,21 @@
           },
           {
             "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
           }
         ]
       },
       {
         "group_id": 75,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1877,21 +2365,12 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 79,
         "occurrences": [
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
           {
             "file_path": ""
           },
@@ -1936,6 +2415,9 @@
       {
         "group_id": 83,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -1988,21 +2470,15 @@
           },
           {
             "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
-          },
-          {
-            "file_path": ""
           }
         ]
       },
       {
         "group_id": 88,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -2028,6 +2504,9 @@
       {
         "group_id": 90,
         "occurrences": [
+          {
+            "file_path": ""
+          },
           {
             "file_path": ""
           },
@@ -2066,6 +2545,162 @@
       },
       {
         "group_id": 93,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 94,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 95,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 96,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 97,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 98,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 99,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 100,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 101,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 102,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 103,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 104,
+        "occurrences": [
+          {
+            "file_path": ""
+          },
+          {
+            "file_path": ""
+          }
+        ]
+      },
+      {
+        "group_id": 105,
         "occurrences": [
           {
             "file_path": ""
@@ -2176,6 +2811,14 @@
       {
         "type": "python",
         "sub_type": "variable",
+        "file_path": "backend/app/models/content.py",
+        "message": "unused variable 'message_digest' (60% confidence)",
+        "line_number": 87,
+        "confidence": "60"
+      },
+      {
+        "type": "python",
+        "sub_type": "variable",
         "file_path": "backend/app/models/provider.py",
         "message": "unused variable 'deactivation_reason' (60% confidence)",
         "line_number": 54,
@@ -2233,14 +2876,6 @@
         "type": "python",
         "sub_type": "variable",
         "file_path": "backend/app/models/site_health.py",
-        "message": "unused variable 'fetched_at' (60% confidence)",
-        "line_number": 716,
-        "confidence": "60"
-      },
-      {
-        "type": "python",
-        "sub_type": "variable",
-        "file_path": "backend/app/models/site_health.py",
         "message": "unused variable 'supporting_artifact_ids' (60% confidence)",
         "line_number": 890,
         "confidence": "60"
@@ -2288,17 +2923,17 @@
       {
         "type": "extra",
         "sub_type": "S1172",
-        "file_path": "backend/app/workers/site_health_worker.py",
-        "message": "Remove the unused function parameter \"root_registrable_domain\".",
-        "line_number": 595,
+        "file_path": "backend/app/workers/audit_worker.py",
+        "message": "Remove the unused function parameter \"audit_id\".",
+        "line_number": 818,
         "confidence": "90"
       },
       {
         "type": "extra",
         "sub_type": "S1172",
-        "file_path": "backend/app/workers/audit_worker.py",
-        "message": "Remove the unused function parameter \"audit_id\".",
-        "line_number": 818,
+        "file_path": "backend/app/workers/site_health_worker.py",
+        "message": "Remove the unused function parameter \"root_registrable_domain\".",
+        "line_number": 595,
         "confidence": "90"
       },
       {
@@ -2363,6 +2998,14 @@
         "file_path": "backend/tests/component/test_site_health_api.py",
         "message": "Replace the unused local variable \"url_c\" with \"_\".",
         "line_number": 146,
+        "confidence": "90"
+      },
+      {
+        "type": "extra",
+        "sub_type": "S1481",
+        "file_path": "backend/tests/unit/test_content_website_context.py",
+        "message": "Replace the unused local variable \"profile_id\" with \"_\".",
+        "line_number": 502,
         "confidence": "90"
       }
     ]

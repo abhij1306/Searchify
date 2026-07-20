@@ -10,8 +10,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
+from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.config.task_queue import (
@@ -22,6 +23,10 @@ from app.core.config.task_queue import (
 if TYPE_CHECKING:
     # Type-only: config never imports a model at runtime (circular import).
     from app.models.content import ContentGeneration
+
+# --- Providers -------------------------------------------------------------
+CONTENT_PROVIDER_MISTRAL: Final = "mistral"
+CONTENT_KNOWN_PROVIDERS: Final[frozenset[str]] = frozenset({CONTENT_PROVIDER_MISTRAL})
 
 # --- Output types ----------------------------------------------------------
 CONTENT_OUTPUT_TYPE_WEBSITE_PAGE: Final = "website_page"
@@ -40,6 +45,9 @@ CONTEXT_STATUSES: Final[frozenset[str]] = frozenset(
 
 # --- Input caps ------------------------------------------------------------
 CONTENT_PROMPT_MAX_LEN: Final = 4000
+# Client-supplied Idempotency-Key cap — must match the DB column width so an
+# overlong header is a 422 at the boundary, never a DataError mid-insert.
+CONTENT_IDEMPOTENCY_KEY_MAX_LEN: Final = 128
 # Deterministic history label: first prompt line trimmed to this many chars.
 CONTENT_HISTORY_TITLE_MAX_LEN: Final = 80
 
@@ -77,7 +85,7 @@ class ContentSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="CONTENT_", extra="ignore")
 
-    provider: str = "mistral"
+    provider: str = CONTENT_PROVIDER_MISTRAL
     model: str = "mistral-small-latest"
     endpoint: str = Field(
         default="https://api.mistral.ai/v1/chat/completions",
@@ -93,6 +101,25 @@ class ContentSettings(BaseSettings):
     poll_interval_seconds: float = Field(default=1.0, gt=0)
     retry_base_delay_seconds: float = Field(default=2.0, gt=0)
     retry_max_delay_seconds: float = Field(default=45.0, gt=0)
+
+    @field_validator("endpoint")
+    @classmethod
+    def _check_endpoint(cls, value: str) -> str:
+        # The endpoint is forwarded verbatim to the provider HTTP client, so a
+        # bad env value must fail at startup, not mid-generation. https only;
+        # plain http is allowed solely for loopback (local mock servers).
+        parts = urlsplit(value)
+        if not parts.hostname:
+            raise ValueError("endpoint must be an absolute URL with a host")
+        if parts.scheme == "https":
+            return value
+        if parts.scheme == "http" and parts.hostname in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            return value
+        raise ValueError("endpoint must use https (http is loopback-only)")
 
     @model_validator(mode="after")
     def _check_operational_bounds(self) -> ContentSettings:

@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  applyTheme,
-  readTheme,
-  subscribeTheme,
-  THEME_STORAGE_KEY,
-} from '@/lib/theme';
+import { applyTheme, readTheme, subscribeTheme, THEME_STORAGE_KEY } from '@/lib/theme';
 
 describe('theme', () => {
   beforeEach(() => {

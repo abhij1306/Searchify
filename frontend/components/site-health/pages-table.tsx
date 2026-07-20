@@ -51,7 +51,9 @@ export function PagesTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead numeric className="w-10">#</TableHead>
+          <TableHead numeric className="w-10">
+            #
+          </TableHead>
           <TableHead>Page URL</TableHead>
           <TableHead>Status</TableHead>
           <TableHead numeric>Issues</TableHead>
@@ -68,10 +70,12 @@ export function PagesTable({
             onClick={() => openPage(page.site_url_id)}
             className="cursor-pointer"
           >
-            <TableCell numeric className="text-muted">{index + 1}</TableCell>
+            <TableCell numeric className="text-muted">
+              {index + 1}
+            </TableCell>
             <TableCell>
               <span className="flex flex-col">
-                <span className="font-medium text-foreground">
+                <span className="text-foreground font-medium">
                   {page.title ?? page.display_url}
                 </span>
                 <span className="mono text-2xs text-muted">{page.display_url}</span>
@@ -85,20 +89,23 @@ export function PagesTable({
             <TableCell numeric className="mono text-danger-text">
               {formatIssueCount(page.issue_count)}
             </TableCell>
-            <TableCell numeric className={cn('mono font-semibold', scoreClass(page.technical_score))}>
+            <TableCell
+              numeric
+              className={cn('mono font-semibold', scoreClass(page.technical_score))}
+            >
               {formatScore(page.technical_score)}
             </TableCell>
             <TableCell numeric className={cn('mono font-semibold', scoreClass(page.aeo_score))}>
               {formatScore(page.aeo_score)}
             </TableCell>
-            <TableCell className="whitespace-nowrap text-xs text-secondary">
+            <TableCell className="text-secondary text-xs whitespace-nowrap">
               {formatAudited(page.last_audited)}
             </TableCell>
             <TableCell>
               <Link
                 href={`/site-health/crawls/${crawlId}/pages/${page.site_url_id}`}
                 onClick={(event) => event.stopPropagation()}
-                className="text-xs font-medium text-accent-text hover:underline"
+                className="text-accent-text text-xs font-medium hover:underline"
               >
                 View
               </Link>

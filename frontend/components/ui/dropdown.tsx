@@ -27,7 +27,7 @@ export function DropdownContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          'z-[300] min-w-[10rem] overflow-hidden rounded-md border border-border bg-elevated p-1 shadow-elevated focus:outline-none',
+          'border-border bg-elevated shadow-elevated z-[300] min-w-[10rem] overflow-hidden rounded-md border p-1 focus:outline-none',
           className,
         )}
         {...props}
@@ -46,7 +46,7 @@ export function DropdownItem({
   return (
     <DropdownPrimitive.Item
       className={cn(
-        'flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-background-alt data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'text-foreground data-[highlighted]:bg-background-alt flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-1.5 text-sm transition-colors outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className,
       )}
       {...props}
@@ -64,14 +64,14 @@ export function DropdownCheckboxItem({
   return (
     <DropdownPrimitive.CheckboxItem
       className={cn(
-        'flex cursor-pointer items-center gap-2 rounded-sm py-1.5 pl-7 pr-2.5 text-sm text-foreground outline-none transition-colors data-[highlighted]:bg-background-alt data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        'text-foreground data-[highlighted]:bg-background-alt flex cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-2.5 pl-7 text-sm transition-colors outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className,
       )}
       {...props}
     >
       <span className="absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownPrimitive.ItemIndicator>
-          <Check className="size-3.5 text-accent" aria-hidden />
+          <Check className="text-accent size-3.5" aria-hidden />
         </DropdownPrimitive.ItemIndicator>
       </span>
       {children}
@@ -85,7 +85,10 @@ export function DropdownLabel({
 }: Readonly<{ className?: string; children: ReactNode }>) {
   return (
     <DropdownPrimitive.Label
-      className={cn('px-2.5 py-1.5 text-2xs font-semibold uppercase tracking-wide text-muted', className)}
+      className={cn(
+        'text-2xs text-muted px-2.5 py-1.5 font-semibold tracking-wide uppercase',
+        className,
+      )}
     >
       {children}
     </DropdownPrimitive.Label>

@@ -42,7 +42,7 @@ export function EmptyPhaseCard({
   return (
     <Card>
       <CardContent className="grid gap-3 py-8 text-center">
-        <p className="text-sm text-secondary">
+        <p className="text-secondary text-sm">
           Discover and analyze your site&apos;s pages for AI search optimization.
         </p>
         <div className="flex justify-center">
@@ -69,10 +69,10 @@ export function TerminalPhaseCard({
             {statusLabel(crawl.status)}
           </Badge>
         </div>
-        <p className="text-sm text-secondary">
+        <p className="text-secondary text-sm">
           {crawl.status === 'cancelled'
             ? 'This crawl was cancelled before it produced results.'
-            : (crawl.error_message || 'This crawl failed before it produced results.')}
+            : crawl.error_message || 'This crawl failed before it produced results.'}
         </p>
         <div className="flex justify-center">
           <Button onClick={onStart} disabled={startPending}>
