@@ -166,7 +166,10 @@ def test_empty_body_yields_partial_facts():
 
 
 def test_malformed_html_never_crashes():
-    body = b"<html><head><title>Broken<body><h1>hi</h1><a href='/x'>"
+    # ``<title>`` must be closed: it is RCDATA per HTML5, so an unclosed title
+    # swallows the rest of the document as text (behavior that differs across
+    # libxml2 versions). The rest stays malformed on purpose.
+    body = b"<html><head><title>Broken</title><body><h1>hi</h1><a href='/x'>"
     facts = _facts(body)
     # lxml's recover parser tolerates it and still yields facts.
     assert facts["has_html"] is True

@@ -355,7 +355,7 @@ class AuditWorker:
             await self._run_provider_call(task_id, audit_id)
         except Exception as exc:  # defensive: never let one task kill the loop
             logger.exception("audit task crashed", extra={"task_id": str(task_id)})
-            await self._record_crash(task_id, audit_id, exc)
+            await self._record_crash(task_id, exc)
         finally:
             await self._finalize_audit(audit_id)
 
@@ -821,9 +821,7 @@ class AuditWorker:
             error_detail=error_detail,
         )
 
-    async def _record_crash(
-        self, task_id: uuid.UUID, audit_id: uuid.UUID, exc: Exception
-    ) -> None:
+    async def _record_crash(self, task_id: uuid.UUID, exc: Exception) -> None:
         detail = f"{type(exc).__name__}: {exc}"
         await self._queue.fail(
             task_id=task_id,

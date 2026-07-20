@@ -1334,9 +1334,7 @@ async def _load_issue_groups(
     return groups
 
 
-async def _issues_summary(
-    session: AsyncSession, *, crawl_id: uuid.UUID, clauses: list
-) -> dict:
+async def _issues_summary(session: AsyncSession, *, clauses: list) -> dict:
     """Crawl-level canonical-group/severity/dimension + distinct affected counts.
 
     Counts are DISTINCT RULE GROUPS (the canonical issue cards the catalog
@@ -1515,7 +1513,7 @@ async def get_issues(
         rule=rule,
         site_url_id=site_url_id,
     )
-    summary = await _issues_summary(session, crawl_id=crawl_id, clauses=summary_clauses)
+    summary = await _issues_summary(session, clauses=summary_clauses)
     return {"items": items, "next_cursor": next_cursor, "summary": summary}
 
 

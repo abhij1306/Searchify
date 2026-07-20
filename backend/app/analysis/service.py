@@ -179,7 +179,7 @@ async def analyze_task(
 
 
 async def _execution_dicts(
-    session: AsyncSession, *, audit_id: uuid.UUID, config: ScoringConfig
+    session: AsyncSession, *, audit_id: uuid.UUID
 ) -> tuple[list[dict], dict[str, list[dict]], list[ResponseAnalysis]]:
     """Build the aggregate input from persisted analyses (invariant 7).
 
@@ -284,9 +284,7 @@ async def finalize_audit_analysis(
         await analyze_task(session, task=task, config=config)
     await session.flush()
 
-    all_dicts, per_engine, analyses = await _execution_dicts(
-        session, audit_id=audit.id, config=config
-    )
+    all_dicts, per_engine, analyses = await _execution_dicts(session, audit_id=audit.id)
     metrics = aggregate_run(all_dicts, config)
     metrics["per_engine"] = {
         engine: aggregate_run(rows, config)

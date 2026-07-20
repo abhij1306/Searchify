@@ -467,7 +467,7 @@ async def test_worker_discards_success_when_lease_lost_mid_call(
 ) -> None:
     # Worker A's lease expires mid-call and Worker B claims the task. When A
     # returns it must NOT write rows for a task it no longer owns (invariant 3/8).
-    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+    _seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
 
     async def _steal_lease() -> None:
         async with session_factory() as session:
@@ -536,7 +536,7 @@ async def test_worker_records_one_attempt_per_provider_call(
 ) -> None:
     # Two retryable failures then a success -> three append-only ProviderAttempt
     # rows (invariant 3: one row per attempt), not a single collapsed row.
-    seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
+    _seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
 
     adapter = _FlakyAdapter(fail_times=2)
     monkeypatch.setattr(audit_worker, "build_adapter", lambda **_: adapter)

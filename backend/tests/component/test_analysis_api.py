@@ -203,7 +203,7 @@ async def test_provenance_and_citation_classification_persisted(
     session_factory: async_sessionmaker[AsyncSession],
     _stub_adapter,
 ) -> None:
-    seed, audit = await _run_completed_audit(session_factory)
+    _seed, audit = await _run_completed_audit(session_factory)
 
     async with session_factory() as session:
         analyses = list(
@@ -363,7 +363,7 @@ async def test_snapshot_records_source_provenance(
     ``source_analysis_ids`` must equal the succeeded tasks' analysis ids and
     ``source_artifact_ids`` their raw response artifacts.
     """
-    seed, audit = await _run_completed_audit(session_factory)
+    _seed, audit = await _run_completed_audit(session_factory)
 
     async with session_factory() as session:
         analyses = list(

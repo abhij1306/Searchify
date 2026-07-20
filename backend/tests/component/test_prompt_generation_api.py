@@ -125,7 +125,7 @@ async def _make_project_and_set(
 async def test_generate_creates_proposed_prompts_and_topics(
     client: httpx.AsyncClient, fake_agent: FakeAgent
 ) -> None:
-    project, prompt_set_id = await _make_project_and_set(client, "gen1@example.com")
+    _project, prompt_set_id = await _make_project_and_set(client, "gen1@example.com")
 
     resp = await client.post(
         f"/api/v1/prompt-sets/{prompt_set_id}/generate",
