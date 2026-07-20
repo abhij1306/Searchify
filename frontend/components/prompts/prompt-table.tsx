@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { Prompt, PromptStatus } from '@/lib/api/types';
 import { intentLabels } from '@/lib/prompts/forms';
 
@@ -60,14 +61,18 @@ export function PromptTable({
         <TableBody>
           {prompts.map((prompt) => (
             <TableRow key={prompt.id}>
-              <TableCell className="max-w-[420px]">
-                <span className="block truncate text-foreground" title={prompt.text}>
-                  {prompt.text}
-                </span>
+              <TableCell className="min-w-[240px] max-w-[520px]">
+                <Tooltip content={prompt.text}>
+                  <span className="line-clamp-2 block text-foreground">{prompt.text}</span>
+                </Tooltip>
               </TableCell>
-              <TableCell>
+              <TableCell className="max-w-[180px]">
                 {prompt.theme ? (
-                  <Badge variant="neutral">{prompt.theme}</Badge>
+                  <Tooltip content={prompt.theme}>
+                    <Badge variant="neutral" className="max-w-full">
+                      <span className="min-w-0 truncate">{prompt.theme}</span>
+                    </Badge>
+                  </Tooltip>
                 ) : (
                   <span className="text-subtle">—</span>
                 )}

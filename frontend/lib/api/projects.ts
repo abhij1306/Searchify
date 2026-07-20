@@ -50,4 +50,6 @@ export const projectsApi = {
     const res = await apiClient.patch<Project>(`/projects/${projectId}`, input, options);
     return strictValidate(projectSchema, res, 'projects.updateProject');
   },
+  deleteProject: (projectId: string, options?: ApiRequestOptions) =>
+    apiClient.delete<void>(`/projects/${projectId}`, options),
 };

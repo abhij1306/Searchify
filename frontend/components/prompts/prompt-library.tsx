@@ -250,7 +250,7 @@ export function PromptLibrary() {
         onAdd={openAdd}
       />
 
-      <div className="grid items-start gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
+      <div className="grid items-start gap-4 md:grid-cols-[minmax(200px,260px)_minmax(0,1fr)]">
         <TopicRail
           topics={topics}
           selectedTopicId={selectedTopicId}
@@ -270,7 +270,7 @@ export function PromptLibrary() {
           }
         />
 
-        <div className="grid min-w-0 content-start gap-3 overflow-hidden">
+        <div className="grid min-w-0 content-start gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border">
             <div role="tablist" aria-label="Prompt status" className="flex gap-0">
               {STATUS_TABS.map((tab) => {

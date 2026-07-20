@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { Topic } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
@@ -236,9 +237,9 @@ function TopicItem({
           selected ? 'font-medium text-accent-text' : 'text-foreground',
         )}
       >
-        <span className="min-w-0 flex-1 truncate" title={label}>
-          {label}
-        </span>
+        <Tooltip content={label}>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+        </Tooltip>
         {typeof activeCount === 'number' ? (
           <span className="shrink-0 text-xs tabular-nums text-secondary">
             {activeCount}

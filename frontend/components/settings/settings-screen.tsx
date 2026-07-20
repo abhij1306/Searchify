@@ -1,16 +1,36 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { ArrowRight, ExternalLink, Moon, Plug, Settings2, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowRight,
+  ExternalLink,
+  Moon,
+  Plug,
+  Settings2,
+  Trash2,
+  User,
+} from 'lucide-react';
 import { useState, type ComponentType } from 'react';
 
+import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { PageTitle } from '@/components/ui/typography';
+import { projectsApi } from '@/lib/api/projects';
+import { queryKeys } from '@/lib/api/query-keys';
 import { useSessionUser } from '@/lib/auth/session-guard';
+import { useProjectContext } from '@/lib/project/project-context';
 import { cn, emailInitials } from '@/lib/utils';
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return 'Something went wrong. Please try again.';
+}
 
 /** Human-readable label for a timestamp (falls back to the raw value).
  * Explicit locale + UTC keep server and client output identical, so the
@@ -108,13 +128,38 @@ function SubnavLink({
  * and `created_at` is when the account was created — neither is a workspace
  * membership role. Provider/project configuration is surfaced as links only (no
  * fabricated per-provider status), pointing at the existing `/providers` and
- * `/setup` screens where those are actually managed.
+ * `/setup` screens where those are actually managed. The one mutation here is
+ * the Danger-zone card, which deletes the active project (backend cascades to
+ * all child data) behind a confirmation dialog.
  */
 export function SettingsScreen() {
   const user = useSessionUser();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { activeProject, projects, setActiveProjectId } = useProjectContext();
   const createdLabel = formatTimestamp(user.created_at);
   const updatedLabel = formatTimestamp(user.updated_at);
-  const [activeSection, setActiveSection] = useState<'account' | 'appearance'>('account');
+  const [activeSection, setActiveSection] = useState<'account' | 'appearance' | 'danger'>(
+    'account',
+  );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: (projectId: string) => projectsApi.deleteProject(projectId),
+    onSuccess: async (_data, deletedId) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      // Switch explicitly so the deleted project never flashes as "active"
+      // while the context's useMemo re-resolves. Route to setup when the
+      // workspace has no projects left.
+      const next = projects.find((project) => project.id !== deletedId) ?? null;
+      if (next) {
+        setActiveProjectId(next.id);
+        setConfirmOpen(false);
+      } else {
+        router.replace('/setup');
+      }
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -158,6 +203,19 @@ export function SettingsScreen() {
             <SubnavLink href="/setup" icon={Settings2}>
               Project setup
             </SubnavLink>
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="px-2.5 text-2xs font-semibold uppercase tracking-wide text-muted">
+              Project
+            </p>
+            <SubnavAnchor
+              href="#danger"
+              icon={Trash2}
+              active={activeSection === 'danger'}
+              onSelect={() => setActiveSection('danger')}
+            >
+              Danger zone
+            </SubnavAnchor>
           </div>
         </nav>
 
@@ -255,8 +313,82 @@ export function SettingsScreen() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card id="danger" className="scroll-mt-4">
+            <CardHeader>
+              <CardTitle>Danger zone</CardTitle>
+              <CardDescription>
+                Permanently delete the active project and everything inside it.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {activeProject ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {activeProject.name}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted">
+                        Brand: {activeProject.brand_name}
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="size-4 shrink-0" aria-hidden strokeWidth={2} />
+                      Delete project
+                    </Button>
+                  </div>
+                  <Alert tone="danger">
+                    Deleting a project removes all of its prompts, topics, audits, visibility
+                    history, and generated content. This cannot be undone.
+                  </Alert>
+                  {deleteMutation.isError ? (
+                    <Alert tone="danger">{errorMessage(deleteMutation.error)}</Alert>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-sm text-muted">No project selected.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!deleteMutation.isPending) setConfirmOpen(open);
+        }}
+        title="Delete project"
+        description={activeProject ? `Delete "${activeProject.name}"?` : undefined}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => activeProject && deleteMutation.mutate(activeProject.id)}
+              disabled={deleteMutation.isPending || !activeProject}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete project'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-secondary">
+          This permanently deletes the project and all of its prompts, topics, audits, visibility
+          history, and generated content. This cannot be undone.
+        </p>
+      </Dialog>
     </div>
   );
 }
