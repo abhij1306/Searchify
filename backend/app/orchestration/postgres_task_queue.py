@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     # Type-only: the queue is generic over the concrete queue-row models (the
     # ``PostgresQueueSpec`` constraint); nothing here imports them at runtime.
     from app.models.audit import AuditTask
+    from app.models.content import ContentGeneration
     from app.models.site_health import SiteCrawlTask
 
 logger = logging.getLogger("app.orchestration.postgres_task_queue")
@@ -48,7 +49,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class PostgresTaskQueue[T: ("AuditTask", "SiteCrawlTask")]:
+class PostgresTaskQueue[T: ("AuditTask", "SiteCrawlTask", "ContentGeneration")]:
     """``TaskQueue[T]`` backed by Postgres ``FOR UPDATE SKIP LOCKED``.
 
     Constructed with a session factory (``async_sessionmaker``) and a

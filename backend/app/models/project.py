@@ -98,6 +98,12 @@ class Project(Base):
         passive_deletes=True,
         order_by="Topic.created_at",
     )
+    content_generations: Mapped[list[ContentGeneration]] = relationship(
+        "ContentGeneration",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ContentGeneration.created_at.desc()",
+    )
 
 
 # Imported at module end to avoid circular imports at definition time; the
@@ -108,4 +114,5 @@ from app.models.brand import (  # noqa: E402
     OwnedDomain,
     UnintendedDomain,
 )
+from app.models.content import ContentGeneration  # noqa: E402
 from app.models.prompt import PromptSet, Topic  # noqa: E402

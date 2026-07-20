@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
+import Link from 'next/link';
 
 import {
   Dropdown,
@@ -13,13 +14,7 @@ import {
 } from '@/components/ui/dropdown';
 import { authApi } from '@/lib/api/auth';
 import { useSession } from '@/lib/auth/session-guard';
-import { cn } from '@/lib/utils';
-
-/** Avatar initials from an email local part. */
-function emailInitials(email: string) {
-  const local = email.split('@')[0] ?? email;
-  return local.slice(0, 2).toUpperCase();
-}
+import { cn, emailInitials } from '@/lib/utils';
 
 /**
  * UserMenu (F5) — shows the current user (from F4's `useSession`) and a logout
@@ -58,6 +53,12 @@ export function UserMenu({ className }: Readonly<{ className?: string }>) {
       <DropdownContent align="start" side="top" className="w-[calc(240px-2rem)]">
         <DropdownLabel>{user.email}</DropdownLabel>
         <DropdownSeparator className="my-1 h-px bg-border-subtle" />
+        <DropdownItem asChild>
+          <Link href="/settings">
+            <Settings className="size-4 shrink-0" aria-hidden />
+            <span>Settings</span>
+          </Link>
+        </DropdownItem>
         <DropdownItem
           onSelect={(event) => {
             event.preventDefault();

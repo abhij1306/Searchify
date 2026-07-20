@@ -62,6 +62,13 @@ import type {
   siteIssueDetailSchema,
   siteIssueSchema,
   siteIssuesPageSchema,
+  // Content
+  contentGenerationDetailSchema,
+  contentGenerationListItemSchema,
+  contentGenerationStatusSchema,
+  contentOutputTypeSchema,
+  websiteContextStatusSchema,
+  websiteContextSummarySchema,
 } from './schemas';
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
@@ -120,3 +127,11 @@ export type VisibilityTrendRankingRow = z.infer<typeof visibilityTrendRankingRow
 export type VisibilityTrendPoint = z.infer<typeof visibilityTrendPointSchema>;
 export type VisibilityExecutionEvidence = z.infer<typeof visibilityExecutionEvidenceSchema>;
 export type VisibilityEvidenceResponse = z.infer<typeof visibilityEvidenceResponseSchema>;
+
+// --- Content ---
+export type ContentGenerationStatus = z.infer<typeof contentGenerationStatusSchema>;
+export type ContentOutputType = z.infer<typeof contentOutputTypeSchema>;
+export type WebsiteContextStatus = z.infer<typeof websiteContextStatusSchema>;
+export type WebsiteContextSummary = z.infer<typeof websiteContextSummarySchema>;
+export type ContentGenerationListItem = z.infer<typeof contentGenerationListItemSchema>;
+export type ContentGenerationDetail = z.infer<typeof contentGenerationDetailSchema>;

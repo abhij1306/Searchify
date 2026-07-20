@@ -1,6 +1,16 @@
 # Roadmap — Content (writer)
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
+> **Status update: a basic v1 shipped** (`/content`, July 2026) — an env-driven,
+> provider-agnostic single output type (`website_page`) with a default-on Website-context
+> tool (deterministic projection from Site Health evidence), cancellable generation via the
+> generic Postgres queue (`content_generations` + append-only attempts, `content_worker`
+> process), and a sanitised-Markdown result screen. See
+> [`../plans/ai-content-settings/`](../plans/ai-content-settings/) for the implemented plan.
+> The richer design below — **briefs, drafts/revisions, tone/style, CMS publishing** —
+> remains roadmap and is NOT built.
+
+> **Status: roadmap / not yet coded** (beyond the basic v1 above). This is a design spec for
+> a future surface, written so
 > an engineer (or agent) can start building without re-deriving the architecture. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read

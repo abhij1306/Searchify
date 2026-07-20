@@ -93,5 +93,22 @@ services:
     # until B5 lands app/workers/audit_worker.py; keeps the service wired now.
     command: ["python", "-m", "app.workers.audit_worker"]
 
+  # Content-generation worker: claims content_generations queue rows and calls
+  # the env-configured provider (MISTRAL_API_KEY empty = provider disabled).
+  content-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.content_worker"]
+
 volumes:
   pg_data:

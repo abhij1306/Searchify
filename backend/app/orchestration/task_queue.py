@@ -4,10 +4,10 @@
 # Orchestration + the workers depend only on this Protocol, never on a concrete
 # implementation, so a future Redis-backed queue can replace the Postgres one
 # with no domain/worker rewrite. The Protocol is generic over the queue-row
-# model ``T`` (``AuditTask`` / ``SiteCrawlTask`` / a future task type) so the
-# one implementation serves every task type. The MVP implementation is
-# ``PostgresTaskQueue`` (``postgres_task_queue.py``), which uses
-# ``FOR UPDATE SKIP LOCKED`` and commits the claim before any network I/O.
+# model ``T`` (``AuditTask`` / ``SiteCrawlTask`` / ``ContentGeneration`` / a
+# future task type) so the one implementation serves every task type. The MVP
+# implementation is ``PostgresTaskQueue`` (``postgres_task_queue.py``), which
+# uses ``FOR UPDATE SKIP LOCKED`` and commits the claim before any network I/O.
 from __future__ import annotations
 
 import uuid

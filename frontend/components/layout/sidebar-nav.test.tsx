@@ -64,6 +64,7 @@ describe('SidebarNav', () => {
       'Prompt Research',
       'Runs',
       'Providers',
+      'Content',
       'Setup',
       'Site Health',
       'Issues',

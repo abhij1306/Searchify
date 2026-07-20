@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Topic } from '@/lib/api/types';
 
 import { TopicRail } from './topic-rail';
@@ -24,14 +25,16 @@ function makeTopic(overrides: Partial<Topic> = {}): Topic {
 
 function renderRail(props: Partial<ComponentProps<typeof TopicRail>> = {}) {
   return render(
-    <TopicRail
-      topics={[makeTopic()]}
-      selectedTopicId={null}
-      onSelect={() => {}}
-      onCreate={() => {}}
-      onDelete={() => {}}
-      {...props}
-    />,
+    <TooltipProvider>
+      <TopicRail
+        topics={[makeTopic()]}
+        selectedTopicId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDelete={() => {}}
+        {...props}
+      />
+    </TooltipProvider>,
   );
 }
 
@@ -63,7 +66,6 @@ describe('TopicRail layout containment', () => {
     const label = within(rail).getByText(longName);
     expect(label).toHaveClass('truncate');
     expect(label).toHaveClass('min-w-0');
-    expect(label).toHaveAttribute('title', longName);
   });
 
   it('preserves topic selection and create/delete actions', async () => {

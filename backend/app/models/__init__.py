@@ -30,6 +30,7 @@ from app.models.brand import (
     OwnedDomain,
     UnintendedDomain,
 )
+from app.models.content import ContentGeneration, ContentGenerationAttempt
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
@@ -71,6 +72,8 @@ __all__ = [
     "Citation",
     "Competitor",
     "CompetitorMention",
+    "ContentGeneration",
+    "ContentGenerationAttempt",
     "DiscoveryModelConfig",
     "MetricSnapshot",
     "OwnedDomain",
