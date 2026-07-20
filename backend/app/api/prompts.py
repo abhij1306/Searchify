@@ -91,6 +91,11 @@ _WorkspaceDep = Annotated[WorkspaceContext, Depends(require_active_workspace)]
 _SessionDep = Annotated[AsyncSession, Depends(get_db)]
 
 
+# Resource labels passed to raise_not_found (S1192: name the repeated literal).
+_RES_PROMPT_SET = "Prompt set"
+_RES_PROJECT = "Project"
+
+
 def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
@@ -127,7 +132,7 @@ async def create_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, payload=payload
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Project", cause=exc)
+        raise_not_found(_RES_PROJECT, cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -140,7 +145,7 @@ async def get_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -159,7 +164,7 @@ async def update_prompt_set_endpoint(
             payload=payload,
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -172,7 +177,7 @@ async def delete_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
 
 
 # --------------------------------------------------------------------------
@@ -190,7 +195,7 @@ async def list_prompts_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     return [prompt_to_response(p) for p in prompts]
 
 
@@ -211,7 +216,7 @@ async def create_prompt_endpoint(
             session, workspace_id=ctx.workspace_id, payload=create
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     except DuplicatePromptError as exc:
         raise _conflict(str(exc)) from exc
     return prompt_to_response(prompt)
@@ -232,7 +237,7 @@ async def update_prompt_endpoint(
             payload=payload,
         )
     except PromptNotFoundError as exc:
-        raise _not_found("Prompt not found") from exc
+        raise_not_found("Prompt", cause=exc)
     except PromptTopicNotFoundError as exc:
         raise _not_found(str(exc)) from exc
     except DuplicatePromptError as exc:
@@ -247,7 +252,7 @@ async def delete_prompt_endpoint(
     try:
         await delete_prompt(session, workspace_id=ctx.workspace_id, prompt_id=prompt_id)
     except PromptNotFoundError as exc:
-        raise _not_found("Prompt not found") from exc
+        raise_not_found("Prompt", cause=exc)
 
 
 # --------------------------------------------------------------------------
@@ -297,7 +302,7 @@ async def import_prompts_endpoint(
             rows=rows,
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -329,7 +334,7 @@ async def generate_prompts_endpoint(
             payload=payload,
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     except GenerationValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -358,7 +363,7 @@ async def generate_prompts_endpoint(
             prompt_set=prompt_set,
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     except GenerationValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -406,7 +411,7 @@ async def bulk_status_endpoint(
             status=payload.status,
         )
     except PromptSetNotFoundError as exc:
-        raise_not_found("Prompt set", cause=exc)
+        raise_not_found(_RES_PROMPT_SET, cause=exc)
     except PromptNotFoundError as exc:
         raise _not_found(str(exc)) from exc
     return prompt_set_to_response(prompt_set)
@@ -424,7 +429,7 @@ async def list_topics_endpoint(
             session, workspace_id=ctx.workspace_id, project_id=project_id
         )
     except TopicNotFoundError as exc:
-        raise_not_found("Project", cause=exc)
+        raise_not_found(_RES_PROJECT, cause=exc)
     counts = await topic_status_counts(session, project_id=project_id)
     return [topic_to_response(t, counts) for t in topics]
 
@@ -448,7 +453,7 @@ async def create_topic_endpoint(
             payload=payload,
         )
     except TopicNotFoundError as exc:
-        raise_not_found("Project", cause=exc)
+        raise_not_found(_RES_PROJECT, cause=exc)
     except DuplicateTopicError as exc:
         raise _conflict(str(exc)) from exc
     return topic_to_response(topic)
@@ -469,7 +474,7 @@ async def update_topic_endpoint(
             payload=payload,
         )
     except TopicNotFoundError as exc:
-        raise _not_found("Topic not found") from exc
+        raise_not_found("Topic", cause=exc)
     except DuplicateTopicError as exc:
         raise _conflict(str(exc)) from exc
     counts = await topic_status_counts(session, project_id=topic.project_id)
@@ -483,4 +488,4 @@ async def delete_topic_endpoint(
     try:
         await delete_topic(session, workspace_id=ctx.workspace_id, topic_id=topic_id)
     except TopicNotFoundError as exc:
-        raise _not_found("Topic not found") from exc
+        raise_not_found("Topic", cause=exc)

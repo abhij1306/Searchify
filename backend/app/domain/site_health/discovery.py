@@ -222,7 +222,10 @@ async def _upsert_site_url(
     now = _utcnow()
     try:
         host, _port = split_host_port(candidate.url)
-    except Exception:
+    # urlsplit port parsing raises ValueError on a malformed-but-admitted URL;
+    # host is display metadata only, so degrade to "" (same catch as
+    # is_in_scope). Anything else is a systemic bug and must propagate.
+    except ValueError:
         host = ""
     stmt = (
         pg_insert(SiteUrl)

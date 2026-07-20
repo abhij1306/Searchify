@@ -48,6 +48,9 @@ async def get_current_user(
     try:
         payload = decode_access_token(session_token)
         user_id = uuid.UUID(str(payload["sub"]))
+    # decode_access_token failures raise TokenDecodeError, a ValueError
+    # subclass (app/core/security.py) — covered here together with a missing
+    # "sub" claim (KeyError) and a malformed UUID (ValueError).
     except (KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
