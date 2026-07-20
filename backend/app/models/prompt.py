@@ -31,6 +31,7 @@ from app.core.config.projects import DEFAULT_PROMPT_ORIGIN
 from app.core.config.prompts import DEFAULT_PROMPT_STATUS, TOPIC_ORIGIN_MANUAL
 from app.core.database import Base
 from app.domain.prompts.normalization import prompt_text_hash
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN, ON_DELETE_SET_NULL
 
 
 class Topic(Base):
@@ -110,7 +111,7 @@ class PromptSet(Base):
     prompts: Mapped[list[Prompt]] = relationship(
         "Prompt",
         back_populates="prompt_set",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="Prompt.created_at",
     )
@@ -147,7 +148,7 @@ class Prompt(Base):
     )
     topic_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("topics.id", ondelete="SET NULL"),
+        ForeignKey("topics.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
         index=True,
     )

@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN
 
 
 class Brand(Base):
@@ -53,7 +54,7 @@ class Brand(Base):
     aliases: Mapped[list[BrandAlias]] = relationship(
         "BrandAlias",
         back_populates="brand",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="BrandAlias.created_at",
     )

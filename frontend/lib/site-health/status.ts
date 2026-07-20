@@ -22,6 +22,7 @@ import type {
   SiteHealthEntitlement,
 } from '@/lib/api/types';
 import type { RunStatusValue, StatusValue } from '@/components/ui/badge-variants';
+import { titleCaseStatus } from '@/lib/utils';
 
 /** The not-yet-analysed / not-applicable placeholder (matches visibility UI). */
 export const PLACEHOLDER = '—';
@@ -340,10 +341,7 @@ export function isErrorRow(status: PageAnalysisStatus): boolean {
 
 /** Human-readable label for any snake_case lifecycle token. */
 export function statusLabel(status: string): string {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return titleCaseStatus(status);
 }
 
 /**

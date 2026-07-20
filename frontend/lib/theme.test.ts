@@ -44,7 +44,9 @@ describe('theme', () => {
     });
     applyTheme('dark');
     // MutationObserver callbacks are microtask/async — wait a tick.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
     expect(calls).toBeGreaterThan(0);
     unsubscribe();
   });

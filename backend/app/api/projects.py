@@ -19,6 +19,7 @@ from app.core.config.analysis import (
     VISIBILITY_EVIDENCE_MAX_LIMIT,
     VISIBILITY_TREND_DEFAULT_GRANULARITY,
 )
+from app.core.http_errors import raise_not_found
 from app.domain.analysis.schemas import (
     VisibilityEvidenceResponse,
     VisibilityResponse,
@@ -97,9 +98,7 @@ async def get_visibility_trends_endpoint(
     try:
         await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)
     try:
         return await get_visibility_trends(
             session,
@@ -152,9 +151,7 @@ async def get_visibility_evidence_endpoint(
     try:
         await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)
     try:
         return await get_visibility_evidence(
             session,
@@ -168,9 +165,7 @@ async def get_visibility_evidence_endpoint(
             limit=limit,
         )
     except AnalysisNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
     except TrendQueryError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -187,9 +182,7 @@ async def get_project_endpoint(
             session, workspace_id=ctx.workspace_id, project_id=project_id
         )
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)
     return project_to_response(project)
 
 
@@ -211,9 +204,7 @@ async def get_visibility_endpoint(
     try:
         await get_project(session, workspace_id=ctx.workspace_id, project_id=project_id)
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)
     try:
         return await get_visibility(
             session,
@@ -243,9 +234,7 @@ async def update_project_endpoint(
             payload=payload,
         )
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)
     return project_to_response(project)
 
 
@@ -258,6 +247,4 @@ async def delete_project_endpoint(
             session, workspace_id=ctx.workspace_id, project_id=project_id
         )
     except ProjectNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        ) from exc
+        raise_not_found("Project", cause=exc)

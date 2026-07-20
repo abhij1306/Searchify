@@ -265,8 +265,10 @@ function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active:
 
   const pagesQuery = useQuery({
     ...siteHealthQueries.pages(crawl.id, { ...activeTab.params, cursor, limit: PAGE_LIMIT }),
-    // While analysis is active the browser keeps refreshing (polling baseline).
-    refetchInterval: active ? POLL_INTERVAL_MS : false,
+    // While analysis is active only the FIRST page of a tab polls (polling
+    // baseline) — deeper cursor pages stay static so rows under review don't
+    // shift as more pages finish scoring.
+    refetchInterval: active && cursor === undefined ? POLL_INTERVAL_MS : false,
   });
 
   const rows = pagesQuery.data?.items ?? [];

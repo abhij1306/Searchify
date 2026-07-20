@@ -249,9 +249,11 @@ def test_aggregate_run_rates_and_stability() -> None:
 
     summary = aggregate_run(executions, config)
     assert summary["total_completed"] == 6
-    assert summary["brand_mention_rate"] == round(4 / 6, 4)
-    assert summary["owned_citation_rate"] == round(2 / 6, 4)
-    assert summary["mention_to_owned_citation_conversion"] == round(2 / 4, 4)
+    assert summary["brand_mention_rate"] == pytest.approx(round(4 / 6, 4))
+    assert summary["owned_citation_rate"] == pytest.approx(round(2 / 6, 4))
+    assert summary["mention_to_owned_citation_conversion"] == pytest.approx(
+        round(2 / 4, 4)
+    )
     assert summary["search_use_rate"] == 1.0
 
     prompt0 = next(p for p in summary["per_prompt"] if p["prompt_index"] == 0)
@@ -261,7 +263,7 @@ def test_aggregate_run_rates_and_stability() -> None:
 
     prompt1 = next(p for p in summary["per_prompt"] if p["prompt_index"] == 1)
     assert prompt1["brand_mentioned_count"] == 1
-    assert prompt1["mention_stability"] == round(2 / 3, 4)
+    assert prompt1["mention_stability"] == pytest.approx(round(2 / 3, 4))
 
 
 def test_conversion_requires_mention_and_citation_in_same_execution() -> None:
@@ -335,8 +337,8 @@ def test_aggregate_run_sums_token_usage() -> None:
     assert usage["total_tokens"] == 1400
     cost = summary["cost"]
     assert cost["grounded_requests"] == 2
-    assert cost["paid_list_token_estimate_usd"] == 0.002009
-    assert cost["grounding_cost_if_billable_usd"] == 0.07
+    assert cost["paid_list_token_estimate_usd"] == pytest.approx(0.002009)
+    assert cost["grounding_cost_if_billable_usd"] == pytest.approx(0.07)
 
 
 def test_aggregate_run_token_usage_defaults_to_zero() -> None:
@@ -386,7 +388,7 @@ def test_share_of_voice_and_roadmap_fields() -> None:
     assert sov["total_mentions"] == 3
     assert sov["mention_counts"]["Best&Less"] == 1
     assert sov["mention_counts"]["Kmart"] == 2
-    assert sov["share"]["Kmart"] == round(2 / 3, 4)
+    assert sov["share"]["Kmart"] == pytest.approx(round(2 / 3, 4))
     # Roadmap metrics present but null (decision B-2, invariant 9).
     assert summary["sentiment"] is None
     assert summary["avg_position"] is None

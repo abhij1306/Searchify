@@ -68,6 +68,10 @@ class AnalysisNotFoundError(LookupError):
     """Raised when a requested projection has no persisted rows to serve."""
 
 
+# Single source for the repeated "audit missing" detail (asserted by tests).
+_AUDIT_NOT_FOUND = "Audit not found"
+
+
 async def get_metrics(
     session: AsyncSession, *, workspace_id: uuid.UUID, audit_id: uuid.UUID
 ) -> MetricsResponse:
@@ -106,7 +110,7 @@ async def get_visibility(
         )
     )
     if audit is None:
-        raise AnalysisNotFoundError("Audit not found")
+        raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
     snapshot = await _load_snapshot(
         session, workspace_id=workspace_id, audit_id=audit_id
     )
@@ -236,7 +240,7 @@ async def get_visibility_evidence(
             )
         )
         if owning is None:
-            raise AnalysisNotFoundError("Audit not found")
+            raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
 
     stmt = (
         select(
@@ -392,7 +396,7 @@ async def load_export_bundle(
         select(Audit).where(Audit.id == audit_id, Audit.workspace_id == workspace_id)
     )
     if audit is None:
-        raise AnalysisNotFoundError("Audit not found")
+        raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
     tasks = list(
         (
             await session.scalars(

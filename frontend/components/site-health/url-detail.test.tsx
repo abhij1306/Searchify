@@ -212,7 +212,9 @@ describe('UrlDetail', () => {
         // reproduces the real race where React re-renders with
         // `rerunPolling` newly `true` while the query cache still holds
         // the *previous* terminal snapshot.
-        await new Promise((resolve) => setTimeout(resolve, 15));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 15);
+        });
         return HttpResponse.json(detail({ analysis_status: status }));
       }),
       http.get(`/api/v1/site-crawls/${CRAWL}/pages/${URL_ID}/issue-history`, () =>

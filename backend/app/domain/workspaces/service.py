@@ -11,7 +11,6 @@ from app.models.workspace import Workspace, WorkspaceMember
 
 # Roles a member can hold within a workspace. The creator is the owner.
 WORKSPACE_ROLE_OWNER = "owner"
-WORKSPACE_ROLE_MEMBER = "member"
 
 
 def _default_workspace_name(user: User) -> str:

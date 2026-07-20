@@ -43,6 +43,7 @@ class _StubAdapter:
     transport_provider = TRANSPORT_GOOGLE
 
     def __init__(self, **_: object) -> None:
+        # No-op: stub holds no state; accepts and ignores adapter build kwargs.
         pass
 
     async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:

@@ -84,7 +84,9 @@ export interface RealStack {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function findRepoRoot(): string {
@@ -328,7 +330,9 @@ export async function startRealStack(): Promise<RealStack> {
   const stop = async (): Promise<void> => {
     for (const proc of procs) killTree(proc);
     if (mockServer) {
-      await new Promise<void>((resolve) => mockServer?.close(() => resolve()));
+      await new Promise<void>((resolve) => {
+        mockServer?.close(() => resolve());
+      });
       mockServer = null;
     }
     if (dbCreated) {

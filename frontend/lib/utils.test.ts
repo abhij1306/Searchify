@@ -5,7 +5,11 @@ import { cn, emailInitials } from './utils';
 describe('cn', () => {
   it('merges conditional class names and resolves Tailwind conflicts', () => {
     expect(cn('px-2', 'px-4')).toBe('px-4');
-    expect(cn('text-sm', false && 'hidden', 'font-bold')).toBe('text-sm font-bold');
+  });
+
+  it('drops falsy conditional class names', () => {
+    const isHidden = false;
+    expect(cn('text-sm', isHidden && 'hidden', 'font-bold')).toBe('text-sm font-bold');
   });
 });
 

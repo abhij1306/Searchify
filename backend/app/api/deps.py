@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.security import TokenDecodeError, decode_access_token
+from app.core.http_errors import raise_not_found
+from app.core.security import decode_access_token
 from app.domain.workspaces.service import get_membership
 from app.models.user import User
 from app.models.workspace import WorkspaceMember
@@ -47,7 +48,7 @@ async def get_current_user(
     try:
         payload = decode_access_token(session_token)
         user_id = uuid.UUID(str(payload["sub"]))
-    except (TokenDecodeError, KeyError, ValueError) as exc:
+    except (KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from exc
@@ -90,9 +91,7 @@ async def require_workspace_member(
     """
     member = await get_membership(session, workspace_id, user.id)
     if member is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
-        )
+        raise_not_found("Workspace")
     return WorkspaceContext(user=user, member=member)
 
 
@@ -120,10 +119,7 @@ async def require_active_workspace(
             ) from exc
         member = await get_membership(session, workspace_id, user.id)
         if member is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workspace not found",
-            )
+            raise_not_found("Workspace")
         return WorkspaceContext(user=user, member=member)
 
     # No explicit selection: fall back to the earliest membership so a
@@ -136,7 +132,5 @@ async def require_active_workspace(
     )
     member = result.scalar_one_or_none()
     if member is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
-        )
+        raise_not_found("Workspace")
     return WorkspaceContext(user=user, member=member)

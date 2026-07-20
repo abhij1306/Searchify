@@ -35,6 +35,11 @@ from app.core.config.audits import (
     TASK_STATUS_QUEUED,
 )
 from app.core.database import Base
+from app.models.constants import (
+    CASCADE_ALL_DELETE_ORPHAN,
+    FK_AUDITS_ID,
+    ON_DELETE_SET_NULL,
+)
 
 
 def _utcnow() -> datetime:
@@ -103,28 +108,28 @@ class Audit(Base):
     prompt_snapshots: Mapped[list[AuditPromptSnapshot]] = relationship(
         "AuditPromptSnapshot",
         back_populates="audit",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="AuditPromptSnapshot.prompt_index",
     )
     engine_snapshots: Mapped[list[AuditEngineSnapshot]] = relationship(
         "AuditEngineSnapshot",
         back_populates="audit",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="AuditEngineSnapshot.created_at",
     )
     tasks: Mapped[list[AuditTask]] = relationship(
         "AuditTask",
         back_populates="audit",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="AuditTask.randomized_position",
     )
     events: Mapped[list[AuditEvent]] = relationship(
         "AuditEvent",
         back_populates="audit",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="AuditEvent.created_at",
     )
@@ -149,14 +154,14 @@ class AuditPromptSnapshot(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     # Optional back-reference to the source prompt (nullable so deleting the
     # prompt never breaks the frozen snapshot).
     prompt_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("prompts.id", ondelete="SET NULL"),
+        ForeignKey("prompts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     prompt_index: Mapped[int] = mapped_column(Integer)
@@ -190,7 +195,7 @@ class AuditEngineSnapshot(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     logical_engine: Mapped[str] = mapped_column(String(32))
@@ -200,7 +205,7 @@ class AuditEngineSnapshot(Base):
     # deleted connection does not break the frozen snapshot).
     connection_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("provider_connections.id", ondelete="SET NULL"),
+        ForeignKey("provider_connections.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     base_url: Mapped[str] = mapped_column(String(1024), default="")
@@ -239,7 +244,7 @@ class AuditTask(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
@@ -290,7 +295,7 @@ class AuditTask(Base):
     # --- Execution result (single-writer = claiming worker, invariant 3) --
     result_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     answer_text: Mapped[str] = mapped_column(Text, default="")
@@ -318,7 +323,7 @@ class AuditTask(Base):
     attempts: Mapped[list[ProviderAttempt]] = relationship(
         "ProviderAttempt",
         back_populates="task",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="ProviderAttempt.attempt_number",
     )
@@ -338,7 +343,7 @@ class RawResponseArtifact(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
@@ -381,7 +386,7 @@ class ProviderAttempt(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     attempt_number: Mapped[int] = mapped_column(Integer)
@@ -395,7 +400,7 @@ class ProviderAttempt(Base):
     # Set on the succeeding attempt.
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -415,7 +420,7 @@ class AuditEvent(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     event_type: Mapped[str] = mapped_column(String(48))

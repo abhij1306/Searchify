@@ -20,6 +20,15 @@ const eslintConfig = [
           ignoreRestSiblings: true,
         },
       ],
+      // Require strict equality everywhere except intentional `value == null`
+      // null-or-undefined checks (the one allowed loose form).
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      // A Promise executor that returns a value is almost always a bug (the
+      // return is ignored) — flag it as an error.
+      'no-promise-executor-return': 'error',
+      // Constant binary expressions (e.g. always-truthy assertions) are dead
+      // logic — flag them as an error.
+      'no-constant-binary-expression': 'error',
     },
   },
   {

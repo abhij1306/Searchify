@@ -71,6 +71,7 @@ _FK_SITE_PAGE_ANALYSIS = "site_page_analyses.id"
 _FK_SITE_RULE_EVALUATION = "site_rule_evaluations.id"
 _ON_DELETE_CASCADE = "CASCADE"
 _ON_DELETE_SET_NULL = "SET NULL"
+_CASCADE_ALL_DELETE_ORPHAN = "all, delete-orphan"
 
 
 def _utcnow() -> datetime:
@@ -258,13 +259,13 @@ class SiteCrawl(Base):
     tasks: Mapped[list[SiteCrawlTask]] = relationship(
         "SiteCrawlTask",
         back_populates="crawl",
-        cascade="all, delete-orphan",
+        cascade=_CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
     events: Mapped[list[SiteCrawlEvent]] = relationship(
         "SiteCrawlEvent",
         back_populates="crawl",
-        cascade="all, delete-orphan",
+        cascade=_CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="SiteCrawlEvent.created_at",
     )

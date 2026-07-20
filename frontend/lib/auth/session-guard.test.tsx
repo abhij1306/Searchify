@@ -67,7 +67,9 @@ describe('SessionGuard', () => {
     );
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     expect(requestCount).toBe(1);
     expect(screen.queryByText(/signed in as/i)).not.toBeInTheDocument();
   });
@@ -89,7 +91,9 @@ describe('SessionGuard', () => {
 
     // The guard stays on the fallback (no user) but never bounces to /login.
     await screen.findByText('loading');
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
     expect(replace).not.toHaveBeenCalled();
   });
 

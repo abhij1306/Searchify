@@ -8,6 +8,8 @@ rounding, config-weighted overall, dimensions with no applicable rules excluded
 
 from __future__ import annotations
 
+import pytest
+
 from app.analysis.site_health.scoring import (
     AnalysisScoreInput,
     _Scored,
@@ -37,7 +39,7 @@ def test_all_pass_is_100():
         _s(RULE_OUTCOME_PASS, 2.0),
     ]
     ds = score_dimension(evals, dimension=DIMENSION_TECHNICAL)
-    assert ds.score == 100.0
+    assert ds.score == pytest.approx(100.0)
     assert ds.applicable_count == 2
 
 
@@ -48,7 +50,7 @@ def test_pass_fail_weighting():
         _s(RULE_OUTCOME_FAIL, 2.0),
     ]
     ds = score_dimension(evals, dimension=DIMENSION_TECHNICAL)
-    assert ds.score == 60.0
+    assert ds.score == pytest.approx(60.0)
 
 
 def test_error_gets_zero_credit_but_stays_in_denominator():
@@ -58,7 +60,7 @@ def test_error_gets_zero_credit_but_stays_in_denominator():
         _s(RULE_OUTCOME_ERROR, 1.0),
     ]
     ds = score_dimension(evals, dimension=DIMENSION_TECHNICAL)
-    assert ds.score == 75.0
+    assert ds.score == pytest.approx(75.0)
     assert ds.error_weight == 1.0
     assert ds.applicable_count == 2
 
@@ -71,7 +73,7 @@ def test_not_applicable_excluded_entirely():
         _s(RULE_OUTCOME_NOT_APPLICABLE, 10.0),
     ]
     ds = score_dimension(evals, dimension=DIMENSION_TECHNICAL)
-    assert ds.score == 100.0
+    assert ds.score == pytest.approx(100.0)
     assert ds.applicable_count == 1
 
 
@@ -89,17 +91,21 @@ def test_single_rounding_to_one_decimal():
         _s(RULE_OUTCOME_FAIL, 2.0),
     ]
     ds = score_dimension(evals, dimension=DIMENSION_TECHNICAL)
-    assert ds.score == 33.3
+    assert ds.score == pytest.approx(33.3)
 
 
 def test_overall_is_config_weighted_mean():
     # 50/50 weights -> mean of 80 and 60 = 70.0
-    assert overall_score({DIMENSION_TECHNICAL: 80.0, DIMENSION_AEO: 60.0}) == 70.0
+    assert overall_score(
+        {DIMENSION_TECHNICAL: 80.0, DIMENSION_AEO: 60.0}
+    ) == pytest.approx(70.0)
 
 
 def test_overall_excludes_none_dimension():
     # AEO None -> overall is just technical (not dragged to zero/halved).
-    assert overall_score({DIMENSION_TECHNICAL: 90.0, DIMENSION_AEO: None}) == 90.0
+    assert overall_score(
+        {DIMENSION_TECHNICAL: 90.0, DIMENSION_AEO: None}
+    ) == pytest.approx(90.0)
 
 
 def test_overall_all_none_is_none():
@@ -116,10 +122,10 @@ def test_score_analysis_end_to_end():
         _s(RULE_OUTCOME_ERROR, 2.0, DIMENSION_AEO),
     ]
     scores = score_analysis(evals)
-    assert scores.technical_score == 75.0
-    assert scores.aeo_score == 50.0
+    assert scores.technical_score == pytest.approx(75.0)
+    assert scores.aeo_score == pytest.approx(50.0)
     # overall = mean(75, 50) = 62.5
-    assert scores.overall_score == 62.5
+    assert scores.overall_score == pytest.approx(62.5)
     assert scores.scoring_version == SCORING_VERSION
 
 
@@ -130,9 +136,9 @@ def test_score_analysis_missing_dimension_not_zero():
         _s(RULE_OUTCOME_NOT_APPLICABLE, 3.0, DIMENSION_AEO),
     ]
     scores = score_analysis(evals)
-    assert scores.technical_score == 100.0
+    assert scores.technical_score == pytest.approx(100.0)
     assert scores.aeo_score is None
-    assert scores.overall_score == 100.0
+    assert scores.overall_score == pytest.approx(100.0)
 
 
 # --- aggregation ----------------------------------------------------------
@@ -144,9 +150,9 @@ def test_aggregate_averages_latest_per_url():
         AnalysisScoreInput("u2", 0, 60.0, 40.0, 50.0),
     ]
     agg = aggregate_scores(analyses)
-    assert agg.technical_score == 80.0  # mean(100, 60)
-    assert agg.aeo_score == 60.0  # mean(80, 40)
-    assert agg.overall_score == 70.0  # mean(90, 50)
+    assert agg.technical_score == pytest.approx(80.0)  # mean(100, 60)
+    assert agg.aeo_score == pytest.approx(60.0)  # mean(80, 40)
+    assert agg.overall_score == pytest.approx(70.0)  # mean(90, 50)
     assert agg.analyzed_url_count == 2
 
 
@@ -157,7 +163,7 @@ def test_aggregate_uses_latest_analysis_per_url():
         AnalysisScoreInput("u1", 1, 90.0, 90.0, 90.0),
     ]
     agg = aggregate_scores(analyses)
-    assert agg.technical_score == 90.0
+    assert agg.technical_score == pytest.approx(90.0)
     assert agg.analyzed_url_count == 1
 
 
@@ -171,9 +177,9 @@ def test_aggregate_ignores_missing_and_error_urls():
     ]
     agg = aggregate_scores(analyses)
     # Mean over only the url with a real score -> 80.0, not (80+0)/2 = 40.
-    assert agg.technical_score == 80.0
-    assert agg.aeo_score == 80.0
-    assert agg.overall_score == 80.0
+    assert agg.technical_score == pytest.approx(80.0)
+    assert agg.aeo_score == pytest.approx(80.0)
+    assert agg.overall_score == pytest.approx(80.0)
     # Both URLs are counted as analyzed (u2 completed, just with no score).
     assert agg.analyzed_url_count == 2
 

@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN, ON_DELETE_SET_NULL
 
 
 class ProviderConnection(Base):
@@ -71,14 +72,14 @@ class ProviderConnection(Base):
     routes: Mapped[list[ProviderRoute]] = relationship(
         "ProviderRoute",
         back_populates="connection",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="ProviderRoute.created_at",
     )
     tests: Mapped[list[ProviderConnectionTest]] = relationship(
         "ProviderConnectionTest",
         back_populates="connection",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="ProviderConnectionTest.created_at",
     )
@@ -197,7 +198,7 @@ class DiscoveryModelConfig(Base):
     )
     connection_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("provider_connections.id", ondelete="SET NULL"),
+        ForeignKey("provider_connections.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
         index=True,
     )

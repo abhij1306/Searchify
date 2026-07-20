@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
 from app.connectors.agent.client import AgentNotConfiguredError, DefaultAgentClient
 from app.connectors.answer_engines.errors import ProviderError
+from app.core.http_errors import raise_not_found
 from app.domain.prompts.csv_import import parse_prompt_csv
 from app.domain.prompts.generation import (
     GenerationOutputError,
@@ -126,7 +127,7 @@ async def create_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, payload=payload
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Project not found") from exc
+        raise_not_found("Project", cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -139,7 +140,7 @@ async def get_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -158,7 +159,7 @@ async def update_prompt_set_endpoint(
             payload=payload,
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -171,7 +172,7 @@ async def delete_prompt_set_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
 
 
 # --------------------------------------------------------------------------
@@ -189,7 +190,7 @@ async def list_prompts_endpoint(
             session, workspace_id=ctx.workspace_id, prompt_set_id=prompt_set_id
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     return [prompt_to_response(p) for p in prompts]
 
 
@@ -210,7 +211,7 @@ async def create_prompt_endpoint(
             session, workspace_id=ctx.workspace_id, payload=create
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     except DuplicatePromptError as exc:
         raise _conflict(str(exc)) from exc
     return prompt_to_response(prompt)
@@ -296,7 +297,7 @@ async def import_prompts_endpoint(
             rows=rows,
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     return prompt_set_to_response(prompt_set)
 
 
@@ -328,7 +329,7 @@ async def generate_prompts_endpoint(
             payload=payload,
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     except GenerationValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -357,7 +358,7 @@ async def generate_prompts_endpoint(
             prompt_set=prompt_set,
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     except GenerationValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -405,7 +406,7 @@ async def bulk_status_endpoint(
             status=payload.status,
         )
     except PromptSetNotFoundError as exc:
-        raise _not_found("Prompt set not found") from exc
+        raise_not_found("Prompt set", cause=exc)
     except PromptNotFoundError as exc:
         raise _not_found(str(exc)) from exc
     return prompt_set_to_response(prompt_set)
@@ -423,7 +424,7 @@ async def list_topics_endpoint(
             session, workspace_id=ctx.workspace_id, project_id=project_id
         )
     except TopicNotFoundError as exc:
-        raise _not_found("Project not found") from exc
+        raise_not_found("Project", cause=exc)
     counts = await topic_status_counts(session, project_id=project_id)
     return [topic_to_response(t, counts) for t in topics]
 
@@ -447,7 +448,7 @@ async def create_topic_endpoint(
             payload=payload,
         )
     except TopicNotFoundError as exc:
-        raise _not_found("Project not found") from exc
+        raise_not_found("Project", cause=exc)
     except DuplicateTopicError as exc:
         raise _conflict(str(exc)) from exc
     return topic_to_response(topic)
