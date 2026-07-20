@@ -132,12 +132,6 @@ export function InventorySelection({
   return (
     <Card>
       <CardContent className="grid gap-4">
-        {crawlInactive ? (
-          <Alert tone="info">
-            Discovery was cancelled — the pages found so far are kept below. Select the pages to
-            monitor, save your selection, then start the analysis.
-          </Alert>
-        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-0.5">
             <Label>Page Inventory</Label>

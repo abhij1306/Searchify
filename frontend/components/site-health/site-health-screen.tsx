@@ -2,7 +2,7 @@
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { PhasePanel } from '@/components/site-health/phase-panel';
+import { SiteHealthDashboardLayout } from '@/components/site-health/dashboard-layout';
 import { ScreenHeader, ScreenSkeleton } from '@/components/site-health/screen-states';
 import { useProjectContext } from '@/lib/project/project-context';
 import { useSiteHealthScreen } from '@/lib/site-health/use-site-health-screen';
@@ -12,8 +12,11 @@ import { useSiteHealthScreen } from '@/lib/site-health/use-site-health-screen';
  *
  * Resolves the active project, then delegates all data orchestration
  * (entitlement, dashboard, pages, mutations, export, phase resolution) to
- * `useSiteHealthScreen` and phase rendering (discovery → selection → analysis
- * → dashboard) to `PhasePanel`.
+ * `useSiteHealthScreen` and rendering to the canonical
+ * `SiteHealthDashboardLayout` — one always-mounted screen whose sections
+ * update in place across the discover → select → analyze → scored flow. The
+ * header offers the single primary control (`primaryAction`) so start/cancel/
+ * re-crawl is available from the same place at every point.
  */
 export function SiteHealthScreen() {
   const { activeProject, isLoading: projectLoading } = useProjectContext();
@@ -23,12 +26,14 @@ export function SiteHealthScreen() {
   const {
     entitlementQuery,
     dashboardQuery,
-    crawl,
-    active,
     phase,
-    recrawlStarting,
+    primaryAction,
+    active,
+    crawlStarting,
     createMutation,
+    cancelMutation,
     startCrawl,
+    cancelCrawl,
     runExport,
     exporting,
     exportError,
@@ -56,8 +61,42 @@ export function SiteHealthScreen() {
     );
   }
 
+  const primaryButton = (() => {
+    switch (primaryAction) {
+      case 'start':
+        return (
+          <Button size="sm" onClick={startCrawl} disabled={crawlStarting}>
+            {crawlStarting ? 'Starting…' : 'Start discovery'}
+          </Button>
+        );
+      case 'cancel':
+        return (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={cancelCrawl}
+            disabled={cancelMutation.isPending}
+          >
+            {cancelMutation.isPending ? 'Cancelling…' : 'Cancel'}
+          </Button>
+        );
+      case 'recrawl':
+        return (
+          <Button size="sm" onClick={startCrawl} disabled={crawlStarting || active}>
+            {crawlStarting
+              ? 'Starting…'
+              : phase === 'terminal'
+                ? 'Start a new crawl'
+                : 'Re-crawl now'}
+          </Button>
+        );
+      default:
+        return null;
+    }
+  })();
+
   const headerActions =
-    crawl && (phase === 'dashboard' || phase === 'terminal') ? (
+    primaryButton || phase === 'dashboard' ? (
       <div className="flex items-center gap-2">
         {phase === 'dashboard' ? (
           <Button
@@ -69,9 +108,7 @@ export function SiteHealthScreen() {
             {exporting ? 'Exporting…' : 'Export'}
           </Button>
         ) : null}
-        <Button size="sm" onClick={startCrawl} disabled={createMutation.isPending || active}>
-          {createMutation.isPending ? 'Starting…' : 'Re-crawl now'}
-        </Button>
+        {primaryButton}
       </div>
     ) : null;
 
@@ -83,14 +120,12 @@ export function SiteHealthScreen() {
       {createMutation.isError ? (
         <Alert tone="danger">Could not start a crawl. It may already be running.</Alert>
       ) : null}
-      {recrawlStarting ? (
-        <Alert tone="info">
-          Starting a fresh crawl — your previous results and monitored selection stay in view until
-          the new run takes over.
-        </Alert>
-      ) : null}
 
-      <PhasePanel screen={screen} entitlement={entitlementQuery.data!} projectId={projectId} />
+      <SiteHealthDashboardLayout
+        screen={screen}
+        entitlement={entitlementQuery.data!}
+        projectId={projectId}
+      />
     </div>
   );
 }

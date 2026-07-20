@@ -13,8 +13,12 @@ import {
 } from '@/lib/site-health/download';
 import { useCrawlEvents } from '@/lib/site-health/use-crawl-events';
 import {
+  inventoryModeForPhase,
+  primaryActionForPhase,
   resolveSiteHealthPhase,
   shouldPollCrawl,
+  type InventoryMode,
+  type PrimaryAction,
   type SiteHealthPhase,
 } from '@/lib/site-health/status';
 
@@ -68,6 +72,13 @@ export function useSiteHealthScreen(projectId: string | null) {
 
   const phase: SiteHealthPhase = useMemo(() => resolveSiteHealthPhase(crawl, plan), [crawl, plan]);
 
+  // Canonical-screen view-model: the same layout stays mounted through the
+  // whole discover → select → analyze → scored flow; these two modifiers are
+  // all that changes (which header control shows, what the inventory section
+  // renders). Derived, never stored — the crawl shape is the single source.
+  const primaryAction: PrimaryAction = primaryActionForPhase(phase, active);
+  const inventoryMode: InventoryMode = inventoryModeForPhase(phase);
+
   // Per-PROJECT selected total for the analysis progress bar. The dashboard
   // quota `used` is workspace-wide, so a multi-project workspace would
   // overcount this crawl's queue — count this project's active monitored rows
@@ -110,13 +121,18 @@ export function useSiteHealthScreen(projectId: string | null) {
   const startCrawl = () => projectId && createMutation.mutate({ project_id: projectId });
   const cancelCrawl = () => crawl && cancelMutation.mutate(crawl.id);
 
-  // "Re-crawl starting": the user launched a fresh crawl from a dashboard /
-  // terminal state and the create request is in flight. Retain the prior
-  // content (dashboard, partial scores, inventory) behind a starting notice
-  // rather than blanking it until the new crawl's first projection lands.
-  const recrawlStarting =
-    createMutation.isPending &&
-    (phase === 'dashboard' || phase === 'terminal' || phase === 'selection');
+  // "Crawl starting": the user launched a fresh crawl (Start discovery /
+  // Start analysis / Re-crawl) and the new run has not yet replaced the
+  // dashboard's crawl — either the create request is still in flight, or it
+  // succeeded but the dashboard query still returns the previous crawl. The
+  // screen keeps its current content frozen behind a starting notice instead
+  // of re-resolving the OLD crawl's phase (which is what used to bounce the
+  // UI back to the selection list after "Start analysis").
+  const crawlStarting =
+    createMutation.isPending ||
+    (createMutation.isSuccess &&
+      createMutation.data != null &&
+      crawl?.id !== createMutation.data.id);
 
   const runExport = async (format: ExportFormat, view: ExportView) => {
     if (!crawl) return;
@@ -138,9 +154,11 @@ export function useSiteHealthScreen(projectId: string | null) {
     crawl,
     active,
     phase,
+    primaryAction,
+    inventoryMode,
     projectSelectedTotal,
     projectSelectedError,
-    recrawlStarting,
+    crawlStarting,
     createMutation,
     cancelMutation,
     startCrawl,

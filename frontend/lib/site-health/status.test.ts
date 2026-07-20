@@ -10,6 +10,7 @@ import {
   formatIssueCount,
   formatScore,
   hasScoreData,
+  inventoryModeForPhase,
   isAnalysisTerminal,
   isCrawlCancelable,
   isDiscoveryProvisional,
@@ -17,6 +18,7 @@ import {
   isErrorRow,
   isSampleMode,
   pageStatusBadgeValue,
+  primaryActionForPhase,
   resolveSiteHealthPhase,
   shouldPollCrawl,
   statusLabel,
@@ -302,8 +304,40 @@ describe('resolveSiteHealthPhase', () => {
   });
 });
 
-describe('score-data helpers (cancelled-with-data product rule)', () => {
-  const summary = {
+describe('canonical-screen view-model (primaryAction / inventoryMode)', () => {
+  it('offers Start on empty and Re-crawl on terminal', () => {
+    expect(primaryActionForPhase('empty', false)).toBe('start');
+    expect(primaryActionForPhase('terminal', false)).toBe('recrawl');
+  });
+
+  it('offers Cancel only while the crawl is actually active', () => {
+    expect(primaryActionForPhase('discovering', true)).toBe('cancel');
+    expect(primaryActionForPhase('analyzing', true)).toBe('cancel');
+    expect(primaryActionForPhase('selection', true)).toBe('cancel');
+    // A stale non-active crawl in a progress phase gets no dangling Cancel.
+    expect(primaryActionForPhase('discovering', false)).toBe('none');
+    expect(primaryActionForPhase('analyzing', false)).toBe('none');
+  });
+
+  it('leaves an inactive selection to the section buttons and gives the dashboard Re-crawl', () => {
+    // A cancelled crawl's selection flow is driven by Save / Start analysis.
+    expect(primaryActionForPhase('selection', false)).toBe('none');
+    expect(primaryActionForPhase('dashboard', false)).toBe('recrawl');
+    // A live projection dashboard (analysis still running) can still cancel.
+    expect(primaryActionForPhase('dashboard', true)).toBe('cancel');
+  });
+
+  it('maps each phase onto the single inventory-section mode', () => {
+    expect(inventoryModeForPhase('discovering')).toBe('discovering');
+    expect(inventoryModeForPhase('selection')).toBe('selectable');
+    expect(inventoryModeForPhase('analyzing')).toBe('analyzing');
+    expect(inventoryModeForPhase('dashboard')).toBe('scored');
+    expect(inventoryModeForPhase('empty')).toBe('none');
+    expect(inventoryModeForPhase('terminal')).toBe('none');
+  });
+});
+
+describe('score-data helpers (cancelled-with-data product rule)', () => {  const summary = {
     overall_score: 71,
     technical_score: 80,
     aeo_score: 62,
