@@ -16,3 +16,15 @@ export function emailInitials(email: string) {
   const local = email.split('@')[0] ?? email;
   return local.slice(0, 2).toUpperCase();
 }
+
+/**
+ * Title-case a snake_case lifecycle/status token for display
+ * (`partially_completed` → `Partially Completed`). Shared by the run/execution
+ * and Site Health status view-models so their labels stay byte-identical.
+ */
+export function titleCaseStatus(status: string): string {
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}

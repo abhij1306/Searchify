@@ -8,6 +8,7 @@
  */
 import type { AuditStatus, CitationClassification, ExecutionStatus } from '@/lib/api/types';
 import type { ClassificationValue, RunStatusValue } from '@/components/ui/badge-variants';
+import { titleCaseStatus } from '@/lib/utils';
 
 /**
  * Audit statuses that are terminal — the run has stopped and needs no further
@@ -71,10 +72,7 @@ export function auditBadgeValue(status: AuditStatus): RunStatusValue {
 
 /** Human-readable label for an audit status. */
 export function auditStatusLabel(status: AuditStatus): string {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return titleCaseStatus(status);
 }
 
 /**
@@ -100,10 +98,7 @@ export function executionBadgeValue(
 
 /** Human-readable label for an execution status. */
 export function executionStatusLabel(status: ExecutionStatus): string {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return titleCaseStatus(status);
 }
 
 /**

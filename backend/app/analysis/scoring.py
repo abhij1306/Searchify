@@ -148,12 +148,6 @@ def classify_fanout(query: str) -> list[str]:
     return features
 
 
-def _any_alias_present(aliases: tuple[str, ...], normalized_haystack: str) -> bool:
-    return any(
-        alias_present(normalize_alias(alias), normalized_haystack) for alias in aliases
-    )
-
-
 def _entity_alias_present(
     aliases: tuple[str, ...], text: str, normalized_haystack: str
 ) -> bool:

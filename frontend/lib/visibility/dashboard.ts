@@ -10,6 +10,7 @@
  * control is a disabled "coming soon" affordance and does not affect the query.
  */
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
+import { shouldPollAudit } from '@/lib/runs/status';
 import type {
   AuditStatus,
   LogicalEngine,
@@ -100,6 +101,31 @@ export function toRunOptions(
       completedAt: audit.completed_at,
       label: formatRunLabel(audit.completed_at ?? audit.created_at),
     }));
+}
+
+/** A run that is still progressing (queued/running/analyzing/…). */
+export type ActiveRun = {
+  id: string;
+  status: AuditStatus;
+  createdAt: string;
+};
+
+/**
+ * The newest run that is still progressing, if any. A run that is active is
+ * NOT dashboard-ready (its metric snapshot doesn't exist yet), so it never
+ * appears in `toRunOptions` — this is the companion signal the dashboard uses
+ * to say "a run is in progress" (and to keep polling the audits list) instead
+ * of silently showing stale data or a bare empty state.
+ */
+export function findActiveRun(
+  audits: ReadonlyArray<{ id: string; status: AuditStatus; created_at: string }>,
+): ActiveRun | null {
+  const active = audits
+    .filter((audit) => shouldPollAudit(audit.status))
+    .slice()
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const newest = active[0];
+  return newest ? { id: newest.id, status: newest.status, createdAt: newest.created_at } : null;
 }
 
 /** Short, stable label for a run — the completion date/time. */

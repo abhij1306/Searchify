@@ -79,6 +79,7 @@ class _StubAdapter:
     transport_provider = TRANSPORT_GOOGLE
 
     def __init__(self, **_: object) -> None:
+        # No-op: stub holds no state; accepts and ignores adapter build kwargs.
         pass
 
     async def execute(self, request: AnswerEngineRequest) -> AnswerEngineResponse:
@@ -450,7 +451,7 @@ async def test_aggregation_preserves_provider_usage(
         cost = metrics.metrics["cost"]
         # 4 executions * $0.25 provider-reported each — previously always zero
         # because provider_metadata was dropped when rebuilding the aggregate.
-        assert cost["provider_reported_cost_usd"] == 1.0
+        assert cost["provider_reported_cost_usd"] == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -650,9 +651,9 @@ async def test_trends_response_and_mention_sov_and_rankings(
         )
     point = points[0]
     # Response-level SOV = brand_rate / (brand_rate + competitor_rate) = 1/1.5.
-    assert point.sov.response == round(1.0 / 1.5, 4)
+    assert point.sov.response == pytest.approx(round(1.0 / 1.5, 4))
     # Mention-level SOV = brand_count / total_mentions = 4/6.
-    assert point.sov.mention == round(4 / 6, 4)
+    assert point.sov.mention == pytest.approx(round(4 / 6, 4))
     # Rankings: brand row first (highest SOV), competitor present.
     brand_rows = [r for r in point.rankings if r.is_brand]
     assert len(brand_rows) == 1
@@ -808,14 +809,14 @@ async def test_trends_weekly_and_monthly_bucketing_math(
     assert bucket.audit_id is None
     assert len(bucket.source_snapshot_ids) == 2
     # Completion-weighted brand rate: (1.0*4 + 0.5*2) / 6 = 5/6.
-    assert bucket.brand_mention_rate == round(5 / 6, 4)
+    assert bucket.brand_mention_rate == pytest.approx(round(5 / 6, 4))
     # Owned-citation rate: (0.5*4 + 0.0*2) / 6 = 2/6.
-    assert bucket.owned_citation_rate == round(2 / 6, 4)
+    assert bucket.owned_citation_rate == pytest.approx(round(2 / 6, 4))
     # Mention counts SUM before division: Acme 4+1=5, Globex 2+1=3, total 8.
     brand_row = next(r for r in bucket.rankings if r.is_brand)
     assert brand_row.mention_count == 5
-    assert brand_row.share_of_voice == round(5 / 8, 4)
-    assert bucket.sov.mention == round(5 / 8, 4)
+    assert brand_row.share_of_voice == pytest.approx(round(5 / 8, 4))
+    assert bucket.sov.mention == pytest.approx(round(5 / 8, 4))
 
     assert len(monthly) == 1
     assert monthly[0].completed_at == datetime(2026, 1, 1, tzinfo=UTC)

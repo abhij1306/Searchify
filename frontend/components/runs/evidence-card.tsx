@@ -7,12 +7,21 @@ import { engineLabel, transportLabel } from '@/lib/providers/catalog';
 import type { ExecutionEvidence } from '@/lib/api/types';
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
 
-/** Render a `score` dict entry value as a compact string. */
+/** Humanize a `score` dict key: `owned_domain_cited` → `Owned domain cited`. */
+function formatScoreKey(key: string): string {
+  const words = key.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Render a `score` dict entry value as a compact, human-readable string. */
 function formatScoreValue(value: unknown): string {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') return value.trim() || '—';
+  if (Array.isArray(value)) {
+    return value.length === 0 ? '—' : value.map((item) => String(item)).join(', ');
+  }
   return JSON.stringify(value);
 }
 
@@ -65,7 +74,7 @@ export function EvidenceCard({
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">Citations</CardTitle>
           </CardHeader>
@@ -79,7 +88,7 @@ export function EvidenceCard({
                     key={`${citation.ordinal}-${citation.url}`}
                     className="border-border-subtle flex items-start justify-between gap-3 border-b pb-2.5 last:border-0 last:pb-0"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-foreground truncate text-sm">
                         {citation.title?.trim() || citation.domain || citation.url}
                       </p>
@@ -88,6 +97,7 @@ export function EvidenceCard({
                       </p>
                     </div>
                     <Badge
+                      className="shrink-0"
                       variant="classification"
                       value={classificationBadgeValue(citation.classification)}
                     >
@@ -100,7 +110,7 @@ export function EvidenceCard({
           </CardContent>
         </Card>
 
-        <div className="grid gap-6">
+        <div className="grid min-w-0 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Mentions</CardTitle>
@@ -109,7 +119,7 @@ export function EvidenceCard({
               <div className="grid gap-1.5">
                 <Label>Brand</Label>
                 {evidence.brand_mentioned ? (
-                  <Badge variant="status" value="success">
+                  <Badge className="justify-self-start" variant="status" value="success">
                     Mentioned
                   </Badge>
                 ) : (
@@ -145,11 +155,18 @@ export function EvidenceCard({
               {scoreEntries.length === 0 ? (
                 <p className="text-muted text-sm">No score recorded.</p>
               ) : (
-                <dl className="grid gap-1.5">
+                <dl className="grid gap-2">
                   {scoreEntries.map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between gap-3">
-                      <dt className="mono text-secondary text-xs">{key}</dt>
-                      <dd className="mono text-foreground text-xs">{formatScoreValue(value)}</dd>
+                    <div
+                      key={key}
+                      className="flex items-baseline justify-between gap-3"
+                    >
+                      <dt className="text-secondary min-w-0 truncate text-xs">
+                        {formatScoreKey(key)}
+                      </dt>
+                      <dd className="mono text-foreground min-w-0 text-right text-xs break-words">
+                        {formatScoreValue(value)}
+                      </dd>
                     </div>
                   ))}
                 </dl>

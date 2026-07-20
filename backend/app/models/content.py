@@ -30,6 +30,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.config.content import CONTENT_MAX_ATTEMPTS
 from app.core.config.task_queue import TASK_STATUS_QUEUED
 from app.core.database import Base
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN
 
 
 def _utcnow() -> datetime:
@@ -138,7 +139,7 @@ class ContentGeneration(Base):
     attempts: Mapped[list[ContentGenerationAttempt]] = relationship(
         "ContentGenerationAttempt",
         back_populates="generation",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="ContentGenerationAttempt.attempt_number",
     )

@@ -56,6 +56,7 @@ from app.core.config.site_health import (
 )
 from app.core.config.task_queue import TASK_STATUS_QUEUED
 from app.core.database import Base
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN
 
 # FK target references + ondelete actions as named constants. A typo in a
 # ``table.column`` reference would otherwise silently bind the wrong parent;
@@ -258,13 +259,13 @@ class SiteCrawl(Base):
     tasks: Mapped[list[SiteCrawlTask]] = relationship(
         "SiteCrawlTask",
         back_populates="crawl",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
     events: Mapped[list[SiteCrawlEvent]] = relationship(
         "SiteCrawlEvent",
         back_populates="crawl",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="SiteCrawlEvent.created_at",
     )

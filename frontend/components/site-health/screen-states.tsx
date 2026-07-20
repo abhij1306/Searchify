@@ -2,17 +2,15 @@
 
 import type { ReactNode } from 'react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { SiteCrawl } from '@/lib/api/types';
-import { crawlBadgeValue, statusLabel } from '@/lib/site-health/status';
 
 /**
- * Stateless presentational pieces of the Site Health screen (header, skeleton,
- * and the empty / terminal phase cards). All behavior stays in
- * `site-health-screen.tsx`; these only render what they are handed.
+ * Stateless presentational pieces of the Site Health screen (header + loading
+ * skeleton). All behavior stays in `site-health-screen.tsx`; these only render
+ * what they are handed. The empty / terminal lifecycle states are in-section
+ * content of the canonical layout (`StatusStrip` / `InventorySection`), not
+ * separate cards — the screen never swaps panels.
  */
 
 export function ScreenHeader({ actions }: Readonly<{ actions?: ReactNode }>) {
@@ -31,55 +29,5 @@ export function ScreenSkeleton() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-/** First-run card: no crawl exists yet for this project. */
-export function EmptyPhaseCard({
-  onStart,
-  startPending,
-}: Readonly<{ onStart: () => void; startPending: boolean }>) {
-  return (
-    <Card>
-      <CardContent className="grid gap-3 py-8 text-center">
-        <p className="text-secondary text-sm">
-          Discover and analyze your site&apos;s pages for AI search optimization.
-        </p>
-        <div className="flex justify-center">
-          <Button onClick={onStart} disabled={startPending}>
-            {startPending ? 'Starting…' : 'Start discovery'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Failed/cancelled crawl without score data: explicit stopped state + restart. */
-export function TerminalPhaseCard({
-  crawl,
-  onStart,
-  startPending,
-}: Readonly<{ crawl: SiteCrawl; onStart: () => void; startPending: boolean }>) {
-  return (
-    <Card>
-      <CardContent className="grid gap-3 py-8 text-center">
-        <div className="flex justify-center">
-          <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
-            {statusLabel(crawl.status)}
-          </Badge>
-        </div>
-        <p className="text-secondary text-sm">
-          {crawl.status === 'cancelled'
-            ? 'This crawl was cancelled before it produced results.'
-            : crawl.error_message || 'This crawl failed before it produced results.'}
-        </p>
-        <div className="flex justify-center">
-          <Button onClick={onStart} disabled={startPending}>
-            {startPending ? 'Starting…' : 'Start a new crawl'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

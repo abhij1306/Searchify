@@ -31,6 +31,11 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.constants import (
+    CASCADE_ALL_DELETE_ORPHAN,
+    FK_AUDITS_ID,
+    ON_DELETE_SET_NULL,
+)
 
 
 def _utcnow() -> datetime:
@@ -67,7 +72,7 @@ class ResponseAnalysis(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
@@ -79,7 +84,7 @@ class ResponseAnalysis(Base):
     # (invariant 4). SET NULL keeps the analysis if the artifact is ever pruned.
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     analyzer_version: Mapped[str] = mapped_column(String(32))
@@ -116,19 +121,19 @@ class ResponseAnalysis(Base):
     brand_mentions: Mapped[list[BrandMention]] = relationship(
         "BrandMention",
         back_populates="analysis",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
     competitor_mentions: Mapped[list[CompetitorMention]] = relationship(
         "CompetitorMention",
         back_populates="analysis",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
     citations: Mapped[list[Citation]] = relationship(
         "Citation",
         back_populates="analysis",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
 
@@ -153,7 +158,7 @@ class BrandMention(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     analysis_id: Mapped[uuid.UUID] = mapped_column(
@@ -163,7 +168,7 @@ class BrandMention(Base):
     )
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     analyzer_version: Mapped[str] = mapped_column(String(32))
@@ -193,7 +198,7 @@ class CompetitorMention(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     analysis_id: Mapped[uuid.UUID] = mapped_column(
@@ -203,7 +208,7 @@ class CompetitorMention(Base):
     )
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     analyzer_version: Mapped[str] = mapped_column(String(32))
@@ -237,7 +242,7 @@ class Citation(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     analysis_id: Mapped[uuid.UUID] = mapped_column(
@@ -247,7 +252,7 @@ class Citation(Base):
     )
     artifact_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("raw_response_artifacts.id", ondelete="SET NULL"),
+        ForeignKey("raw_response_artifacts.id", ondelete=ON_DELETE_SET_NULL),
         nullable=True,
     )
     analyzer_version: Mapped[str] = mapped_column(String(32))
@@ -291,7 +296,7 @@ class MetricSnapshot(Base):
     )
     audit_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("audits.id", ondelete="CASCADE"),
+        ForeignKey(FK_AUDITS_ID, ondelete="CASCADE"),
         index=True,
     )
     project_id: Mapped[uuid.UUID] = mapped_column(

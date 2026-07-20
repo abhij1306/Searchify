@@ -28,8 +28,7 @@ import {
   toggleStaged,
 } from '@/lib/site-health/selection';
 import { useMonitoredSelection } from '@/lib/site-health/use-monitored-selection';
-
-const PAGE_LIMIT = 25;
+import { PAGE_LIMIT } from '@/lib/site-health/status';
 
 /**
  * Starter monitored-selection (Slice 7, mockup 709).
@@ -132,12 +131,6 @@ export function InventorySelection({
   return (
     <Card>
       <CardContent className="grid gap-4">
-        {crawlInactive ? (
-          <Alert tone="info">
-            Discovery was cancelled — the pages found so far are kept below. Select the pages to
-            monitor, save your selection, then start the analysis.
-          </Alert>
-        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-0.5">
             <Label>Page Inventory</Label>

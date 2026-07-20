@@ -132,6 +132,10 @@ class SiteHealthNotFoundError(Exception):
     """A workspace-scoped resource was missing / foreign (maps to 404)."""
 
 
+# Single source for the repeated "crawl missing" detail (asserted by tests).
+_CRAWL_NOT_FOUND = "Crawl not found"
+
+
 class InvalidCursorError(Exception):
     """A cursor was tampered with or replayed cross-scope (maps to 400)."""
 
@@ -248,7 +252,7 @@ async def _load_crawl(
         )
     )
     if crawl is None:
-        raise SiteHealthNotFoundError("Crawl not found")
+        raise SiteHealthNotFoundError(_CRAWL_NOT_FOUND)
     return crawl
 
 
@@ -401,7 +405,7 @@ async def cancel_crawl(
     )
     crawl = locked.scalar_one_or_none()
     if crawl is None:
-        raise SiteHealthNotFoundError("Crawl not found")
+        raise SiteHealthNotFoundError(_CRAWL_NOT_FOUND)
 
     if crawl.status in CRAWL_TERMINAL_STATUSES:
         return project_crawl(crawl)
@@ -1772,7 +1776,7 @@ async def get_dashboard(
             )
         )
         if crawl is None:
-            raise SiteHealthNotFoundError("Crawl not found")
+            raise SiteHealthNotFoundError(_CRAWL_NOT_FOUND)
     else:
         crawl = await session.scalar(
             select(SiteCrawl)

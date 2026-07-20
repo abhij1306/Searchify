@@ -1,11 +1,18 @@
 import { http, HttpResponse } from 'msw';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { mswServer } from '@/test/msw-server';
 import { renderWithProviders } from '@/test/render';
 import { ProjectProvider } from '@/lib/project/project-context';
 import { SiteHealthScreen } from './site-health-screen';
+
+// The analyzing/scored inventory modes render PagesTable, which calls
+// useRouter for clickable rows; stub next/navigation (unavailable in jsdom).
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const WORKSPACE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PROJECT = '11111111-1111-4111-8111-111111111111';
@@ -75,6 +82,26 @@ function crawl(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function inventoryRow(id: string, url: string) {
+  return {
+    site_url_id: id,
+    normalized_url: url,
+    display_url: url,
+    title: null,
+    content_type: 'text/html',
+    source: 'link',
+    depth: 1,
+    monitored: false,
+    first_seen_at: null,
+    last_seen_at: null,
+    issue_count: null,
+    technical_score: null,
+    aeo_score: null,
+    overall_score: null,
+    last_audited: null,
+  };
+}
+
 function mockRoutes(crawlOverrides: Record<string, unknown> = {}) {
   mswServer.use(
     http.get('/api/v1/projects', () => HttpResponse.json([project])),
@@ -117,16 +144,19 @@ beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => mswServer.resetHandlers());
 afterAll(() => mswServer.close());
 
-describe('SiteHealthScreen — terminal phase', () => {
-  it('renders an explicit terminal state (not the active-progress UI) for a failed crawl', async () => {
+describe('SiteHealthScreen — terminal states on the canonical screen', () => {
+  it('renders an explicit terminal notice (not the active-progress UI) for a failed crawl', async () => {
     mockRoutes({ status: 'failed', error_message: 'Robots.txt denied crawling.' });
 
     renderScreen();
 
     expect(await screen.findByText('Robots.txt denied crawling.')).toBeInTheDocument();
+    // The header offers the restart — the screen itself stays the dashboard.
     expect(screen.getByRole('button', { name: 'Start a new crawl' })).toBeInTheDocument();
     // No redundant Cancel control for an already-stopped crawl.
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    // The score section stays mounted with placeholders (no screen swap).
+    expect(screen.getByTestId('score-section')).toBeInTheDocument();
   });
 
   it('shows generic terminal copy for a cancelled crawl with NOTHING discovered', async () => {
@@ -139,33 +169,15 @@ describe('SiteHealthScreen — terminal phase', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps the discovered inventory (selection phase) for a cancelled Starter crawl', async () => {
+  it('keeps the discovered inventory (selection mode) for a cancelled Starter crawl', async () => {
     // Cancelling discovery must NOT dead-end the discovered URLs: the
-    // inventory persists server-side, so the selection screen renders with a
-    // cancellation notice instead of the terminal card.
+    // inventory persists server-side, so the inventory section switches to
+    // selection mode with a cancellation notice instead of a terminal card.
     mockRoutes({ status: 'cancelled', error_message: '', visible_url_count: 3 });
     mswServer.use(
       http.get(`/api/v1/site-crawls/${CRAWL}/inventory`, () =>
         HttpResponse.json({
-          items: [
-            {
-              site_url_id: '66666666-6666-4666-8666-666666666666',
-              normalized_url: 'https://acme.com/pricing',
-              display_url: 'https://acme.com/pricing',
-              title: null,
-              content_type: 'text/html',
-              source: 'link',
-              depth: 1,
-              monitored: false,
-              first_seen_at: null,
-              last_seen_at: null,
-              issue_count: null,
-              technical_score: null,
-              aeo_score: null,
-              overall_score: null,
-              last_audited: null,
-            },
-          ],
+          items: [inventoryRow('66666666-6666-4666-8666-666666666666', 'https://acme.com/pricing')],
           next_cursor: null,
         }),
       ),
@@ -184,7 +196,7 @@ describe('SiteHealthScreen — terminal phase', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders no Re-crawl button in the header while a crawl is still active (discovering)', async () => {
+  it('offers Cancel (not Re-crawl) in the header while a crawl is discovering', async () => {
     mockRoutes({
       status: 'running',
       discovery_status: 'running',
@@ -196,9 +208,9 @@ describe('SiteHealthScreen — terminal phase', () => {
 
     // Wait for the screen to settle past the initial loading skeleton.
     await waitFor(() => expect(screen.queryByText(/Discovering pages/)).toBeInTheDocument());
-    // The header only renders "Re-crawl now" for the dashboard/terminal
-    // phases; an active (discovering) crawl must not expose it, since the
-    // dedicated in-flow Cancel button is the only control while active.
+    // The single header control is Cancel while active; Re-crawl only appears
+    // for a settled dashboard/terminal state.
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Re-crawl now/ })).not.toBeInTheDocument();
   });
 
@@ -215,12 +227,7 @@ describe('SiteHealthScreen — terminal phase', () => {
       issue_count: 3,
       scoring_version: 's1',
     };
-    mockRoutes({
-      status: 'cancelled',
-      discovery_status: 'cancelled',
-      analysis_status: 'cancelled',
-      score_summary: summary,
-    });
+    mockRoutes();
     mswServer.use(
       http.get(`/api/v1/projects/${PROJECT}/site-health`, () =>
         HttpResponse.json({
@@ -247,9 +254,165 @@ describe('SiteHealthScreen — terminal phase', () => {
     expect(await screen.findByText('71 / 100')).toBeInTheDocument();
     // The header offers Re-crawl for a terminal-with-data dashboard.
     expect(screen.getByRole('button', { name: /Re-crawl now/ })).toBeInTheDocument();
-    // Not the bare terminal card.
+    // Not the bare terminal notice.
     expect(
       screen.queryByText('This crawl was cancelled before it produced results.'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteHealthScreen — canonical single-screen flow (regression)', () => {
+  it('walks discover → cancel → select → start analysis → finish without ever swapping the screen', async () => {
+    // The reported bug: each lifecycle step replaced the whole panel (cancel
+    // showed a URL-list screen, starting analysis bounced back to that list,
+    // finishing jumped to a separate dashboard). This walks the exact
+    // sequence against ONE mutable server state and asserts the canonical
+    // layout container is the SAME DOM node at every step — data updates in
+    // place, the screen never changes.
+    const user = userEvent.setup();
+    const NEW_CRAWL = '99999999-9999-4999-8999-999999999999';
+    const URL_ID = '66666666-6666-4666-8666-666666666666';
+    const summary = {
+      overall_score: 71,
+      technical_score: 80,
+      aeo_score: 62,
+      selected_count: 1,
+      analyzed_count: 1,
+      issue_count: 3,
+      scoring_version: 's1',
+    };
+
+    // Mutable server state the handlers read on every request.
+    let serverCrawl = crawl({
+      status: 'running',
+      discovery_status: 'running',
+      analysis_status: 'pending',
+      inventory_complete: false,
+      score_summary: null,
+      completed_at: null,
+    });
+    const monitored: Array<Record<string, unknown>> = [];
+
+    mswServer.use(
+      http.get('/api/v1/projects', () => HttpResponse.json([project])),
+      http.get('/api/v1/entitlements', () => HttpResponse.json(entitlement)),
+      http.get(`/api/v1/projects/${PROJECT}/site-health`, () =>
+        HttpResponse.json({
+          project_id: PROJECT,
+          crawl: serverCrawl,
+          score_summary: serverCrawl.score_summary,
+          quota: { used: monitored.length, limit: 50 },
+        }),
+      ),
+      http.get(`/api/v1/projects/${PROJECT}/monitored-urls`, () =>
+        HttpResponse.json({
+          project_id: PROJECT,
+          selection_version: 1,
+          monitored_urls: monitored,
+          quota: { used: monitored.length, limit: 50 },
+        }),
+      ),
+      http.put(`/api/v1/projects/${PROJECT}/monitored-urls`, async ({ request }) => {
+        const body = (await request.json()) as { site_url_ids: string[] };
+        monitored.length = 0;
+        for (const id of body.site_url_ids) {
+          monitored.push({
+            site_url_id: id,
+            normalized_url: 'https://acme.com/pricing',
+            display_url: 'https://acme.com/pricing',
+            title: null,
+            active: true,
+            selection_source: 'user',
+            selected_at: '2026-07-16T00:00:00Z',
+            deselected_at: null,
+          });
+        }
+        return HttpResponse.json({
+          project_id: PROJECT,
+          selection_version: 2,
+          monitored_urls: monitored,
+          quota: { used: monitored.length, limit: 50 },
+        });
+      }),
+      http.post(`/api/v1/site-crawls/${serverCrawl.id}/cancel`, () => {
+        serverCrawl = crawl({
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+          score_summary: null,
+          completed_at: null,
+        });
+        return HttpResponse.json(serverCrawl);
+      }),
+      http.post('/api/v1/site-crawls', () => {
+        serverCrawl = crawl({
+          id: NEW_CRAWL,
+          status: 'running',
+          discovery_status: 'completed',
+          analysis_status: 'running',
+          score_summary: null,
+          completed_at: null,
+        });
+        return HttpResponse.json(serverCrawl);
+      }),
+      http.get('/api/v1/site-crawls/:id/pages', () =>
+        HttpResponse.json({ items: [], next_cursor: null }),
+      ),
+      http.get('/api/v1/site-crawls/:id/inventory', () =>
+        HttpResponse.json({
+          items: [inventoryRow(URL_ID, 'https://acme.com/pricing')],
+          next_cursor: null,
+        }),
+      ),
+      http.get('/api/v1/site-crawls/:id/events', () => HttpResponse.text('', { status: 200 })),
+    );
+
+    const { queryClient } = renderScreen();
+
+    // Step 1 — discovering: canonical layout with live discovery narration.
+    await waitFor(() => expect(screen.queryByTestId('site-health-canonical')).toBeInTheDocument());
+    const canonical = screen.getByTestId('site-health-canonical');
+    expect(screen.getByText(/pages discovered so far/)).toBeInTheDocument();
+
+    // Step 2 — cancel from the header. The SAME screen shifts to selection
+    // mode (inventory persists), no navigation, no terminal dead-end.
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(
+      await screen.findByText(/Discovery was cancelled — the pages found so far are kept/),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('site-health-canonical')).toBe(canonical);
+
+    // Step 3 — stage + save a monitored page, then start the analysis.
+    await user.click(await screen.findByLabelText('Monitor https://acme.com/pricing'));
+    await user.click(screen.getByRole('button', { name: /Save selection/ }));
+    const startAnalysis = screen.getByRole('button', { name: 'Start analysis' });
+    await waitFor(() => expect(startAnalysis).toBeEnabled());
+    await user.click(startAnalysis);
+
+    // The screen moves FORWARD to the analysis view in place — it must never
+    // bounce back to the selection list (the reported regression).
+    expect(
+      await screen.findByText('Auditing selected pages for technical and AEO health issues'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Monitor https://acme.com/pricing')).not.toBeInTheDocument();
+    expect(screen.getByTestId('site-health-canonical')).toBe(canonical);
+
+    // Step 4 — the run finishes server-side; the next poll/SSE invalidation
+    // lands the scores IN PLACE on the same screen (no dashboard jump).
+    serverCrawl = crawl({
+      id: NEW_CRAWL,
+      status: 'completed',
+      discovery_status: 'completed',
+      analysis_status: 'completed',
+      score_summary: summary,
+    });
+    await queryClient.invalidateQueries();
+
+    expect(await screen.findByText('71 / 100')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Re-crawl now/ })).toBeInTheDocument();
+    expect(screen.getByTestId('site-health-canonical')).toBe(canonical);
+    // The score section that showed placeholders during analysis is the same
+    // mounted section now showing real data.
+    expect(screen.getByTestId('score-section')).toBeInTheDocument();
   });
 });

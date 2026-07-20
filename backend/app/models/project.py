@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.config.projects import DEFAULT_BENCHMARK_MODE, DEFAULT_REPETITIONS
 from app.core.database import Base
+from app.models.constants import CASCADE_ALL_DELETE_ORPHAN
 
 
 class Project(Base):
@@ -60,47 +61,47 @@ class Project(Base):
         "Brand",
         back_populates="project",
         uselist=False,
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
     )
     competitors: Mapped[list[Competitor]] = relationship(
         "Competitor",
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="Competitor.created_at",
     )
     owned_domains: Mapped[list[OwnedDomain]] = relationship(
         "OwnedDomain",
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="OwnedDomain.created_at",
     )
     unintended_domains: Mapped[list[UnintendedDomain]] = relationship(
         "UnintendedDomain",
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="UnintendedDomain.created_at",
     )
     prompt_sets: Mapped[list[PromptSet]] = relationship(
         "PromptSet",
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="PromptSet.created_at",
     )
     topics: Mapped[list[Topic]] = relationship(
         "Topic",
         back_populates="project",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="Topic.created_at",
     )
     content_generations: Mapped[list[ContentGeneration]] = relationship(
         "ContentGeneration",
-        cascade="all, delete-orphan",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
         passive_deletes=True,
         order_by="ContentGeneration.created_at.desc()",
     )

@@ -60,6 +60,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Vitest
         run: pnpm test
+      - name: Lint
+        run: pnpm lint
       - name: Type check
         run: pnpm exec tsc --noEmit
       - name: Architecture / token policy

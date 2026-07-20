@@ -89,7 +89,7 @@ def _idna_host(host: str) -> str:
         return ""
     try:
         return host.encode("idna").decode("ascii")
-    except (UnicodeError, ValueError):
+    except ValueError:
         return host
 
 

@@ -23,7 +23,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config.site_health import (
@@ -73,8 +73,6 @@ class DimensionScore:
 
     dimension: str
     score: float | None
-    passed_weight: float
-    failed_weight: float
     error_weight: float
     applicable_count: int
 
@@ -87,7 +85,6 @@ class AnalysisScores:
     aeo_score: float | None
     overall_score: float | None
     scoring_version: str = SCORING_VERSION
-    dimensions: dict[str, DimensionScore] = field(default_factory=dict)
 
 
 def _round(value: float) -> float:
@@ -131,8 +128,6 @@ def score_dimension(
     return DimensionScore(
         dimension=dimension,
         score=score,
-        passed_weight=passed,
-        failed_weight=failed,
         error_weight=errored,
         applicable_count=applicable,
     )
@@ -186,10 +181,6 @@ def score_analysis(evaluations: Iterable[_ScoredLike]) -> AnalysisScores:
         technical_score=technical.score,
         aeo_score=aeo.score,
         overall_score=overall,
-        dimensions={
-            DIMENSION_TECHNICAL: technical,
-            DIMENSION_AEO: aeo,
-        },
     )
 
 

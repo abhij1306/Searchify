@@ -513,6 +513,55 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
     // No tablist is rendered in the empty state.
     expect(screen.queryByRole('tablist')).toBeNull();
   });
+
+  it('shows the in-progress banner when the only run is still active', async () => {
+    mswServer.use(
+      http.get('/api/v1/projects', () => HttpResponse.json([makeProject()])),
+      http.get('/api/v1/audits', () =>
+        HttpResponse.json([
+          { ...makeAudit(AUDIT_LATEST, '2026-07-15T00:00:00Z'), status: 'running', completed_at: null },
+        ]),
+      ),
+    );
+    renderPage();
+
+    // The banner names the run's progress and links to its live detail page.
+    expect(await screen.findByText(/a run is in progress/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /watch live progress/i })).toHaveAttribute(
+      'href',
+      `/runs/${AUDIT_LATEST}`,
+    );
+    // The empty state acknowledges the active run instead of urging a launch.
+    expect(screen.getByText(/an audit is running now/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /launch your first audit/i })).toBeNull();
+  });
+
+  it('shows the in-progress banner above the dashboard when a completed run exists', async () => {
+    useBaseHandlers([
+      http.get(`/api/v1/projects/${PROJECT_ID}/visibility`, () =>
+        HttpResponse.json(makeVisibility(AUDIT_LATEST, 67)),
+      ),
+    ]);
+    // Override the base audits handler: one completed run + one still running.
+    mswServer.use(
+      http.get('/api/v1/audits', () =>
+        HttpResponse.json([
+          makeAudit(AUDIT_LATEST, '2026-07-15T00:00:00Z'),
+          { ...makeAudit(AUDIT_OLDER, '2026-07-18T00:00:00Z'), status: 'running', completed_at: null },
+        ]),
+      ),
+    );
+    renderPage();
+
+    // The completed run's dashboard renders as usual…
+    expect(await screen.findByLabelText('Visibility score: 67%')).toBeInTheDocument();
+    // …with the active-run banner on top, linking to the running audit.
+    expect(screen.getByText(/a run is in progress/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /watch live progress/i })).toHaveAttribute(
+      'href',
+      `/runs/${AUDIT_OLDER}`,
+    );
+  });
 });
 
 describe('VisibilityPage — per-tab query enablement + cache reuse', () => {

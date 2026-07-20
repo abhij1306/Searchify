@@ -45,8 +45,15 @@ GENERATION_SYSTEM_PROMPT: Final = (
     "Rules:\n"
     "- Prompts must read like natural consumer questions or requests, not "
     "marketing copy.\n"
-    "- Cover a mix of unbranded discovery queries and, where natural, "
-    "branded/comparison queries.\n"
+    "- Prompts must be predominantly UNBRANDED discovery queries: questions a "
+    "consumer would ask before knowing any specific brand. At least 8 in "
+    "every 10 prompts must NOT contain the brand's name, its aliases, or any "
+    "competitor's name. Measuring unaided visibility is the whole point — a "
+    "prompt that names the brand trivially guarantees a mention and corrupts "
+    "the score.\n"
+    "- At most 2 in every 10 prompts may be branded/comparison queries, and "
+    "only where a real consumer would naturally name a brand (e.g. an "
+    "explicit head-to-head comparison).\n"
     "- Reuse an existing topic name verbatim when a prompt fits it; only "
     "invent a new topic when none fits.\n"
     "- Never duplicate any of the existing prompts you are shown.\n"
@@ -104,6 +111,22 @@ class PromptGenerationSettings(BaseSettings):
         validation_alias=AliasChoices(
             "GENERATION_EXISTING_PROMPT_CONTEXT_LIMIT",
             "generation_existing_prompt_context_limit",
+        ),
+    )
+    # Cap on the share of the ACTIVE pool that may be branded prompts (brand,
+    # alias, or competitor name in the text — the deterministic ``branded``
+    # flag). A branded prompt trivially guarantees a brand mention, so an
+    # active pool dominated by them inflates the Visibility Score toward 100%.
+    # Auto-activation never exceeds this share; a human can still promote
+    # branded prompts past it deliberately. 0 disables auto-activating any
+    # branded prompt; 1 disables the cap.
+    max_branded_active_share: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        validation_alias=AliasChoices(
+            "GENERATION_MAX_BRANDED_ACTIVE_SHARE",
+            "generation_max_branded_active_share",
         ),
     )
 

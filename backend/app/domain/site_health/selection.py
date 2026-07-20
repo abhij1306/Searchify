@@ -131,7 +131,6 @@ class SelectionResult:
     added_ids: tuple[uuid.UUID, ...]
     removed_ids: tuple[uuid.UUID, ...]
     workspace_used: int
-    workspace_limit: int
     enqueued_task_ids: tuple[uuid.UUID, ...]
     cancelled_task_ids: tuple[uuid.UUID, ...]
 
@@ -556,7 +555,6 @@ async def replace_monitored_set(
         added_ids=tuple(added_ids),
         removed_ids=tuple(removed_ids),
         workspace_used=new_workspace_total,
-        workspace_limit=limit,
         enqueued_task_ids=tuple(enqueued_task_ids),
         cancelled_task_ids=tuple(cancelled_task_ids),
     )

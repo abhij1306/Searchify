@@ -468,6 +468,53 @@ async def test_generate_second_run_stays_proposed_when_pool_full(
 
 
 @pytest.mark.asyncio
+async def test_generate_caps_branded_share_of_active_pool(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Branded prompts fill at most 20% of the active pool; the slots they
+    would have taken go to later unbranded prompts, and the skipped branded
+    rows stay proposed."""
+    _, prompt_set_id = await _make_project_and_set(client, "brandcap@example.com")
+    # 10 branded prompts first, then 10 unbranded. Pool=20, branded cap=20% -> 4.
+    branded_prompts = [
+        {"text": f"is Acme Corp good for use case {i}", "intent": "discovery"}
+        for i in range(10)
+    ]
+    unbranded_prompts = [
+        {"text": f"best running shoes for terrain {i}", "intent": "discovery"}
+        for i in range(10)
+    ]
+    all_prompts = branded_prompts + unbranded_prompts
+    agent = FakeAgent(
+        response=json.dumps({"topics": [{"name": "Mix", "prompts": all_prompts}]})
+    )
+    monkeypatch.setattr(prompts_api, "DefaultAgentClient", lambda: agent)
+
+    resp = await client.post(
+        f"/api/v1/prompt-sets/{prompt_set_id}/generate",
+        json={"count": 20, "confirm_send_evidence": True},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert len(body["generated"]) == 20
+
+    by_text = {p["text"]: p for p in body["generated"]}
+    active_branded = [
+        p for p in body["generated"] if p["branded"] and p["status"] == "active"
+    ]
+    # Cap = int(20 * 0.2) = 4 branded slots; the first 4 branded rows take them.
+    assert len(active_branded) == 4
+    for i in range(4):
+        assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "active"
+    # Branded rows beyond the cap stay proposed even though pool slots remained.
+    for i in range(4, 10):
+        assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "proposed"
+    # Every unbranded row is activated (4 branded + 10 unbranded = 14 <= 20).
+    for i in range(10):
+        assert by_text[f"best running shoes for terrain {i}"]["status"] == "active"
+
+
+@pytest.mark.asyncio
 async def test_generate_manual_active_rows_count_toward_pool(
     client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

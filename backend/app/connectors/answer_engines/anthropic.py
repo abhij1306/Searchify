@@ -11,6 +11,7 @@ The API key is supplied by the caller (resolved from the decrypted
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -26,6 +27,7 @@ from app.connectors.answer_engines.contracts import (
 from app.connectors.answer_engines.errors import (
     ProviderError,
     classify_provider_status,
+    raise_provider_http_error,
 )
 from app.core.config.provider_catalog import (
     ENGINE_CLAUDE,
@@ -38,6 +40,8 @@ from app.core.config.provider_catalog import (
     TRANSPORT_ANTHROPIC,
     provider_catalog_settings,
 )
+
+logger = logging.getLogger(__name__)
 
 # Basic web search tool. Sufficient for a single grounded answer turn.
 _WEB_SEARCH_TOOL_TYPE = "web_search_20250305"
@@ -148,8 +152,18 @@ class AnthropicAnswerEngineAdapter:
         latency_ms = int((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
             error_code, retryable = classify_provider_status(response.status_code)
-            raise ProviderError(
-                f"Anthropic returned HTTP {response.status_code}",
+            # Never log the response body verbatim (could echo the request),
+            # only the status and a short reason token.
+            logger.warning(
+                "anthropic call failed",
+                extra={
+                    "status": response.status_code,
+                    "error_code": error_code,
+                },
+            )
+            raise_provider_http_error(
+                response,
+                prefix="Anthropic returned HTTP",
                 error_code=error_code,
                 retryable=retryable,
             )

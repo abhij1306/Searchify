@@ -389,27 +389,58 @@ async def _activate_first_n(
     Assumes the caller already holds the prompt-set writer lock. Counts the
     prompts already ``active`` in the set (existing manual/active rows count
     toward the cap; archived rows are never auto-reactivated), then activates
-    only the earliest ``ordered_new_ids`` needed to reach
-    ``active_threshold``. Everything beyond the pool stays ``proposed`` until a
-    human promotes it.
+    the earliest ``ordered_new_ids`` needed to reach ``active_threshold``.
+    Everything beyond the pool stays ``proposed`` until a human promotes it.
+
+    Branded prompts (brand/alias/competitor name in the text) are capped at
+    ``max_branded_active_share`` of the pool: a branded prompt trivially
+    guarantees a brand mention, so a pool dominated by them inflates the
+    Visibility Score toward 100%. When a branded candidate would exceed the
+    cap it is skipped (stays ``proposed``) and the slot goes to the next
+    unbranded candidate; a human can still promote it deliberately.
     """
     if not ordered_new_ids:
         return
     threshold = prompt_generation_settings.active_threshold
-    active_count = (
+    counts = (
         await session.execute(
-            select(func.count())
+            select(
+                func.count(),
+                func.count().filter(Prompt.branded.is_(True)),
+            )
             .select_from(Prompt)
             .where(
                 Prompt.prompt_set_id == prompt_set_id,
                 Prompt.status == PROMPT_STATUS_ACTIVE,
             )
         )
-    ).scalar_one()
+    ).one()
+    active_count, active_branded = int(counts[0]), int(counts[1])
     remaining = threshold - active_count
     if remaining <= 0:
         return
-    to_activate = ordered_new_ids[:remaining]
+    branded_cap = int(threshold * prompt_generation_settings.max_branded_active_share)
+    branded_budget = max(0, branded_cap - active_branded)
+
+    branded_rows = (
+        await session.execute(
+            select(Prompt.id, Prompt.branded).where(Prompt.id.in_(ordered_new_ids))
+        )
+    ).all()
+    branded_by_id: dict[uuid.UUID, bool] = {
+        row_id: bool(row_branded) for row_id, row_branded in branded_rows
+    }
+    to_activate: list[uuid.UUID] = []
+    for prompt_id in ordered_new_ids:
+        if len(to_activate) >= remaining:
+            break
+        if branded_by_id.get(prompt_id, False):
+            if branded_budget <= 0:
+                continue
+            branded_budget -= 1
+        to_activate.append(prompt_id)
+    if not to_activate:
+        return
     await session.execute(
         update(Prompt)
         .where(Prompt.id.in_(to_activate))

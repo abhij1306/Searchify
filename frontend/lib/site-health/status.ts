@@ -22,9 +22,16 @@ import type {
   SiteHealthEntitlement,
 } from '@/lib/api/types';
 import type { RunStatusValue, StatusValue } from '@/components/ui/badge-variants';
+import { titleCaseStatus } from '@/lib/utils';
 
 /** The not-yet-analysed / not-applicable placeholder (matches visibility UI). */
 export const PLACEHOLDER = '—';
+
+/** Rows per cursor page across the Site Health inventory/pages lists. */
+export const PAGE_LIMIT = 25;
+
+/** Poll cadence for the Site Health screen's active-crawl queries. */
+export const POLL_INTERVAL_MS = 4_000;
 
 /** Overall crawl statuses that are terminal (stop polling). */
 const TERMINAL_OVERALL: ReadonlySet<CrawlOverallStatus> = new Set<CrawlOverallStatus>([
@@ -195,6 +202,66 @@ export function resolveSiteHealthPhase(
 }
 
 /**
+ * The single primary control the canonical screen's header offers for a phase.
+ * Start/cancel is available from the same place at every point in the flow —
+ * the header, never a per-panel button that appears and disappears:
+ *   - 'start':   no crawl yet (or nothing usable) — "Start discovery";
+ *   - 'cancel':  a crawl is actively discovering/analyzing — "Cancel";
+ *   - 'recrawl': terminal-with-results — "Re-crawl now";
+ *   - 'none':    the selection section owns the next step ("Start analysis").
+ */
+export type PrimaryAction = 'start' | 'cancel' | 'recrawl' | 'none';
+
+export function primaryActionForPhase(phase: SiteHealthPhase, active: boolean): PrimaryAction {
+  switch (phase) {
+    case 'empty':
+      return 'start';
+    case 'terminal':
+      return 'recrawl';
+    case 'discovering':
+    case 'analyzing':
+      return active ? 'cancel' : 'none';
+    case 'selection':
+      // An ACTIVE crawl parked in selection (discovery done, analysis pending)
+      // can still be cancelled from the header; a cancelled crawl's selection
+      // is driven by the section's own Save/Start-analysis buttons.
+      return active ? 'cancel' : 'none';
+    case 'dashboard':
+      return active ? 'cancel' : 'recrawl';
+    default:
+      return 'none';
+  }
+}
+
+/**
+ * Which content the always-mounted inventory section renders for a phase. The
+ * canonical Site Health screen never swaps whole panels — the layout (status
+ * strip + scores + inventory) stays mounted and only this mode changes:
+ *   - 'discovering': read-only inventory rows streaming in;
+ *   - 'selectable':  Starter monitored-set staging (checkboxes + commit);
+ *   - 'analyzing':   monitored pages with live per-page audit statuses;
+ *   - 'scored':      the tabbed (monitored/all/errors) scored page browser;
+ *   - 'none':        empty/terminal — nothing to list yet.
+ */
+export type InventoryMode = 'none' | 'discovering' | 'selectable' | 'analyzing' | 'scored';
+
+export function inventoryModeForPhase(phase: SiteHealthPhase): InventoryMode {
+  switch (phase) {
+    case 'discovering':
+      return 'discovering';
+    case 'selection':
+      return 'selectable';
+    case 'analyzing':
+      return 'analyzing';
+    case 'dashboard':
+      return 'scored';
+    default:
+      // 'empty' | 'terminal'
+      return 'none';
+  }
+}
+
+/**
  * Dashboard run-outcome notice for a crawl whose results are shown but whose run
  * did NOT complete cleanly. Returns `null` for a completed crawl (no notice),
  * otherwise a text-labelled badge value + tone + message so the dashboard can
@@ -274,10 +341,7 @@ export function isErrorRow(status: PageAnalysisStatus): boolean {
 
 /** Human-readable label for any snake_case lifecycle token. */
 export function statusLabel(status: string): string {
-  return status
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return titleCaseStatus(status);
 }
 
 /**

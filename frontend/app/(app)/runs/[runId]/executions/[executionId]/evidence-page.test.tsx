@@ -110,8 +110,10 @@ describe('ExecutionEvidencePage', () => {
     expect(screen.getByText('Beta blog')).toBeInTheDocument();
     // Competitor mention chip (appears in citations + mentions).
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
-    // Score dict.
-    expect(screen.getByText('visibility')).toBeInTheDocument();
+    // Score dict (keys are humanized for display; "Brand mentioned" also
+    // appears as the header badge, hence getAllByText).
+    expect(screen.getByText('Visibility')).toBeInTheDocument();
+    expect(screen.getAllByText('Brand mentioned').length).toBeGreaterThan(1);
     // Sentiment placeholder.
     expect(screen.getByText('—')).toBeInTheDocument();
   });

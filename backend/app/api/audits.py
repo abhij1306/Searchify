@@ -29,6 +29,7 @@ from app.analysis.exports import audit_to_csv, audit_to_markdown
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
 from app.core.config.audits import AUDIT_TERMINAL_STATUSES
 from app.core.database import SessionLocal
+from app.core.http_errors import raise_not_found
 from app.domain.analysis.schemas import MetricsResponse
 from app.domain.analysis.service import (
     AnalysisNotFoundError,
@@ -119,9 +120,7 @@ async def cancel_audit_endpoint(
             session, workspace_id=ctx.workspace_id, audit_id=audit_id
         )
     except AuditNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
     except AuditValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
@@ -138,9 +137,7 @@ async def list_executions_endpoint(
             session, workspace_id=ctx.workspace_id, audit_id=audit_id
         )
     except AuditNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
     return [AuditTaskResponse.model_validate(t) for t in tasks]
 
 
@@ -176,9 +173,7 @@ async def export_csv_endpoint(
             session, workspace_id=ctx.workspace_id, audit_id=audit_id
         )
     except AnalysisNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
     body = audit_to_csv(audit, tasks)
     return Response(
         content=body,
@@ -199,9 +194,7 @@ async def export_markdown_endpoint(
             session, workspace_id=ctx.workspace_id, audit_id=audit_id
         )
     except AnalysisNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
     body = audit_to_markdown(audit, tasks)
     return PlainTextResponse(
         content=body,
@@ -243,9 +236,7 @@ async def _get_or_404(
     try:
         return await get_audit(session, workspace_id=workspace_id, audit_id=audit_id)
     except AuditNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found"
-        ) from exc
+        raise_not_found("Audit", cause=exc)
 
 
 async def _load_events(

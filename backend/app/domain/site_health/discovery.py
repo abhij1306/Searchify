@@ -50,7 +50,7 @@ from app.core.config.site_health import (
     site_health_settings,
 )
 from app.core.config.task_queue import TASK_STATUS_QUEUED
-from app.domain.site_health.normalization import canonical_identity, url_hash
+from app.domain.site_health.normalization import canonical_identity
 from app.domain.site_health.schemas import (
     AdmissionResult,
     DiscoveredLink,
@@ -222,7 +222,10 @@ async def _upsert_site_url(
     now = _utcnow()
     try:
         host, _port = split_host_port(candidate.url)
-    except Exception:
+    # urlsplit port parsing raises ValueError on a malformed-but-admitted URL;
+    # host is display metadata only, so degrade to "" (same catch as
+    # is_in_scope). Anything else is a systemic bug and must propagate.
+    except ValueError:
         host = ""
     stmt = (
         pg_insert(SiteUrl)
@@ -527,25 +530,3 @@ async def admit_candidates(
         sample_capped=sample_capped,
         site_url_ids=site_url_ids,
     )
-
-
-async def monitored_hashes_for_project(
-    session: AsyncSession, *, project_id: uuid.UUID
-) -> set[str]:
-    """Return the url_hashes of active monitored URLs in a project.
-
-    Used by the discover loop to auto-enqueue an ``analyze`` task the moment a
-    discovered URL is already monitored (analysis can start during discovery).
-    """
-    rows = await session.execute(
-        select(SiteUrl.url_hash)
-        .join(MonitoredSiteUrl, MonitoredSiteUrl.site_url_id == SiteUrl.id)
-        .where(MonitoredSiteUrl.project_id == project_id)
-        .where(MonitoredSiteUrl.active.is_(True))
-    )
-    return {row[0] for row in rows.all()}
-
-
-def compute_url_hash(url: str) -> str:
-    """Convenience re-export of the canonical url hash for callers/tests."""
-    return url_hash(url)
