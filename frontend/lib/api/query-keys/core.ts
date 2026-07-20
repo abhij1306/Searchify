@@ -1,4 +1,4 @@
-/** Auth + workspaces + projects + prompts + providers query-key namespaces. */
+/** Auth + workspaces + projects + prompts + providers + content query-key namespaces. */
 
 export const authKeys = {
   all: ['auth'] as const,
@@ -33,4 +33,11 @@ export const providerKeys = {
   connections: () => ['providers', 'connections'] as const,
   connection: (connectionId: string) => ['providers', 'connection', connectionId] as const,
   catalog: () => ['providers', 'catalog'] as const,
+};
+
+export const contentKeys = {
+  all: ['content'] as const,
+  // `limit` is part of the key so different caps cache separately.
+  list: (projectId: string, limit: number) => ['content', 'list', projectId, limit] as const,
+  detail: (generationId: string) => ['content', 'detail', generationId] as const,
 };

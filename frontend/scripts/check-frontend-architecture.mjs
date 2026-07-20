@@ -29,6 +29,7 @@ const lineBudgets = [
 // enforced as a hard failure. ENFORCE_API_OWNERS=0 can soften it for debugging.
 const requiredApiOwners = [
   'auth.ts',
+  'content.ts',
   'projects.ts',
   'prompts.ts',
   'providers.ts',

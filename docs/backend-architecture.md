@@ -29,7 +29,7 @@ full-product surface is marked below.
 | Sentiment + average position | `analysis` | Roadmap (nullable; not computed) |
 | LLM Analytics / AI referrals | — | Roadmap |
 | Traffic | — | Roadmap |
-| Content (writer) | — | Roadmap |
+| Content (writer) | `domain/content` + `connectors/discovery_models` + `workers/content_worker.py` | **Implemented (basic v1)** — env-driven single output type (`website_page`), default-on Website-context tool, cancel; briefs/revisions/CMS stay roadmap ([`roadmap/content-writer.md`](roadmap/content-writer.md)) |
 | Opportunities | — | Roadmap |
 | Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
 | Issues catalog | `site_health` | **Implemented** — grouped issues + per-URL detail |
@@ -52,8 +52,10 @@ full-product surface is marked below.
   `encrypt_secret`/`decrypt_secret` for BYOK.
 - **httpx** async client for provider calls.
 - **structlog** + correlation ids (optional Logfire).
-- **Deploy**: FastAPI web + worker on Railway, PostgreSQL on Railway, Next.js on Vercel. No
-  Redis, no S3 at MVP.
+- **Deploy**: FastAPI web + workers on Railway, PostgreSQL on Railway, Next.js on Vercel. The
+  content worker is a **separate Railway service** (start command
+  `python -m app.workers.content_worker`) sharing the same env — including `MISTRAL_API_KEY`
+  and the `CONTENT_*` knobs — as the web + audit-worker services. No Redis, no S3 at MVP.
 
 App factory (`app/main.py`) wires CORS, lifespan, explicit router includes under `/api/v1`,
 and `/health`.
@@ -72,6 +74,7 @@ services.
 | `app/api/provider_connections.py` | `GET/POST /provider-connections`, `PATCH/DELETE /provider-connections/{id}`, `POST /provider-connections/{id}/test`; `GET /provider-catalog` |
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
+| `app/api/content.py` | `GET/POST /content/generations` (idempotent enqueue via `Idempotency-Key`), `GET /content/generations/{id}`, `POST /content/generations/{id}/regenerate` (new record, fresh context), `POST /content/generations/{id}/try-again` (new record, frozen context snapshot), `POST /content/generations/{id}/cancel` |
 
 > The `brands/analyze`, `audits/estimate`,
 > `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the
@@ -124,11 +127,13 @@ deterministic ([architecture.md](architecture.md) §11). Metrics are a **project
 | `app/core/{database,security,telemetry}.py` | `Base`/engine/session; argon2/JWT/Fernet; structlog + correlation ids. |
 | `app/models/*` | SQLAlchemy persistence (UUID PKs, provenance columns). |
 | `app/schemas/*` | Pydantic request/response DTOs (secrets never present). |
-| `app/domain/{auth,workspaces,projects,prompts,providers,audits}/*` | Services + business rules per resource. |
+| `app/domain/{auth,workspaces,projects,prompts,providers,audits,content}/*` | Services + business rules per resource. |
 | `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openai — direct OpenAI Responses API). The retired OpenRouter adapter/parser were deleted. |
-| `app/orchestration/{audit_state,task_queue,postgres_task_queue}.py` + `domain/audits/planner.py` | State machine, `TaskQueue` Protocol + Postgres impl, slot planning. |
+| `app/connectors/discovery_models/*` | Discovery/generative model connectors for the content vertical (Mistral chat-completions at v1). Provider-agnostic contract; the API key is env-held (`SecretStr`), resolved only at call time — deliberately **not** BYOK: content generation is a platform capability, measurement keys stay per-workspace. |
+| `app/orchestration/{audit_state,task_queue,postgres_task_queue}.py` + `domain/audits/planner.py` | State machine, `TaskQueue` Protocol + Postgres impl (generic over queue specs — see §10), slot planning. |
 | `app/analysis/{normalization,scoring,exports}.py` | Deterministic scoring, aggregation, CSV/MD export. |
 | `app/workers/audit_worker.py` | Separate process: claim → execute → persist → analyze → transition. |
+| `app/workers/content_worker.py` | Separate process for content generation: claim → build messages (prompt + optional deterministic Website-context projection) → call provider → atomic `finalize_attempt` (one locked transaction re-checking lease + cancel before writing the attempt + terminal state). |
 
 ## 7. Persistence model
 
@@ -150,6 +155,8 @@ project). No integer PKs, no `user_id` columns.
 | `models/audit.py` `AuditEvent` | Append-only lifecycle events (SSE source) | — |
 | `models/analysis.py` `ResponseAnalysis`, `BrandMention`, `CompetitorMention`, `Citation` | Deterministic per-execution analysis | each references its `RawResponseArtifact` + `analyzer_version` (invariant 4) |
 | `models/analysis.py` `MetricSnapshot` | Aggregate run metrics (projection) | `analyzer_version` + formula version |
+| `models/content.py` `ContentGeneration` | Content request + queue row in one (AuditTask pattern): prompt, `output_type`, `website_context_*` (enabled/status/frozen snapshot), provider/model identity, output + usage, plus the full generic-queue column set (status/lease/attempts/idempotency) | `(workspace_id, idempotency_key)` unique + `request_fingerprint`; `generator_version`; `website_context_snapshot` frozen at enqueue |
+| `models/content.py` `ContentGenerationAttempt` | Append-only per-provider-call attempts | writer = claiming worker inside `finalize_attempt` (invariant 3) |
 
 The execution row (`AiVisibilityExecution`, UUID-keyed) carries:
 `prompt_index`, `prompt_text_snapshot`, `prompt_theme_snapshot`, `prompt_intent_snapshot`,
@@ -228,6 +235,18 @@ the `TaskQueue` Protocol so a future Redis impl needs no domain rewrite.
 `TaskQueue` Protocol: `claim() / heartbeat() / succeed() / retry() / fail() / cancel() /
 release_expired()`. MVP impl = `PostgresTaskQueue`.
 
+**Generic queue extension (type-only).** `PostgresTaskQueue` is parameterized over a
+`QueueSpec` (`app/core/config/task_queue.py`) so the same claim/lease/heartbeat/sweeper
+machinery serves three task types — `audit_tasks`, the Site Health crawl queue, and
+`content_generations` (`CONTENT_QUEUE_SPEC` in `app/core/config/content.py`, claim order
+`priority desc → available_at asc → randomized_position asc`). The extension is type-only:
+`succeed()` and the queue semantics are unchanged. The content worker deliberately uses the
+queue only for claim/heartbeat/mark-running/cancel/release-expired; **terminal writes go
+through its own atomic `finalize_attempt`** — one locked transaction per provider call that
+re-checks the lease owner and a cancelled-in-flight status before appending the
+`ContentGenerationAttempt` and stamping terminal state (a cancelled-in-flight call records
+the attempt but discards the output).
+
 **Deterministic slot + cooperative cancel** (invariant 9): the planner freezes prompt/engine/
 scoring snapshots, generates slots, **shuffles them from the stored 64-bit `random_seed`**, and
 enqueues one `AuditTask` per slot with an idempotency key. Cancellation is cooperative — the
@@ -288,7 +307,9 @@ providers, audits, visibility, citations, reports}`, `connectors/{answer_engines
 discovery_models, web_evidence, object_storage}`, `orchestration/*`, `analysis/*`,
 `reporting/*`, `workers/*`. **At MVP only** `domain/{auth, workspaces, projects, prompts,
 providers, audits}`, `connectors/answer_engines`, `orchestration/*`, `analysis/*`, and
-`workers/audit_worker.py` are coded; the rest are documented placeholders.
+`workers/audit_worker.py` are coded; since then `site_health` (crawler + issues) and the
+**content vertical** (`domain/content`, `connectors/discovery_models`, `api/content.py`,
+`workers/content_worker.py` — basic v1) have shipped; the rest are documented placeholders.
 
 ## 14. Known Issues / Drift
 

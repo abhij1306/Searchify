@@ -55,7 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Runs', href: '/runs', icon: ListChecks, live: true },
       { label: 'Providers', href: '/providers', icon: PlugZap, live: true },
-      { label: 'Content', href: '/content', icon: FileText, live: false },
+      { label: 'Content', href: '/content', icon: FileText, live: true },
       { label: 'Opportunities', href: '/opportunities', icon: Lightbulb, live: false },
     ],
   },

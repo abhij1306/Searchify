@@ -11,8 +11,8 @@ vi.mock('next/navigation', () => ({
 
 // Session is mocked per test so the screen renders without a real SessionGuard.
 const user: SessionUser = {
-  id: '2f9a1c04-77b3-4e19-8a6d-c1e0b4d92f10',
-  email: 'abhineet.jain@cube27.com',
+  id: '00000000-0000-4000-8000-000000000001',
+  email: 'test.user@example.test',
   role: 'user',
   is_active: true,
   created_at: '2026-01-03T00:00:00Z',
@@ -29,12 +29,12 @@ describe('SettingsScreen', () => {
     render(<SettingsScreen />);
 
     // Email appears in the summary and the detail row.
-    expect(screen.getAllByText('abhineet.jain@cube27.com').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('test.user@example.test').length).toBeGreaterThanOrEqual(1);
     // Account role label (not "workspace owner") + the free-form role value.
     expect(screen.getByText('Account role')).toBeInTheDocument();
     expect(screen.getAllByText('user').length).toBeGreaterThanOrEqual(1);
     // Initials avatar from the email local part.
-    expect(screen.getByText('AB')).toBeInTheDocument();
+    expect(screen.getByText('TE')).toBeInTheDocument();
   });
 
   it('labels the created timestamp as "Account created", not "Member since"', () => {

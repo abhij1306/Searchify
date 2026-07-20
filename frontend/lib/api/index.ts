@@ -7,6 +7,7 @@
  * error surfaces. The architecture guard enforces the no-transport rule.
  */
 import { authApi } from './auth';
+import { contentApi } from './content';
 import { projectsApi } from './projects';
 import { promptsApi } from './prompts';
 import { providersApi } from './providers';
@@ -17,6 +18,7 @@ import { visibilityApi } from './visibility';
 
 export const api = {
   ...authApi,
+  ...contentApi,
   ...projectsApi,
   ...promptsApi,
   ...providersApi,
@@ -27,6 +29,14 @@ export const api = {
 };
 
 export { authApi } from './auth';
+export {
+  contentApi,
+  CONTENT_PROMPT_MAX_LEN,
+  CONTENT_OUTPUT_TYPE_WEBSITE_PAGE,
+  CONTENT_LIST_DEFAULT_LIMIT,
+  CONTENT_LIST_POLL_MS,
+  CONTENT_DETAIL_POLL_MS,
+} from './content';
 export { projectsApi } from './projects';
 export { promptsApi } from './prompts';
 export { topicsApi } from './topics';

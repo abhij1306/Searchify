@@ -33,7 +33,7 @@
 | `/runs`, `/runs/[runId]`, `/runs/[runId]/executions/[executionId]` | Run/Executions explorer | **MVP** |
 | `/analytics` (AEO Insights beyond the Visibility workspace) | LLM Analytics | Roadmap |
 | `/traffic` | Traffic | Roadmap |
-| `/content` | Content writer | Roadmap |
+| `/content` | Content writer (basic v1: prompt-box-first composer, Website-context toggle, sanitised Markdown result, cancel, history) | **Implemented** |
 | `/opportunities` | Opportunities | Roadmap |
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
@@ -68,6 +68,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Providers | `/providers` + `lib/api/providers.ts` | BYOK cards, connection test. One **direct** transport per engine (ChatGPT/OpenAI, Gemini/Google, Claude/Anthropic) — the old route toggle and the reserved "Direct OpenAI — coming soon" option are removed. |
 | Visibility | `/visibility` + `lib/api/visibility.ts` | Four-tab workspace with a shared filter bar (§7) |
 | Runs / executions | `/runs/*` + `lib/api/runs.ts` | Launch, progress, cancel, evidence, export |
+| Content | `/content` + `lib/api/content.ts` + `lib/content/{use-content-generations.ts,markdown.tsx}` + `components/content/content-screen.tsx` | **Live** — enqueue (client-generated `Idempotency-Key`), conditional polling while non-terminal, cancel/regenerate/try-again, history list, and a sanitised Markdown renderer (react-markdown + remark-gfm, **no rehype-raw**, http/https/mailto URL allowlist, images dropped, hardened links) |
 | UI + token policy | `components/ui/*`, `app/globals.css` | CVA primitives, bridged tokens only (no raw hex) |
 
 ## 5. Live backend API usage
@@ -91,6 +92,8 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   - Runs → `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`,
     `GET /audits/{id}/executions`, `GET /executions/{id}`, `GET /audits/{id}/export.{csv,md}`,
     `GET /audits/{id}/events` (SSE, optional)
+  - Content → `GET/POST /content/generations`, `GET /content/generations/{id}`,
+    `POST /content/generations/{id}/{regenerate|try-again|cancel}`
 - **Workspace scoping**: the active workspace + project are carried in context; the backend
   enforces workspace auth on every query (invariant 5). No `user_id` anywhere.
 - **Cookie session**: JWT in a secure HttpOnly cookie; the client sends `credentials:'include'`.
@@ -183,6 +186,10 @@ responses pass through `strictValidate`.
   `strictValidate` throws on mismatch, `shouldRetryQuery` matrix, form validation, table CRUD,
   dashboard rendering from data, theme toggle).
 - **Playwright** smoke: login → shell → Visibility → open run → open execution.
+- **Playwright real-stack content integration** (`e2e/content-integration.spec.ts`, own config
+  `e2e/content-integration.config.ts`): disposable Postgres DB + real API + real
+  `content_worker` + mock provider endpoint (swap is `CONTENT_PROVIDER_ENDPOINT` only). Run
+  explicitly: `pnpm exec playwright test --config e2e/content-integration.config.ts`.
 - **Architecture-guard scripts**: line budgets, required API owners exist, `index.ts` owns no
   transport, token-escape / **no-raw-hex** guard over `globals.css` + `components/`.
 - Full-suite + build + guards run in task **V1** (final full-stack verification).

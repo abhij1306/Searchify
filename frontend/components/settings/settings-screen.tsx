@@ -12,17 +12,20 @@ import { PageTitle } from '@/components/ui/typography';
 import { useSessionUser } from '@/lib/auth/session-guard';
 import { cn, emailInitials } from '@/lib/utils';
 
-/** Human-readable label for a timestamp (falls back to the raw value). */
+/** Human-readable label for a timestamp (falls back to the raw value).
+ * Explicit locale + UTC keep server and client output identical, so the
+ * SSR markup matches during hydration. */
 function formatTimestamp(timestamp: string | undefined): string | undefined {
   if (!timestamp) return undefined;
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   });
 }
 

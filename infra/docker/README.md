@@ -1,7 +1,22 @@
 # Searchify Docker stack
 
 Services: `db` (Postgres 16), `migrate` (one-shot `alembic upgrade head`),
-`web` (FastAPI/uvicorn), `worker` (audit worker — real impl in B5).
+`web` (FastAPI/uvicorn), `worker` (audit worker — real impl in B5),
+`content-worker` (content-generation worker, `python -m app.workers.content_worker`).
+
+## Content generation env
+
+The content worker's provider is env-driven (see `.env.example`):
+`CONTENT_PROVIDER` (default `mistral`), `CONTENT_MODEL` (default
+`mistral-small-latest`), `MISTRAL_API_KEY` (**empty = content generation
+disabled**; the API returns 409 `provider_not_configured` on enqueue),
+`CONTENT_PROVIDER_ENDPOINT` (OpenAI-compatible chat-completions URL),
+`CONTENT_REQUEST_TIMEOUT_SECONDS`, `CONTENT_MAX_OUTPUT_TOKENS`.
+
+On **Railway**, run the content worker as a **separate service** with start
+command `python -m app.workers.content_worker`, sharing the same env
+(including `MISTRAL_API_KEY`) as the web + audit-worker services.
+
 
 ## Bring the stack up (gotcha 1 workaround — use verbatim)
 

@@ -11,7 +11,7 @@ describe('cn', () => {
 
 describe('emailInitials', () => {
   it('takes the first two characters of the local part, upper-cased', () => {
-    expect(emailInitials('abhineet.jain@cube27.com')).toBe('AB');
+    expect(emailInitials('test.user@example.test')).toBe('TE');
     expect(emailInitials('jo@example.com')).toBe('JO');
   });
 

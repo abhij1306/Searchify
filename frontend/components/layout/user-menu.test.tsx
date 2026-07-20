@@ -13,8 +13,8 @@ const clearSession = vi.fn();
 vi.mock('@/lib/auth/session-guard', () => ({
   useSession: () => ({
     user: {
-      id: '2f9a1c04-77b3-4e19-8a6d-c1e0b4d92f10',
-      email: 'abhineet.jain@cube27.com',
+      id: '00000000-0000-4000-8000-000000000001',
+      email: 'test.user@example.test',
       role: 'user',
       is_active: true,
       created_at: '2026-01-03T00:00:00Z',
@@ -50,7 +50,7 @@ describe('UserMenu', () => {
     const user = userEvent.setup();
     renderMenu();
 
-    await user.click(screen.getByRole('button', { name: /abhineet\.jain@cube27\.com/i }));
+    await user.click(screen.getByRole('button', { name: /test\.user@example\.test/i }));
 
     const menu = await screen.findByRole('menu');
     const items = within(menu).getAllByRole('menuitem');

@@ -1096,6 +1096,98 @@ export const visibilityEvidenceResponseSchema = z
   .strict();
 
 // ---------------------------------------------------------------------------
+// Content generation
+// ---------------------------------------------------------------------------
+
+// Generic queue-row lifecycle (backend `task_queue.TASK_STATUS_*`): the
+// content row IS the queue row (AuditTask pattern), so the wire statuses are
+// the queue statuses. `leased`/`running`/`retry_wait` are all "in flight"
+// from the UI's perspective; terminal = succeeded | failed | cancelled.
+export const contentGenerationStatusSchema = z.enum([
+  'queued',
+  'leased',
+  'running',
+  'succeeded',
+  'retry_wait',
+  'failed',
+  'cancelled',
+]);
+
+// Frozen on the row at enqueue: whether Website context was projected in,
+// unavailable (no usable crawl evidence), or turned off by the user.
+export const websiteContextStatusSchema = z.enum(['included', 'unavailable', 'disabled']);
+
+export const contentOutputTypeSchema = z.enum(['website_page']);
+
+// Provenance for the frozen Website-context snapshot (backend
+// `WebsiteContextSummary`) — which crawl, how fresh, which sources. Never
+// page bodies, never the key.
+export const websiteContextSummarySchema = z
+  .object({
+    crawl_id: uuid(),
+    crawl_completed_at: z.string().nullable(),
+    extractor_version: z.string(),
+    analyzer_version: z.string(),
+    page_count: z.number().int(),
+    char_count: z.number().int(),
+    site_url_ids: z.array(uuid()),
+    artifact_ids: z.array(uuid()),
+    content_hashes: z.array(z.string()),
+  })
+  .strict();
+
+// Bounded history-list projection (backend `ContentGenerationListItem`) —
+// never `output_text`, never the full prompt. Model provenance is explicit
+// (`requested_model` vs `returned_model`); there is no generic `model` field.
+export const contentGenerationListItemSchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    status: contentGenerationStatusSchema,
+    output_type: contentOutputTypeSchema,
+    website_context_status: websiteContextStatusSchema,
+    requested_model: z.string(),
+    returned_model: z.string().nullable(),
+    provider: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    completed_at: z.string().nullable(),
+    error_code: z.string(),
+    prompt_preview: z.string(),
+  })
+  .strict();
+
+// Full projection of one generation (backend `ContentGenerationDetail`).
+// Superset of the list item; never the provider API key (invariant 6).
+export const contentGenerationDetailSchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    status: contentGenerationStatusSchema,
+    output_type: contentOutputTypeSchema,
+    website_context_status: websiteContextStatusSchema,
+    requested_model: z.string(),
+    returned_model: z.string().nullable(),
+    provider: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    completed_at: z.string().nullable(),
+    error_code: z.string(),
+    prompt_preview: z.string(),
+    prompt: z.string(),
+    website_context_enabled: z.boolean(),
+    website_context_summary: websiteContextSummarySchema.nullable(),
+    finish_reason: z.string().nullable(),
+    output_truncated: z.boolean(),
+    output_text: z.string().nullable(),
+    usage: z.record(z.string(), z.unknown()).nullable(),
+    latency_ms: z.number().int().nullable(),
+    error_detail: z.string(),
+    generator_version: z.string(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
 // strictValidate — fail loud on any schema drift (drift policy §6)
 // ---------------------------------------------------------------------------
 

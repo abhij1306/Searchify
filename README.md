@@ -91,7 +91,8 @@ Browser ── /api/* ──> Next.js same-origin proxy ──> FastAPI ──> 
                                                         │             └─ metrics
                                                         │
                                                         ├─ Audit worker ──> AI providers (BYOK)
-                                                        └─ Site Health worker ──> public website pages
+                                                        ├─ Site Health worker ──> public website pages
+                                                        └─ Content worker ──> content provider (env key)
 ```
 
 - **Same-origin proxying.** The browser calls relative `/api/*` routes. Next.js forwards them to the server-only `BACKEND_ORIGIN`, keeping backend topology out of the client bundle.
@@ -127,7 +128,7 @@ Searchify/
 │       ├── connectors/      # BYOK answer-engine adapters
 │       ├── orchestration/   # Audit state machine + task queue
 │       ├── analysis/        # Deterministic scoring, normalization, exports
-│       └── workers/         # Audit and Site Health workers
+│       └── workers/         # Audit, Site Health, and content workers
 ├── frontend/                 # Next.js App Router app
 │   ├── app/                  # Routes (auth, app shell, screens)
 │   └── lib/api/             # Typed API-contract layer (zod schemas)
@@ -159,7 +160,7 @@ Searchify/
 # 1. Copy the env template
 cp infra/docker/.env.example infra/docker/.env    # then edit secrets for anything non-local
 
-# 2. Bring the stack up (Postgres + backend web + audit worker)
+# 2. Bring the stack up (Postgres + backend web + audit worker + content worker)
 env -u POSTGRES_PASSWORD -u POSTGRES_USER -u POSTGRES_DB -u DATABASE_URL \
   POSTGRES_PASSWORD=searchify_dev_password \
   docker compose -f infra/docker/docker-compose.yml up -d --force-recreate
@@ -189,6 +190,7 @@ export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/searc
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000     # web API
 uv run python -m app.workers.audit_worker            # audit worker (separate shell)
+uv run python -m app.workers.content_worker          # content worker (separate shell; optional)
 
 # Frontend
 cd frontend
@@ -210,6 +212,9 @@ Backend settings are read from the environment (see `infra/docker/.env.example`)
 | `ENCRYPTION_KEY` | Fernet key for BYOK provider secrets at rest |
 | `FRONTEND_URL` / `FRONTEND_ORIGINS` | Allowed origins |
 | `LOGFIRE_ENABLED` / `LOGFIRE_TOKEN` | Optional observability |
+| `CONTENT_PROVIDER` / `CONTENT_MODEL` | Content-generation provider (default `mistral` / `mistral-small-latest`) |
+| `MISTRAL_API_KEY` | Content provider API key (env-held, never per-workspace). **Empty = content generation disabled** (enqueue returns 409) |
+| `CONTENT_PROVIDER_ENDPOINT` / `CONTENT_REQUEST_TIMEOUT_SECONDS` / `CONTENT_MAX_OUTPUT_TOKENS` | Content provider endpoint (OpenAI-compatible chat completions), request timeout, output token cap |
 
 Frontend: `BACKEND_ORIGIN` (server-only) is the backend the Next.js `rewrites()` proxy
 forwards `/api/*` to. Never expose it to the browser.
