@@ -345,6 +345,9 @@ def test_anthropic_safe_error_detail_extracts_type_and_message() -> None:
     # Malformed / empty bodies degrade to an empty string, never raise.
     assert safe_error_detail({}) == ""
     assert safe_error_detail({"error": "not-a-dict"}) == ""
+    # Non-dict top-level payloads degrade the same way.
+    assert safe_error_detail([]) == ""
+    assert safe_error_detail("oops") == ""
     # Oversized messages are length-capped.
     long_body = {"error": {"type": "api_error", "message": "x" * 10_000}}
     assert len(safe_error_detail(long_body)) < 300

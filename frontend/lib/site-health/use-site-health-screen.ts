@@ -14,6 +14,7 @@ import {
 import { useCrawlEvents } from '@/lib/site-health/use-crawl-events';
 import {
   inventoryModeForPhase,
+  POLL_INTERVAL_MS,
   primaryActionForPhase,
   resolveSiteHealthPhase,
   shouldPollCrawl,
@@ -21,8 +22,6 @@ import {
   type PrimaryAction,
   type SiteHealthPhase,
 } from '@/lib/site-health/status';
-
-const POLL_INTERVAL_MS = 4_000;
 
 /**
  * Data orchestration for the Site Health screen (Slice 7).

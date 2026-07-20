@@ -28,8 +28,7 @@ import {
   toggleStaged,
 } from '@/lib/site-health/selection';
 import { useMonitoredSelection } from '@/lib/site-health/use-monitored-selection';
-
-const PAGE_LIMIT = 25;
+import { PAGE_LIMIT } from '@/lib/site-health/status';
 
 /**
  * Starter monitored-selection (Slice 7, mockup 709).

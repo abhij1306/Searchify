@@ -164,7 +164,7 @@ export function EvidenceCard({
                       <dt className="text-secondary min-w-0 truncate text-xs">
                         {formatScoreKey(key)}
                       </dt>
-                      <dd className="mono text-foreground shrink-0 text-right text-xs">
+                      <dd className="mono text-foreground min-w-0 text-right text-xs break-words">
                         {formatScoreValue(value)}
                       </dd>
                     </div>

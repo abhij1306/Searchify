@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CursorPager } from '@/components/ui/cursor-pager';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,10 +21,12 @@ import { PagesTable } from '@/components/site-health/pages-table';
 import { siteHealthQueries, type PagesParams } from '@/lib/api/site-health';
 import type { PageSummary, SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
-import { statusLabel, type InventoryMode } from '@/lib/site-health/status';
-
-const PAGE_LIMIT = 25;
-const POLL_INTERVAL_MS = 4_000;
+import {
+  PAGE_LIMIT,
+  POLL_INTERVAL_MS,
+  statusLabel,
+  type InventoryMode,
+} from '@/lib/site-health/status';
 
 /**
  * Always-mounted inventory section of the canonical Site Health screen.
@@ -320,14 +321,16 @@ function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active:
           <PagesTable pages={rows} crawlId={crawl.id} />
         )}
 
-        <div className="border-border-subtle flex items-center justify-end gap-2 border-t px-[var(--card-padding)] py-3">
-          <Button variant="secondary" size="sm" onClick={goPrev} disabled={!canPrev}>
-            Previous
-          </Button>
-          <Button variant="secondary" size="sm" onClick={goNext} disabled={!nextCursor}>
-            Next
-          </Button>
-        </div>
+        {canPrev || nextCursor ? (
+          <div className="border-border-subtle flex items-center justify-end gap-2 border-t px-[var(--card-padding)] py-3">
+            <CursorPager
+              canPrev={canPrev}
+              canNext={Boolean(nextCursor)}
+              onPrev={goPrev}
+              onNext={goNext}
+            />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

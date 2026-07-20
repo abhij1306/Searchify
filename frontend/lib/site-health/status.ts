@@ -26,6 +26,12 @@ import type { RunStatusValue, StatusValue } from '@/components/ui/badge-variants
 /** The not-yet-analysed / not-applicable placeholder (matches visibility UI). */
 export const PLACEHOLDER = '—';
 
+/** Rows per cursor page across the Site Health inventory/pages lists. */
+export const PAGE_LIMIT = 25;
+
+/** Poll cadence for the Site Health screen's active-crawl queries. */
+export const POLL_INTERVAL_MS = 4_000;
+
 /** Overall crawl statuses that are terminal (stop polling). */
 const TERMINAL_OVERALL: ReadonlySet<CrawlOverallStatus> = new Set<CrawlOverallStatus>([
   'completed',

@@ -27,7 +27,7 @@ from app.connectors.answer_engines.contracts import (
 from app.connectors.answer_engines.errors import (
     ProviderError,
     classify_provider_status,
-    safe_error_detail,
+    raise_provider_http_error,
 )
 from app.core.config.provider_catalog import (
     ENGINE_CLAUDE,
@@ -161,13 +161,9 @@ class AnthropicAnswerEngineAdapter:
                     "error_code": error_code,
                 },
             )
-            try:
-                safe_detail = safe_error_detail(response.json())
-            except ValueError:
-                safe_detail = ""
-            suffix = f" ({safe_detail})" if safe_detail else ""
-            raise ProviderError(
-                f"Anthropic returned HTTP {response.status_code}{suffix}",
+            raise_provider_http_error(
+                response,
+                prefix="Anthropic returned HTTP",
                 error_code=error_code,
                 retryable=retryable,
             )

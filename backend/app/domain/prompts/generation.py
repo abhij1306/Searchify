@@ -422,13 +422,14 @@ async def _activate_first_n(
     branded_cap = int(threshold * prompt_generation_settings.max_branded_active_share)
     branded_budget = max(0, branded_cap - active_branded)
 
-    branded_by_id = dict(
-        (
-            await session.execute(
-                select(Prompt.id, Prompt.branded).where(Prompt.id.in_(ordered_new_ids))
-            )
-        ).all()
-    )
+    branded_rows = (
+        await session.execute(
+            select(Prompt.id, Prompt.branded).where(Prompt.id.in_(ordered_new_ids))
+        )
+    ).all()
+    branded_by_id: dict[uuid.UUID, bool] = {
+        row_id: bool(row_branded) for row_id, row_branded in branded_rows
+    }
     to_activate: list[uuid.UUID] = []
     for prompt_id in ordered_new_ids:
         if len(to_activate) >= remaining:

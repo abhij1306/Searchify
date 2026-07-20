@@ -24,7 +24,7 @@ export function VisibilityEmptyState({
           <h2 className="text-foreground text-lg font-semibold">No completed runs yet</h2>
           <p className="text-secondary max-w-md text-sm">
             {hasActiveRun
-              ? 'Your first audit is running now. Once it completes, its Visibility Score, per-engine comparison and rankings show up here automatically.'
+              ? 'An audit is running now. Once it completes, its Visibility Score, per-engine comparison and rankings show up here automatically.'
               : 'Launch an audit to see how AI answer engines talk about your brand. Once a run completes, its Visibility Score, per-engine comparison and rankings show up here.'}
           </p>
         </div>

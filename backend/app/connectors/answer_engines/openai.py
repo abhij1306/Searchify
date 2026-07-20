@@ -32,7 +32,7 @@ from app.connectors.answer_engines.errors import (
     ProviderError,
     classify_provider_status,
     parse_retry_after,
-    safe_error_detail,
+    raise_provider_http_error,
 )
 from app.connectors.answer_engines.openai_parser import parse_openai_response
 from app.core.config.provider_catalog import (
@@ -140,13 +140,9 @@ class OpenAIAnswerEngineAdapter:
                     "error_code": error_code,
                 },
             )
-            try:
-                safe_detail = safe_error_detail(response.json())
-            except ValueError:
-                safe_detail = ""
-            suffix = f" ({safe_detail})" if safe_detail else ""
-            raise ProviderError(
-                f"OpenAI returned HTTP {response.status_code}{suffix}",
+            raise_provider_http_error(
+                response,
+                prefix="OpenAI returned HTTP",
                 error_code=error_code,
                 retryable=retryable,
                 retry_after_seconds=retry_after,
