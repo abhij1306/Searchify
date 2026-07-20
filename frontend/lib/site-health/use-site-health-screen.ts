@@ -127,12 +127,15 @@ export function useSiteHealthScreen(projectId: string | null) {
   // succeeded but the dashboard query still returns the previous crawl. The
   // screen keeps its current content frozen behind a starting notice instead
   // of re-resolving the OLD crawl's phase (which is what used to bounce the
-  // UI back to the selection list after "Start analysis").
+  // UI back to the selection list after "Start analysis"). Scoped to the
+  // create's own project so a sticky success from another project (after a
+  // project switch) can never freeze this screen.
   const crawlStarting =
-    createMutation.isPending ||
-    (createMutation.isSuccess &&
-      createMutation.data != null &&
-      crawl?.id !== createMutation.data.id);
+    createMutation.variables?.project_id === projectId &&
+    (createMutation.isPending ||
+      (createMutation.isSuccess &&
+        createMutation.data != null &&
+        crawl?.id !== createMutation.data.id));
 
   const runExport = async (format: ExportFormat, view: ExportView) => {
     if (!crawl) return;

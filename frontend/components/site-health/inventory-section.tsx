@@ -272,7 +272,11 @@ function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active:
 
   const goNext = () => {
     if (!nextCursor) return;
-    setCursorStack((prev) => ({ ...prev, [tab]: [...prev[tab], nextCursor] }));
+    setCursorStack((prev) =>
+      // Idempotent under rapid clicks: the captured nextCursor may already be
+      // on the stack before the rerender lands.
+      prev[tab].at(-1) === nextCursor ? prev : { ...prev, [tab]: [...prev[tab], nextCursor] },
+    );
   };
   const goPrev = () => setCursorStack((prev) => ({ ...prev, [tab]: prev[tab].slice(0, -1) }));
 
