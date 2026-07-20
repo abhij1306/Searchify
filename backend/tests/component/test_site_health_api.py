@@ -143,7 +143,7 @@ async def _seed_scenario(session: AsyncSession, *, email: str) -> Scenario:
         session.add(su)
         urls.append(su)
     await session.flush()
-    url_a, url_b, url_c = urls
+    url_a, url_b, _url_c = urls
 
     # Admit all three URLs to the crawl. Endpoint reads (page-detail, pages,
     # issues, history, exports) are scoped to URLs with a SiteUrlObservation

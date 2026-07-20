@@ -461,9 +461,6 @@ class SiteHealthWorker:
             requested_url=requested_url,
             depth=depth,
             outcome=outcome,
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            root_registrable_domain=root_registrable_domain,
         )
 
     async def _fetch_discover(
@@ -597,9 +594,6 @@ class SiteHealthWorker:
         requested_url: str,
         depth: int,
         outcome: _DiscoverOutcome,
-        include_globs: list[str] | None,
-        exclude_globs: list[str] | None,
-        root_registrable_domain: str,
     ) -> None:
         """Persist the discover result atomically, then finalize the queue row.
 
@@ -645,8 +639,6 @@ class SiteHealthWorker:
                     session,
                     crawl=crawl,
                     candidates=self._candidates_for(outcome.output, depth),
-                    include_globs=include_globs,
-                    exclude_globs=exclude_globs,
                 )
                 crawl.discovered_url_count += 1
                 # Link the queue row to its immutable artifact (mirrors the

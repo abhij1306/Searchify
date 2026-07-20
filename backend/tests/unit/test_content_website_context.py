@@ -537,7 +537,7 @@ async def test_workspace_and_project_scoping(
 ) -> None:
     """Another project's crawl evidence never bleeds into the projection."""
     async with session_factory() as session:
-        ws_id, project_id, profile_id = await _seed_project(session)
+        ws_id, project_id, _profile_id = await _seed_project(session)
         other_ws, other_project, other_profile = await _seed_project(session)
         other_crawl = await _seed_crawl(
             session,

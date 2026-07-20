@@ -231,7 +231,7 @@ async def list_events_endpoint(
         events = await _load_events(session, audit_id, after=None)
         return [AuditEventResponse.model_validate(e) for e in events]
     return StreamingResponse(
-        _event_stream(ctx.workspace_id, audit_id),
+        _event_stream(audit_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -282,7 +282,7 @@ def _sse_payload(event: AuditEvent) -> str:
 
 
 async def _event_stream(
-    workspace_id: uuid.UUID, audit_id: uuid.UUID
+    audit_id: uuid.UUID,
 ):  # pragma: no cover - streaming loop
     """Tail an audit's events until it terminalizes.
 

@@ -479,7 +479,6 @@ async def replace_monitored_set(
     for rid in requested:
         existing = by_url_id.get(rid)
         if existing is None:
-            site_url = site_urls[rid]
             membership = MonitoredSiteUrl(
                 workspace_id=workspace_id,
                 project_id=project_id,

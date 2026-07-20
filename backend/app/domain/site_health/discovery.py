@@ -421,8 +421,6 @@ async def admit_candidates(
     *,
     crawl: SiteCrawl,
     candidates: list[FrontierCandidate],
-    include_globs: list[str] | None = None,
-    exclude_globs: list[str] | None = None,
     enqueue_children: bool = True,
 ) -> AdmissionResult:
     """Admit a deterministically-ordered batch of candidates.
@@ -442,7 +440,6 @@ async def admit_candidates(
     """
     # Deterministic order (invariant 9).
     ordered = sorted(candidates, key=lambda c: c.order_key)
-    result = AdmissionResult(admitted=0, sample_capped=False)
     admitted = 0
     settings = site_health_settings
 
