@@ -14,10 +14,11 @@ import { cn } from '@/lib/utils';
  */
 
 /** Table column order — matches the PricingTableRow fields one to one. */
-const TIER_COLUMN_KEYS = ['free', 'starter', 'pro', 'enterprise'] as const;
+const TIER_COLUMN_KEYS = PRICING_TIERS.map((tier) => tier.key);
+const TIERS_BY_KEY = new Map(PRICING_TIERS.map((tier) => [tier.key, tier]));
 
-function isHighlighted(key: string) {
-  return PRICING_TIERS.some((tier) => tier.key === key && tier.highlighted);
+function isHighlighted(key: PricingTier['key']) {
+  return Boolean(TIERS_BY_KEY.get(key)?.highlighted);
 }
 
 /** PricingTiers — the four plan cards driven by PRICING_TIERS. */
@@ -39,9 +40,7 @@ function TierCard({ tier }: { tier: PricingTier }) {
   // Mockup: the "Custom" price drops the per-label; its cadence moves down
   // to the note line under the price.
   const isCustom = tier.price === 'Custom';
-  // Mockup CTA styling: the self-serve paid tiers (Starter, Pro) get the
-  // primary button with arrow; Free sample and Enterprise get the ghost one.
-  const primaryCta = tier.key === 'starter' || tier.key === 'pro';
+  const primaryCta = tier.primaryCta === true;
   return (
     <div className={cn('card tier-card', tier.highlighted && 'popular rim')}>
       {tier.highlighted && <span className="tier-tag">Recommended</span>}
@@ -177,10 +176,9 @@ export function PricingCta() {
             Get started
             <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
           </Link>
-          {/* TODO(user): wire to CONTACT_EMAIL (lib/marketing-content/social.ts) once set. */}
-          <a className="btn btn-ghost" href="#">
-            Enterprise contact
-          </a>
+          <Link className="btn btn-ghost" href="/enterprise">
+            Explore Enterprise
+          </Link>
         </div>
       </div>
     </section>

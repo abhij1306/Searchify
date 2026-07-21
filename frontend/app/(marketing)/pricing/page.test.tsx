@@ -42,10 +42,9 @@ describe('Pricing page (public marketing `/pricing`)', () => {
       ).toHaveAttribute('href', tier.cta.href);
     }
 
-    // Prices render verbatim from the module — until the user fills them, the
-    // Starter/Pro cards show the '[TODO(user)]' placeholder as their amount.
-    expect(byName('Starter').querySelector('.amount')).toHaveTextContent('[TODO(user)]');
-    expect(byName('Pro').querySelector('.amount')).toHaveTextContent('[TODO(user)]');
+    // Pricing remains presentation-safe until commercial values are approved.
+    expect(byName('Starter').querySelector('.amount')).toHaveTextContent('Custom');
+    expect(byName('Pro').querySelector('.amount')).toHaveTextContent('Custom');
     expect(byName('Free sample').querySelector('.amount')).toHaveTextContent('$0');
     expect(byName('Enterprise').querySelector('.amount')).toHaveTextContent('Custom');
 
@@ -68,12 +67,11 @@ describe('Pricing page (public marketing `/pricing`)', () => {
       expect(screen.getByRole('rowheader', { name: row.dimension })).toBeInTheDocument();
     }
 
-    // Spot-check grounded pro cells: full inventory rides every paid tier,
-    // and the pro monitored-URL cell is still a visible placeholder.
+    // Spot-check grounded pro cells: full inventory rides every paid tier.
     const inventoryRow = screen.getByRole('row', { name: /Site Health crawl mode/ });
     expect(within(inventoryRow).getAllByText('Full progressive inventory')).toHaveLength(3);
     const monitoredRow = screen.getByRole('row', { name: /Monitored URL set/ });
-    expect(within(monitoredRow).getByText('[TODO(user)]')).toBeInTheDocument();
+    expect(within(monitoredRow).getByText('Expanded selection')).toBeInTheDocument();
   });
 
   it('renders the BYOK trust strip', () => {
@@ -94,7 +92,7 @@ describe('Pricing page (public marketing `/pricing`)', () => {
     );
   });
 
-  it('closes with a CTA band linking /register plus the Enterprise contact placeholder', () => {
+  it('closes with CTAs to registration and the Enterprise page', () => {
     render(<Page />);
 
     const finalCta = screen.getByRole('region', { name: 'Get started' });
@@ -102,9 +100,9 @@ describe('Pricing page (public marketing `/pricing`)', () => {
       'href',
       '/register',
     );
-    expect(within(finalCta).getByRole('link', { name: /enterprise contact/i })).toHaveAttribute(
+    expect(within(finalCta).getByRole('link', { name: /explore enterprise/i })).toHaveAttribute(
       'href',
-      '#',
+      '/enterprise',
     );
   });
 });

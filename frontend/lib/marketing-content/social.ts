@@ -1,4 +1,4 @@
-import { Github, Instagram, Linkedin, Twitter, Youtube, type LucideIcon } from 'lucide-react';
+import { Github, type LucideIcon } from 'lucide-react';
 
 /**
  * Social/contact content for the marketing chrome (footer social row, contact
@@ -20,34 +20,6 @@ export type SocialLink = {
 };
 
 export const SOCIAL_LINKS: readonly SocialLink[] = [
-  {
-    key: 'linkedin',
-    label: 'LinkedIn',
-    // TODO(user): real profile URL
-    href: '#',
-    icon: Linkedin,
-  },
-  {
-    key: 'twitter',
-    label: 'Twitter',
-    // TODO(user): real profile URL
-    href: '#',
-    icon: Twitter,
-  },
-  {
-    key: 'youtube',
-    label: 'YouTube',
-    // TODO(user): real profile URL
-    href: '#',
-    icon: Youtube,
-  },
-  {
-    key: 'instagram',
-    label: 'Instagram',
-    // TODO(user): real profile URL
-    href: '#',
-    icon: Instagram,
-  },
   {
     key: 'github',
     label: 'GitHub',

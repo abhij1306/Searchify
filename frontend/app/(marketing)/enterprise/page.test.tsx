@@ -53,15 +53,14 @@ describe('Enterprise page (public marketing `/enterprise`)', () => {
     );
   });
 
-  it('shows [TODO(user)] for every custom-limit value', () => {
+  it('shows custom values for every enterprise limit', () => {
     render(<Page />);
 
     const limits = screen.getByRole('region', { name: 'Custom limits' });
     for (const label of ['Monthly audit runs', 'Monitored URLs', 'Seats', 'Evidence retention']) {
       expect(within(limits).getByText(label)).toBeInTheDocument();
     }
-    // Volumes, seats, retention — all six dials are user-fillable placeholders.
-    expect(within(limits).getAllByText('[TODO(user)]')).toHaveLength(6);
+    expect(within(limits).getAllByText('Custom')).toHaveLength(6);
   });
 
   it('renders the contact CTA with the mailto-or-placeholder href', () => {

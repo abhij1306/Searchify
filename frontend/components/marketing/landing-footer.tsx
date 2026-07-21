@@ -78,8 +78,7 @@ const FOOTER_COLUMNS: readonly FooterColumn[] = [
     label: 'Company',
     links: [
       { label: 'GitHub', href: GITHUB_URL, external: true },
-      // Falls back to '#' until CONTACT_EMAIL is set in the content module.
-      { label: 'Contact', href: CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '#' },
+      ...(CONTACT_EMAIL ? [{ label: 'Contact', href: `mailto:${CONTACT_EMAIL}` }] : []),
       { label: 'Sign in', href: '/login' },
       { label: 'Get started', href: '/register' },
     ],
@@ -105,19 +104,13 @@ function FooterColumnLink({ link }: { link: FooterLink }) {
 /** Social chip: '#' placeholders stay plain anchors; real profiles open externally. */
 function SocialButton({ social }: { social: SocialLink }) {
   const Icon = social.icon;
-  if (social.href === '#') {
-    return (
-      <a className="social-btn" href="#" aria-label={social.label}>
-        <Icon aria-hidden />
-      </a>
-    );
-  }
+  const external = social.href !== '#';
   return (
     <a
       className="social-btn"
       href={social.href}
-      target="_blank"
-      rel="noreferrer"
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noreferrer' : undefined}
       aria-label={social.label}
     >
       <Icon aria-hidden />
@@ -166,12 +159,6 @@ export function LandingFooter() {
               MIT License
             </a>
           </span>
-          <nav className="footer-legal" aria-label="Legal">
-            {/* TODO(user): real privacy policy URL */}
-            <a href="#">Privacy</a>
-            {/* TODO(user): real terms of service URL */}
-            <a href="#">Terms</a>
-          </nav>
         </div>
       </div>
     </footer>

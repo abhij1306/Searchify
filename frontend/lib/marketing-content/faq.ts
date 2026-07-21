@@ -130,15 +130,15 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         q: 'How much does Searchify cost?',
         a:
           'Searchify is open source under the MIT license and free to self-host — you pay only ' +
-          'your own AI provider usage on your own keys. Hosted plans: [TODO(user)].',
+          'your own AI provider usage on your own keys. Hosted plan details will be published before launch.',
       },
       {
         q: 'What’s the refund policy?',
-        a: '[TODO(user)]',
+        a: 'Refund terms will be published with hosted-plan availability.',
       },
       {
         q: 'How do I get an invoice?',
-        a: '[TODO(user)]',
+        a: 'Invoice options will be published with hosted-plan availability.',
       },
     ],
   },

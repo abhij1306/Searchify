@@ -1,10 +1,9 @@
 /**
  * Blog content for /blog and /blog/[slug].
  *
- * `POSTS` holds exactly one ready-to-edit placeholder entry — duplicate it and
- * fill in the '[TODO(user)]' fields to publish a real post. The placeholder
- * slug `hello-searchify` is hardcoded in the e2e suite; keep it (or update
- * e2e/marketing-pages.spec.ts in the same change).
+ * `POSTS` is intentionally empty until editorial content is approved. The
+ * index renders its designed empty state, and all `/blog/[slug]` paths return
+ * 404 until a reviewed entry is added here.
  */
 
 export type BlogBlock =
@@ -21,28 +20,8 @@ export type BlogPost = {
   body: readonly BlogBlock[];
 };
 
-export const POSTS: readonly BlogPost[] = [
-  {
-    slug: 'hello-searchify',
-    title: '[Draft placeholder] Introducing Searchify: own how your brand appears in AI answers',
-    // Grounded in README.md.
-    excerpt:
-      'Searchify is an open-source AI visibility and site intelligence platform — ' +
-      'measure brand presence across ChatGPT, Gemini, and Claude on your own keys, ' +
-      'inspect the evidence behind every result, and improve the pages those answers rely on.',
-    date: '[TODO(user)]',
-    readTime: '[TODO(user)]',
-    author: '[TODO(user)]',
-    tags: ['Product'],
-    // Placeholder body — exercises every BlogBlock variant the template renders.
-    body: [
-      { type: 'paragraph', text: '[TODO(user)]' },
-      { type: 'heading', text: '[TODO(user)]' },
-      { type: 'paragraph', text: '[TODO(user)]' },
-      { type: 'list', items: ['[TODO(user)]', '[TODO(user)]', '[TODO(user)]'] },
-    ],
-  },
-];
+/** Posts are published only after editorial review; the blog renders its designed empty state meanwhile. */
+export const POSTS: readonly BlogPost[] = [];
 
 export type BlogEmptyState = {
   heading: string;

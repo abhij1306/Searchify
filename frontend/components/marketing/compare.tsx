@@ -69,6 +69,14 @@ export function CompareIndex() {
                 </span>
               </Link>
             ))}
+            {COMPETITORS.length === 0 ? (
+              <div className="empty-state">
+                <p>
+                  Comparison research is in progress. We publish pages only after every claim is
+                  verified.
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

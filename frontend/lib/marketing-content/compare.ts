@@ -27,7 +27,7 @@ export type Competitor = {
  * unverified placeholder. When you research a competitor, inline their rows
  * with real `competitor` cells (and mark the review date on the page).
  */
-const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }[] = [
+export const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }[] = [
   {
     dimension: 'Engines covered',
     searchify:
@@ -71,37 +71,5 @@ const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }[] = [
   },
 ];
 
-function placeholderRows(): readonly ComparisonRow[] {
-  return SEARCHIFY_COLUMN.map((row) => ({ ...row, competitor: '[TODO(user)]' }));
-}
-
-export const COMPETITORS: readonly Competitor[] = [
-  {
-    slug: 'profound',
-    name: 'Profound',
-    tagline: '[TODO(user)]',
-    rows: placeholderRows(),
-    verdict: '[TODO(user)]',
-  },
-  {
-    slug: 'otterly-ai',
-    name: 'Otterly AI',
-    tagline: '[TODO(user)]',
-    rows: placeholderRows(),
-    verdict: '[TODO(user)]',
-  },
-  {
-    slug: 'scrunch-ai',
-    name: 'Scrunch AI',
-    tagline: '[TODO(user)]',
-    rows: placeholderRows(),
-    verdict: '[TODO(user)]',
-  },
-  {
-    slug: 'peec-ai',
-    name: 'Peec AI',
-    tagline: '[TODO(user)]',
-    rows: placeholderRows(),
-    verdict: '[TODO(user)]',
-  },
-];
+/** Publish comparison pages only after first-party review of every claim. */
+export const COMPETITORS: readonly Competitor[] = [];

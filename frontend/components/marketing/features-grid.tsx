@@ -41,9 +41,9 @@ export function FeaturesGrid() {
         <div className="section-head">
           <span className="eyebrow">What you get</span>
           <h2 className="h2">
-            Everything your audit needs.
+            See every answer.
             <br />
-            <span className="grad-text">Nothing it doesn’t.</span>
+            <span className="grad-text">Know what to do next.</span>
           </h2>
           <p>
             One workspace for your brand, your competitors, and the prompts that decide who gets

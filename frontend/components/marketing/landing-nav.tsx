@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Fragment, useEffect, useState, useSyncExternalStore } from 'react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { GITHUB_URL } from '@/lib/marketing-content/social';
 import { applyTheme, readTheme, subscribeTheme } from '@/lib/theme';
@@ -284,6 +284,11 @@ export function LandingNav() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => 'light');
   const [scrolled, setScrolled] = useState(false);
   const [openDrop, setOpenDrop] = useState<DropKey | null>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+  const [dropLeft, setDropLeft] = useState(0);
+  const navLinksRef = useRef<HTMLDivElement | null>(null);
+  const triggerRefs = useRef<Partial<Record<DropKey, HTMLButtonElement>>>({});
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openAcc, setOpenAcc] = useState<DropKey | null>(null);
 
@@ -298,6 +303,34 @@ export function LandingNav() {
     setMobileOpen(false);
     setOpenAcc(null);
   };
+
+  const clearDropClose = () => {
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+
+  const openDesktopDrop = (key: DropKey) => {
+    clearDropClose();
+    const order: DropKey[] = ['product', 'resources', 'solutions'];
+    if (openDrop && openDrop !== key) {
+      setSlideDirection(order.indexOf(key) > order.indexOf(openDrop) ? 'right' : 'left');
+    }
+    const trigger = triggerRefs.current[key];
+    const navLinks = navLinksRef.current;
+    if (trigger && navLinks) {
+      const triggerRect = trigger.getBoundingClientRect();
+      const navRect = navLinks.getBoundingClientRect();
+      setDropLeft(triggerRect.left - navRect.left + triggerRect.width / 2);
+    }
+    setOpenDrop(key);
+  };
+
+  const scheduleDropClose = () => {
+    clearDropClose();
+    closeTimer.current = window.setTimeout(() => setOpenDrop(null), 140);
+  };
+
+  useEffect(() => () => clearDropClose(), []);
 
   // Esc closes an open mobile menu (desktop dropdowns handle their own Esc
   // inside dropProps, where they can also blur the trigger).
@@ -314,9 +347,8 @@ export function LandingNav() {
   }, [mobileOpen]);
 
   const dropProps = (key: DropKey) => ({
-    onMouseEnter: () => setOpenDrop(key),
-    onMouseLeave: () => setOpenDrop((current) => (current === key ? null : current)),
-    onFocusCapture: () => setOpenDrop(key),
+    onMouseEnter: () => openDesktopDrop(key),
+    onFocusCapture: () => openDesktopDrop(key),
     onBlurCapture: (event: React.FocusEvent<HTMLDivElement>) => {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
         setOpenDrop((current) => (current === key ? null : current));
@@ -331,6 +363,7 @@ export function LandingNav() {
   });
 
   const toggleAcc = (key: DropKey) => setOpenAcc((current) => (current === key ? null : key));
+  const activeDrop = NAV_DROPS.find((drop) => drop.key === openDrop);
 
   return (
     <div className="nav-wrap">
@@ -340,25 +373,55 @@ export function LandingNav() {
           <span>Searchify</span>
           <span className="by-tag">by CUBE27</span>
         </Link>
-        <div className="nav-links">
-          {NAV_DROPS.map(({ key, label, groups }) => (
+        <div
+          className="nav-links"
+          ref={navLinksRef}
+          onMouseEnter={clearDropClose}
+          onMouseLeave={scheduleDropClose}
+        >
+          {NAV_DROPS.map(({ key, label }) => (
             <div
               className={cn('nav-item', openDrop === key && 'open')}
               key={key}
               {...dropProps(key)}
             >
               <button
+                ref={(node) => {
+                  if (node) triggerRefs.current[key] = node;
+                }}
                 className="nav-link"
                 type="button"
                 aria-expanded={openDrop === key}
                 aria-haspopup="true"
-                aria-controls={`drop-${key}`}
-                onClick={() => setOpenDrop(key)}
+                aria-controls="desktop-nav-panel"
+                onClick={() => openDesktopDrop(key)}
               >
                 {label} <ChevronDown className="chev" aria-hidden />
               </button>
-              <div className={`drop drop-${key}`} id={`drop-${key}`} role="menu">
-                {groups.map((group) =>
+            </div>
+          ))}
+          <Link className="nav-link" href="/enterprise">
+            Enterprise
+          </Link>
+          <Link className="nav-link" href="/pricing">
+            Pricing
+          </Link>
+          <div
+            className={cn(
+              'drop shared-drop',
+              openDrop && 'open',
+              openDrop && `drop-${openDrop}`,
+              `slide-${slideDirection}`,
+            )}
+            id="desktop-nav-panel"
+            role="menu"
+            aria-hidden={!openDrop}
+            style={{ left: dropLeft }}
+            onMouseEnter={clearDropClose}
+          >
+            {activeDrop ? (
+              <div className="drop-content" key={activeDrop.key}>
+                {activeDrop.groups.map((group) =>
                   group.label ? (
                     <div className="d-group" key={group.label}>
                       <span className="d-group-label">{group.label}</span>
@@ -383,14 +446,8 @@ export function LandingNav() {
                   ),
                 )}
               </div>
-            </div>
-          ))}
-          <Link className="nav-link" href="/enterprise">
-            Enterprise
-          </Link>
-          <Link className="nav-link" href="/pricing">
-            Pricing
-          </Link>
+            ) : null}
+          </div>
         </div>
         <div className="nav-actions">
           <button

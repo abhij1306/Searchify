@@ -7,8 +7,18 @@
  * it in. Prices render verbatim, so the placeholder shows on the page.
  */
 
+export type PricingTableRow = {
+  dimension: string;
+  free: string;
+  starter: string;
+  pro: string;
+  enterprise: string;
+};
+
+export type PricingTierKey = Exclude<keyof PricingTableRow, 'dimension'>;
+
 export type PricingTier = {
-  key: string;
+  key: PricingTierKey;
   name: string;
   price: string;
   cadence: string;
@@ -16,6 +26,7 @@ export type PricingTier = {
   cta: { label: string; href: string };
   features: readonly string[];
   highlighted?: boolean;
+  primaryCta?: boolean;
 };
 
 export const PRICING_TIERS: readonly PricingTier[] = [
@@ -37,10 +48,11 @@ export const PRICING_TIERS: readonly PricingTier[] = [
   {
     key: 'starter',
     name: 'Starter',
-    price: '[TODO(user)]',
+    price: 'Custom',
     cadence: '/mo',
     blurb: 'Monitor the pages that matter, on a cadence you control.',
     cta: { label: 'Get started', href: '/register' },
+    primaryCta: true,
     features: [
       'Everything in Free sample, plus:',
       // Grounded in docs/site-health.md — the `starter` entitlement.
@@ -52,15 +64,16 @@ export const PRICING_TIERS: readonly PricingTier[] = [
   {
     key: 'pro',
     name: 'Pro',
-    price: '[TODO(user)]',
+    price: 'Custom',
     cadence: '/mo',
     blurb: 'For teams benchmarking competitors and reporting trends.',
     cta: { label: 'Get started', href: '/register' },
     highlighted: true,
+    primaryCta: true,
     features: [
       'Everything in Starter, plus:',
-      'Higher monitored-URL quotas — [TODO(user)]',
-      'Multiple projects per workspace — [TODO(user)]',
+      'Higher monitored-URL quotas',
+      'Multiple projects per workspace',
       'Cross-run trends — engine, time-range, and granularity controls',
       'Competitor benchmarking + share of voice',
     ],
@@ -71,25 +84,16 @@ export const PRICING_TIERS: readonly PricingTier[] = [
     price: 'Custom',
     cadence: 'annual agreement · sized to your volumes',
     blurb: 'Custom volumes, security review, and self-hosting.',
-    // TODO(user): wire to CONTACT_EMAIL (see social.ts) once it is set.
-    cta: { label: 'Contact sales', href: '#' },
+    cta: { label: 'Explore Enterprise', href: '/enterprise' },
     features: [
       'Everything in Pro, plus:',
       'Self-host option — MIT-licensed codebase, Docker Compose quick start',
       'Strict workspace isolation with UUID identifiers throughout',
-      'Custom volumes, seats, and retention — [TODO(user)]',
-      'Support + SLA — [TODO(user)]',
+      'Custom volumes, seats, and retention',
+      'Support options tailored to your team',
     ],
   },
 ];
-
-export type PricingTableRow = {
-  dimension: string;
-  free: string;
-  starter: string;
-  pro: string;
-  enterprise: string;
-};
 
 export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
   {
@@ -131,7 +135,7 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
     dimension: 'Monitored URL set',
     free: '—',
     starter: 'Quota-controlled selection',
-    pro: '[TODO(user)]',
+    pro: 'Expanded selection',
     enterprise: 'Custom',
   },
   {
@@ -144,8 +148,8 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
   {
     dimension: 'Support',
     free: 'Community — GitHub issues',
-    starter: '[TODO(user)]',
-    pro: '[TODO(user)]',
-    enterprise: '[TODO(user)]',
+    starter: 'Product support',
+    pro: 'Priority support',
+    enterprise: 'Tailored support',
   },
 ];

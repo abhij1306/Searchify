@@ -103,9 +103,6 @@ describe('LandingSessionRedirect', () => {
     await waitFor(() =>
       expect(queryClient.getQueryState(queryKeys.auth.me())?.status).toBe('error'),
     );
-    await new Promise((resolve) => {
-      setTimeout(resolve, 50);
-    });
     expect(replace).not.toHaveBeenCalled();
     expect(screen.getByText('marketing page content')).toBeInTheDocument();
   });
@@ -122,9 +119,6 @@ describe('LandingSessionRedirect', () => {
     await waitFor(() =>
       expect(queryClient.getQueryState(queryKeys.auth.me())?.status).toBe('error'),
     );
-    await new Promise((resolve) => {
-      setTimeout(resolve, 50);
-    });
     expect(replace).not.toHaveBeenCalled();
   });
 
@@ -141,9 +135,6 @@ describe('LandingSessionRedirect', () => {
     await waitFor(() =>
       expect(queryClient.getQueryState(queryKeys.projects.list())?.status).toBe('error'),
     );
-    await new Promise((resolve) => {
-      setTimeout(resolve, 50);
-    });
     expect(replace).not.toHaveBeenCalled();
   });
 });

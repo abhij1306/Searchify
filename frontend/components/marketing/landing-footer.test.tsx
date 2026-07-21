@@ -50,13 +50,12 @@ describe('LandingFooter (marketing chrome)', () => {
     expect(docs).toHaveAttribute('target', '_blank');
     expect(docs.getAttribute('rel')).toContain('noreferrer');
 
-    // CONTACT_EMAIL is still empty, so Contact keeps the '#' fallback.
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute('href', '#');
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute('href', '/register');
   });
 
-  it('renders the social row: GitHub real and external, four placeholders as plain # anchors', () => {
+  it('renders only published social destinations', () => {
     const { container } = render(<LandingFooter />);
 
     const socialRow = container.querySelector('.social-row');
@@ -66,19 +65,14 @@ describe('LandingFooter (marketing chrome)', () => {
     const socials = within(socialRow);
 
     const github = socials.getByRole('link', { name: 'GitHub' });
-    expect(github).toHaveAttribute('href', 'https://github.com/abhij1306/Searchify');
+    expect(github).toHaveAttribute('href', GITHUB_URL);
     expect(github).toHaveAttribute('target', '_blank');
     expect(github.getAttribute('rel')).toContain('noreferrer');
 
-    expect(socials.getAllByRole('link')).toHaveLength(5);
-    for (const label of ['LinkedIn', 'Twitter', 'YouTube', 'Instagram']) {
-      const placeholder = socials.getByRole('link', { name: label });
-      expect(placeholder).toHaveAttribute('href', '#');
-      expect(placeholder).not.toHaveAttribute('target');
-    }
+    expect(socials.getAllByRole('link')).toHaveLength(1);
   });
 
-  it('renders the legal row with the MIT License link and # placeholders', () => {
+  it('renders the legal row with the published MIT License link', () => {
     render(<LandingFooter />);
 
     expect(screen.getByText(/© 2026 Searchify · A CUBE27 product/)).toBeInTheDocument();
@@ -88,7 +82,7 @@ describe('LandingFooter (marketing chrome)', () => {
     expect(mit).toHaveAttribute('target', '_blank');
     expect(mit.getAttribute('rel')).toContain('noreferrer');
 
-    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '#');
-    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '#');
+    expect(screen.queryByRole('link', { name: 'Privacy' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Terms' })).toBeNull();
   });
 });

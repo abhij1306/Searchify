@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { LandingNav } from './landing-nav';
+import { GITHUB_URL } from '@/lib/marketing-content/social';
 
+import { LandingNav } from './landing-nav';
 /**
  * The desktop trigger and the mobile accordion head share a name, so pick a
  * button by the panel it controls (`drop-*` desktop, `acc-*` mobile).
@@ -27,17 +28,17 @@ describe('LandingNav', () => {
 
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
 
-    for (const [name, key] of [
+    for (const [name] of [
       [/^product$/i, 'product'],
       [/^resources$/i, 'resources'],
       [/^solutions$/i, 'solutions'],
     ] as const) {
-      const trigger = control(name, `drop-${key}`);
+      const trigger = control(name, 'desktop-nav-panel');
       expect(trigger).toHaveAttribute('aria-haspopup', 'true');
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
-      const drop = panel(`drop-${key}`);
+      const drop = panel('desktop-nav-panel');
       expect(drop).toHaveAttribute('role', 'menu');
-      expect(drop).toHaveClass('drop', `drop-${key}`);
+      expect(drop).toHaveClass('drop', 'shared-drop');
     }
 
     // Enterprise / Pricing are plain links — no dropdown chrome whatsoever.
@@ -65,7 +66,10 @@ describe('LandingNav', () => {
 
     // Product: the 6 feature rows (absolute anchors so they resolve from
     // subpages) + the "How it works" group's 3 numbered steps.
-    const product = panel('drop-product');
+    fireEvent.mouseEnter(
+      control(/^product$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+    );
+    const product = panel('desktop-nav-panel');
     expect(within(product).getAllByRole('menuitem')).toHaveLength(9);
     for (const title of [
       'Three-engine coverage',
@@ -86,7 +90,10 @@ describe('LandingNav', () => {
     }
     expect(product.querySelector('.d-group-label')).toHaveTextContent('How it works');
 
-    const resources = panel('drop-resources');
+    fireEvent.mouseEnter(
+      control(/^resources$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+    );
+    const resources = panel('desktop-nav-panel');
     expect(within(resources).getAllByRole('menuitem')).toHaveLength(4);
     expect(within(resources).getByRole('menuitem', { name: /^blog/i })).toHaveAttribute(
       'href',
@@ -102,11 +109,14 @@ describe('LandingNav', () => {
     );
     // Documentation is the one external row: plain <a>, new tab, no referrer.
     const docs = within(resources).getByRole('menuitem', { name: /^documentation/i });
-    expect(docs).toHaveAttribute('href', 'https://github.com/abhij1306/Searchify');
+    expect(docs).toHaveAttribute('href', GITHUB_URL);
     expect(docs).toHaveAttribute('target', '_blank');
     expect(docs).toHaveAttribute('rel', 'noreferrer');
 
-    const solutions = panel('drop-solutions');
+    fireEvent.mouseEnter(
+      control(/^solutions$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+    );
+    const solutions = panel('desktop-nav-panel');
     expect(within(solutions).getAllByRole('menuitem')).toHaveLength(4);
     expect(within(solutions).getByRole('menuitem', { name: /^agencies/i })).toHaveAttribute(
       'href',
@@ -157,15 +167,16 @@ describe('LandingNav', () => {
     render(<LandingNav />);
 
     // Desktop dropdown: hovering the trigger's wrapper opens it.
-    const product = control(/^product$/i, 'drop-product');
+    const product = control(/^product$/i, 'desktop-nav-panel');
     const navItem = product.closest('.nav-item');
     expect(navItem).not.toBeNull();
     fireEvent.mouseEnter(navItem as Element);
     expect(navItem).toHaveClass('nav-item', 'open');
     expect(product).toHaveAttribute('aria-expanded', 'true');
+    // Leaving one item does not close the shared desktop hover zone: this
+    // lets the next dropdown slide in rather than flashing closed first.
     fireEvent.mouseLeave(navItem as Element);
-    expect(navItem).toHaveClass('nav-item');
-    expect(navItem).not.toHaveClass('open');
+    expect(navItem).toHaveClass('nav-item', 'open');
 
     // Trigger click opens (touch / Enter-Space path; fireEvent.click
     // dispatches no focus, so onFocusCapture can't interfere). Click only

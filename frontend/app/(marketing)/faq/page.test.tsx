@@ -76,15 +76,14 @@ describe('FAQ page (public marketing `/faq`)', () => {
     }
   });
 
-  it('keeps the unfilled billing answers as visible [TODO(user)] placeholders', () => {
+  it('uses presentation-safe billing copy while hosted details are finalized', () => {
     render(<Page />);
 
     const billing = screen.getByRole('region', { name: 'Account & billing' });
-    // Every billing placeholder renders as the todo-tag pill: the two
-    // bare-placeholder answers (refund, invoice) plus the inline one in the
-    // cost answer.
-    expect(within(billing).getAllByText('[TODO(user)]')).toHaveLength(3);
-    expect(within(billing).getByText(/Hosted plans:/)).toHaveTextContent('[TODO(user)]');
+    expect(
+      within(billing).getByText(/Hosted plan details will be published before launch/i),
+    ).toBeInTheDocument();
+    expect(within(billing).getByText(/Refund terms will be published/i)).toBeInTheDocument();
   });
 
   it('links the real GitHub URL from the open-source group', () => {

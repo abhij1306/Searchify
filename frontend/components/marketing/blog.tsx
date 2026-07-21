@@ -82,7 +82,7 @@ function PostGrid({ posts }: Readonly<{ posts: readonly BlogPost[] }>) {
         <div className="list-head">
           <span className="panel-label">All notes</span>
           <span className="post-count">
-            {POSTS.length} {POSTS.length === 1 ? 'post' : 'posts'}
+            {posts.length} {posts.length === 1 ? 'post' : 'posts'}
           </span>
         </div>
         <div className="post-grid">

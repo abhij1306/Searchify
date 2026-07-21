@@ -1,4 +1,5 @@
 import { Bricolage_Grotesque, IBM_Plex_Mono, Public_Sans } from 'next/font/google';
+import Script from 'next/script';
 import type { ReactNode } from 'react';
 
 import { THEME_STORAGE_KEY } from '@/lib/theme';
@@ -48,7 +49,9 @@ const MARKETING_THEME_DEFAULT_SCRIPT = `(() =\u003e {
 export default function MarketingLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className={`${display.variable} ${sans.variable} ${mono.variable} mkt`}>
-      <script dangerouslySetInnerHTML={{ __html: MARKETING_THEME_DEFAULT_SCRIPT }} />
+      <Script id="marketing-theme-default" strategy="beforeInteractive">
+        {MARKETING_THEME_DEFAULT_SCRIPT}
+      </Script>
       {/* Restores the bootstrap theme on client-side exit so the dark-first
           default above stays marketing-only (see MarketingThemeReset). */}
       <MarketingThemeReset />

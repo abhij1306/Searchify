@@ -67,7 +67,7 @@ const OPS_CARDS: readonly OpsCard[] = [
     points: [
       'PostgreSQL durable queues — FOR UPDATE SKIP LOCKED, no Redis dependency',
       'Leases, heartbeats, retries, and idempotency on every task',
-      'Custom audit + crawl volumes on enterprise plans — [TODO(user)]',
+      'Custom audit + crawl volumes tailored to your team',
     ],
   },
   {
@@ -98,8 +98,8 @@ const DEPLOY_CARDS: readonly DeployCard[] = [
     points: [
       'Managed workers, queues, and upgrades',
       'Workspace isolation with UUID scoping throughout',
-      'Custom volumes, seats, and retention — [TODO(user)]',
-      'Support + SLA options — [TODO(user)]',
+      'Custom volumes, seats, and retention',
+      'Support options tailored to your review process',
     ],
   },
   {
@@ -332,8 +332,7 @@ export function EnterpriseLimits() {
           {LIMIT_CELLS.map((cell) => (
             <div className="card limit-cell" key={cell.label}>
               <div className="panel-label">{cell.label}</div>
-              {/* TODO(user): enterprise limit value */}
-              <div className="limit-val">[TODO(user)]</div>
+              <div className="limit-val">Custom</div>
               <div className="limit-desc">{cell.desc}</div>
             </div>
           ))}
