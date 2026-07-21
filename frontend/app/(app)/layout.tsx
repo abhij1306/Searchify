@@ -13,8 +13,9 @@ import { ProjectProvider } from '@/lib/project/project-context';
  * Wraps every `(app)` route in F4's `<SessionGuard>` (bounces unauthenticated
  * visitors to `/login` and installs the 401 watchdog), then the F5
  * `<ProjectProvider>` (active-project context + `X-Workspace-Id` header wiring),
- * then the `<AppShell>` chrome (sidebar + top bar). The landing redirector at
- * `(app)/page.tsx` keeps its own guard for the pre-project routing case.
+ * then the `<AppShell>` chrome (sidebar + top bar). `/` is now the public
+ * marketing page (see `app/(marketing)/`); its LandingSessionRedirect island
+ * forwards signed-in visitors here (`/visibility`, or `/setup` pre-project).
  */
 export default function AppLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (

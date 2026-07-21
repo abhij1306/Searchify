@@ -23,6 +23,11 @@
 
 | Route | Screen | Status |
 |---|---|---|
+| `/` | Public marketing landing page (shared chrome in `app/(marketing)/layout.tsx`; client island forwards authed visitors to `/visibility` or `/setup`) | **MVP** |
+| `/pricing`, `/enterprise`, `/solutions` | Public marketing plans, enterprise, and audience-solution pages | **MVP** |
+| `/blog`, `/blog/[slug]` | Public marketing blog index and statically generated posts (`notFound()` for unknown slugs) | **MVP** |
+| `/compare`, `/compare/[competitor]` | Public marketing comparison index and statically generated comparison pages (`notFound()` for unknown slugs) | **MVP** |
+| `/faq` | Public marketing FAQ (native disclosure controls) | **MVP** |
 | `/login`, `/register` | Auth | **MVP** |
 | `(app)/layout.tsx` | App shell (sidebar + top bar + project switcher) | **MVP** |
 | `/setup` | Brand/Project setup | **MVP** |
