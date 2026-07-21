@@ -1,4 +1,4 @@
-# Searchify — AI-Visibility MVP + Product Documentation (Summary)
+# Searchify — AI-Visibility Product Documentation (Summary)
 
 ## Problem & goals
 Searchify is a greenfield AEO / AI-visibility SaaS (an original "Searchable"-class product).
@@ -24,7 +24,7 @@ documentation an agent can build the rest of the product from.
 ## Subsystem scope (grounded)
 - **Implemented as Searchify's own `ai_visibility` domain** (`backend/app/` with `models/`, `schemas/`,
   `api/`, `core/config/ai_visibility.py`, tests): the answer-engine adapters (Gemini grounded working;
-  Anthropic + OpenRouter present), the deterministic scoring/normalization/exports, the run-planning +
+  direct Anthropic, OpenAI, and Google transports), the deterministic scoring/normalization/exports, the run-planning +
   deterministic slot shuffle, cooperative cancel, retry/pacing/guardrails.
 - **Backend conventions**: FastAPI app-factory + router-per-
   domain; async SQLAlchemy 2.0 typed `Mapped`/`Base`/`get_session`; Fernet `encrypt_secret`/
@@ -49,7 +49,7 @@ flowchart TD
   API -->|"polling (SSE optional)"| Web
   API --> PG[("PostgreSQL: workspaces, projects, prompts, encrypted provider connections, audits, audit_tasks queue+leases, executions, analysis, metrics, provenance")]
   Worker["Python worker (Railway)"] -->|"FOR UPDATE SKIP LOCKED claim"| PG
-  Worker -->|"AnswerEngineAdapter.execute()"| Engines["ChatGPT via OpenRouter · Gemini (direct/OpenRouter) · Claude (direct/OpenRouter). Direct OpenAI = fast-follow"]
+  Worker -->|"AnswerEngineAdapter.execute()"| Engines["ChatGPT via OpenAI · Gemini via Google · Claude via Anthropic"]
   Worker -->|"deterministic scoring -> analysis + metrics"| PG
 ```
 
@@ -69,9 +69,9 @@ flowchart LR
 | Decision | Rule | Rationale |
 |---|---|---|
 | Full target architecture from day one | Workspaces + `WorkspaceMember`; **workspace-scoped auth on every query**; **UUID PKs everywhere** | Locked decision #1472 — not a faithful as-is port |
-| All three engines at MVP | ChatGPT, Gemini, Claude all measurable at MVP. **Gemini** (transport `google`, direct) + **Claude** (transport `anthropic`, direct) have working direct adapters; **ChatGPT** ships via **OpenRouter** transport at MVP (direct OpenAI adapter is a fast-follow, see B-3) | Locked decision #1473 |
+| All three engines | ChatGPT, Gemini, and Claude are measurable through their direct transports (`openai`, `google`, and `anthropic`) | Locked decision #1473 |
 | BYOK provider settings | Fernet-encrypted `ProviderConnection`/`ProviderRoute`; `POST /provider-connections/{id}/test`; secret never returned/logged; key resolved from connection, not env | Replaces reference env-only key resolution |
-| Postgres is the MVP queue | `FOR UPDATE SKIP LOCKED` + lease + heartbeat + sweeper + idempotency; **`TaskQueue` Protocol** so a Redis swap needs no domain rewrite; no Redis | Locked decision + Redis is roadmap |
+| Postgres is the queue | `FOR UPDATE SKIP LOCKED` + lease + heartbeat + sweeper + idempotency; **`TaskQueue` Protocol** so a Redis swap needs no domain rewrite; no Redis | Locked decision + Redis is roadmap |
 | Deterministic slot shuffle + cooperative cancel preserved | Slots shuffled with the run's stored 64-bit seed; worker cancels only at execution boundary | Reproducibility; no zombie/mid-call kills |
 | logical vs transport identity | Persist `logical_engine` + `transport_provider` + `transport_model` on every route/attempt (v2 §2.3) | Compare engines; unambiguous provenance |
 | Immutable evidence + metrics are projections | Derived rows reference their `RawResponseArtifact` + `analyzer_version`; aggregates read persisted analysis, never re-call providers | Reproducible reports |
@@ -86,10 +86,8 @@ they are now **decided**. Any can be vetoed in plan review.
   **sentiment + average position deferred to roadmap** (documented as not-yet-computed). *Keeps headline
   metrics deterministic and shipped; adding an LLM for headline metrics would break the "no LLM for
   headline metrics" invariant.*
-- **B-3 ChatGPT via OpenRouter at MVP; direct OpenAI adapter is the immediate fast-follow.** *Gemini &
-  Claude have working direct adapters; OpenRouter-OpenAI is what the reference actually implements, so
-  MVP still covers all three engines.*
-- **B-4 Discovery/analysis model is plumbing-only in MVP** (`DiscoveryModelConfig` stored, not invoked);
+- **B-3 Direct provider routes.** ChatGPT uses OpenAI, Gemini uses Google, and Claude uses Anthropic.
+- **B-4 Discovery/analysis model is plumbing-only** (`DiscoveryModelConfig` stored, not invoked);
   AI prompt-suggestion + adjudication are roadmap. *Keeps the visibility loop deterministic.*
 - **Frontend Q1–Q4 all resolve to option (A):** backend owns **workspaces + UUIDs**, a
   `/provider-connections` + `/test` BYOK contract, a dedicated **`/prompt-sets`** resource (**MVP CSV
@@ -101,14 +99,12 @@ they are now **decided**. Any can be vetoed in plan review.
 - **All ids are string UUIDs** in backend DTOs and frontend zod schemas — the reference's integer PKs +
   `user_id` scoping are replaced with UUID + workspace scoping.
 - **API prefix is `/api/v1`** everywhere (the reference `/api/ai-visibility` prefix is dropped).
-- Logical engines are `chatgpt` / `gemini` / `claude`; MVP transports are `anthropic` / `google` /
-  `openrouter`. `openai` (direct) is **reserved — fast-follow, disabled at MVP** (chatgpt reaches MVP via
-  `openrouter`).
+- Logical engines are `chatgpt` / `gemini` / `claude`; transports are `openai`, `google`, and
+  `anthropic` direct transports.
 
 ## MVP vs roadmap boundary (docs describe all; code ships visibility)
 - **Coded MVP:** the five doc files (written first); auth + workspaces; projects/brand + prompts
-  (manual entry **and** CSV import); BYOK provider settings (ChatGPT via OpenRouter, Gemini + Claude
-  direct or OpenRouter); Postgres-queue audit execution + worker + state machine; deterministic analysis
+  (manual entry **and** CSV import); BYOK provider settings for the three direct transports; Postgres-queue audit execution + worker + state machine; deterministic analysis
   + metrics; a **single-run/selected-run** Visibility dashboard projection (score + per-engine comparison
   + brand-vs-competitor rankings); Run/Executions API — **backend SSE `/events` endpoint is MVP; the UI
   uses polling first and consumes SSE optionally** — + CSV/Markdown export; the seven
@@ -120,8 +116,8 @@ they are now **decided**. Any can be vetoed in plan review.
   Opportunities, **Site Health + Issues (a simple HTTP/Screaming-Frog-style crawler — no browser, and
   no full acquisition engine)**, open-ended Issue catalog, Brand / Competitors / E-E-A-T, Topics,
   GSC/GA4/Bing integrations, Agent, MCP, Settings/white-labelling, HTML/JSON report renderers, S3
-  artifacts, Redis queue, sentiment + avg position, direct OpenAI adapter, discovery-model prompt
-  suggestion + LLM adjudication.
+  artifacts, Redis queue, sentiment + avg position, discovery-model prompt suggestion + LLM
+  adjudication.
 
 ## Operational gotchas (must land in invariants + runbook)
 1. **Account shell secrets override Docker Compose `${VAR}`.** This machine exports `POSTGRES_PASSWORD`,

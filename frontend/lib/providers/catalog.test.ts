@@ -50,11 +50,10 @@ describe('buildEngineCards', () => {
     }
   });
 
-  it('labels the ChatGPT route as Direct (OpenAI) — no OpenRouter, no "coming soon"', () => {
+  it('labels the ChatGPT route as Direct (OpenAI)', () => {
     const chatgpt = buildEngineCards(catalog).find((c) => c.logical_engine === 'chatgpt')!;
     expect(chatgpt.route!.label).toBe('Direct (OpenAI)');
     const serialized = JSON.stringify(chatgpt);
-    expect(serialized).not.toContain('openrouter');
     expect(serialized).not.toContain('coming soon');
   });
 

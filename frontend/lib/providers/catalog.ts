@@ -10,7 +10,6 @@
  * route with no toggle and no reserved "coming soon" option.
  */
 import type {
-  HistoricalTransportProvider,
   LogicalEngine,
   ProviderCatalog,
   ProviderConnection,
@@ -28,15 +27,12 @@ export const ENGINE_LABELS: Record<LogicalEngine, string> = {
 };
 
 /**
- * Human display names for each transport provider. Keyed by the historical
- * transport space so read-only provenance (e.g. a legacy `openrouter` audit
- * row) still labels, even though only the three direct transports are writable.
+ * Human display names for each transport provider.
  */
-export const TRANSPORT_LABELS: Record<HistoricalTransportProvider, string> = {
+export const TRANSPORT_LABELS: Record<TransportProvider, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   google: 'Google',
-  openrouter: 'OpenRouter',
 };
 
 /** Human label for an engine key (falls back to the raw key). */
@@ -46,7 +42,7 @@ export function engineLabel(key: string): string {
 
 /** Human label for a transport key (falls back to the raw key). */
 export function transportLabel(key: string): string {
-  return TRANSPORT_LABELS[key as HistoricalTransportProvider] ?? key;
+  return TRANSPORT_LABELS[key as TransportProvider] ?? key;
 }
 
 /** The single fixed direct route on an engine card. */

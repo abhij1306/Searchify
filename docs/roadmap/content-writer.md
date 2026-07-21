@@ -27,7 +27,7 @@ human edits through to a publish-ready state.
 
 This surface is powered by the **discovery/analysis model**, **not** a measurement engine. The
 master plan (v2 §2.3) keeps these two concepts strictly separate: measurement engines
-(`chatgpt|gemini|claude` via direct or OpenRouter transports) are the *products being measured*;
+(`chatgpt|gemini|claude` via approved direct transports) are the *products being measured*;
 the discovery/analysis model is a *separately configured* generative LLM used for brand
 understanding, prompt suggestion, clustering, and — here — content drafting. Because the
 discovery model is a generative LLM, its output is **never** used to compute any headline

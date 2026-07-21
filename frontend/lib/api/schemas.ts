@@ -280,37 +280,20 @@ export const projectSchema = z
 // Providers (BYOK) — secret never present
 // ---------------------------------------------------------------------------
 
-// Active BYOK transports a connection may declare on the create/write path and
-// that the provider catalog lists (v2 direct-provider retirement). Backend
-// `ActiveTransportProvider` (providers/schemas) + `ACTIVE_TRANSPORTS`
-// (provider_catalog): direct OpenAI / Anthropic / Google only. The retired
-// `openrouter` token is NOT accepted here, so no new OpenRouter connection or
-// route can be created.
+// The complete BYOK transport surface exposed by the provider catalog.
 export const transportProviderSchema = z.enum(['openai', 'anthropic', 'google']);
-// Historical transport space including the retired `openrouter`. Read-only DTOs
-// (provider connections/routes) accept it so legacy OpenRouter rows still parse
-// under strict validation (invariant 10); it is never used for a write DTO.
-export const historicalTransportProviderSchema = z.enum([
-  'openai',
-  'anthropic',
-  'google',
-  'openrouter',
-]);
 export const logicalEngineSchema = z.enum(['chatgpt', 'gemini', 'claude']);
 
 // A configured route on a connection: which logical engine this transport
-// serves and the concrete transport model to call. Reads accept the historical
-// transport space so a legacy `openrouter` route still parses; `active` is
-// false for retired routes so read clients can identify (and skip) them without
-// seeing the internal deactivation marker.
+// serves and the concrete transport model to call.
 export const providerRouteSchema = z
   .object({
     id: uuid(),
     logical_engine: logicalEngineSchema,
-    transport_provider: historicalTransportProviderSchema,
+    transport_provider: transportProviderSchema,
     transport_model: z.string(),
     is_default: z.boolean(),
-    // Backend defaults to true; legacy openrouter routes are returned false.
+    // Backend defaults to true.
     active: z.boolean().optional(),
   })
   .strict();
@@ -322,9 +305,7 @@ export const providerConnectionSchema = z
     // Optional so the pre-B4 minimal shape (used in the schema test) still
     // validates; the live B4 DTO always sends these.
     label: z.string().nullable().optional(),
-    // Reads accept the historical transport space so a legacy `openrouter`
-    // connection still parses under strict validation (invariant 10).
-    transport_provider: historicalTransportProviderSchema,
+    transport_provider: transportProviderSchema,
     base_url: z.string().nullable(),
     active: z.boolean(),
     // Presence flag only — the key value itself is NEVER on the wire.
@@ -1115,8 +1096,7 @@ export const visibilityTrendListSchema = z.array(visibilityTrendPointSchema);
 // Execution-evidence projection (Mentions & Citations + Query Fanout tabs)
 // `GET /projects/{id}/visibility/evidence`. A pure read projection over already
 // persisted mention/citation/task/artifact rows — nothing is inferred or
-// backfilled at read time (invariant 7). Transport/model stay plain strings so
-// a legacy (e.g. `openrouter`) row still parses under strict validation.
+// backfilled at read time (invariant 7).
 // ---------------------------------------------------------------------------
 
 // Three-state query-fanout availability for one execution (backend

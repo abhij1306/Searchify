@@ -82,7 +82,7 @@ describe('ProviderSettings', () => {
     expect(screen.getAllByText('Not configured')).toHaveLength(3);
   });
 
-  it('shows ChatGPT as a fixed direct OpenAI route with no OpenRouter and no toggle', async () => {
+  it('shows ChatGPT as a fixed direct OpenAI route with no toggle', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
@@ -97,13 +97,12 @@ describe('ProviderSettings', () => {
     // Fixed direct route label; the OpenAI model is surfaced.
     expect(utils.getByText('Direct (OpenAI)')).toBeInTheDocument();
     expect(utils.getByText(/gpt-5\.4/)).toBeInTheDocument();
-    // No route toggle / radios at all, and no OpenRouter or "coming soon" copy.
+    // No route toggle / radios or alternate route copy.
     expect(utils.queryByRole('radio')).toBeNull();
-    expect(utils.queryByText(/openrouter/i)).toBeNull();
     expect(utils.queryByText(/coming soon/i)).toBeNull();
   });
 
-  it('never renders an OpenRouter control anywhere on the panel', async () => {
+  it('never renders an alternate transport control anywhere on the panel', async () => {
     mswServer.use(
       catalogHandler(),
       http.get('/api/v1/provider-connections', () => HttpResponse.json([])),
@@ -111,7 +110,6 @@ describe('ProviderSettings', () => {
 
     renderWithProviders(<ProviderSettings />);
     await screen.findByRole('heading', { name: 'ChatGPT' });
-    expect(screen.queryByText(/openrouter/i)).toBeNull();
   });
 
   it('submits a new OpenAI key and surfaces a successful connection test', async () => {

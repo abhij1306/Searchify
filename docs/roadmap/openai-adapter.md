@@ -4,13 +4,10 @@
 > record; the direct OpenAI adapter has shipped and is now the **only** active route for
 > `chatgpt`. Live owners:
 > - Adapter + parser: `backend/app/connectors/answer_engines/openai.py` +
->   `openai_parser.py` (OpenAI Responses API). The former OpenRouter adapter/parser were
->   **deleted**.
+>   `openai_parser.py` (OpenAI Responses API).
 > - Catalog: `backend/app/core/config/provider_catalog.py` —
 >   `APPROVED_ROUTES[chatgpt] = {openai: "gpt-5.4"}`, `ACTIVE_TRANSPORTS = {openai, anthropic,
->   google}`, and `openrouter` demoted to `HISTORICAL_TRANSPORTS` (read-only).
-> - Retirement: migration `migrations/versions/0008_direct_openai_retirement.py` (marker
->   `openrouter_retired_v2`) deactivates active OpenRouter connections/routes.
+>   google}`.
 > - Tests: `backend/tests/unit/test_answer_engine_adapters.py`,
 >   `backend/tests/component/test_provider_retirement_migration.py`.
 >
@@ -22,11 +19,8 @@
 
 **As shipped**, the logical engine `chatgpt` is measured through the **direct OpenAI Responses
 API only** (`transport_provider=openai`, model `gpt-5.4`), matching the shape of the direct
-Gemini (`google`) and Anthropic (`anthropic`) adapters. OpenRouter is **retired** as an active
-transport: `config/provider_catalog.py` now sets `APPROVED_ROUTES[chatgpt] = {openai:
-"gpt-5.4"}` and keeps `openrouter` only as a historical token so legacy rows read safely. (This
-spec originally designed the adapter as a fast-follow to an OpenRouter-only MVP; that route no
-longer exists.)
+Gemini (`google`) and Anthropic (`anthropic`) adapters. The provider catalog exposes the
+approved direct route for ChatGPT.
 
 This added a **new transport for an existing logical engine** — it introduced **no new logical
 engine** and changed nothing about deterministic scoring (non-goals §7).
@@ -71,7 +65,7 @@ All wiring is config + one factory branch; nothing is hard-coded in service code
 **As shipped:**
 - **`config/provider_catalog.py`**: `TRANSPORT_OPENAI` is in `ACTIVE_TRANSPORTS`;
   `APPROVED_ROUTES[ENGINE_CHATGPT] = {openai: "gpt-5.4"}` is the **only** route for ChatGPT (the
-  `openrouter` entry was removed and `openrouter` demoted to `HISTORICAL_TRANSPORTS`);
+  direct ChatGPT route is the sole approved entry);
   `openai_responses_url` lives on `ProviderCatalogSettings`. `is_route_approved`, `default_model`,
   `engines_for_transport`, and the `/provider-catalog` projection pick it up automatically.
 - **`connectors/answer_engines/factory.py`** `build_adapter()`: the
@@ -90,14 +84,13 @@ downstream analysis + classification stay transport-agnostic:
   `normalization.normalize_domain`, cited_text) — identical target shape to the Gemini/Anthropic
   parsers, so the deterministic citation classifier is unchanged.
 Where OpenAI exposes no equivalent field (e.g. char offsets), record `None` — never invent it.
-(The retired OpenRouter parser previously normalized a Chat Completions payload; it was deleted.)
+(The parser normalizes the OpenAI Responses payload.)
 
 ## 6. Frontend (transport selection)
 
 **As shipped**, `frontend/lib/api/schemas.ts` has one wire schema
 `transportProviderSchema = z.enum(['openai','anthropic','google'])` plus
-`historicalTransportProviderSchema` (adds `'openrouter'`) used only for read-only legacy
-provenance. `/providers` renders three per-engine cards with **one direct transport each**
+`providerRouteSchema` for direct-provider provenance. `/providers` renders three per-engine cards with **one direct transport each**
 (ChatGPT/OpenAI, Gemini/Google, Claude/Anthropic) — there is no route toggle and no reserved
 "OpenAI (direct) — coming soon" option. Browser calls stay same-origin through the `/api/*`
 proxy (invariant 12).

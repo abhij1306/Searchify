@@ -4,8 +4,8 @@
 **Scope:** Standalone Searchify AEO / AI-visibility audit product  
 **Frontend:** Next.js App Router on Vercel  
 **Backend:** Python / FastAPI on Railway  
-**Primary database and MVP job queue:** PostgreSQL on Railway  
-**MVP boundary:** Ship a focused one-time AI-visibility audit product with the minimum configuration, execution, evidence-inspection, and reporting surfaces required for a reliable audit, built on the full target architecture (workspaces, UUID PKs, BYOK, Postgres queue) from day one.
+**Primary database and job queue:** PostgreSQL on Railway
+**Product boundary:** Searchify is a full greenfield AEO platform built on workspaces, UUID PKs, BYOK, and a Postgres queue from day one.
 
 This is the high-level, whole-product architecture document. The supporting docs go deeper on each layer: [`backend-architecture.md`](backend-architecture.md) (API, models, queue, state machine, analysis), [`frontend-architecture.md`](frontend-architecture.md) (routes, API-contract layer, data flow), [`invariants.md`](invariants.md) (the hard rules), and [`design.md`](design.md) (tokens, theme, per-screen layout).
 
@@ -15,7 +15,7 @@ This is the high-level, whole-product architecture document. The supporting docs
 
 ### 1.1 Build a modular monolith
 
-Use one Python application with explicit domain modules and a separate worker process. Do not create microservices for the MVP.
+Use one Python application with explicit domain modules and a separate worker process. Do not create microservices solely to split current domain boundaries.
 
 The main workflow is one coherent product transaction:
 
@@ -31,7 +31,7 @@ brand and prompt definition
 
 Separating those steps into networked services now would add deployment, consistency, tracing, and contract overhead without improving the initial customer outcome.
 
-### 1.2 Use PostgreSQL as both durable state and the MVP task queue
+### 1.2 Use PostgreSQL as both durable state and the task queue
 
 The revised deployment has no Redis dependency:
 
@@ -66,7 +66,7 @@ The revised deployment has no Redis dependency:
 
 PostgreSQL remains the source of truth for every audit and task. Workers claim queue rows using row-level locking with `FOR UPDATE SKIP LOCKED`, leases, and idempotency keys.
 
-### 1.3 Treat Redis as a future scaling option, not an MVP requirement
+### 1.3 Treat Redis as an optional future scaling choice, not a requirement
 
 Introduce Redis only after measurements show that PostgreSQL queue activity or distributed coordination is becoming a bottleneck.
 
@@ -92,7 +92,7 @@ Settings -> Providers
 Main audit pages may display a read-only summary such as:
 
 ```text
-Discovery model: OpenRouter / configured model
+Discovery model: configured provider / model
 Measurement engines: ChatGPT, Gemini, Claude
 ```
 
@@ -121,9 +121,9 @@ The products being measured:
 Each logical engine can use:
 
 - its direct provider API; or
-- an OpenRouter transport route.
+- a configured direct-provider route.
 
-**Shipped route matrix (v2 direct-provider retirement).** The direct-vs-OpenRouter choice
+**Shipped route matrix.** The direct-provider route matrix
 above is the *target-state* contract. As shipped, every engine runs through its **direct**
 transport and there is exactly one approved route per engine:
 
@@ -131,13 +131,11 @@ transport and there is exactly one approved route per engine:
 - **Claude / Anthropic** — direct (`anthropic`), model `claude-sonnet-4-6`.
 - **ChatGPT / OpenAI** — direct (`openai`) via the **OpenAI Responses API**, model `gpt-5.4`.
   The direct OpenAI adapter (`backend/app/connectors/answer_engines/openai.py`) is **shipped**;
-  `openrouter` is retired as an active transport (see `docs/roadmap/openai-adapter.md`).
 
 #### Discovery and analysis model
 
 A separately configured model used for brand understanding, prompt suggestion, clustering, and optional ambiguity adjudication. Supported transports may include:
 
-- OpenRouter;
 - NVIDIA;
 - Mistral API;
 - OpenAI;
@@ -147,18 +145,17 @@ A separately configured model used for brand understanding, prompt suggestion, c
 - other explicitly approved OpenAI-compatible endpoints.
 
 A result must always preserve both identities. Active measurement rows now carry a direct
-transport (`openai | anthropic | google`); `openrouter` appears only on **historical** rows
-retired by migration `0008`, which must still read safely:
+transport (`openai | anthropic | google`):
 
 ```text
 logical_engine = gemini
-transport_provider = google           # active; a legacy row may read `openrouter`
+transport_provider = google           # active direct route
 transport_model = gemini-flash-latest
 ```
 
 ---
 
-## 3. MVP scope
+## 3. Current product scope
 
 ### 3.1 Included
 
@@ -878,10 +875,10 @@ Before upgrading:
 
 ---
 
-## 18. MVP acceptance criteria
+## 18. Acceptance criteria
 
 1. All provider secrets are configured only in Providers & Settings.
-2. The supported measurement routes work: direct `google` for Gemini, direct `anthropic` for Claude, and direct `openai` (OpenAI Responses API) for ChatGPT. `openrouter` is retired as an active transport and kept read-only for historical rows.
+2. The supported measurement routes work: direct `google` for Gemini, direct `anthropic` for Claude, and direct `openai` (OpenAI Responses API) for ChatGPT.
 3. Discovery/analysis model configuration is separate.
 4. AI discovery can be skipped.
 5. Manual and CSV prompt paths work.
@@ -901,7 +898,7 @@ Before upgrading:
 
 ---
 
-## 19. Post-MVP roadmap
+## 19. Product roadmap
 
 ### Release 1.1
 

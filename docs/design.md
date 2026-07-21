@@ -303,7 +303,7 @@ All CVA-driven, token-only, Radix where relevant, lucide icons.
 | `skeleton` | `--skeleton-base` → `--skeleton-highlight` shimmer. |
 | `history-drawer` | right-side Radix drawer for run history / execution list. |
 
-## 9. Per-screen layout prose (seven MVP screens)
+## 9. Per-screen layout prose (seven application screens)
 
 The app is a fixed **left sidebar (240px)** + **top bar (52px)** + scrolling content region
 (max content width ~1440px, `--content-gutter` padding). Auth screens are the exception
@@ -366,8 +366,8 @@ Gemini/Google, Claude/Anthropic). Each card shows its fixed route + default mode
 `input` (masked, write-only — never shows a stored secret), a "Test connection" `button`
 surfacing success/error inline, and a `configured` status badge. After the v2 direct-provider
 retirement each engine has exactly ONE route, so the **route segmented toggle and the reserved
-"Direct OpenAI — coming soon" option are removed**; `openrouter` labels appear only on read-only
-historical provenance. Below the engine cards, a separate **Discovery / analysis model**
+"Direct OpenAI — coming soon" option are removed**. Each card displays only its approved
+direct-provider route. Below the engine cards, a separate **Discovery / analysis model**
 selection card (plumbing-only; stored, not invoked). Unconfigured engines show a muted "Not
 configured" state.
 

@@ -285,18 +285,18 @@ async def test_worker_persists_openai_provenance(
 
 
 @pytest.mark.asyncio
-async def test_worker_rejects_frozen_openrouter_task_without_network(
+async def test_worker_rejects_frozen_retired_task_without_network(
     session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # A task frozen before the v2 retirement still points at the ``openrouter``
+    # A task frozen before the transport retirement still points at a retired
     # transport. The worker must fail it terminally with ``invalid_surface``
     # BEFORE the connection-activity check, key decryption, or any network call
     # (invariant 6/10) — build_adapter must never be reached.
     seed, audit = await _make_audit(session_factory, prompts=1, reps=1)
 
     # Rewrite the frozen task + engine snapshot to the retired transport, as a
-    # persisted pre-v2 OpenRouter task would look.
+    # persisted pre-retirement task would look.
     async with session_factory() as session:
         from app.models.audit import AuditEngineSnapshot
 
@@ -304,10 +304,10 @@ async def test_worker_rejects_frozen_openrouter_task_without_network(
             select(AuditTask).where(AuditTask.audit_id == audit.id)
         )
         assert task is not None
-        task.transport_provider = "openrouter"
+        task.transport_provider = "retired"
         snapshot = await session.get(AuditEngineSnapshot, task.engine_snapshot_id)
         if snapshot is not None:
-            snapshot.transport_provider = "openrouter"
+            snapshot.transport_provider = "retired"
         await session.commit()
 
     def _boom(**_: object):  # noqa: ANN202

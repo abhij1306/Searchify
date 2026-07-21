@@ -1,6 +1,6 @@
 """Direct OpenAI Responses API adapter (transport ``openai``).
 
-Calls the OpenAI Responses API directly (no OpenRouter hop) using the built-in
+Calls the OpenAI Responses API directly using the built-in
 ``web_search`` tool for grounding. Serves the ``chatgpt`` logical engine — the
 only active path to ChatGPT after the v2 direct-provider retirement.
 

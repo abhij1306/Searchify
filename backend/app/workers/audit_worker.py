@@ -459,10 +459,10 @@ class AuditWorker:
             prompt_text = task.prompt_text or ""
             base_url = snapshot.base_url if snapshot is not None else ""
 
-        # A frozen task on a retired transport (e.g. a legacy OpenRouter task
-        # persisted before the v2 retirement) fails terminally BEFORE the
-        # connection-activity check, key decryption, or any network I/O — no
-        # provider attempt, no external call, no raw artifact (invariant 6/10).
+        # A frozen task on a retired transport fails terminally BEFORE the
+        # connection-activity check, key decryption, and external network I/O.
+        # ``_fail_terminal`` persists a failed ProviderAttempt, but no adapter
+        # is invoked and no raw artifact occurs (invariant 6/10).
         if not is_active_transport(transport_provider):
             await self._fail_terminal(
                 task_id=task_id,

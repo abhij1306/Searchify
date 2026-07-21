@@ -21,7 +21,6 @@ import type {
   executionEvidenceSchema,
   executionSchema,
   executionStatusSchema,
-  historicalTransportProviderSchema,
   logicalEngineSchema,
   projectSchema,
   promptGenerateResponseSchema,
@@ -93,8 +92,6 @@ export type PromptGenerateResponse = z.infer<typeof promptGenerateResponseSchema
 export type BenchmarkMode = z.infer<typeof benchmarkModeSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type TransportProvider = z.infer<typeof transportProviderSchema>;
-/** Historical transport space including the retired `openrouter` (read DTOs). */
-export type HistoricalTransportProvider = z.infer<typeof historicalTransportProviderSchema>;
 export type LogicalEngine = z.infer<typeof logicalEngineSchema>;
 export type ProviderConnection = z.infer<typeof providerConnectionSchema>;
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;

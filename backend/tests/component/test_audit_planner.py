@@ -186,7 +186,7 @@ async def test_create_audit_ignores_inactive_legacy_route(
 ) -> None:
     """A retired (inactive) legacy route must not resolve for a new audit.
 
-    Even though the connection is active, an ``active=false`` OpenRouter route
+    Even though the connection is active, an ``active=false`` retired route
     is excluded by the planner, so the engine has no usable route.
     """
     from app.models.provider import ProviderConnection, ProviderRoute
@@ -197,8 +197,8 @@ async def test_create_audit_ignores_inactive_legacy_route(
     async with session_factory() as session:
         connection = ProviderConnection(
             workspace_id=seed.workspace_id,
-            label="Legacy OpenRouter",
-            transport_provider="openrouter",
+            label="Retired transport",
+            transport_provider="retired",
             api_key_encrypted="x",
             active=True,
         )
@@ -209,11 +209,11 @@ async def test_create_audit_ignores_inactive_legacy_route(
                 workspace_id=seed.workspace_id,
                 connection_id=connection.id,
                 logical_engine="chatgpt",
-                transport_provider="openrouter",
+                transport_provider="retired",
                 transport_model="openai/gpt-5.4",
                 is_default=True,
                 active=False,
-                deactivation_reason="openrouter_retired_v2",
+                deactivation_reason="transport_retired",
             )
         )
         await session.commit()

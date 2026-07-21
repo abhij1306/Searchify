@@ -40,18 +40,18 @@ class ProviderConnection(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"),
         index=True,
     )
-    # Human label for the connection (e.g. "Prod OpenRouter key").
+    # Human label for the connection (for example, "Production OpenAI key").
     label: Mapped[str] = mapped_column(String(255), default="")
-    # An active transport (openai|anthropic|google) on new rows; may hold the
-    # historical ``openrouter`` token on legacy rows (read-only, v2).
+    # Active connections use openai|anthropic|google; historical persisted rows
+    # may retain a no-longer-supported provider value for provenance.
     transport_provider: Mapped[str] = mapped_column(String(32))
     # Optional endpoint override (self-hosted gateway / proxy); "" = catalog URL.
     base_url: Mapped[str] = mapped_column(String(1024), default="")
     # Fernet ciphertext of the BYOK secret. NEVER returned in a DTO.
     api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Non-empty marker naming why an active row was retired (e.g. the v2
-    # ``openrouter_retired_v2`` migration). "" for rows never auto-deactivated.
+    # Non-empty marker naming why an inactive connection was retired; empty for
+    # connections that have never been auto-deactivated.
     deactivation_reason: Mapped[str] = mapped_column(
         String(64), default="", server_default=""
     )
@@ -90,10 +90,10 @@ class ProviderRoute(Base):
 
     Records the logical vs transport identity (invariant 10): ``logical_engine``
     is what the user asked for (chatgpt|gemini|claude), ``transport_provider``
-    is how it is reached (openai|anthropic|google, or the historical
-    openrouter token on legacy rows), and ``transport_model``
-    is the concrete model. ``is_default`` marks the preferred route for an
-    engine within the workspace.
+    is how it is reached (active routes use openai|anthropic|google; historical
+    rows may retain an older value), and ``transport_model`` is the concrete
+    model. ``is_default`` marks the preferred route for an engine within the
+    workspace.
     """
 
     __tablename__ = "provider_routes"
@@ -115,10 +115,10 @@ class ProviderRoute(Base):
     transport_provider: Mapped[str] = mapped_column(String(32))
     transport_model: Mapped[str] = mapped_column(String(255))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
-    # False marks a retired route (e.g. a legacy openrouter route the v2
-    # migration deactivated) so read clients skip it without deleting history.
+    # False marks a retired route so read clients skip it without deleting
+    # history.
     active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    # Non-empty marker naming why an active route was retired. "" otherwise.
+    # Non-empty marker naming why an inactive route was retired. "" otherwise.
     deactivation_reason: Mapped[str] = mapped_column(
         String(64), default="", server_default=""
     )
@@ -165,7 +165,8 @@ class ProviderConnectionTest(Base):
     # Short, credential-free human message (never echoes the key).
     detail: Mapped[str] = mapped_column(String(1024), default="")
     latency_ms: Mapped[int | None] = mapped_column(nullable=True)
-    # Provenance of what was probed (logical_engine / transport / model).
+    # Immutable provenance of what was probed (logical_engine / transport /
+    # model); historical test rows may retain an older transport value.
     logical_engine: Mapped[str] = mapped_column(String(32), default="")
     transport_provider: Mapped[str] = mapped_column(String(32), default="")
     transport_model: Mapped[str] = mapped_column(String(255), default="")
@@ -202,6 +203,8 @@ class DiscoveryModelConfig(Base):
         nullable=True,
         index=True,
     )
+    # Active configurations use the approved catalog; historical rows may retain
+    # values from an earlier catalog.
     logical_engine: Mapped[str] = mapped_column(String(32), default="")
     transport_provider: Mapped[str] = mapped_column(String(32), default="")
     transport_model: Mapped[str] = mapped_column(String(255), default="")

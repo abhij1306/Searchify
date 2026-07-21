@@ -54,13 +54,8 @@ class InvalidRouteError(ValueError):
     """Raised when a requested (engine, transport) route is not approved."""
 
 
-class LegacyConnectionReadOnlyError(RuntimeError):
-    """Raised when a mutation/test targets a retired (legacy) transport.
-
-    Legacy OpenRouter connections survive read-only for historical provenance
-    (invariant 10). Updating or testing one is refused BEFORE any key
-    decryption, mutation, or network call. The message is credential-free.
-    """
+class RetiredConnectionReadOnlyError(RuntimeError):
+    """Raised when a mutation/test targets a retired transport."""
 
 
 def _connection_query():
@@ -100,7 +95,7 @@ def _build_routes(
         logical_engine = item.logical_engine
         if not is_route_approved(logical_engine, transport_provider):
             raise InvalidRouteError(
-                f"Route not approved at MVP: {logical_engine} via {transport_provider}"
+                f"Route not approved: {logical_engine} via {transport_provider}"
             )
         model = (item.transport_model or "").strip() or default_model(
             logical_engine, transport_provider
@@ -183,9 +178,9 @@ async def update_connection(
     connection = await get_connection(
         session, workspace_id=workspace_id, connection_id=connection_id
     )
-    # Reject legacy (retired-transport) connections before any mutation.
+    # Reject retired-transport connections before any mutation.
     if not is_active_transport(connection.transport_provider):
-        raise LegacyConnectionReadOnlyError(
+        raise RetiredConnectionReadOnlyError(
             "This connection uses a retired transport and is historical and "
             "read-only; create a new direct connection instead."
         )
@@ -243,7 +238,7 @@ async def run_connection_test(
     # Refuse to test a retired-transport connection before decrypting the key
     # or issuing any network call (invariant 6 + 10).
     if not is_active_transport(transport):
-        raise LegacyConnectionReadOnlyError(
+        raise RetiredConnectionReadOnlyError(
             "This connection uses a retired transport and is historical and "
             "read-only; create a new direct connection instead."
         )

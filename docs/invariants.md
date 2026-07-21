@@ -70,8 +70,8 @@ The audit queue is Postgres via `FOR UPDATE SKIP LOCKED`. Rules:
 - Slots are shuffled with the audit's **stored 64-bit `random_seed`** — the same seed
   reproduces the same order.
 - Scoring is **deterministic alias/domain matching**. **No LLM is used for headline metrics.**
-  (Sentiment + avg-position, which would need an LLM/context, are therefore NOT computed at
-  MVP — see invariant-adjacent note below.)
+  (Sentiment + avg-position, which would need an LLM/context, are therefore NOT computed in
+  the current deterministic scoring model — see invariant-adjacent note below.)
 - Cancellation is **cooperative only**: the worker stops at the execution boundary (before the
   next provider call / analysis stage). No mid-call kills, no zombie tasks.
 
@@ -82,11 +82,8 @@ exact model id). A result missing any of the three is invalid. This is what lets
 compare engines and gives unambiguous provenance. **Active** transports are exactly
 `openai | anthropic | google`, one approved route per engine
 (`chatgpt → openai → gpt-5.4`, `claude → anthropic → claude-sonnet-4-6`,
-`gemini → google → gemini-flash-latest`). `openrouter` is **retired** as an active transport
-and survives ONLY as a HISTORICAL token: read/guard comparisons still recognise it so legacy
-rows read safely, but it is NEVER an active/approved/write route. Reads must therefore stay
-tolerant of a historical value. Example of a legacy row that still renders:
-`logical_engine=gemini, transport_provider=openrouter, transport_model=google/<exact-id>`.
+`gemini → google → gemini-flash-latest`). Only these three direct transports are valid for
+new connections, routes, and executions.
 
 ### 11. Gotcha 1 runbook — shell secrets override Docker Compose `${VAR}`
 **Symptom:** `docker compose up` connects Postgres/backend with the wrong
@@ -125,7 +122,7 @@ async rewrites() {
 **Always test this in a real browser, not curl.**
 
 ## Note on not-yet-computed metrics (roadmap, keeps invariants 7 + 9 intact)
-Sentiment and average-position are **present in the schema but null at MVP**. Computing them
+Sentiment and average-position are **present in the schema but currently null**. Computing them
 would require an LLM/contextual judgement, which would break "no LLM for headline metrics"
 (invariant 9). They are deferred to the roadmap and surfaced as `—` in the UI. Do not
 back-fill them with a heuristic that pretends to be deterministic.

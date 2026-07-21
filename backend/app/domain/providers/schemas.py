@@ -45,13 +45,7 @@ def _validate_base_url(value: str | None) -> str | None:
 # Enumerations mirror provider_catalog (kept as Literals so FastAPI validates
 # the request body; the service re-validates against the catalog for routes).
 #
-# v2 direct-provider retirement: ``ActiveTransportProvider`` is the write/create
-# surface and accepts ONLY the three direct transports — the retired
-# ``openrouter`` token is rejected at request validation, so a new OpenRouter
-# connection cannot be created. Response provenance stays a tolerant ``str``
-# (see ``ProviderConnectionResponse.transport_provider`` /
-# ``ProviderRouteResponse.transport_provider``) so historical OpenRouter rows
-# still read (invariant 10).
+# ``ActiveTransportProvider`` is the complete write/create transport surface.
 ActiveTransportProvider = Literal["openai", "anthropic", "google"]
 # Backwards-compatible alias used by the create/write path.
 TransportProvider = ActiveTransportProvider
@@ -72,9 +66,7 @@ class ProviderRouteResponse(BaseModel):
     transport_provider: str
     transport_model: str
     is_default: bool
-    # Whether this route is still executable. Legacy openrouter routes are
-    # returned with active=false so read clients can identify (and skip) retired
-    # rows without seeing the internal deactivation marker.
+    # Whether this route is executable.
     active: bool = True
 
 

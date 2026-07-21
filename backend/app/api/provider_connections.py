@@ -30,8 +30,8 @@ from app.domain.providers.schemas import (
 )
 from app.domain.providers.service import (
     InvalidRouteError,
-    LegacyConnectionReadOnlyError,
     ProviderConnectionNotFoundError,
+    RetiredConnectionReadOnlyError,
     connection_to_response,
     create_connection,
     delete_connection,
@@ -96,7 +96,7 @@ async def update_connection_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND
         ) from exc
-    except LegacyConnectionReadOnlyError as exc:
+    except RetiredConnectionReadOnlyError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
         ) from exc
@@ -146,7 +146,7 @@ async def test_connection_endpoint(
         return await run_connection_test(
             session, workspace_id=ctx.workspace_id, connection_id=connection_id
         )
-    except LegacyConnectionReadOnlyError as exc:
+    except RetiredConnectionReadOnlyError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
         ) from exc

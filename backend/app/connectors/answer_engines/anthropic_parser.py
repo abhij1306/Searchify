@@ -8,7 +8,7 @@ Anthropic returns a block list rather than a single message string:
   - ``text`` blocks carry the answer, each with an optional ``citations`` list
     of ``web_search_result_location`` entries (url/title/cited_text).
   - ``server_tool_use`` blocks (``name == "web_search"``) carry the actual
-    search query text — unlike OpenRouter, which only reports a count.
+    search query text when the provider returns it.
   - ``usage.server_tool_use.web_search_requests`` counts the searches performed.
 """
 

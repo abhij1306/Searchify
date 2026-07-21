@@ -3,7 +3,7 @@
 The reference implementation hangs ``AiVisibilityProviderError`` and
 ``classify_provider_status`` off the Gemini module and imports them elsewhere;
 here they live in a neutral module so every adapter (Gemini/Anthropic/
-OpenRouter) depends on the shared type rather than on a sibling adapter.
+provider adapters) depends on the shared type rather than on a sibling adapter.
 """
 
 from __future__ import annotations

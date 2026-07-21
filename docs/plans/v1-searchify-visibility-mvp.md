@@ -1,4 +1,4 @@
-# Searchify — AI-Visibility MVP + Product Documentation (Implementation Plan)
+# Searchify — AI-Visibility Product Documentation (Implementation Plan)
 
 > One merged plan across backend + frontend for Searchify's own AI-visibility subsystem, built on the
 > target architecture. The full-product surface (auth, workspaces, brand/project setup, prompts,
@@ -27,8 +27,7 @@ Searchify/
 ## Unified contract (both layers)
 - **All ids are string UUIDs.** Workspace-scoped; no `user_id` scoping, no integer PKs.
 - **API prefix `/api/v1`** (reference `/api/ai-visibility` dropped).
-- Logical engines `chatgpt|gemini|claude`; MVP transports `anthropic|google|openrouter` (`openai` direct
-  is **reserved — fast-follow, disabled at MVP**; chatgpt reaches MVP via `openrouter`).
+- Logical engines `chatgpt|gemini|claude`; transports `openai|anthropic|google`, one direct route per engine.
 - benchmark_mode `consumer_like|controlled_localized|forced_grounded`; prompt intents
   `discovery|comparison|purchase|service|local`.
 - Browser → backend is **same-origin** via Next.js `rewrites()` (`/api/:path*` → server-only
@@ -134,18 +133,19 @@ MVP/roadmap marker per surface, both operational gotchas in `invariants.md` + a 
   `DiscoveryModelConfig` (plumbing-only, B-4); migration. `app/core/config/provider_catalog.py` (approved
   transports/models + guardrail knobs, adapted from `config/ai_visibility.py`).
 - Port adapters into `app/connectors/answer_engines/{contracts,gemini,gemini_parser,anthropic,
-  anthropic_parser,openrouter,openrouter_parser}.py`. **MVP engine transports (B-3):** `gemini` direct
-  (transport `google`) or via OpenRouter; `claude` direct (transport `anthropic`) or via OpenRouter;
-  `chatgpt` **via OpenRouter only** at MVP. A **direct OpenAI adapter is an explicit fast-follow, NOT in
-  MVP and not covered by MVP tests.** Key resolution reads the decrypted `ProviderConnection`, never env,
+  anthropic_parser,openai,openai_parser}.py`. **Engine transports:** `gemini` direct
+  (transport `google`), `claude` direct (transport `anthropic`), and `chatgpt` direct
+  (transport `openai` via the OpenAI Responses API). Each adapter records the
+  logical-engine/transport/model provenance triple and maps provider errors through the shared
+  error taxonomy. Key resolution reads the decrypted `ProviderConnection`, never env, and is
   never persisted into snapshots/logs.
 - Routers `app/api/provider_connections.py` incl. `POST /provider-connections/{id}/test` (mirror
   `llm.py:test-connection`); `GET /provider-catalog`.
 - **Test:** secret encrypted at rest + never in any Response DTO/log (assert redaction); `test` returns
-  status; adapter unit tests for **all MVP engines** — Gemini direct (`google` transport, grounding +
-  citation parsing), Claude direct (`anthropic`), and OpenRouter (chatgpt + claude) — adapted from
-  `tests/unit/test_{anthropic,openrouter}_ai_visibility.py` plus new Gemini-direct coverage; each asserts
-  the recorded `logical_engine` + `transport_provider` + `transport_model` provenance.
+  status; adapter unit tests for Gemini direct (`google` transport, grounding + citation parsing),
+  Claude direct (`anthropic`), and OpenAI Responses (`openai`) — each asserts the recorded
+  `logical_engine` + `transport_provider` + `transport_model` provenance. Cover factory
+  selection and provider-connection route assertions for all three direct transports.
 
 ## B5 — Postgres-queue audit execution + worker + state machine [after B3, B4]
 - Models `Audit`, `AuditPromptSnapshot`, `AuditEngineSnapshot`, `AuditTask` (queue+lease fields:
@@ -292,14 +292,13 @@ Uses `prompts.ts`. **Depends on B3** (`/prompt-sets`).
   panel renders its not-yet-enabled state; empty state.
 
 ## F8 — BYOK Provider Settings [after F5, B4]
-`/providers` — per-engine cards for all three engines: **Gemini** and **Claude** offer a direct/OpenRouter
-route toggle; **ChatGPT** offers the **OpenRouter route only** at MVP with a disabled "direct OpenAI —
-coming soon" option (B-3). Each card: API-key entry, **connection test**, and `configured` status; plus
+`/providers` — per-engine cards for all three engines, each with one direct route: **Gemini** via Google,
+  **Claude** via Anthropic, and **ChatGPT** via OpenAI. Each card: API-key entry,
+  **connection test**, and `configured` status; plus
 a separate discovery/analysis model selection (plumbing). Uses `providers.ts` against
 `/provider-connections` + `/test` + `/provider-catalog`. **Depends on B4.**
-- **Test:** cards render all three engines; Gemini/Claude route toggle works and ChatGPT is OpenRouter-
-  only with the direct option disabled; key entry submits; test surfaces success/error; unconfigured
-  state.
+- **Test:** cards render all three engines with their direct routes and no route toggles.
+  key entry submits; test surfaces success/error; unconfigured state.
 
 ## F9 — Visibility dashboard [after F5, B6]
 `/visibility` — a **selected-run** projection: Visibility Score header, **per-engine comparison** for the
@@ -377,4 +376,4 @@ Final: `V1 [after B6, F10]`.
 Site Health + Issues (simple HTTP/Screaming-Frog crawler, no browser), open-ended Issue catalog, LLM
 Analytics, Traffic, Content, Opportunities, Competitors/E-E-A-T, Topics, GSC/GA4/Bing integrations,
 Agent, MCP, Settings/white-labelling, HTML/JSON renderers, S3 artifacts, Redis queue, sentiment +
-avg-position computation, AI prompt-suggestion + LLM adjudication, direct OpenAI adapter (fast-follow).
+avg-position computation and AI prompt-suggestion + LLM adjudication.

@@ -17,14 +17,12 @@ Traffic, Content, Opportunities, Site Health + Issues, Brand/Competitors/E-E-A-T
 integrations (GSC/GA4/Bing), Agent, and MCP. See [`docs/architecture.md`](docs/architecture.md)
 for that full surface.
 
-**The MVP boundary** (what we actually code) is the **visibility slice** only — seven
-frontend screens (Auth, App Shell, Brand/Project setup, Prompt library, Provider Settings,
-Visibility dashboard, Run/Executions explorer) on the **full target architecture from day
-one**: workspaces + workspace-scoped auth, **UUID PKs everywhere**, BYOK provider settings,
-a **Postgres `FOR UPDATE SKIP LOCKED` task queue** (no Redis), and a full audit state
-machine. Every other surface is documented as **roadmap** and not coded. See
-`docs/backend-architecture.md` §Surface map and `docs/frontend-architecture.md` §Route map
-for the per-surface MVP/roadmap marker.
+The current product centers on the **visibility slice** — seven frontend screens (Auth, App
+Shell, Brand/Project setup, Prompt library, Provider Settings, Visibility dashboard,
+Run/Executions explorer) on the full greenfield architecture: workspaces + workspace-scoped
+auth, **UUID PKs everywhere**, BYOK provider settings, a **Postgres `FOR UPDATE SKIP LOCKED`
+task queue** (no Redis), and a full audit state machine. Additional AEO surfaces are
+documented in the architecture and roadmap references as they are designed and delivered.
 
 ## Unified contract (memorize this — every doc agrees)
 
@@ -33,12 +31,9 @@ for the per-surface MVP/roadmap marker.
 - **Logical engines**: `chatgpt | gemini | claude` (what the user asked for). **Active
   transports** (how we physically reach an engine) are **exactly** `openai | anthropic |
   google`, one approved route per engine: `chatgpt → openai → gpt-5.4`, `claude → anthropic
-  → claude-sonnet-4-6`, `gemini → google → gemini-flash-latest`. `openrouter` is **retired
-  as an active transport** — it survives ONLY as a HISTORICAL token so old rows read safely
-  (never an active/approved/write route). ChatGPT runs through the **direct OpenAI Responses
-  API** (`backend/app/connectors/answer_engines/openai.py`); the OpenRouter adapter/parser
-  were deleted. See `backend/app/core/config/provider_catalog.py`
-  (`ACTIVE_TRANSPORTS` / `HISTORICAL_TRANSPORTS` / `APPROVED_ROUTES`).
+  → claude-sonnet-4-6`, `gemini → google → gemini-flash-latest`. ChatGPT runs through the
+  **direct OpenAI Responses API** (`backend/app/connectors/answer_engines/openai.py`). See
+  `backend/app/core/config/provider_catalog.py` (`ACTIVE_TRANSPORTS` / `APPROVED_ROUTES`).
 - `benchmark_mode`: `consumer_like | controlled_localized | forced_grounded`.
 - Prompt `intent`: `discovery | comparison | purchase | service | local`.
 - Browser → backend is **same-origin** via Next.js `rewrites()` (`/api/:path*` → server-only
@@ -63,7 +58,7 @@ for the per-surface MVP/roadmap marker.
 | the hard rules you must never break + the two ops gotchas | `docs/invariants.md` |
 | any frontend route, API contract layer, data flow | `docs/frontend-architecture.md` |
 | tokens, theme, per-screen layout, component primitives | `docs/design.md` |
-| the approved plan / task graph | `docs/plans/v1-searchify-visibility-mvp.md` |
+| the approved plan / task graph | `docs/plans/` |
 | whole-product architecture rationale | `docs/architecture.md` |
 
 ## Default startup flow (every task)

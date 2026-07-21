@@ -1,7 +1,7 @@
 """Provider-neutral contracts for answer-engine adapters.
 
 Every field is transport-agnostic so the Gemini (``google``), Anthropic
-(``anthropic``), and OpenRouter adapters produce the same shape. The response
+(``anthropic``) adapters produce the same shape. The response
 records the resolved provenance triple — ``logical_engine`` (what was asked
 for), ``transport_provider`` (how it was reached), and ``transport_model`` (the
 concrete model) — so downstream persistence carries identity per invariant 10.

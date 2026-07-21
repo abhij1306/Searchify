@@ -1344,10 +1344,10 @@ async def test_evidence_malformed_entries_ignored_and_empty_preserved(
 
 
 @pytest.mark.asyncio
-async def test_evidence_count_only_legacy_openrouter(
+async def test_evidence_count_only_retired_transport(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Legacy OpenRouter count-only row: count present, no query text."""
+    """Retired transport count-only row: count present, no query text."""
     async with session_factory() as session:
         seed = await seed_audit_fixtures(session, prompt_count=1)
         await _seed_evidence_execution(
@@ -1356,11 +1356,11 @@ async def test_evidence_count_only_legacy_openrouter(
             project_id=seed.project_id,
             completed_at=datetime(2026, 2, 1, tzinfo=UTC),
             logical_engine=ENGINE_CHATGPT,
-            transport_provider="openrouter",
+            transport_provider="retired",
             transport_model="openai/gpt-5.4",
             search_used=True,
             search_query_count=3,
-            # OpenRouter parser emits count-only empty-query events.
+            # A parser can emit count-only empty-query events.
             artifact_events=[_event(0, ""), _event(1, "")],
             # An analysis with citations but no query strings stays count_only.
             citations=[("https://ref.com/", "ref.com", "third_party")],
@@ -1375,8 +1375,8 @@ async def test_evidence_count_only_legacy_openrouter(
     assert item.state == VisibilityFanoutState.COUNT_ONLY
     assert item.query_text_available is False
     assert item.search_query_count == 3
-    # Historical transport string tolerated (not rejected).
-    assert item.transport_provider == "openrouter"
+    # The persisted transport identity remains part of the evidence row.
+    assert item.transport_provider == "retired"
     assert item.transport_model == "openai/gpt-5.4"
     assert len(item.citations) == 1
 

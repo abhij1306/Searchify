@@ -6,11 +6,9 @@
 # (token caps, timeouts, endpoint URLs, retry classification tokens). Adapters,
 # services, and routers READ these values; they never hard-code them.
 #
-# v2 direct-provider retirement: ChatGPT is now executable ONLY through the
-# direct OpenAI Responses API (transport ``openai``). OpenRouter is retired as
-# an ACTIVE transport — it survives ONLY as a HISTORICAL token so old rows read
-# safely (invariant 10). Active transports are exactly ``openai | anthropic |
-# google`` and each logical engine has exactly one approved route.
+# ChatGPT is executable through the direct OpenAI Responses API (transport
+# ``openai``). Active transports are exactly ``openai | anthropic | google`` and
+# each logical engine has exactly one approved route.
 from __future__ import annotations
 
 from typing import Final
@@ -29,10 +27,6 @@ LOGICAL_ENGINES: Final[frozenset[str]] = frozenset(
 TRANSPORT_OPENAI: Final = "openai"
 TRANSPORT_ANTHROPIC: Final = "anthropic"
 TRANSPORT_GOOGLE: Final = "google"
-# Retired legacy transport. Kept ONLY as a token so read/guard comparisons can
-# recognise historical rows; it is NEVER an active/approved route (v2).
-TRANSPORT_OPENROUTER: Final = "openrouter"
-
 # Transports a NEW BYOK ``ProviderConnection`` may declare (active surface).
 ACTIVE_TRANSPORTS: Final[frozenset[str]] = frozenset(
     {TRANSPORT_OPENAI, TRANSPORT_ANTHROPIC, TRANSPORT_GOOGLE}

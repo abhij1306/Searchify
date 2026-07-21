@@ -17,8 +17,9 @@
    ever consume `status='active' AND enabled=true` (preserves the "no auto-run" non-goal).
 3. **One-call generation**: brand context (name, aliases, competitors, market, existing topics,
    existing prompt texts) → default agent → JSON `{topics:[{name, prompts:[...]}]}`. Optional
-   `topic_id` in the request scopes generation to one existing topic. Inline execution only
-   (count capped by env, default 20) — no queued path in this iteration.
+   `topic_id` in the request scopes generation to one existing topic. `seed` is excluded from
+   the request contract and this iteration's implementation. Inline execution only (count capped
+   by env, default 20) — no queued path in this iteration.
 4. **Default agent, not BYOK**: a new app-level, env-configured OpenAI-compatible client
    (`DEFAULT_AGENT_API_KEY` with fallback alias `MISTRALAI_API_KEY`, `DEFAULT_AGENT_BASE_URL`
    default `https://api.mistral.ai/v1`, `DEFAULT_AGENT_MODEL` default `mistral-small-latest`).
@@ -145,6 +146,6 @@
   `docs/backend-architecture.md`/`frontend-architecture.md` surface maps.
 
 ## Out of scope (this iteration)
-- Queued generation path / web-evidence fetching (`include_web_evidence`), BYOK
-  `DiscoveryModelConfig` invocation, subscription-tier limits (env cap stands in), topic
+- Queued generation path / web-evidence fetching (`include_web_evidence`), request-level `seed`,
+  BYOK `DiscoveryModelConfig` invocation, subscription-tier limits (env cap stands in), topic
   clustering of existing prompts (`docs/roadmap/topics.md`), sentiment/avg-position columns.

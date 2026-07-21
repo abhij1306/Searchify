@@ -5,8 +5,8 @@ Covers the adapter acceptance for the v2 direct-provider matrix: OpenAI direct
 direct (``google``), and Claude direct (``anthropic``). Each parser assertion
 checks the recorded provenance triple — ``logical_engine`` +
 ``transport_provider`` + ``transport_model`` (invariant 10). HTTP transports are
-mocked; no real API spend. OpenRouter has no adapter anymore (retired); its
-rejection is covered by the factory/worker/API tests.
+mocked; no real API spend. Retired transports have no adapter; their rejection
+is covered by the factory/worker/API tests.
 """
 
 from __future__ import annotations

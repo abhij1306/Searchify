@@ -1,6 +1,6 @@
 """Native Anthropic Messages API adapter (transport ``anthropic``).
 
-Calls the Anthropic Messages API directly (no OpenRouter hop) using Claude's
+Calls the Anthropic Messages API directly using Claude's
 first-party ``web_search`` server tool for grounding. Serves the ``claude``
 logical engine. Ported from the reference ``ai_visibility/anthropic.py`` and
 adapted to the shared error type + provenance triple.

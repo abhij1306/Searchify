@@ -210,7 +210,7 @@ class VisibilityFanoutState(StrEnum):
     - ``queries_available``: at least one stored search event has non-blank
       query text (e.g. a Gemini/Anthropic/OpenAI grounded response).
     - ``count_only``: search was used or the persisted count is positive, but no
-      stored event carries query text (e.g. a legacy OpenRouter count-only row).
+      stored event carries query text.
     - ``no_search``: neither a search signal nor a positive count is present.
     """
 
@@ -253,8 +253,7 @@ class VisibilityExecutionEvidence(BaseModel):
 
     Read-only projection over ``ResponseAnalysis`` + its child mention/citation
     rows + the frozen ``AuditTask``/immutable ``RawResponseArtifact`` search
-    events. ``transport_provider`` / ``transport_model`` stay plain strings so a
-    historical (e.g. ``openrouter``) row still renders (invariant tolerant read).
+    events.
     """
 
     audit_id: uuid.UUID

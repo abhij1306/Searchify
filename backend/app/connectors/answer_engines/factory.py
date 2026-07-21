@@ -5,11 +5,8 @@ Key resolution reads the decrypted ``ProviderConnection`` at execution time and
 the key is passed straight into the adapter — never read from env, never
 persisted into snapshots/logs (invariant 6). B5's worker reuses this resolver.
 
-v2 direct-provider retirement: only the three direct transports are
-constructible (``openai`` -> ChatGPT, ``anthropic`` -> Claude, ``google`` ->
-Gemini). The retired ``openrouter`` transport is rejected here with
-``invalid_surface`` even if a caller reaches this function directly with a
-historical route, so no OpenRouter call can ever be issued again.
+Only the three direct transports are constructible (``openai`` -> ChatGPT,
+``anthropic`` -> Claude, ``google`` -> Gemini).
 """
 
 from __future__ import annotations
@@ -38,8 +35,7 @@ def build_adapter(
     """Construct the adapter for an approved (engine, transport) route.
 
     Raises ``ProviderError`` with ``invalid_surface`` if the route is not an
-    approved active route (e.g. any legacy ``openrouter`` route, or an engine
-    over a transport it no longer maps to).
+    approved active route.
     """
     if not is_route_approved(logical_engine, transport_provider):
         raise ProviderError(

@@ -7,7 +7,6 @@ import {
   citationSchema,
   executionEvidenceSchema,
   executionSchema,
-  historicalTransportProviderSchema,
   projectSchema,
   providerCatalogSchema,
   providerConnectionSchema,
@@ -131,44 +130,11 @@ describe('contract schemas', () => {
     ).toThrow();
   });
 
-  it('splits active-write and historical-read transport spaces (v2 retirement)', () => {
-    // Write/catalog surface: only the three direct transports.
+  it('accepts only the three direct transports', () => {
     for (const t of ['openai', 'anthropic', 'google']) {
       expect(transportProviderSchema.parse(t)).toBe(t);
     }
-    expect(() => transportProviderSchema.parse('openrouter')).toThrow();
-    // Read surface: historical space still accepts the retired openrouter token.
-    for (const t of ['openai', 'anthropic', 'google', 'openrouter']) {
-      expect(historicalTransportProviderSchema.parse(t)).toBe(t);
-    }
-  });
-
-  it('reads a legacy openrouter connection + inactive route under strict validation', () => {
-    const legacy = {
-      id: UUID,
-      workspace_id: UUID2,
-      label: 'legacy',
-      transport_provider: 'openrouter',
-      base_url: null,
-      active: false,
-      api_key_set: true,
-      routes: [
-        {
-          id: UUID2,
-          logical_engine: 'chatgpt',
-          transport_provider: 'openrouter',
-          transport_model: 'openai/gpt-5.4',
-          is_default: true,
-          active: false,
-        },
-      ],
-      created_at: '2026-07-15T00:00:00Z',
-      updated_at: '2026-07-15T00:00:00Z',
-    };
-    const parsed = strictValidate(providerConnectionSchema, legacy, 'legacy');
-    expect(parsed.transport_provider).toBe('openrouter');
-    expect(parsed.active).toBe(false);
-    expect(parsed.routes?.[0]?.active).toBe(false);
+    expect(() => transportProviderSchema.parse('unsupported')).toThrow();
   });
 
   it('defaults route.active to true when omitted and rejects a create-only openai catalog gap', () => {
@@ -183,7 +149,7 @@ describe('contract schemas', () => {
     expect(strictValidate(providerRouteSchema, route, 'route').transport_provider).toBe('openai');
   });
 
-  it('validates a direct-only provider catalog and rejects an openrouter catalog transport', () => {
+  it('validates the direct-only provider catalog', () => {
     const catalog = {
       transports: ['openai', 'anthropic', 'google'],
       engines: [
@@ -202,14 +168,6 @@ describe('contract schemas', () => {
       ],
     };
     expect(strictValidate(providerCatalogSchema, catalog, 'catalog').transports).toHaveLength(3);
-    // The catalog must never advertise the retired openrouter transport.
-    expect(() =>
-      strictValidate(
-        providerCatalogSchema,
-        { ...catalog, transports: ['openai', 'openrouter'] },
-        'catalog',
-      ),
-    ).toThrow();
   });
 
   it('validates citation classification enum', () => {

@@ -16,7 +16,7 @@
   endpoint modules with zod `strictValidate`, a `queryKeys` module, a React Query retry policy,
   CVA primitives, a single-`globals.css` token bridge, and a `data-theme` toggle — on
   **App Router**.
-- **Role**: render the seven MVP screens and orchestrate calls to the FastAPI backend. It owns
+- **Role**: render the seven current application screens and orchestrate calls to the FastAPI backend. It owns
   no business logic and no source of truth — **the backend is the source of truth** (§7).
 
 ## 2. Full-product route map (every surface tagged)
@@ -43,7 +43,7 @@
 
 The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live.
 
-## 3. MVP-vs-roadmap boundary table
+## 3. Current surface and roadmap table
 
 | Capability | MVP | Roadmap |
 |---|---|---|
@@ -175,8 +175,8 @@ reuses the cached dataset rather than refetching.
 - `visibilityEvidenceResponseSchema {items,truncated}` (`visibilityExecutionEvidenceSchema` →
   mentions/citations + `search_events[]` + fanout `state` of
   `queries_available|count_only|no_search`) — the shared dataset for the two evidence tabs.
-- `transportProviderSchema = z.enum(['openai','anthropic','google'])` (active/wire) and
-  `historicalTransportProviderSchema` (adds `openrouter` for read-only legacy provenance).
+- `transportProviderSchema = z.enum(['openai','anthropic','google'])` for the approved
+  direct transports on both request and response DTOs.
 
 **Every `id` and `*_id` field is `z.string().uuid()`; no numeric ids; no `user_id`.** All
 responses pass through `strictValidate`.

@@ -1,7 +1,7 @@
 [project]
 name = "searchify-backend"
 version = "0.1.0"
-description = "Searchify AI-Visibility MVP backend"
+description = "Searchify AI-Visibility backend"
 requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.16.5,<2",

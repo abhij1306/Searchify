@@ -6,7 +6,7 @@ import { expect, test, type Request } from '@playwright/test';
  * All backend calls are stubbed at the network layer so the spec runs without a
  * live backend (mirrors `runs.spec.ts`). It asserts the v2 direct-provider
  * retirement UI — exactly three direct engine cards (ChatGPT/OpenAI,
- * Gemini/Google, Claude/Anthropic), NO OpenRouter and NO "coming soon" options —
+ * Gemini/Google, Claude/Anthropic), with no alternate or "coming soon" options —
  * and exercises saving + testing an OpenAI key.
  *
  * The app calls only relative `/api/v1` paths (Next rewrites proxy them), so the
@@ -101,7 +101,7 @@ function assertSameOriginApi(requests: Request[], baseURL: string) {
   }
 }
 
-test('direct-only provider settings: three engines, no OpenRouter, save + test an OpenAI key', async ({
+test('direct-only provider settings: three engines, save + test an OpenAI key', async ({
   page,
   baseURL,
 }) => {
@@ -152,8 +152,7 @@ test('direct-only provider settings: three engines, no OpenRouter, save + test a
   await expect(page.getByText('Direct (Google)')).toBeVisible();
   await expect(page.getByText('Direct (Anthropic)')).toBeVisible();
 
-  // No OpenRouter option, no route toggle, no "coming soon" disabled option.
-  await expect(page.getByText(/openrouter/i)).toHaveCount(0);
+  // No route toggle or "coming soon" disabled option.
   await expect(page.getByRole('radio')).toHaveCount(0);
   await expect(page.getByText(/coming soon/i)).toHaveCount(0);
   await expect(page.getByText(/direct openai — coming soon/i)).toHaveCount(0);

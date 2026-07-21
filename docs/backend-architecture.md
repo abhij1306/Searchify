@@ -1,12 +1,12 @@
 # Backend Architecture — Searchify
 
 > The visibility-slice backend of Searchify. Modular monolith: FastAPI **web** + a separate
-> **worker** process, PostgreSQL as durable state **and** MVP task queue (no Redis). Built on
+> **worker** process, PostgreSQL as durable state **and** task queue (no Redis). Built on
 > the full target architecture (workspaces, UUID PKs, BYOK, Postgres queue) from day one.
 > Companion docs: [`../Agents.md`](../Agents.md), [`invariants.md`](invariants.md),
 > [`frontend-architecture.md`](frontend-architecture.md), [`design.md`](design.md).
 
-## 1. Scope + MVP/roadmap table
+## 1. Scope + delivery table
 
 Searchify is a full AEO product; the backend **codes only the visibility slice**. Everything
 else is documented as roadmap so the product can grow into it without rework. Every
@@ -39,7 +39,7 @@ full-product surface is marked below.
 | GSC / GA4 / Bing integrations | — | Roadmap |
 | Agent, MCP, Settings/white-labelling | — | Roadmap |
 | HTML/JSON report renderers, S3 artifacts, Redis queue | `reporting` / infra | Roadmap |
-| Direct OpenAI adapter (`openai.py` + `openai_parser.py`) | `connectors/answer_engines` | **Coded** — active transport (OpenRouter adapter/parser deleted) |
+| Direct OpenAI adapter (`openai.py` + `openai_parser.py`) | `connectors/answer_engines` | **Coded** — active transport |
 
 ## 2. Runtime stack
 
@@ -78,7 +78,7 @@ services.
 
 > The `brands/analyze`, `audits/estimate`,
 > `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the
-> MVP surface is exactly the table above.
+> The current coded surface is exactly the table above.
 
 ## 4. Audit request + settings contract
 
@@ -128,7 +128,7 @@ deterministic ([architecture.md](architecture.md) §11). Metrics are a **project
 | `app/models/*` | SQLAlchemy persistence (UUID PKs, provenance columns). |
 | `app/schemas/*` | Pydantic request/response DTOs (secrets never present). |
 | `app/domain/{auth,workspaces,projects,prompts,providers,audits,content}/*` | Services + business rules per resource. |
-| `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openai — direct OpenAI Responses API). The retired OpenRouter adapter/parser were deleted. |
+| `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openai — direct OpenAI Responses API). |
 | `app/connectors/discovery_models/*` | Discovery/generative model connectors for the content vertical (Mistral chat-completions at v1). Provider-agnostic contract; the API key is env-held (`SecretStr`), resolved only at call time — deliberately **not** BYOK: content generation is a platform capability, measurement keys stay per-workspace. |
 | `app/orchestration/{audit_state,task_queue,postgres_task_queue}.py` + `domain/audits/planner.py` | State machine, `TaskQueue` Protocol + Postgres impl (generic over queue specs — see §10), slot planning. |
 | `app/analysis/{normalization,scoring,exports}.py` | Deterministic scoring, aggregation, CSV/MD export. |
@@ -186,7 +186,7 @@ The execution row (`AiVisibilityExecution`, UUID-keyed) carries:
 
 ```
 logical_engine     = gemini | chatgpt | claude
-transport_provider = google | anthropic | openai   # active; `openrouter` is historical-only
+transport_provider = google | anthropic | openai   # active direct transports
 transport_model    = <exact model id, e.g. gemini-flash-latest>
 ```
 
@@ -198,13 +198,8 @@ route per engine —
 - `chatgpt` → direct `openai` via the **OpenAI Responses API** (`openai.py` +
   `openai_parser.py`), model `gpt-5.4`.
 
-`ACTIVE_TRANSPORTS` is `{openai, anthropic, google}`. `openrouter` is **retired** as an active
-transport — it lives on only in `HISTORICAL_TRANSPORTS` so retired rows read safely (never an
-active/approved/write route). Migration
-`migrations/versions/0008_direct_openai_retirement.py` (marker `openrouter_retired_v2`) retires
-active OpenRouter connections/routes and adds `provider_connections.deactivation_reason`,
-`provider_routes.active`, and `provider_routes.deactivation_reason`. The OpenRouter
-adapter/parser files were deleted.
+`ACTIVE_TRANSPORTS` is `{openai, anthropic, google}`. Each logical engine has one approved
+direct route in `APPROVED_ROUTES`; retired routes are never executable.
 
 **BYOK** (invariant 6): the decrypted key is resolved from `ProviderConnection` at execution
 time, never from env, never persisted into snapshots/logs. `POST /provider-connections/{id}/test`
