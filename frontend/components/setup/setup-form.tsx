@@ -133,12 +133,17 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
   /** Brand context for the stateless suggestion endpoints, from live values. */
   const brandContext = () => {
     const values = getValues();
+    const websiteUrl = values.website_url.trim();
+    const countryCode = values.country_code.trim();
+    const languageCode = values.language_code.trim();
     return {
       brand_name: values.brand_name.trim(),
-      website_url: values.website_url.trim(),
+      // Optional fields are omitted (not sent as '') when empty so the
+      // suggestion endpoints only see fields that carry a value.
+      ...(websiteUrl ? { website_url: websiteUrl } : {}),
       brand_aliases: values.aliases.map((a) => a.value.trim()).filter(Boolean),
-      country_code: values.country_code.trim(),
-      language_code: values.language_code.trim(),
+      ...(countryCode ? { country_code: countryCode } : {}),
+      ...(languageCode ? { language_code: languageCode } : {}),
       confirm_send_evidence: true as const,
     };
   };
@@ -146,9 +151,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
   const suggestCompetitorsMutation = useMutation({
     mutationFn: (input: CompetitorSuggestInput) => projectsApi.suggestCompetitors(input),
     onSuccess: (result) => {
-      const existing = new Set(
-        getValues().competitors.map((c) => c.name.trim().toLowerCase()),
-      );
+      const existing = new Set(getValues().competitors.map((c) => c.name.trim().toLowerCase()));
       let added = 0;
       for (const competitor of result.competitors) {
         const key = competitor.name.trim().toLowerCase();
@@ -173,9 +176,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
   const suggestDomainsMutation = useMutation({
     mutationFn: (input: OwnedDomainSuggestInput) => projectsApi.suggestOwnedDomains(input),
     onSuccess: (result) => {
-      const existing = new Set(
-        getValues().owned_domains.map((d) => d.value.trim().toLowerCase()),
-      );
+      const existing = new Set(getValues().owned_domains.map((d) => d.value.trim().toLowerCase()));
       let added = 0;
       for (const domain of result.domains) {
         const key = domain.trim().toLowerCase();
@@ -263,9 +264,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
                 )}
               </Field>
               <Field label="Project name" required error={errors.name?.message}>
-                {(props) => (
-                  <Input {...props} {...register('name')} placeholder="Searchify — US" />
-                )}
+                {(props) => <Input {...props} {...register('name')} placeholder="Searchify — US" />}
               </Field>
             </div>
             <Field
@@ -438,9 +437,7 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
         onOpenChange={(next) => {
           if (!next) setSuggestOpen(null);
         }}
-        title={
-          suggestOpen === 'domains' ? 'Generate owned domains' : 'Generate competitors'
-        }
+        title={suggestOpen === 'domains' ? 'Generate owned domains' : 'Generate competitors'}
         description={
           suggestOpen === 'domains'
             ? 'Searchify suggests domains your brand owns and operates. Suggestions are added to the form for review — nothing is saved until you save the project.'

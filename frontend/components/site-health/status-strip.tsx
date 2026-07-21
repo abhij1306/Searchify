@@ -116,9 +116,7 @@ function StripContent({
   }
 
   if (phase === 'discovering') {
-    return (
-      <DiscoveryStrip crawl={crawl} entitlement={entitlement} cancelPending={cancelPending} />
-    );
+    return <DiscoveryStrip crawl={crawl} entitlement={entitlement} cancelPending={cancelPending} />;
   }
 
   if (phase === 'analyzing') {
@@ -252,8 +250,8 @@ function DiscoveryStrip({
     <ProgressRow crawl={crawl} narration={narration} counts={counts}>
       {isFree ? (
         <p className="text-warning-text text-sm">
-          Free plan — we&apos;ll automatically analyze a {entitlement.sample_url_limit}-page
-          sample of your site. Upgrade to Starter to choose which pages to monitor.
+          Free plan — we&apos;ll automatically analyze a {entitlement.sample_url_limit}-page sample
+          of your site. Upgrade to Starter to choose which pages to monitor.
         </p>
       ) : null}
     </ProgressRow>

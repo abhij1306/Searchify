@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CursorPager } from '@/components/ui/cursor-pager';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,6 +53,8 @@ export function InventorySection({
   entitlement,
   projectId,
   active,
+  onCancel,
+  cancelPending,
   onStartAnalysis,
   startPending,
 }: Readonly<{
@@ -61,6 +64,9 @@ export function InventorySection({
   projectId: string;
   /** True while the crawl is non-terminal (keeps inventory/pages polling). */
   active: boolean;
+  /** Cancels the active discovery/analysis crawl from the inventory controls. */
+  onCancel: () => void;
+  cancelPending: boolean;
   /** Starts a fresh crawl that seeds the committed monitored set. */
   onStartAnalysis: () => void;
   startPending: boolean;
@@ -75,7 +81,14 @@ export function InventorySection({
       </Card>
     );
   } else if (mode === 'discovering') {
-    content = <DiscoveringInventory crawl={crawl} active={active} />;
+    content = (
+      <DiscoveringInventory
+        crawl={crawl}
+        active={active}
+        onCancel={onCancel}
+        cancelPending={cancelPending}
+      />
+    );
   } else if (mode === 'selectable') {
     content = (
       <InventorySelection
@@ -86,12 +99,21 @@ export function InventorySection({
         // run analysis itself — selections persist, and "Start analysis"
         // launches a fresh crawl that seeds them as analyze tasks.
         crawlInactive={!active}
+        onCancel={onCancel}
+        cancelPending={cancelPending}
         onStartAnalysis={onStartAnalysis}
         startPending={startPending}
       />
     );
   } else {
-    content = <ScoredInventory crawl={crawl} active={active} />;
+    content = (
+      <ScoredInventory
+        crawl={crawl}
+        active={active}
+        onCancel={onCancel}
+        cancelPending={cancelPending}
+      />
+    );
   }
 
   return (
@@ -109,7 +131,14 @@ export function InventorySection({
 function DiscoveringInventory({
   crawl,
   active,
-}: Readonly<{ crawl: SiteCrawl; active: boolean }>) {
+  onCancel,
+  cancelPending,
+}: Readonly<{
+  crawl: SiteCrawl;
+  active: boolean;
+  onCancel: () => void;
+  cancelPending: boolean;
+}>) {
   const pager = useCursorStack();
   const inventoryQuery = useQuery({
     ...siteHealthQueries.inventory(crawl.id, { cursor: pager.cursor, limit: PAGE_LIMIT }),
@@ -157,7 +186,14 @@ function DiscoveringInventory({
   return (
     <Card>
       <CardContent className="grid gap-2">
-        <Label>Pages discovered so far</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label>Pages discovered so far</Label>
+          {active ? (
+            <Button variant="destructive" size="sm" onClick={onCancel} disabled={cancelPending}>
+              {cancelPending ? 'Cancelling…' : 'Cancel'}
+            </Button>
+          ) : null}
+        </div>
         {body}
         <div className="flex flex-wrap items-center justify-between gap-3">
           {crawl.status === 'running' || crawl.status === 'queued' ? (
@@ -200,7 +236,17 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string; params: PagesParams }> =
  * → completed and its scores fill in — the SAME rows, in place, until the run
  * settles. Finishing changes nothing structurally.
  */
-function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active: boolean }>) {
+function ScoredInventory({
+  crawl,
+  active,
+  onCancel,
+  cancelPending,
+}: Readonly<{
+  crawl: SiteCrawl;
+  active: boolean;
+  onCancel: () => void;
+  cancelPending: boolean;
+}>) {
   const [tab, setTab] = useState<TabKey>('monitored');
   // Per-tab cursor stack so Prev/Next walk keyset pages without offsets.
   const pagers = {
@@ -245,9 +291,7 @@ function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active:
   } else if (rows.length === 0) {
     body = (
       <p className="text-secondary p-[var(--card-padding)] text-sm">
-        {active
-          ? 'Pages appear here as the audit reaches them.'
-          : 'No pages in this view.'}
+        {active ? 'Pages appear here as the audit reaches them.' : 'No pages in this view.'}
       </p>
     );
   } else {
@@ -257,23 +301,36 @@ function ScoredInventory({ crawl, active }: Readonly<{ crawl: SiteCrawl; active:
   return (
     <Card>
       <CardContent className="grid gap-4 p-0">
-        <div className="border-border-subtle flex flex-wrap items-center gap-1 border-b px-[var(--card-padding)] pt-[var(--card-padding)]">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              aria-current={t.key === tab ? 'true' : undefined}
-              className={cn(
-                'rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                t.key === tab
-                  ? 'border-accent text-foreground'
-                  : 'text-secondary hover:text-foreground border-transparent',
-              )}
+        <div className="border-border-subtle flex flex-wrap items-center gap-2 border-b px-[var(--card-padding)] pt-[var(--card-padding)]">
+          <div className="flex flex-wrap items-center gap-1">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                aria-current={t.key === tab ? 'true' : undefined}
+                className={cn(
+                  'rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+                  t.key === tab
+                    ? 'border-accent text-foreground'
+                    : 'text-secondary hover:text-foreground border-transparent',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {active ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mb-1 ml-auto"
+              onClick={onCancel}
+              disabled={cancelPending}
             >
-              {t.label}
-            </button>
-          ))}
+              {cancelPending ? 'Cancelling…' : 'Cancel'}
+            </Button>
+          ) : null}
         </div>
 
         {body}

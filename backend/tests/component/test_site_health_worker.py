@@ -880,6 +880,51 @@ async def test_run_once_claims_and_executes_a_bounded_concurrent_batch(
 
 
 @pytest.mark.asyncio
+async def test_run_once_waits_for_all_claimed_tasks_before_raising(
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A crashing child must not abandon a still-running sibling mid-lease.
+
+    One claimed task raises immediately while the other blocks; ``run_once()``
+    must stay pending until the blocked child completes, then re-raise.
+    """
+    async with session_factory() as session:
+        await seed_site_crawl(session, task_count=2)
+
+    worker = _worker(session_factory, {}, owner="gather-wait")
+    release = asyncio.Event()
+    blocked_started = asyncio.Event()
+    blocked_finished = asyncio.Event()
+    calls = 0
+
+    async def crash_or_block(task: SiteCrawlTask) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("boom")
+        blocked_started.set()
+        await release.wait()
+        blocked_finished.set()
+
+    monkeypatch.setattr(site_health_settings, "worker_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "global_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "per_host_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "per_host_delay_seconds", 0.0)
+    monkeypatch.setattr(worker, "_execute_task", crash_or_block)
+
+    run = asyncio.create_task(worker.run_once())
+    await asyncio.wait_for(blocked_started.wait(), timeout=5)
+    # The crashed child has already raised; run_once must still be pending.
+    await asyncio.sleep(0.05)
+    assert not run.done()
+    release.set()
+    with pytest.raises(RuntimeError, match="boom"):
+        await asyncio.wait_for(run, timeout=5)
+    assert blocked_finished.is_set()
+
+
+@pytest.mark.asyncio
 async def test_analyze_guard_blocks_live_entitlement_downgrade_before_io(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:

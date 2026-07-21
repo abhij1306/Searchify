@@ -157,10 +157,7 @@ export function EvidenceCard({
               ) : (
                 <dl className="grid gap-2">
                   {scoreEntries.map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex items-baseline justify-between gap-3"
-                    >
+                    <div key={key} className="flex items-baseline justify-between gap-3">
                       <dt className="text-secondary min-w-0 truncate text-xs">
                         {formatScoreKey(key)}
                       </dt>

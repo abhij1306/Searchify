@@ -369,6 +369,7 @@ async def create_crawl(
             .where(
                 SiteCrawl.workspace_id == workspace_id,
                 SiteCrawl.project_id == project_id,
+                SiteCrawl.sample_mode.is_(False),
             )
             .order_by(SiteCrawl.created_at.desc(), SiteCrawl.id.desc())
             .limit(1)

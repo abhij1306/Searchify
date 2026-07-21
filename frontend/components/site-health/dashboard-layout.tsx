@@ -37,6 +37,7 @@ export function SiteHealthDashboardLayout({
     projectSelectedError,
     crawlStarting,
     cancelMutation,
+    cancelCrawl,
     startCrawl,
   } = screen;
 
@@ -73,6 +74,8 @@ export function SiteHealthDashboardLayout({
         entitlement={entitlement}
         projectId={projectId}
         active={active}
+        onCancel={cancelCrawl}
+        cancelPending={cancelMutation.isPending}
         onStartAnalysis={startCrawl}
         // Disabled for the FULL starting window (create in flight AND the
         // post-success gap until the dashboard returns the new crawl) so a

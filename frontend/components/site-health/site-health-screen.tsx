@@ -31,9 +31,7 @@ export function SiteHealthScreen() {
     active,
     crawlStarting,
     createMutation,
-    cancelMutation,
     startCrawl,
-    cancelCrawl,
     runExport,
     exporting,
     exportError,
@@ -70,16 +68,9 @@ export function SiteHealthScreen() {
           </Button>
         );
       case 'cancel':
-        return (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={cancelCrawl}
-            disabled={cancelMutation.isPending}
-          >
-            {cancelMutation.isPending ? 'Cancelling…' : 'Cancel'}
-          </Button>
-        );
+        // Cancellation lives beside the active inventory/table controls, not
+        // in the global page header.
+        return null;
       case 'recrawl':
         return (
           <Button size="sm" onClick={startCrawl} disabled={crawlStarting || active}>

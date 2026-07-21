@@ -287,9 +287,7 @@ describe('SetupForm — AI suggestions', () => {
     // The consent checkbox gates the dialog's Generate action.
     const generate = screen.getByRole('button', { name: /^generate$/i });
     expect(generate).toBeDisabled();
-    await user.click(
-      screen.getByLabelText(/confirm sending brand details to the ai provider/i),
-    );
+    await user.click(screen.getByLabelText(/confirm sending brand details to the ai provider/i));
     await user.click(generate);
 
     expect(
@@ -322,9 +320,7 @@ describe('SetupForm — AI suggestions', () => {
     await next(user); // Domains
 
     await user.click(screen.getByRole('button', { name: /generate with ai/i }));
-    await user.click(
-      screen.getByLabelText(/confirm sending brand details to the ai provider/i),
-    );
+    await user.click(screen.getByLabelText(/confirm sending brand details to the ai provider/i));
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
 
     expect(
@@ -352,9 +348,7 @@ describe('SetupForm — AI suggestions', () => {
     await next(user); // Domains
 
     await user.click(screen.getByRole('button', { name: /generate with ai/i }));
-    await user.click(
-      screen.getByLabelText(/confirm sending brand details to the ai provider/i),
-    );
+    await user.click(screen.getByLabelText(/confirm sending brand details to the ai provider/i));
     await user.click(screen.getByRole('button', { name: /^generate$/i }));
 
     expect(await screen.findByText(/no ai provider is configured/i)).toBeInTheDocument();

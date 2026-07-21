@@ -835,13 +835,9 @@ async def test_starter_recrawl_keeps_prior_discovered_inventory_visible(
     """A fresh analysis crawl must not collapse All Discovered to its subset."""
     await _register(client, "inventory-continuity@example.com")
     async with session_factory() as session:
-        scn = await _seed_scenario(
-            session, email="inventory-continuity@example.com"
-        )
+        scn = await _seed_scenario(session, email="inventory-continuity@example.com")
         second = await _add_second_crawl(session, scn, admit_slugs=("a",))
-        second.configuration = {
-            INVENTORY_SOURCE_CRAWL_IDS_KEY: [str(scn.crawl_id)]
-        }
+        second.configuration = {INVENTORY_SOURCE_CRAWL_IDS_KEY: [str(scn.crawl_id)]}
         await session.commit()
         second_id = second.id
     headers = {"X-Workspace-Id": str(scn.workspace_id)}
@@ -856,9 +852,7 @@ async def test_starter_recrawl_keeps_prior_discovered_inventory_visible(
         "https://acme.test/c",
     }
 
-    pages = await client.get(
-        f"/api/v1/site-crawls/{second_id}/pages", headers=headers
-    )
+    pages = await client.get(f"/api/v1/site-crawls/{second_id}/pages", headers=headers)
     assert pages.status_code == 200
     by_url = {row["normalized_url"]: row for row in pages.json()["items"]}
     assert set(by_url) == {

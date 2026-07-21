@@ -720,9 +720,7 @@ async def test_create_recrawl_freezes_prior_inventory_lineage(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        seed = await _seed_workspace(
-            session, projects=[{"name": "a", "url_count": 3}]
-        )
+        seed = await _seed_workspace(session, projects=[{"name": "a", "url_count": 3}])
     proj = seed.projects[0]
 
     async with session_factory() as session:
@@ -761,9 +759,56 @@ async def test_create_recrawl_freezes_prior_inventory_lineage(
         )
 
     assert recrawl.configuration is not None
-    assert recrawl.configuration[INVENTORY_SOURCE_CRAWL_IDS_KEY] == [
-        str(prior_id)
-    ]
+    assert recrawl.configuration[INVENTORY_SOURCE_CRAWL_IDS_KEY] == [str(prior_id)]
+
+
+@pytest.mark.asyncio
+async def test_recrawl_lineage_skips_intervening_free_sample_crawl(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Starter -> Free -> Starter: the final recrawl must inherit the older
+    Starter full inventory, not the newer Free sample crawl (whose lineage
+    freezes to nothing and would silently drop the inventory)."""
+    async with session_factory() as session:
+        seed = await _seed_workspace(session, projects=[{"name": "a", "url_count": 1}])
+    proj = seed.projects[0]
+
+    async with session_factory() as session:
+        starter_crawl = SiteCrawl(
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+            profile_id=proj.profile_id,
+            status=CRAWL_STATUS_COMPLETED,
+            root_url="https://example.com/",
+            random_seed="1",
+            sample_mode=False,
+        )
+        session.add(starter_crawl)
+        await session.flush()
+        # A newer Free sample crawl sits between the two Starter crawls.
+        sample_crawl = SiteCrawl(
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+            profile_id=proj.profile_id,
+            status=CRAWL_STATUS_COMPLETED,
+            root_url="https://example.com/",
+            random_seed="2",
+            sample_mode=True,
+        )
+        session.add(sample_crawl)
+        await session.commit()
+        starter_id = starter_crawl.id
+
+    async with session_factory() as session:
+        await set_entitlement(session, seed.workspace_id, CAPABILITY_STARTER)
+        recrawl = await create_crawl(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+        )
+
+    assert recrawl.configuration is not None
+    assert recrawl.configuration[INVENTORY_SOURCE_CRAWL_IDS_KEY] == [str(starter_id)]
 
 
 @pytest.mark.asyncio

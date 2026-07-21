@@ -196,7 +196,7 @@ describe('SiteHealthScreen — terminal states on the canonical screen', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('offers Cancel (not Re-crawl) in the header while a crawl is discovering', async () => {
+  it('offers Cancel beside the inventory controls while a crawl is discovering', async () => {
     mockRoutes({
       status: 'running',
       discovery_status: 'running',
@@ -208,9 +208,10 @@ describe('SiteHealthScreen — terminal states on the canonical screen', () => {
 
     // Wait for the screen to settle past the initial loading skeleton.
     await waitFor(() => expect(screen.queryByText(/Discovering pages/)).toBeInTheDocument());
-    // The single header control is Cancel while active; Re-crawl only appears
-    // for a settled dashboard/terminal state.
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    // Active controls live with the discovered-page table, not in the global
+    // page header. Re-crawl only appears for a settled dashboard/terminal run.
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(screen.getByTestId('inventory-section')).toContainElement(cancel);
     expect(screen.queryByRole('button', { name: /Re-crawl now/ })).not.toBeInTheDocument();
   });
 

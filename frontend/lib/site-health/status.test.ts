@@ -393,7 +393,8 @@ describe('canonical-screen view-model (primaryAction / inventoryMode)', () => {
   });
 });
 
-describe('score-data helpers (cancelled-with-data product rule)', () => {  const summary = {
+describe('score-data helpers (cancelled-with-data product rule)', () => {
+  const summary = {
     overall_score: 71,
     technical_score: 80,
     aeo_score: 62,

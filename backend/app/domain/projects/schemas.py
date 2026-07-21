@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -94,7 +94,9 @@ class ProjectUpdate(BaseModel):
 class BrandContextRequest(BaseModel):
     brand_name: str = Field(min_length=1, max_length=255)
     website_url: str = Field(default="", max_length=1024)
-    brand_aliases: list[str] = Field(default_factory=list)
+    brand_aliases: list[Annotated[str, Field(max_length=255)]] = Field(
+        default_factory=list, max_length=50
+    )
     country_code: str = Field(default="", max_length=8)
     language_code: str = Field(default="", max_length=16)
     # Backend-enforced consent gate (mirrors PromptGenerateRequest): brand
@@ -106,11 +108,15 @@ class BrandContextRequest(BaseModel):
 
 
 class CompetitorSuggestRequest(BrandContextRequest):
-    existing_competitor_names: list[str] = Field(default_factory=list)
+    existing_competitor_names: list[Annotated[str, Field(max_length=255)]] = Field(
+        default_factory=list, max_length=200
+    )
 
 
 class OwnedDomainSuggestRequest(BrandContextRequest):
-    existing_owned_domains: list[str] = Field(default_factory=list)
+    existing_owned_domains: list[Annotated[str, Field(max_length=255)]] = Field(
+        default_factory=list, max_length=200
+    )
 
 
 class CompetitorSuggestResponse(BaseModel):

@@ -94,7 +94,9 @@ export function SettingsScreen() {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState<SettingsTab>(() =>
-    SETTINGS_TABS.some((tab) => tab.id === requestedTab) ? (requestedTab as SettingsTab) : 'account',
+    SETTINGS_TABS.some((tab) => tab.id === requestedTab)
+      ? (requestedTab as SettingsTab)
+      : 'account',
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});

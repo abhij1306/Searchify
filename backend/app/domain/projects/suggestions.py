@@ -36,7 +36,10 @@ class SuggestionOutputError(RuntimeError):
 # Agent-output contracts (strict, unit-testable without a live provider)
 # --------------------------------------------------------------------------
 class SuggestedCompetitor(BaseModel):
-    name: str = Field(min_length=1)
+    # ``max_length`` mirrors ``CompetitorInput.name``: an overlong agent name
+    # must fail HERE (converted to ``SuggestionOutputError`` -> 502) rather
+    # than at response serialization.
+    name: str = Field(min_length=1, max_length=255)
     aliases: list[str] = Field(default_factory=list)
     domains: list[str] = Field(default_factory=list)
 
@@ -253,7 +256,12 @@ async def suggest_competitors(
     raw = await agent.complete_json(
         system=COMPETITOR_SUGGESTION_SYSTEM_PROMPT, user=user_message
     )
-    competitors, dropped = parse_competitor_output(raw, existing_names=existing)
+    # The brand itself and its aliases are excluded server-side, not just via
+    # the system prompt — an agent echoing the brand must never survive.
+    excluded = existing + [
+        n for n in (payload.brand_name, *payload.brand_aliases) if n.strip()
+    ]
+    competitors, dropped = parse_competitor_output(raw, existing_names=excluded)
     return competitors[: payload.count], dropped
 
 

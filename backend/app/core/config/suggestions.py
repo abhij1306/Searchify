@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # --- System prompts ---------------------------------------------------------
@@ -72,6 +72,17 @@ class BrandSuggestionSettings(BaseSettings):
             "BRAND_SUGGESTION_MAX_COUNT", "brand_suggestion_max_count"
         ),
     )
+
+    @model_validator(mode="after")
+    def _default_within_max(self) -> BrandSuggestionSettings:
+        # A default above the cap would make every omitted-count request fail
+        # ``validate_suggestion_payload``; reject the env combination up front.
+        if self.default_count > self.max_count:
+            raise ValueError(
+                "BRAND_SUGGESTION_DEFAULT_COUNT must not exceed "
+                f"BRAND_SUGGESTION_MAX_COUNT ({self.default_count} > {self.max_count})"
+            )
+        return self
 
 
 brand_suggestion_settings = BrandSuggestionSettings()

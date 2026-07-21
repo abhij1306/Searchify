@@ -843,9 +843,7 @@ class SiteHealthSettings(BaseSettings):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
         if self.per_host_concurrency > self.global_concurrency:
-            raise ValueError(
-                "per_host_concurrency must not exceed global_concurrency"
-            )
+            raise ValueError("per_host_concurrency must not exceed global_concurrency")
         return self
 
     def retry_delay(

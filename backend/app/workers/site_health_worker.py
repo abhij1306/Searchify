@@ -285,6 +285,10 @@ class SiteHealthWorker:
         self._host_semaphores: dict[str, asyncio.Semaphore] = {}
         self._host_start_locks: dict[str, asyncio.Lock] = {}
         self._host_last_started: dict[str, float] = {}
+        # Waiters + holders per host: the three maps above are only evicted
+        # once this drops to zero AND the polite start-delay window has
+        # elapsed, so cleanup can never race active crawling of the host.
+        self._host_refcounts: dict[str, int] = {}
 
     async def run_once(self) -> int:
         """Sweep expired leases, claim a batch of all task kinds, execute it.
@@ -297,6 +301,7 @@ class SiteHealthWorker:
         await self._queue.release_expired(
             batch_size=site_health_settings.lease_reclaim_batch_size
         )
+        self._evict_idle_hosts()
         claim_limit = min(
             site_health_settings.worker_concurrency,
             site_health_settings.global_concurrency,
@@ -311,15 +316,31 @@ class SiteHealthWorker:
             ],
         )
         if tasks:
-            await asyncio.gather(*(self._execute_claimed(task) for task in tasks))
+            # ``return_exceptions`` waits for EVERY claimed task before any
+            # failure propagates: a plain gather would re-raise on the first
+            # crash and abandon still-running siblings mid-lease.
+            results = await asyncio.gather(
+                *(self._execute_claimed(task) for task in tasks),
+                return_exceptions=True,
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
         return len(tasks)
 
     async def _execute_claimed(self, task: SiteCrawlTask) -> None:
-        """Heartbeat a claimed lease while it waits for its polite host slot."""
+        """Heartbeat a claimed lease while it waits for its polite host slot.
+
+        The heartbeat here covers ONLY the wait for the host slot; once the
+        slot is secured it stops before ``_execute_task`` runs, because the
+        fetch heartbeats are owned by ``_run_discover`` / ``_run_analyze`` /
+        ``_run_link_check`` — one loop per active fetch, never two.
+        """
         try:
             host, _port = split_host_port(task.requested_url)
         except Exception:
             host = task.requested_url
+        self._host_refcounts[host] = self._host_refcounts.get(host, 0) + 1
         semaphore = self._host_semaphores.setdefault(
             host,
             asyncio.Semaphore(site_health_settings.per_host_concurrency),
@@ -334,11 +355,55 @@ class SiteHealthWorker:
                     if elapsed < delay:
                         await asyncio.sleep(delay - elapsed)
                     self._host_last_started[host] = time.monotonic()
+                heartbeat.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await heartbeat
                 await self._execute_task(task)
         finally:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat
+            self._release_host_gate(host)
+
+    def _release_host_gate(self, host: str) -> None:
+        """Drop one waiter/holder reference; evict idle per-host state at zero.
+
+        Eviction requires BOTH a zero refcount and the politeness window
+        having elapsed, so cleanup never races active crawling and a task
+        claimed inside the delay window still honors the delay. A host still
+        inside its window at refcount zero is swept by ``_evict_idle_hosts``
+        on a later ``run_once``.
+        """
+        remaining = self._host_refcounts.get(host, 1) - 1
+        if remaining > 0:
+            self._host_refcounts[host] = remaining
+            return
+        self._host_refcounts.pop(host, None)
+        delay = max(0.0, site_health_settings.per_host_delay_seconds)
+        if time.monotonic() - self._host_last_started.get(host, 0.0) < delay:
+            return
+        self._evict_host(host)
+
+    def _evict_idle_hosts(self) -> None:
+        """Sweep per-host state whose refcount is zero and delay window passed."""
+        delay = max(0.0, site_health_settings.per_host_delay_seconds)
+        now = time.monotonic()
+        hosts = (
+            self._host_semaphores.keys()
+            | self._host_start_locks.keys()
+            | self._host_last_started.keys()
+        )
+        for host in list(hosts):
+            if (
+                self._host_refcounts.get(host, 0) == 0
+                and now - self._host_last_started.get(host, 0.0) >= delay
+            ):
+                self._evict_host(host)
+
+    def _evict_host(self, host: str) -> None:
+        self._host_semaphores.pop(host, None)
+        self._host_start_locks.pop(host, None)
+        self._host_last_started.pop(host, None)
 
     async def run_until_idle(self, *, max_batches: int = 1000) -> int:
         """Drain the discover queue until a claim returns nothing (test mode)."""

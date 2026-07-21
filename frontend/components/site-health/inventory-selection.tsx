@@ -50,6 +50,8 @@ export function InventorySelection({
   entitlement,
   projectId,
   crawlInactive = false,
+  onCancel,
+  cancelPending = false,
   onStartAnalysis,
   startPending = false,
 }: Readonly<{
@@ -58,6 +60,8 @@ export function InventorySelection({
   projectId: string;
   /** True when the crawl is terminal (cancelled) — analysis needs a new crawl. */
   crawlInactive?: boolean;
+  onCancel?: () => void;
+  cancelPending?: boolean;
   /** Starts a fresh crawl that seeds the committed monitored set (re-analysis). */
   onStartAnalysis?: () => void;
   startPending?: boolean;
@@ -137,11 +141,22 @@ export function InventorySelection({
             </span>
           </div>
           {quota ? (
-            <span
-              className={`text-sm font-medium ${quota.overLimit ? 'text-danger-text' : 'text-secondary'}`}
-            >
-              {quota.staged} of {quota.limit} selected
-            </span>
+            <div className="flex items-center gap-3">
+              <span
+                className={`text-sm font-medium ${quota.overLimit ? 'text-danger-text' : 'text-secondary'}`}
+              >
+                {quota.staged} of {quota.limit} selected
+              </span>
+              {!crawlInactive && onCancel ? (
+                <Button variant="destructive" size="sm" onClick={onCancel} disabled={cancelPending}>
+                  {cancelPending ? 'Cancelling…' : 'Cancel'}
+                </Button>
+              ) : null}
+            </div>
+          ) : !crawlInactive && onCancel ? (
+            <Button variant="destructive" size="sm" onClick={onCancel} disabled={cancelPending}>
+              {cancelPending ? 'Cancelling…' : 'Cancel'}
+            </Button>
           ) : null}
         </div>
 

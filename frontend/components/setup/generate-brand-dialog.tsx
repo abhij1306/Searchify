@@ -84,8 +84,8 @@ export function GenerateBrandDialog({
             className="focus-ring accent-accent mt-0.5 size-4 shrink-0"
           />
           <span className="text-secondary">
-            I understand my brand profile (brand name, website, aliases, and market) will be sent
-            to the configured AI provider to generate suggestions.
+            I understand my brand profile (brand name, website, aliases, and market) will be sent to
+            the configured AI provider to generate suggestions.
           </span>
         </label>
       </div>

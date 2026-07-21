@@ -46,9 +46,7 @@ export function PagesTable({
   const router = useRouter();
   const openPage = (siteUrlId: string) => {
     const page = pages.find((row) => row.site_url_id === siteUrlId);
-    router.push(
-      `/site-health/crawls/${page?.crawl_id ?? crawlId}/pages/${siteUrlId}`,
-    );
+    router.push(`/site-health/crawls/${page?.crawl_id ?? crawlId}/pages/${siteUrlId}`);
   };
   return (
     <Table>

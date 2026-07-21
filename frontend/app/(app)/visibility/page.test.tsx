@@ -519,7 +519,11 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
       http.get('/api/v1/projects', () => HttpResponse.json([makeProject()])),
       http.get('/api/v1/audits', () =>
         HttpResponse.json([
-          { ...makeAudit(AUDIT_LATEST, '2026-07-15T00:00:00Z'), status: 'running', completed_at: null },
+          {
+            ...makeAudit(AUDIT_LATEST, '2026-07-15T00:00:00Z'),
+            status: 'running',
+            completed_at: null,
+          },
         ]),
       ),
     );
@@ -547,7 +551,11 @@ describe('VisibilityPage — Overview (unchanged behavior)', () => {
       http.get('/api/v1/audits', () =>
         HttpResponse.json([
           makeAudit(AUDIT_LATEST, '2026-07-15T00:00:00Z'),
-          { ...makeAudit(AUDIT_OLDER, '2026-07-18T00:00:00Z'), status: 'running', completed_at: null },
+          {
+            ...makeAudit(AUDIT_OLDER, '2026-07-18T00:00:00Z'),
+            status: 'running',
+            completed_at: null,
+          },
         ]),
       ),
     );

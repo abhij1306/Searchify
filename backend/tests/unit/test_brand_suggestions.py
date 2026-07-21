@@ -80,27 +80,19 @@ class TestParseCompetitorOutput:
         assert dropped == 0
 
     def test_blank_names_are_dropped(self) -> None:
-        raw = json.dumps(
-            {"competitors": [{"name": "  "}, {"name": "Globex"}]}
-        )
+        raw = json.dumps({"competitors": [{"name": "  "}, {"name": "Globex"}]})
         competitors, _ = parse_competitor_output(raw, existing_names=[])
         assert [c.name for c in competitors] == ["Globex"]
 
     def test_dedupes_case_insensitively_within_response(self) -> None:
-        raw = json.dumps(
-            {"competitors": [{"name": "Globex"}, {"name": "GLOBEX"}]}
-        )
+        raw = json.dumps({"competitors": [{"name": "Globex"}, {"name": "GLOBEX"}]})
         competitors, dropped = parse_competitor_output(raw, existing_names=[])
         assert [c.name for c in competitors] == ["Globex"]
         assert dropped == 1
 
     def test_dedupes_against_existing_names(self) -> None:
-        raw = json.dumps(
-            {"competitors": [{"name": "globex"}, {"name": "Initech"}]}
-        )
-        competitors, dropped = parse_competitor_output(
-            raw, existing_names=["Globex"]
-        )
+        raw = json.dumps({"competitors": [{"name": "globex"}, {"name": "Initech"}]})
+        competitors, dropped = parse_competitor_output(raw, existing_names=["Globex"])
         assert [c.name for c in competitors] == ["Initech"]
         assert dropped == 1
 
@@ -130,9 +122,7 @@ class TestParseCompetitorOutput:
 
     def test_no_usable_competitors_raises(self) -> None:
         with pytest.raises(SuggestionOutputError):
-            parse_competitor_output(
-                json.dumps({"competitors": []}), existing_names=[]
-            )
+            parse_competitor_output(json.dumps({"competitors": []}), existing_names=[])
 
 
 # --------------------------------------------------------------------------
@@ -153,9 +143,7 @@ class TestParseOwnedDomainOutput:
 
     def test_dedupes_within_response_and_against_existing(self) -> None:
         raw = json.dumps({"domains": ["acme.com", "ACME.com", "acme.io"]})
-        domains, dropped = parse_owned_domain_output(
-            raw, existing_domains=["acme.io"]
-        )
+        domains, dropped = parse_owned_domain_output(raw, existing_domains=["acme.io"])
         assert domains == ["acme.com"]
         assert dropped == 2
 

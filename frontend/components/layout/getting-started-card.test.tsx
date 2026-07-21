@@ -69,10 +69,7 @@ const audit = {
 };
 
 /** Register both card queries; override per test with `mswServer.use`. */
-function handlers({
-  connections = [] as unknown[],
-  audits = [] as unknown[],
-} = {}) {
+function handlers({ connections = [] as unknown[], audits = [] as unknown[] } = {}) {
   mswServer.use(
     http.get('/api/v1/provider-connections', () => HttpResponse.json(connections)),
     http.get('/api/v1/audits', () => HttpResponse.json(audits)),
@@ -80,9 +77,7 @@ function handlers({
 }
 
 async function findProgress(label: RegExp) {
-  return waitFor(() =>
-    expect(screen.getByRole('progressbar')).toHaveAccessibleName(label),
-  );
+  return waitFor(() => expect(screen.getByRole('progressbar')).toHaveAccessibleName(label));
 }
 
 describe('GettingStartedCard', () => {
@@ -146,8 +141,9 @@ describe('GettingStartedCard', () => {
     renderWithProviders(<GettingStartedCard />);
 
     await findProgress(/5 of 6 steps complete/);
-    expect(
-      screen.getByRole('link', { name: /next: review visibility/i }),
-    ).toHaveAttribute('href', '/visibility');
+    expect(screen.getByRole('link', { name: /next: review visibility/i })).toHaveAttribute(
+      'href',
+      '/visibility',
+    );
   });
 });
