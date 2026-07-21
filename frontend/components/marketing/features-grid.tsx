@@ -41,7 +41,7 @@ export function FeaturesGrid() {
         <div className="section-head">
           <span className="eyebrow">What you get</span>
           <h2 className="h2">
-            Everything an audit needs.
+            Everything your audit needs.
             <br />
             <span className="grad-text">Nothing it doesn’t.</span>
           </h2>

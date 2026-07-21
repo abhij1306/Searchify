@@ -1,4 +1,4 @@
-import { Bricolage_Grotesque, IBM_Plex_Mono, Inter } from 'next/font/google';
+import { Bricolage_Grotesque, IBM_Plex_Mono, Public_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import { THEME_STORAGE_KEY } from '@/lib/theme';
@@ -12,7 +12,7 @@ const display = Bricolage_Grotesque({
   variable: '--font-bricolage',
   display: 'swap',
 });
-const sans = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
+const sans = Public_Sans({ subsets: ['latin'], variable: '--font-public-sans', display: 'swap' });
 const mono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],

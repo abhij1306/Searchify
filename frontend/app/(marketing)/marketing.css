@@ -21,11 +21,11 @@
 /* ── TOKENS ─────────────────────────────────────────────────────────────── */
 .mkt {
   --mkt-font-display:
-    var(--font-bricolage), 'Bricolage Grotesque', 'Inter Variable', 'Inter', ui-sans-serif,
-    system-ui, sans-serif;
+    var(--font-bricolage), 'Bricolage Grotesque', 'Public Sans', ui-sans-serif, system-ui,
+    sans-serif;
   --mkt-font-sans:
-    var(--font-inter), 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    var(--font-public-sans), 'Public Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
   --mkt-font-mono:
     var(--font-plex), 'IBM Plex Mono', ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
@@ -791,11 +791,15 @@ html[data-theme='dark'] .mkt {
   color: var(--mkt-text-3);
   flex-wrap: wrap;
 }
+.mkt .trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .mkt .trust svg {
   width: 13px;
   height: 13px;
-  vertical-align: -2px;
-  margin-right: 6px;
+  flex: none;
 }
 .mkt .trust .sep {
   opacity: 0.5;
