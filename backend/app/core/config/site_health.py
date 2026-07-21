@@ -58,6 +58,12 @@ DEFAULT_SITE_HEALTH_CAPABILITY: Final = CAPABILITY_FREE
 DISCOVERY_MODE_SAMPLE: Final = "sample"
 DISCOVERY_MODE_FULL: Final = "full"
 
+# Internal frozen-configuration key for Starter inventory continuity. A fresh
+# analysis/recrawl remains a distinct evidence run, but its dashboard may read
+# the admitted URL sets from these earlier full-discovery crawls so discovered
+# URLs do not disappear while the new crawl is still re-discovering them.
+INVENTORY_SOURCE_CRAWL_IDS_KEY: Final = "inventory_source_crawl_ids"
+
 # Capability limit DEFAULTS. The operative values are env-overridable via
 # ``SiteHealthSettings`` (``SITE_HEALTH_FREE_SAMPLE_URL_LIMIT`` etc.) so
 # development can lift them without a code change; ``capability_profile()``
@@ -721,6 +727,10 @@ class SiteHealthSettings(BaseSettings):
     max_crawl_depth: int = 20
     # Batch size for progressive inventory admission (INSERT ... ON CONFLICT).
     admission_batch_size: int = 200
+    # Maximum number of prior full-discovery crawl inventories carried forward
+    # into a Starter recrawl's dashboard scope. Bounds the frozen JSON config
+    # and the UNION used by inventory/page queries.
+    inventory_history_crawl_limit: int = 20
 
     # --- Concurrency / politeness ---
     # Global in-process concurrent fetch ceiling for the Site Health worker.
@@ -802,6 +812,8 @@ class SiteHealthSettings(BaseSettings):
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must be non-negative")
+        if self.inventory_history_crawl_limit <= 0:
+            raise ValueError("inventory_history_crawl_limit must be positive")
         return self
 
     @model_validator(mode="after")
@@ -823,6 +835,17 @@ class SiteHealthSettings(BaseSettings):
             )
         if self.lease_reclaim_batch_size <= 0:
             raise ValueError("lease_reclaim_batch_size must be positive")
+        for name in (
+            "global_concurrency",
+            "per_host_concurrency",
+            "worker_concurrency",
+        ):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.per_host_concurrency > self.global_concurrency:
+            raise ValueError(
+                "per_host_concurrency must not exceed global_concurrency"
+            )
         return self
 
     def retry_delay(

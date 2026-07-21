@@ -6,10 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppQueryClient } from '@/lib/api/query-client';
 import type { Project, SessionUser } from '@/lib/api/types';
 
-// Stub next/navigation (Link uses it in jsdom).
+// Stub next/navigation (Link uses it in jsdom). `search` is mutable per test
+// so the ?tab= deep link can be exercised.
+let search = '';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/settings',
+  useSearchParams: () => new URLSearchParams(search),
 }));
 
 // Session is mocked per test so the screen renders without a real SessionGuard.
@@ -69,6 +72,7 @@ describe('SettingsScreen', () => {
   beforeEach(() => {
     deleteProject.mockClear();
     setActiveProjectId.mockClear();
+    search = '';
   });
 
   it('renders the three settings tabs with Account selected by default', () => {
@@ -126,6 +130,22 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('provider-settings-panel')).toBeVisible();
     // Account content is hidden while another tab is active.
     expect(screen.getByText('Account role')).not.toBeVisible();
+  });
+
+  it('opens the Provider Settings tab from a ?tab=providers deep link', () => {
+    search = 'tab=providers';
+    renderScreen();
+    expect(screen.getByRole('tab', { name: 'Provider Settings' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('provider-settings-panel')).toBeVisible();
+  });
+
+  it('falls back to Account on an unknown ?tab value', () => {
+    search = 'tab=nonsense';
+    renderScreen();
+    expect(screen.getByRole('tab', { name: 'Account' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('supports arrow-key navigation across tabs', async () => {

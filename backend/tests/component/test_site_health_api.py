@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config.site_health import (
     CRAWL_STATUS_COMPLETED,
     INITIAL_TASK_GENERATION,
+    INVENTORY_SOURCE_CRAWL_IDS_KEY,
     PAGE_ANALYSIS_STATUS_COMPLETED,
     RULE_OUTCOME_FAIL,
     SELECTION_SOURCE_USER,
@@ -825,6 +826,50 @@ async def test_selected_crawl_scoping_no_downgrade_leakage(
     assert "https://acme.test/a" in csv_resp.text
     assert "https://acme.test/b" not in csv_resp.text
     assert "https://acme.test/c" not in csv_resp.text
+
+
+async def test_starter_recrawl_keeps_prior_discovered_inventory_visible(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A fresh analysis crawl must not collapse All Discovered to its subset."""
+    await _register(client, "inventory-continuity@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(
+            session, email="inventory-continuity@example.com"
+        )
+        second = await _add_second_crawl(session, scn, admit_slugs=("a",))
+        second.configuration = {
+            INVENTORY_SOURCE_CRAWL_IDS_KEY: [str(scn.crawl_id)]
+        }
+        await session.commit()
+        second_id = second.id
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    inventory = await client.get(
+        f"/api/v1/site-crawls/{second_id}/inventory", headers=headers
+    )
+    assert inventory.status_code == 200
+    assert {row["normalized_url"] for row in inventory.json()["items"]} == {
+        "https://acme.test/a",
+        "https://acme.test/b",
+        "https://acme.test/c",
+    }
+
+    pages = await client.get(
+        f"/api/v1/site-crawls/{second_id}/pages", headers=headers
+    )
+    assert pages.status_code == 200
+    by_url = {row["normalized_url"]: row for row in pages.json()["items"]}
+    assert set(by_url) == {
+        "https://acme.test/a",
+        "https://acme.test/b",
+        "https://acme.test/c",
+    }
+    # Current observations stay on the current detail route. Inherited-only
+    # rows link to the immutable source crawl where their detail exists.
+    assert by_url["https://acme.test/a"]["crawl_id"] == str(second_id)
+    assert by_url["https://acme.test/b"]["crawl_id"] == str(scn.crawl_id)
 
 
 async def test_issue_history_bounded_to_crawl_chronology(

@@ -131,6 +131,31 @@ export const promptGenerateResponseSchema = z
   })
   .strict();
 
+// `POST /brand-suggestions/competitors` result: setup-form competitor
+// suggestions (stateless — nothing persisted until the user saves the form).
+export const competitorSuggestResponseSchema = z
+  .object({
+    competitors: z.array(
+      z
+        .object({
+          name: z.string(),
+          aliases: z.array(z.string()),
+          domains: z.array(z.string()),
+        })
+        .strict(),
+    ),
+    dropped_duplicates: z.number().int(),
+  })
+  .strict();
+
+// `POST /brand-suggestions/owned-domains` result: bare owned-domain strings.
+export const ownedDomainSuggestResponseSchema = z
+  .object({
+    domains: z.array(z.string()),
+    dropped_duplicates: z.number().int(),
+  })
+  .strict();
+
 export const promptSetSchema = z
   .object({
     id: uuid(),

@@ -19,6 +19,7 @@ injected fake DNS resolver + ``httpx.MockTransport`` (fully offline). Covers:
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -43,6 +44,7 @@ from app.core.config.site_health import (
     SELECTION_SOURCE_FREE_SAMPLE,
     TASK_KIND_ANALYZE,
     TASK_KIND_DISCOVER,
+    site_health_settings,
 )
 from app.core.config.task_queue import (
     TASK_STATUS_CANCELLED,
@@ -832,23 +834,35 @@ async def _seed_analyze_ready(
 
 
 @pytest.mark.asyncio
-async def test_run_once_claims_one_task_to_keep_lease_heartbeated(
+async def test_run_once_claims_and_executes_a_bounded_concurrent_batch(
     session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Serial execution must not claim a batch whose later leases can expire."""
+    """The Postgres claim batch executes concurrently instead of serially."""
     async with session_factory() as session:
         await seed_site_crawl(session, task_count=2)
 
     worker = _worker(session_factory, {}, owner="single-claim")
     executed: list[uuid.UUID] = []
+    active = 0
+    max_active = 0
 
     async def record_only(task: SiteCrawlTask) -> None:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
         executed.append(task.id)
+        await asyncio.sleep(0)
+        active -= 1
 
+    monkeypatch.setattr(site_health_settings, "worker_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "global_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "per_host_concurrency", 2)
+    monkeypatch.setattr(site_health_settings, "per_host_delay_seconds", 0.0)
     monkeypatch.setattr(worker, "_execute_task", record_only)
-    assert await worker.run_once() == 1
-    assert len(executed) == 1
+    assert await worker.run_once() == 2
+    assert len(executed) == 2
+    assert max_active == 2
 
     async with session_factory() as session:
         leased = await session.scalar(
@@ -861,8 +875,8 @@ async def test_run_once_claims_one_task_to_keep_lease_heartbeated(
             .select_from(SiteCrawlTask)
             .where(SiteCrawlTask.status == TASK_STATUS_QUEUED)
         )
-        assert leased == 1
-        assert queued == 1
+        assert leased == 2
+        assert queued == 0
 
 
 @pytest.mark.asyncio

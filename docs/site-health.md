@@ -163,16 +163,24 @@ Data flow notes:
 - **Selection** commits a full versioned monitored set; a `409`
   `stale_selection_version` surfaces a stale notice and rebases (no silent
   overwrite).
+- **Discovered inventory continuity.** A Starter recrawl freezes a bounded
+  newest-first lineage of earlier full-crawl ids in its configuration. The
+  inventory and `All Discovered` read models union those immutable observation
+  sets while the new crawl re-discovers the site, so starting analysis never
+  collapses hundreds of discovered URLs to only the monitored subset. Current
+  results stay current-crawl-only; inherited rows link to the source crawl that
+  owns their persisted detail. Free/sample crawls ignore this lineage entirely.
 
 ---
 
 ## Screen lifecycle & phase precedence
 
-The Site Health screen renders exactly one phase, derived by
-`resolveSiteHealthPhase(crawl, plan)` in `frontend/lib/site-health/status.ts`.
-That function is the **single source of truth** for phase — the components hold
-no duplicated lifecycle flags. Its clauses are mutually exclusive and evaluated
-in this **explicit, deterministic precedence** (top wins):
+The Site Health route renders one canonical dashboard layout. Its score cards,
+compact status row, and inventory stay mounted while their data/mode changes.
+`resolveSiteHealthPhase(crawl, plan, hasMonitoredSelection)` in
+`frontend/lib/site-health/status.ts` is the single source of truth for those
+view modes. Its clauses are mutually exclusive and evaluated in this explicit,
+deterministic precedence (top wins):
 
 1. **no crawl** → `empty` (first-run "Start discovery" card).
 2. **`completed` / `partially_completed`** → `dashboard`.
@@ -183,9 +191,12 @@ in this **explicit, deterministic precedence** (top wins):
 5. **`cancelled` without data**: Starter with discovered URLs → `selection`
    (the inventory persists through a cancel and re-seeds the next crawl);
    otherwise → `terminal`.
-6. **discovery still running** → `discovering`.
-7. **analysis running** → `analyzing`.
-8. **Starter + analysis pending** → `selection`; otherwise (Free auto-analysis)
+6. **active Starter crawl + committed monitored set** → `analyzing`, including
+   the interval where re-discovery is running and `analysis_status` still says
+   `pending`.
+7. **discovery still running** → `discovering`.
+8. **analysis running** → `analyzing`.
+9. **Starter + analysis pending** → `selection`; otherwise (Free auto-analysis)
    → `analyzing`.
 
 ### Cancellation with partial data
@@ -208,7 +219,8 @@ that produced *no* data routes to `selection` (Starter, inventory survives) or
   crawl's first projection takes over.
 - **Recrawl** re-seeds from the committed monitored set — a fresh crawl
   re-discovers and enqueues the persisted selection (a cancelled crawl cannot
-  enqueue analyze tasks itself).
+  enqueue analyze tasks itself). Its `All Discovered` tab retains the earlier
+  full inventory until re-discovery refreshes those URL observations.
 
 ### Count integrity during loading
 
@@ -221,14 +233,9 @@ fetch is surfaced as a warning (`projectSelectedError`) instead of silently
 approximating or disabling actions. Missing scores always render `—`, never a
 fabricated zero.
 
-The per-page audit table window (`pagesQuery`, bounded `limit: 200,
-monitored: true`) distinguishes its own fetch state from a genuine empty
-result. React Query keeps the prior `data` across refetches, so existing rows
-stay visible; on top of that `AnalysisProgress` receives `pagesLoading` /
-`pagesError`: a first-load with no rows shows a "Loading audited pages…" hint
-(not an empty "no pages" table), and a failed fetch shows a warning while
-retaining the last-loaded rows. A failed or in-flight query must never
-masquerade as a valid empty table.
+The same server-backed Monitored / All Discovered / Errors table renders during
+analysis and after completion. Its first cursor page polls while active, so row
+statuses and scores fill in without swapping to a separate results screen.
 
 Free non-disclosure is preserved across every state: no phase leaks a
 discovered/full-site total, and sample-mode discovery never implies continued
@@ -242,6 +249,8 @@ full-site scanning.
   must be an indistinguishable `404`.
 - Preserve Free count/event/export **non-disclosure** (never leak a
   discovered/full-site total).
+- Keep inherited inventory ids as read-scope references only. Never manufacture
+  a `SiteUrlObservation` or copy old analysis into a new crawl.
 - Read status/severity/dimension/limits/error tokens from
   `app/core/config/site_health.py`; never hardcode them.
 - No raw-HTML storage, no PageSpeed/CrUX, no headless browser.

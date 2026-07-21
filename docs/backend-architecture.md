@@ -232,6 +232,13 @@ the `TaskQueue` Protocol so a future Redis impl needs no domain rewrite.
 5. `SKIP LOCKED` + the two unique constraints prevent **double-claim**.
 6. Succeeded tasks are never re-run; a rerun creates a new task identity.
 
+The Site Health worker claims a config-bounded batch and executes it with
+`asyncio` concurrency. Every claimed lease is heartbeated even while waiting
+for a per-host slot; `global_concurrency`, `worker_concurrency`,
+`per_host_concurrency`, and `per_host_delay_seconds` bound throughput and
+politeness. Each task still uses short transactions and commits its claim before
+network I/O, so concurrency does not weaken the leasing contract.
+
 `TaskQueue` Protocol: `claim() / heartbeat() / succeed() / retry() / fail() / cancel() /
 release_expired()`. MVP impl = `PostgresTaskQueue`.
 

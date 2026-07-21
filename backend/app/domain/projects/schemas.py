@@ -18,6 +18,7 @@ from app.core.config.projects import (
     MAX_REPETITIONS,
     MIN_REPETITIONS,
 )
+from app.core.config.suggestions import brand_suggestion_settings
 from app.domain.prompts.schemas import PromptSetResponse
 
 BenchmarkMode = Literal["consumer_like", "controlled_localized", "forced_grounded"]
@@ -84,6 +85,42 @@ class ProjectUpdate(BaseModel):
     default_repetitions: int | None = Field(
         default=None, ge=MIN_REPETITIONS, le=MAX_REPETITIONS
     )
+
+
+# --------------------------------------------------------------------------
+# Brand suggestions (stateless — the setup form may be pre-save, so brand
+# context travels in the body instead of a project id in the path)
+# --------------------------------------------------------------------------
+class BrandContextRequest(BaseModel):
+    brand_name: str = Field(min_length=1, max_length=255)
+    website_url: str = Field(default="", max_length=1024)
+    brand_aliases: list[str] = Field(default_factory=list)
+    country_code: str = Field(default="", max_length=8)
+    language_code: str = Field(default="", max_length=16)
+    # Backend-enforced consent gate (mirrors PromptGenerateRequest): brand
+    # evidence is only sent to the default agent when this is true.
+    confirm_send_evidence: bool = False
+    count: int = Field(
+        default_factory=lambda: brand_suggestion_settings.default_count, ge=1
+    )
+
+
+class CompetitorSuggestRequest(BrandContextRequest):
+    existing_competitor_names: list[str] = Field(default_factory=list)
+
+
+class OwnedDomainSuggestRequest(BrandContextRequest):
+    existing_owned_domains: list[str] = Field(default_factory=list)
+
+
+class CompetitorSuggestResponse(BaseModel):
+    competitors: list[CompetitorInput] = Field(default_factory=list)
+    dropped_duplicates: int = 0
+
+
+class OwnedDomainSuggestResponse(BaseModel):
+    domains: list[str] = Field(default_factory=list)
+    dropped_duplicates: int = 0
 
 
 # --------------------------------------------------------------------------

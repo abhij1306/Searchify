@@ -24,8 +24,10 @@ from app.core.config.site_health import (
     CAPABILITY_FREE,
     CAPABILITY_STARTER,
     CRAWL_ACTIVE_STATUSES,
+    CRAWL_STATUS_COMPLETED,
     CRAWL_STATUS_RUNNING,
     INITIAL_TASK_GENERATION,
+    INVENTORY_SOURCE_CRAWL_IDS_KEY,
     SELECTION_SOURCE_FREE_SAMPLE,
     SELECTION_SOURCE_USER,
     TASK_KIND_ANALYZE,
@@ -713,6 +715,57 @@ async def test_guard_helpers_lease_and_crawl(
 # =========================================================================
 # Persistent selection on second crawl + unselected-URL isolation
 # =========================================================================
+@pytest.mark.asyncio
+async def test_create_recrawl_freezes_prior_inventory_lineage(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        seed = await _seed_workspace(
+            session, projects=[{"name": "a", "url_count": 3}]
+        )
+    proj = seed.projects[0]
+
+    async with session_factory() as session:
+        prior = SiteCrawl(
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+            profile_id=proj.profile_id,
+            status=CRAWL_STATUS_COMPLETED,
+            root_url="https://example.com/",
+            random_seed="1",
+        )
+        session.add(prior)
+        await session.flush()
+        for site_url_id in proj.site_url_ids:
+            site_url = await session.get(SiteUrl, site_url_id)
+            assert site_url is not None
+            session.add(
+                SiteUrlObservation(
+                    workspace_id=seed.workspace_id,
+                    project_id=proj.project_id,
+                    crawl_id=prior.id,
+                    site_url_id=site_url_id,
+                    source_kind="link",
+                    observed_url=site_url.normalized_url,
+                    final_url=site_url.normalized_url,
+                )
+            )
+        await session.commit()
+        prior_id = prior.id
+
+    async with session_factory() as session:
+        recrawl = await create_crawl(
+            session,
+            workspace_id=seed.workspace_id,
+            project_id=proj.project_id,
+        )
+
+    assert recrawl.configuration is not None
+    assert recrawl.configuration[INVENTORY_SOURCE_CRAWL_IDS_KEY] == [
+        str(prior_id)
+    ]
+
+
 @pytest.mark.asyncio
 async def test_second_crawl_seeds_active_monitored_only(
     session_factory: async_sessionmaker[AsyncSession],

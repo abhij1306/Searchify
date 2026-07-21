@@ -38,7 +38,9 @@ export function SiteHealthDashboardLayout({
     crawlStarting,
     cancelMutation,
     startCrawl,
-  } = screen;  return (
+  } = screen;
+
+  return (
     <div className="grid gap-6" data-testid="site-health-canonical">
       <ScoreSection
         crawl={crawl}

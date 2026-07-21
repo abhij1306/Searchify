@@ -1,8 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 
+import { providersApi } from '@/lib/api/providers';
+import { queryKeys } from '@/lib/api/query-keys';
+import { runsApi } from '@/lib/api/runs';
 import { useProjectContext } from '@/lib/project/project-context';
 import { cn } from '@/lib/utils';
 
@@ -11,11 +15,11 @@ import { cn } from '@/lib/utils';
  * card in the sidebar (docs/design.md §9.2).
  *
  * The six MVP onboarding steps map to the live surfaces a user completes to get
- * their first run. Completion is derived from what the active project already
- * has (project created → prompts added → provider connected …). At MVP we can
- * only *cheaply* infer the first two from the loaded project; the rest link to
- * their screens and are shown as not-yet-complete. It is intentionally a light
- * nudge, not a source of truth.
+ * their first run. Completion is fully derived from live data: project +
+ * prompts from the loaded project, provider from the BYOK connections list
+ * (an active connection with a stored key), and run/review from the project's
+ * audits (any launched → step 5; any completed → step 6). It is intentionally
+ * a light nudge, not a source of truth.
  */
 type Step = { label: string; href: string; done: boolean };
 
@@ -25,13 +29,38 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
   const hasProject = Boolean(activeProject);
   const hasPrompts = (activeProject?.prompt_sets ?? []).some((set) => set.prompts.length > 0);
 
+  // Provider step: any active connection with a stored key counts. Only fetch
+  // once a project exists (the earlier steps gate everything anyway) and stop
+  // refetching once the card is fully complete.
+  const connectionsQuery = useQuery({
+    queryKey: queryKeys.providers.connections(),
+    queryFn: ({ signal }) => providersApi.listConnections({ signal }),
+    enabled: hasProject,
+  });
+  const hasProvider = (connectionsQuery.data ?? []).some(
+    (connection) => connection.active && connection.api_key_set !== false,
+  );
+
+  // Run steps: share the runs list cache with /runs (same key + params).
+  const projectId = activeProject?.id ?? '';
+  const auditsQuery = useQuery({
+    queryKey: queryKeys.runs.list({ project_id: projectId }),
+    queryFn: ({ signal }) => runsApi.listAudits({ project_id: projectId }, { signal }),
+    enabled: hasProject,
+  });
+  const audits = auditsQuery.data ?? [];
+  const hasRun = audits.length > 0;
+  const hasCompletedRun = audits.some(
+    (audit) => audit.status === 'completed' || audit.status === 'partially_completed',
+  );
+
   const steps: Step[] = [
     { label: 'Create your project', href: '/setup', done: hasProject },
     { label: 'Add brand details', href: '/setup', done: hasProject },
     { label: 'Add prompts', href: '/prompts', done: hasPrompts },
-    { label: 'Connect a provider', href: '/providers', done: false },
-    { label: 'Launch your first run', href: '/runs', done: false },
-    { label: 'Review visibility', href: '/visibility', done: false },
+    { label: 'Connect a provider', href: '/settings?tab=providers', done: hasProvider },
+    { label: 'Launch your first run', href: '/runs', done: hasRun },
+    { label: 'Review visibility', href: '/visibility', done: hasCompletedRun },
   ];
 
   const completed = steps.filter((step) => step.done).length;

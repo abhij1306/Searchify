@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 
 const UUID = '11111111-1111-4111-8111-111111111111';
 const CRAWL = '22222222-2222-4222-8222-222222222222';
+const SOURCE_CRAWL = '33333333-3333-4333-8333-333333333333';
 
 function page(overrides: Partial<PageSummary> = {}): PageSummary {
   return {
@@ -80,5 +81,18 @@ describe('PagesTable', () => {
     render(<PagesTable pages={[page()]} crawlId={CRAWL} />);
     fireEvent.click(screen.getByText('Homepage'));
     expect(push).toHaveBeenCalledWith(`/site-health/crawls/${CRAWL}/pages/${UUID}`);
+  });
+
+  it('links an inherited discovered row to the crawl that owns its detail', () => {
+    render(
+      <PagesTable
+        pages={[page({ crawl_id: SOURCE_CRAWL, analysis_status: 'not_selected' })]}
+        crawlId={CRAWL}
+      />,
+    );
+    expect(screen.getByText('View').closest('a')).toHaveAttribute(
+      'href',
+      `/site-health/crawls/${SOURCE_CRAWL}/pages/${UUID}`,
+    );
   });
 });

@@ -76,6 +76,10 @@ export function PromptLibrary() {
     }
     if (promptSet)
       await queryClient.invalidateQueries({ queryKey: queryKeys.prompts.set(promptSet.id) });
+    // The projects list embeds prompt_sets[].prompts, which the onboarding
+    // "Getting Started" card reads to mark the "Add prompts" step done. Refresh
+    // it so adding prompts (via generate, manual, or import) advances the flow.
+    await queryClient.invalidateQueries({ queryKey: queryKeys.projects.list() });
   };
 
   const createMutation = useMutation({

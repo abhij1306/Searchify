@@ -53,6 +53,7 @@ from app.domain.site_health.entitlements import (
     lock_entitlement,
     resolve_entitlement,
 )
+from app.domain.site_health.inventory_scope import inventory_site_url_subquery
 from app.models.project import Project
 from app.models.site_health import (
     MonitoredSiteUrl,
@@ -600,9 +601,9 @@ async def bulk_select_monitored_set(
     - ``all``     — every admitted URL (quota still enforced downstream).
     - ``none``    — clear the selection (empty set).
 
-    Candidates are scoped to the crawl's ADMITTED URLs (``SiteUrlObservation``
-    rows for this crawl), exactly like the inventory listing — a bulk select
-    can never sweep in URLs from an earlier crawl's fuller catalog.
+    Candidates use the exact same durable inventory scope as the listing:
+    current observations plus the explicitly frozen earlier full-crawl lineage
+    for a Starter recrawl. Sample crawls never inherit that lineage.
 
     The heavy lifting (capability gate, version check, workspace quota under
     the entitlement lock, delta application, task enqueue/cancel) is delegated
@@ -642,14 +643,9 @@ async def bulk_select_monitored_set(
         entitlement = await resolve_entitlement(session, workspace_id)
         limit = int(entitlement.monitored_url_limit)
         fetch_cap = limit + 1 if count is None else min(count, limit + 1)
-        admitted = (
-            select(SiteUrlObservation.site_url_id)
-            .where(SiteUrlObservation.crawl_id == crawl_id)
-            .scalar_subquery()
-        )
         stmt = select(SiteUrl.id).where(
             SiteUrl.project_id == project_id,
-            SiteUrl.id.in_(admitted),
+            SiteUrl.id.in_(inventory_site_url_subquery(crawl)),
         )
         if query:
             pattern = f"%{query.strip().lower()}%"

@@ -21,10 +21,26 @@ type EntryListName =
   | `competitors.${number}.domains`;
 
 /**
+ * The slice of a `useFieldArray` return the list view needs. Typed
+ * structurally (not `UseFieldArrayReturn`) so a controller lifted into the
+ * parent — react-hook-form allows only one `useFieldArray` per name — plugs in
+ * regardless of which entry-list name it manages.
+ */
+export type EntryFieldArray = {
+  fields: { id: string }[];
+  append: (value: { value: string }) => void;
+  remove: (index: number) => void;
+};
+
+/**
  * EntryList (F6) — a repeatable single-column text list backed by
  * react-hook-form's `useFieldArray`. Each row is an `{ value }` object so the
  * field array has a stable key; the form mappers flatten these to `string[]`.
  * Per-row validation errors render inline beneath each input.
+ *
+ * Owns its `useFieldArray`. When a parent needs to append rows itself (e.g.
+ * AI suggestions), it lifts the hook and renders `EntryListView` directly
+ * instead — never both, since a field name must have exactly one hook.
  */
 export function EntryList({
   control,
@@ -41,7 +57,39 @@ export function EntryList({
   addLabel: string;
   errors?: FieldErrors<SetupFormValues>;
 }>) {
-  const { fields, append, remove } = useFieldArray({ control, name });
+  const fieldArray = useFieldArray({ control, name });
+  return (
+    <EntryListView
+      control={control}
+      name={name}
+      label={label}
+      placeholder={placeholder}
+      addLabel={addLabel}
+      errors={errors}
+      fieldArray={fieldArray}
+    />
+  );
+}
+
+/** Presentational entry list driven by an externally-owned field array. */
+export function EntryListView({
+  control,
+  name,
+  label,
+  placeholder,
+  addLabel,
+  errors,
+  fieldArray,
+}: Readonly<{
+  control: Control<SetupFormValues>;
+  name: EntryListName;
+  label: string;
+  placeholder?: string;
+  addLabel: string;
+  errors?: FieldErrors<SetupFormValues>;
+  fieldArray: EntryFieldArray;
+}>) {
+  const { fields, append, remove } = fieldArray;
 
   // Resolve the array of per-row errors for this named list from the (possibly
   // nested) form errors object without leaning on `any`.

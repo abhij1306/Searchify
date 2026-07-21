@@ -58,6 +58,10 @@ from app.core.config.task_queue import (
     TASK_STATUS_SUCCEEDED,
 )
 from app.domain.site_health.entitlements import resolve_entitlement
+from app.domain.site_health.inventory_scope import (
+    inherited_inventory_crawl_ids,
+    inventory_site_url_subquery,
+)
 from app.domain.site_health.normalization import (
     CursorScopeError,
     decode_keyset_cursor,
@@ -644,12 +648,12 @@ async def get_inventory(
         "monitored": (str(monitored) if monitored is not None else None),
     }
 
-    # Scope to URLs THIS crawl admitted (observed), not the project's
-    # historical catalog: a later Free/downgraded crawl can only surface the
-    # URLs it actually admitted, never a prior Starter crawl's fuller set.
+    # A Starter recrawl reads its explicitly frozen earlier full inventories
+    # while new observations stream in. Sample crawls ignore inherited ids, so
+    # a Free/downgraded run cannot expose the earlier Starter catalog.
     stmt = select(SiteUrl).where(
         SiteUrl.project_id == project_id,
-        SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
+        SiteUrl.id.in_(inventory_site_url_subquery(crawl)),
     )
     if query:
         pattern = f"%{query.strip().lower()}%"
@@ -886,11 +890,12 @@ async def get_pages(
     }
 
     monitored_ids = await _monitored_site_url_ids(session, project_id=project_id)
-    # Scope to URLs admitted to THIS crawl (see `get_inventory`): a downgraded
-    # / different later crawl never exposes a prior crawl's fuller URL set.
+    # Same durable Starter inventory scope as get_inventory. Analysis, tasks,
+    # issues, and scores below remain current-crawl-only, so inherited rows
+    # show as not selected rather than borrowing old evidence.
     stmt = select(SiteUrl).where(
         SiteUrl.project_id == project_id,
-        SiteUrl.id.in_(_admitted_site_url_subquery(crawl_id)),
+        SiteUrl.id.in_(inventory_site_url_subquery(crawl)),
     )
     if monitored is True:
         if not monitored_ids:
@@ -913,6 +918,35 @@ async def get_pages(
     rows = list((await session.scalars(stmt)).all())
 
     site_ids = [r.id for r in rows]
+    current_observed_ids = set(
+        (
+            await session.scalars(
+                select(SiteUrlObservation.site_url_id).where(
+                    SiteUrlObservation.crawl_id == crawl_id,
+                    SiteUrlObservation.site_url_id.in_(site_ids),
+                )
+            )
+        ).all()
+    )
+    inherited_ids = inherited_inventory_crawl_ids(crawl)
+    inherited_crawl_by_url: dict[uuid.UUID, uuid.UUID] = {}
+    if inherited_ids and site_ids:
+        source_rows = (
+            await session.execute(
+                select(
+                    SiteUrlObservation.site_url_id,
+                    SiteUrlObservation.crawl_id,
+                ).where(
+                    SiteUrlObservation.crawl_id.in_(inherited_ids),
+                    SiteUrlObservation.site_url_id.in_(site_ids),
+                )
+            )
+        ).all()
+        source_rank = {value: rank for rank, value in enumerate(inherited_ids)}
+        for source_site_url_id, source_crawl_id in sorted(
+            source_rows, key=lambda row: source_rank.get(row[1], len(source_rank))
+        ):
+            inherited_crawl_by_url.setdefault(source_site_url_id, source_crawl_id)
     analyses = await _latest_analysis_by_site_url(
         session, crawl_id=crawl_id, site_url_ids=site_ids
     )
@@ -938,7 +972,11 @@ async def get_pages(
         items.append(
             {
                 "site_url_id": row.id,
-                "crawl_id": crawl_id,
+                "crawl_id": (
+                    crawl_id
+                    if row.id in current_observed_ids
+                    else inherited_crawl_by_url.get(row.id, crawl_id)
+                ),
                 "normalized_url": row.normalized_url,
                 "display_url": row.display_url or row.normalized_url,
                 "title": row.latest_title or None,

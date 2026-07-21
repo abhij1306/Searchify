@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import {
   Dropdown,
@@ -27,6 +28,7 @@ function initials(name: string) {
  * (which persists the choice and re-scopes the API client's workspace header).
  */
 export function ProjectSwitcher({ className }: Readonly<{ className?: string }>) {
+  const router = useRouter();
   const { projects, activeProject, activeProjectId, setActiveProjectId, isLoading } =
     useProjectContext();
 
@@ -80,6 +82,16 @@ export function ProjectSwitcher({ className }: Readonly<{ className?: string }>)
             </DropdownItem>
           );
         })}
+        <DropdownSeparator className="bg-border-subtle my-1 h-px" />
+        <DropdownItem onSelect={() => router.push('/setup/new')}>
+          <span
+            aria-hidden
+            className="bg-accent-soft text-accent-text flex size-6 shrink-0 items-center justify-center rounded"
+          >
+            <Plus className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate">New project</span>
+        </DropdownItem>
       </DropdownContent>
     </Dropdown>
   );

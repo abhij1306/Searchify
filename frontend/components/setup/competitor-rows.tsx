@@ -1,12 +1,7 @@
 'use client';
 
 import { Trash2 } from 'lucide-react';
-import {
-  useFieldArray,
-  type Control,
-  type FieldErrors,
-  type UseFormRegister,
-} from 'react-hook-form';
+import type { Control, FieldErrors, UseFieldArrayReturn, UseFormRegister } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -19,17 +14,23 @@ import { EntryList } from './entry-list';
  * CompetitorRows (F6) — repeatable competitor cards, each with a name plus
  * nested alias and domain lists (their own `useFieldArray` via `EntryList`).
  * Add / remove a whole competitor row here; the inner lists manage their rows.
+ *
+ * The `competitors` field array is owned by the parent form (react-hook-form
+ * allows only one `useFieldArray` per name, and SetupForm appends AI-suggested
+ * competitors itself) and passed in via `fieldArray`.
  */
 export function CompetitorRows({
   control,
   register,
   errors,
+  fieldArray,
 }: Readonly<{
   control: Control<SetupFormValues>;
   register: UseFormRegister<SetupFormValues>;
   errors: FieldErrors<SetupFormValues>;
+  fieldArray: UseFieldArrayReturn<SetupFormValues, 'competitors'>;
 }>) {
-  const { fields, append, remove } = useFieldArray({ control, name: 'competitors' });
+  const { fields, append, remove } = fieldArray;
 
   return (
     <div className="grid gap-4">

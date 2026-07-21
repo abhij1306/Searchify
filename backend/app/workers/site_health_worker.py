@@ -259,11 +259,10 @@ class _SystemDnsResolver:
 class SiteHealthWorker:
     """Owns a claim/lease loop over ``SiteCrawlTask`` discover rows.
 
-    Mirrors ``AuditWorker``: a single worker claims up to
-    ``worker_concurrency`` discover tasks per poll and runs them serially, each
-    in its own short-lived session (never one held open across the fetch). The
-    DNS resolver is injected (a real one in production, a fake one in tests) so
-    the SSRF-safe fetcher runs fully offline under test.
+    Claims a bounded batch from PostgreSQL and executes it concurrently, each
+    task in its own short-lived session (never one held open across the fetch).
+    A per-host semaphore and start-delay gate retain crawler politeness while
+    unrelated hosts use the full in-process concurrency budget.
     """
 
     def __init__(
@@ -283,6 +282,9 @@ class SiteHealthWorker:
         # An injected httpx transport (tests pass ``httpx.MockTransport``);
         # None in production so the fetcher pins the validated connection IP.
         self._transport = transport
+        self._host_semaphores: dict[str, asyncio.Semaphore] = {}
+        self._host_start_locks: dict[str, asyncio.Lock] = {}
+        self._host_last_started: dict[str, float] = {}
 
     async def run_once(self) -> int:
         """Sweep expired leases, claim a batch of all task kinds, execute it.
@@ -295,21 +297,48 @@ class SiteHealthWorker:
         await self._queue.release_expired(
             batch_size=site_health_settings.lease_reclaim_batch_size
         )
+        claim_limit = min(
+            site_health_settings.worker_concurrency,
+            site_health_settings.global_concurrency,
+        )
         tasks = await self._queue.claim(
             owner=self.owner,
-            # Execution is serial, so claiming a batch would leave every task
-            # after the first without a heartbeat while the first performs
-            # network I/O. Claim one lease at a time to prevent expiry/reclaim.
-            limit=1,
+            limit=claim_limit,
             kinds=[
                 TASK_KIND_DISCOVER,
                 TASK_KIND_ANALYZE,
                 TASK_KIND_LINK_CHECK,
             ],
         )
-        for task in tasks:
-            await self._execute_task(task)
+        if tasks:
+            await asyncio.gather(*(self._execute_claimed(task) for task in tasks))
         return len(tasks)
+
+    async def _execute_claimed(self, task: SiteCrawlTask) -> None:
+        """Heartbeat a claimed lease while it waits for its polite host slot."""
+        try:
+            host, _port = split_host_port(task.requested_url)
+        except Exception:
+            host = task.requested_url
+        semaphore = self._host_semaphores.setdefault(
+            host,
+            asyncio.Semaphore(site_health_settings.per_host_concurrency),
+        )
+        start_lock = self._host_start_locks.setdefault(host, asyncio.Lock())
+        heartbeat = asyncio.create_task(self._heartbeat_loop(task.id))
+        try:
+            async with semaphore:
+                async with start_lock:
+                    delay = max(0.0, site_health_settings.per_host_delay_seconds)
+                    elapsed = time.monotonic() - self._host_last_started.get(host, 0.0)
+                    if elapsed < delay:
+                        await asyncio.sleep(delay - elapsed)
+                    self._host_last_started[host] = time.monotonic()
+                await self._execute_task(task)
+        finally:
+            heartbeat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat
 
     async def run_until_idle(self, *, max_batches: int = 1000) -> int:
         """Drain the discover queue until a claim returns nothing (test mode)."""
@@ -353,7 +382,7 @@ class SiteHealthWorker:
             # cancelled/terminalized since the claim, rather than fetching.
             async with self._session_factory() as session:
                 task = await session.get(SiteCrawlTask, task_id)
-                crawl = await session.get(SiteCrawl, crawl_id)
+                crawl = await session.get(SiteCrawl, crawl_id, with_for_update=True)
                 if task is None or crawl is None:
                     await session.rollback()
                     await self._queue.cancel(task_id=task_id)

@@ -45,7 +45,10 @@ export function PagesTable({
 }: Readonly<{ pages: PageSummary[]; crawlId: string }>) {
   const router = useRouter();
   const openPage = (siteUrlId: string) => {
-    router.push(`/site-health/crawls/${crawlId}/pages/${siteUrlId}`);
+    const page = pages.find((row) => row.site_url_id === siteUrlId);
+    router.push(
+      `/site-health/crawls/${page?.crawl_id ?? crawlId}/pages/${siteUrlId}`,
+    );
   };
   return (
     <Table>
@@ -103,7 +106,7 @@ export function PagesTable({
             </TableCell>
             <TableCell>
               <Link
-                href={`/site-health/crawls/${crawlId}/pages/${page.site_url_id}`}
+                href={`/site-health/crawls/${page.crawl_id}/pages/${page.site_url_id}`}
                 onClick={(event) => event.stopPropagation()}
                 className="text-accent-text text-xs font-medium hover:underline"
               >

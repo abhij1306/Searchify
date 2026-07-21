@@ -51,6 +51,7 @@ from app.core.config.site_health import (
     EVENT_CRAWL_CREATED,
     EVENT_CRAWL_QUEUED,
     EXTRACTOR_VERSION,
+    INVENTORY_SOURCE_CRAWL_IDS_KEY,
     OBSERVATION_SOURCE_ROOT,
     RULE_CATALOG_VERSION,
     SCORING_VERSION,
@@ -64,6 +65,7 @@ from app.domain.site_health.entitlements import (
     lock_entitlement,
     resolve_entitlement,
 )
+from app.domain.site_health.inventory_scope import freeze_inventory_lineage
 from app.domain.site_health.normalization import canonical_identity
 from app.domain.site_health.selection import seed_monitored_targets
 from app.domain.site_health.state_events import (
@@ -356,6 +358,27 @@ async def create_crawl(
         exclude_globs=excludes,
         entitlement=entitlement,
     )
+
+    # Keep a Starter project's earlier discovered inventory visible while a
+    # new analysis crawl re-discovers the site. The lineage references
+    # immutable observations; it never copies or fabricates evidence. Sample
+    # crawls inherit nothing, preserving Free catalog non-disclosure.
+    if not sample_mode:
+        previous_crawl = await session.scalar(
+            select(SiteCrawl)
+            .where(
+                SiteCrawl.workspace_id == workspace_id,
+                SiteCrawl.project_id == project_id,
+            )
+            .order_by(SiteCrawl.created_at.desc(), SiteCrawl.id.desc())
+            .limit(1)
+        )
+        lineage = freeze_inventory_lineage(
+            previous_crawl,
+            limit=site_health_settings.inventory_history_crawl_limit,
+        )
+        if lineage:
+            configuration[INVENTORY_SOURCE_CRAWL_IDS_KEY] = lineage
 
     crawl = SiteCrawl(
         workspace_id=workspace_id,

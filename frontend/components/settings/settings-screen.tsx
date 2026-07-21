@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import { useRef, useState, type KeyboardEvent } from 'react';
 
@@ -89,7 +89,13 @@ export function SettingsScreen() {
   const { activeProject, projects, setActiveProjectId } = useProjectContext();
   const createdLabel = formatTimestamp(user.created_at);
   const updatedLabel = formatTimestamp(user.updated_at);
-  const [activeTab, setActiveTab] = useState<SettingsTab>('account');
+  // Deep-linkable initial tab (`/settings?tab=providers` from the onboarding
+  // card); invalid/absent values fall back to Account.
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() =>
+    SETTINGS_TABS.some((tab) => tab.id === requestedTab) ? (requestedTab as SettingsTab) : 'account',
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
