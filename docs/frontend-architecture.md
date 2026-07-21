@@ -23,6 +23,7 @@
 
 | Route | Screen | Status |
 |---|---|---|
+| `/` | Public marketing landing page (`app/(marketing)/`, CUBE27 midnight brand; client island forwards authed visitors to `/visibility` or `/setup`) | **MVP** |
 | `/login`, `/register` | Auth | **MVP** |
 | `(app)/layout.tsx` | App shell (sidebar + top bar + project switcher) | **MVP** |
 | `/setup` | Brand/Project setup | **MVP** |
