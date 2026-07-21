@@ -345,11 +345,16 @@ describe('SiteHealthScreen — canonical single-screen flow (regression)', () =>
         return HttpResponse.json(serverCrawl);
       }),
       http.post('/api/v1/site-crawls', () => {
+        // The shape a real recrawl has for most of its life: discovery re-runs
+        // while the seeded monitored-set analysis is still 'pending' (the
+        // worker's reconcile flips it later). Resolving THIS shape back to the
+        // URL list is the exact reported bug.
         serverCrawl = crawl({
           id: NEW_CRAWL,
           status: 'running',
-          discovery_status: 'completed',
-          analysis_status: 'running',
+          discovery_status: 'running',
+          analysis_status: 'pending',
+          inventory_complete: false,
           score_summary: null,
           completed_at: null,
         });
@@ -390,9 +395,12 @@ describe('SiteHealthScreen — canonical single-screen flow (regression)', () =>
     await user.click(startAnalysis);
 
     // The screen moves FORWARD to the analysis view in place — it must never
-    // bounce back to the selection list (the reported regression).
+    // bounce back to the selection list (the reported regression), even though
+    // the fresh crawl reports discovery running + analysis still pending.
     expect(
-      await screen.findByText('Auditing selected pages for technical and AEO health issues'),
+      await screen.findByText(
+        'Auditing selected pages while discovery re-scans the site in the background',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Monitor https://acme.com/pricing')).not.toBeInTheDocument();
     expect(screen.getByTestId('site-health-canonical')).toBe(canonical);

@@ -161,10 +161,16 @@ export function hasScoreData(crawl: Pick<SiteCrawl, 'score_summary'>): boolean {
  *        - Starter + discovered URLs   → 'selection' (inventory persists through
  *          a cancel; the user stages a monitored set and re-crawls)
  *        - otherwise                   → 'terminal' (nothing to show)
- *   7. discovery still running         → 'discovering'
- *   8. analysis running                → 'analyzing'
- *   9. Starter + analysis pending      → 'selection'
- *  10. otherwise (Free auto-analysis)  → 'analyzing'
+ *   7. ACTIVE Starter crawl + committed monitored set → 'analyzing'. Every
+ *      crawl created while a monitored set exists is seeded with its analyze
+ *      tasks at creation, and a selection commit enqueues into the active
+ *      crawl — so this crawl IS an analysis run even while re-discovery
+ *      streams. Resolving it to 'discovering'/'selection' is what bounced the
+ *      screen back to the URL list after "Start analysis" / "Re-crawl".
+ *   8. discovery still running         → 'discovering'
+ *   9. analysis running                → 'analyzing'
+ *  10. Starter + analysis pending      → 'selection'
+ *  11. otherwise (Free auto-analysis)  → 'analyzing'
  */
 export function resolveSiteHealthPhase(
   crawl: Pick<
@@ -172,6 +178,8 @@ export function resolveSiteHealthPhase(
     'status' | 'discovery_status' | 'analysis_status' | 'score_summary' | 'visible_url_count'
   > | null,
   plan: SiteHealthEntitlement['plan_key'],
+  /** True when the project has at least one ACTIVE monitored URL committed. */
+  hasMonitoredSelection = false,
 ): SiteHealthPhase {
   // 1. Nothing yet.
   if (!crawl) return 'empty';
@@ -191,10 +199,20 @@ export function resolveSiteHealthPhase(
     return plan === 'starter' && crawl.visible_url_count > 0 ? 'selection' : 'terminal';
   }
 
-  // 7. Discovery still running.
+  // 7. Every remaining status is ACTIVE (draft/validating/queued/running). An
+  // active crawl for a project with a committed monitored set is an analysis
+  // run from the moment it is created: the planner seeds the monitored set's
+  // analyze tasks at crawl creation, and a selection commit enqueues analyze
+  // tasks into the active crawl immediately — `analysis_status` merely lags
+  // ('pending' until the worker's first reconcile). Resolving this shape to
+  // 'discovering'/'selection' is what bounced the screen back to the URL list
+  // right after "Start analysis" / "Re-crawl".
+  if (hasMonitoredSelection) return 'analyzing';
+
+  // 8. Discovery still running.
   if (!TERMINAL_DISCOVERY.has(crawl.discovery_status)) return 'discovering';
 
-  // 8–10. Discovery done. Free auto-analyzes its sample (no manual selection);
+  // 9–11. Discovery done. Free auto-analyzes its sample (no manual selection);
   // Starter stages a monitored set unless analysis has already started.
   if (crawl.analysis_status === 'running') return 'analyzing';
   if (plan === 'starter' && crawl.analysis_status === 'pending') return 'selection';
@@ -235,15 +253,16 @@ export function primaryActionForPhase(phase: SiteHealthPhase, active: boolean): 
 
 /**
  * Which content the always-mounted inventory section renders for a phase. The
- * canonical Site Health screen never swaps whole panels — the layout (status
- * strip + scores + inventory) stays mounted and only this mode changes:
+ * canonical Site Health screen never swaps whole panels — the layout (scores +
+ * status row + inventory) stays mounted and only this mode changes:
  *   - 'discovering': read-only inventory rows streaming in;
  *   - 'selectable':  Starter monitored-set staging (checkboxes + commit);
- *   - 'analyzing':   monitored pages with live per-page audit statuses;
- *   - 'scored':      the tabbed (monitored/all/errors) scored page browser;
+ *   - 'scored':      the tabbed (monitored/all/errors) page browser — used
+ *                    DURING analysis and after: the same table, rows advance
+ *                    queued → running → completed and scores fill in place;
  *   - 'none':        empty/terminal — nothing to list yet.
  */
-export type InventoryMode = 'none' | 'discovering' | 'selectable' | 'analyzing' | 'scored';
+export type InventoryMode = 'none' | 'discovering' | 'selectable' | 'scored';
 
 export function inventoryModeForPhase(phase: SiteHealthPhase): InventoryMode {
   switch (phase) {
@@ -252,8 +271,10 @@ export function inventoryModeForPhase(phase: SiteHealthPhase): InventoryMode {
     case 'selection':
       return 'selectable';
     case 'analyzing':
-      return 'analyzing';
     case 'dashboard':
+      // ONE table for the whole audit lifecycle: the analyzing phase renders
+      // the same tabbed browser as the finished dashboard, so finishing a run
+      // changes NOTHING structurally — statuses and scores update in place.
       return 'scored';
     default:
       // 'empty' | 'terminal'

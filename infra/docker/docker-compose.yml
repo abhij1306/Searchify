@@ -92,6 +92,29 @@ services:
     # Audit worker is a SEPARATE process (Postgres task queue, B5). Placeholder
     # until B5 lands app/workers/audit_worker.py; keeps the service wired now.
     command: ["python", "-m", "app.workers.audit_worker"]
+    # The Dockerfile HEALTHCHECK probes the web /health endpoint, which worker
+    # containers don't serve — disable it so they don't report unhealthy.
+    healthcheck:
+      disable: true
+
+  # Site Health worker: claims site crawl (discover) tasks from the Postgres
+  # queue — the dedicated process app/workers/site_health_worker.py expects.
+  site-health-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.site_health_worker"]
+    healthcheck:
+      disable: true
 
   # Content-generation worker: claims content_generations queue rows and calls
   # the env-configured provider (MISTRAL_API_KEY empty = provider disabled).
@@ -109,6 +132,8 @@ services:
       migrate:
         condition: service_completed_successfully
     command: ["python", "-m", "app.workers.content_worker"]
+    healthcheck:
+      disable: true
 
 volumes:
   pg_data:

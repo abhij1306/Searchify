@@ -136,17 +136,22 @@ async def test_generate_creates_proposed_prompts_and_topics(
 
     assert body["dropped_duplicates"] == 0
     assert len(body["generated"]) == 3
+    by_status = {p["text"]: p["status"] for p in body["generated"]}
+    # Fresh set, 3 < the 20-active pool -> unbranded prompts promoted to
+    # active. The branded comparison prompt stays proposed: the branded cap
+    # applies to the post-activation pool (int(2 * 0.2) = 0 slots), not the
+    # configured threshold.
+    assert by_status["best running shoes in australia"] == "active"
+    assert by_status["how do running shoe sizes work"] == "active"
+    assert by_status["acme vs globex running shoes"] == "proposed"
     for prompt in body["generated"]:
-        # Fresh set, 3 < the 20-active pool -> all promoted to active and
-        # immediately visible on Your Prompts.
-        assert prompt["status"] == "active"
         assert prompt["origin"] == "generated"
         assert prompt["topic_id"] is not None
     assert {t["name"] for t in body["topics"]} == {"Footwear", "Sizing"}
     footwear = next(t for t in body["topics"] if t["name"] == "Footwear")
     assert footwear["origin"] == "generated"
-    assert footwear["active_count"] == 2
-    assert footwear["proposed_count"] == 0
+    assert footwear["active_count"] == 1
+    assert footwear["proposed_count"] == 1
 
     # The brand evidence went to the agent (confirmed above), and the
     # request embedded identity + count instructions.
@@ -471,11 +476,12 @@ async def test_generate_second_run_stays_proposed_when_pool_full(
 async def test_generate_caps_branded_share_of_active_pool(
     client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Branded prompts fill at most 20% of the active pool; the slots they
-    would have taken go to later unbranded prompts, and the skipped branded
-    rows stay proposed."""
+    """Branded prompts fill at most 20% of the post-activation active pool;
+    the slots they would have taken go to later unbranded prompts, and the
+    skipped branded rows stay proposed."""
     _, prompt_set_id = await _make_project_and_set(client, "brandcap@example.com")
-    # 10 branded prompts first, then 10 unbranded. Pool=20, branded cap=20% -> 4.
+    # 10 branded prompts first, then 10 unbranded. Pool lands at 12 active
+    # (2 branded + 10 unbranded): cap iterates to int(12 * 0.2) = 2.
     branded_prompts = [
         {"text": f"is Acme Corp good for use case {i}", "intent": "discovery"}
         for i in range(10)
@@ -502,15 +508,85 @@ async def test_generate_caps_branded_share_of_active_pool(
     active_branded = [
         p for p in body["generated"] if p["branded"] and p["status"] == "active"
     ]
-    # Cap = int(20 * 0.2) = 4 branded slots; the first 4 branded rows take them.
-    assert len(active_branded) == 4
-    for i in range(4):
+    # Projected pool = 12 active -> branded cap = int(12 * 0.2) = 2; the
+    # first 2 branded rows take the slots.
+    assert len(active_branded) == 2
+    for i in range(2):
         assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "active"
     # Branded rows beyond the cap stay proposed even though pool slots remained.
-    for i in range(4, 10):
+    for i in range(2, 10):
         assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "proposed"
-    # Every unbranded row is activated (4 branded + 10 unbranded = 14 <= 20).
+    # Every unbranded row is activated (2 branded + 10 unbranded = 12 <= 20).
     for i in range(10):
+        assert by_text[f"best running shoes for terrain {i}"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_generate_branded_cap_holds_for_undersized_pool(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An initially empty pool that stays below the threshold still honors the
+    branded share against the pool that actually exists after activation, not
+    the configured threshold."""
+    _, prompt_set_id = await _make_project_and_set(client, "brandcap2@example.com")
+    # Only 5 prompts (3 branded + 2 unbranded) into an empty pool. Capping
+    # against threshold alone (int(20 * 0.2) = 4) would activate all 3 branded
+    # -> a 5-row pool at 60% branded. Against the projected pool the cap
+    # iterates down to int(2 * 0.2) = 0: no branded row auto-activates.
+    prompts = [
+        {"text": f"is Acme Corp good for use case {i}", "intent": "discovery"}
+        for i in range(3)
+    ] + [
+        {"text": f"best running shoes for terrain {i}", "intent": "discovery"}
+        for i in range(2)
+    ]
+    agent = FakeAgent(
+        response=json.dumps({"topics": [{"name": "Mix", "prompts": prompts}]})
+    )
+    monkeypatch.setattr(prompts_api, "DefaultAgentClient", lambda: agent)
+
+    resp = await client.post(
+        f"/api/v1/prompt-sets/{prompt_set_id}/generate",
+        json={"count": 5, "confirm_send_evidence": True},
+    )
+    assert resp.status_code == 201
+    by_text = {p["text"]: p for p in resp.json()["generated"]}
+    for i in range(3):
+        assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "proposed"
+    for i in range(2):
+        assert by_text[f"best running shoes for terrain {i}"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_generate_branded_cap_allows_share_of_undersized_pool(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pool below threshold still admits branded rows up to its own share."""
+    _, prompt_set_id = await _make_project_and_set(client, "brandcap3@example.com")
+    # 4 branded + 6 unbranded into an empty pool. Fixed point: 1 branded + 6
+    # unbranded = 7 active, int(7 * 0.2) = 1 branded allowed.
+    prompts = [
+        {"text": f"is Acme Corp good for use case {i}", "intent": "discovery"}
+        for i in range(4)
+    ] + [
+        {"text": f"best running shoes for terrain {i}", "intent": "discovery"}
+        for i in range(6)
+    ]
+    agent = FakeAgent(
+        response=json.dumps({"topics": [{"name": "Mix", "prompts": prompts}]})
+    )
+    monkeypatch.setattr(prompts_api, "DefaultAgentClient", lambda: agent)
+
+    resp = await client.post(
+        f"/api/v1/prompt-sets/{prompt_set_id}/generate",
+        json={"count": 10, "confirm_send_evidence": True},
+    )
+    assert resp.status_code == 201
+    by_text = {p["text"]: p for p in resp.json()["generated"]}
+    assert by_text["is Acme Corp good for use case 0"]["status"] == "active"
+    for i in range(1, 4):
+        assert by_text[f"is Acme Corp good for use case {i}"]["status"] == "proposed"
+    for i in range(6):
         assert by_text[f"best running shoes for terrain {i}"]["status"] == "active"
 
 

@@ -395,9 +395,12 @@ async def _activate_first_n(
     Branded prompts (brand/alias/competitor name in the text) are capped at
     ``max_branded_active_share`` of the pool: a branded prompt trivially
     guarantees a brand mention, so a pool dominated by them inflates the
-    Visibility Score toward 100%. When a branded candidate would exceed the
-    cap it is skipped (stays ``proposed``) and the slot goes to the next
-    unbranded candidate; a human can still promote it deliberately.
+    Visibility Score toward 100%. The cap applies to the pool as it will
+    exist AFTER activation (existing active rows plus newly activated ones),
+    not the configured threshold, so an empty or undersized pool can't end
+    up mostly branded. When a branded candidate would exceed the cap it is
+    skipped (stays ``proposed``) and the slot goes to the next unbranded
+    candidate; a human can still promote it deliberately.
     """
     if not ordered_new_ids:
         return
@@ -419,8 +422,6 @@ async def _activate_first_n(
     remaining = threshold - active_count
     if remaining <= 0:
         return
-    branded_cap = int(threshold * prompt_generation_settings.max_branded_active_share)
-    branded_budget = max(0, branded_cap - active_branded)
 
     branded_rows = (
         await session.execute(
@@ -430,15 +431,32 @@ async def _activate_first_n(
     branded_by_id: dict[uuid.UUID, bool] = {
         row_id: bool(row_branded) for row_id, row_branded in branded_rows
     }
-    to_activate: list[uuid.UUID] = []
-    for prompt_id in ordered_new_ids:
-        if len(to_activate) >= remaining:
+
+    def _select(branded_cap: int) -> list[uuid.UUID]:
+        branded_budget = max(0, branded_cap - active_branded)
+        picked: list[uuid.UUID] = []
+        for prompt_id in ordered_new_ids:
+            if len(picked) >= remaining:
+                break
+            if branded_by_id.get(prompt_id, False):
+                if branded_budget <= 0:
+                    continue
+                branded_budget -= 1
+            picked.append(prompt_id)
+        return picked
+
+    # The cap depends on the post-activation pool size, which depends on how
+    # many branded rows get skipped — iterate to a fixed point. The cap only
+    # ever shrinks, so this terminates; when it stabilizes, total branded
+    # active <= share of the pool that actually exists after activation.
+    share = prompt_generation_settings.max_branded_active_share
+    branded_cap = int(threshold * share)
+    while True:
+        to_activate = _select(branded_cap)
+        recomputed = int((active_count + len(to_activate)) * share)
+        if recomputed >= branded_cap:
             break
-        if branded_by_id.get(prompt_id, False):
-            if branded_budget <= 0:
-                continue
-            branded_budget -= 1
-        to_activate.append(prompt_id)
+        branded_cap = recomputed
     if not to_activate:
         return
     await session.execute(

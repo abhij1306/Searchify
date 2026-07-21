@@ -64,6 +64,7 @@ from app.models.site_health import (
     SiteCrawlTask,
     SiteHealthProfile,
     SiteUrl,
+    SiteUrlObservation,
 )
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
@@ -771,6 +772,24 @@ async def test_second_crawl_seeds_active_monitored_only(
     assert len(tasks) == 2
     assert {t.site_url_id for t in tasks} == set(monitored_ids)
     assert all(t.generation == INITIAL_TASK_GENERATION for t in tasks)
+
+    # Seeding also ADMITS the monitored URLs into the new crawl's observed
+    # set: the pages/inventory projections scope through SiteUrlObservation,
+    # so without these rows the monitored pages would be invisible on the new
+    # crawl until re-discovery re-observed them.
+    async with session_factory() as session:
+        observed = (
+            (
+                await session.execute(
+                    select(SiteUrlObservation.site_url_id).where(
+                        SiteUrlObservation.crawl_id == crawl2_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert set(observed) == set(monitored_ids)
 
 
 @pytest.mark.asyncio

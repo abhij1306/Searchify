@@ -28,6 +28,7 @@ import {
   toggleStaged,
 } from '@/lib/site-health/selection';
 import { useMonitoredSelection } from '@/lib/site-health/use-monitored-selection';
+import { useCursorStack } from '@/lib/site-health/use-cursor-stack';
 import { PAGE_LIMIT } from '@/lib/site-health/status';
 
 /**
@@ -62,20 +63,17 @@ export function InventorySelection({
   startPending?: boolean;
 }>) {
   const [filters, setFilters] = useState<InventoryFilters>(emptyInventoryFilters);
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const pager = useCursorStack();
   const [searchInput, setSearchInput] = useState('');
-
-  const cursor = cursorStack.at(-1) ?? undefined;
 
   const inventoryQuery = useQuery(
     siteHealthQueries.inventory(crawl.id, {
-      ...toInventoryParams(filters, cursor, PAGE_LIMIT),
+      ...toInventoryParams(filters, pager.cursor, PAGE_LIMIT),
     }),
   );
 
   const rows = inventoryQuery.data?.items ?? [];
   const nextCursor = inventoryQuery.data?.next_cursor ?? null;
-  const canPrev = cursorStack.length > 0;
 
   const homepageId = inventoryQuery.data?.items.find(
     (row) => row.normalized_url === crawl.root_url,
@@ -110,7 +108,7 @@ export function InventorySelection({
   const applyFilters = (next: Partial<InventoryFilters>) => {
     const changed = changeInventoryFilters(filters, next);
     setFilters(changed.filters);
-    setCursorStack([]);
+    pager.reset();
   };
 
   if (monitoredQuery.isLoading || inventoryQuery.isLoading) {
@@ -206,17 +204,10 @@ export function InventorySelection({
         <div className="border-border-subtle flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <div className="flex items-center gap-2">
             <CursorPager
-              canPrev={canPrev}
+              canPrev={pager.canPrev}
               canNext={Boolean(nextCursor)}
-              onPrev={() => setCursorStack((prev) => prev.slice(0, -1))}
-              onNext={() =>
-                nextCursor &&
-                setCursorStack((prev) =>
-                  // Idempotent under rapid clicks: the captured nextCursor may
-                  // already be on the stack before the rerender lands.
-                  prev.at(-1) === nextCursor ? prev : [...prev, nextCursor],
-                )
-              }
+              onPrev={pager.pop}
+              onNext={() => pager.push(nextCursor)}
             />
           </div>
           <div className="flex items-center gap-3">

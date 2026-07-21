@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 from typing import TypeGuard
 
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config.site_health import (
@@ -36,6 +37,7 @@ from app.core.config.site_health import (
     CODE_STARTER_REQUIRED,
     CRAWL_ACTIVE_STATUSES,
     INITIAL_TASK_GENERATION,
+    OBSERVATION_SOURCE_LINK,
     SELECTION_SOURCE_USER,
     TASK_KIND_ANALYZE,
 )
@@ -867,6 +869,14 @@ async def seed_monitored_targets(
     Seeds at ``INITIAL_TASK_GENERATION`` because a fresh crawl owns a fresh
     slot namespace. Idempotent: an already-seeded slot is skipped so a retry
     never violates the unique ``(crawl_id, task_kind, url_hash, generation)``.
+
+    Every seeded URL is also admitted into the NEW crawl's observed set
+    (``SiteUrlObservation``, conflict-safe): the pages/inventory read paths
+    scope strictly through observations, so without this row the monitored
+    pages are INVISIBLE on the new crawl until re-discovery happens to
+    re-observe them — the dashboard's page table starts (nearly) empty while
+    the analysis counters already move. Same pattern as the Free sample
+    admission and the single-page rerun crawl.
     """
     result = await session.execute(
         select(MonitoredSiteUrl, SiteUrl)
@@ -895,6 +905,26 @@ async def seed_monitored_targets(
     seeded: list[uuid.UUID] = []
     position = 0
     for _monitored, site_url in rows:
+        # Admit into the new crawl's observed set FOR EVERY active row (not
+        # just newly-seeded tasks) so a pre-fix crawl retried through here
+        # self-heals its missing observations. Sparse row; the analyze result
+        # enriches status/title later.
+        await session.execute(
+            pg_insert(SiteUrlObservation)
+            .values(
+                workspace_id=crawl.workspace_id,
+                project_id=crawl.project_id,
+                crawl_id=crawl.id,
+                site_url_id=site_url.id,
+                source_kind=site_url.latest_source_kind or OBSERVATION_SOURCE_LINK,
+                depth=site_url.depth,
+                observed_url=site_url.normalized_url,
+                final_url=site_url.normalized_url,
+                content_type=site_url.latest_content_type or "",
+                title=site_url.latest_title or "",
+            )
+            .on_conflict_do_nothing(index_elements=["crawl_id", "site_url_id"])
+        )
         if site_url.url_hash in already_seeded:
             continue
         task = await _enqueue_analyze_task(

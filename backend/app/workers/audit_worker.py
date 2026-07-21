@@ -39,6 +39,7 @@ from app.connectors.answer_engines.contracts import (
 )
 from app.connectors.answer_engines.errors import ProviderError
 from app.connectors.answer_engines.factory import build_adapter
+from app.core.config import settings
 from app.core.config.audits import (
     ATTEMPT_STATUS_FAILED,
     ATTEMPT_STATUS_SUCCEEDED,
@@ -247,6 +248,29 @@ def _serialize_citations(response: AnswerEngineResponse) -> list[dict]:
     return deduped
 
 
+def _warn_if_pool_undersized() -> None:
+    """Validate the shared engine pool against worker concurrency at startup.
+
+    Every session here is short-lived (never held across provider I/O), but a
+    batch of ``worker_concurrency`` tasks plus their heartbeat loops can check
+    out up to ~2 connections per task at once. When the configured pool
+    (``pool_size + max_overflow``) is smaller than that peak, every batch
+    queues on connection checkout (bounded by ``pool_timeout``) — flag the
+    mismatch loudly instead of degrading silently.
+    """
+    capacity = settings.db_pool_size + settings.db_max_overflow
+    demand = 2 * max(1, audit_settings.worker_concurrency)
+    if capacity < demand:
+        logger.warning(
+            "db pool smaller than peak worker session demand",
+            extra={
+                "worker_concurrency": audit_settings.worker_concurrency,
+                "pool_capacity": capacity,
+                "peak_session_demand": demand,
+            },
+        )
+
+
 class AuditWorker:
     """Owns a claim/lease loop against ``PostgresTaskQueue``.
 
@@ -275,8 +299,12 @@ class AuditWorker:
 
         The claimed batch executes concurrently — per-prompt provider calls
         take tens of seconds, so serial execution would make a run's wall-clock
-        time scale linearly with its task count. ``_execute_task`` never raises
-        (it records crashes itself), so ``gather`` cannot abort mid-batch.
+        time scale linearly with its task count. ``_execute_task`` catches and
+        records its own crashes, but its cleanup (crash recording / audit
+        finalization) can itself raise (e.g. DB connection loss) — gather with
+        ``return_exceptions=True`` so one task's cleanup failure never abandons
+        the rest of the batch mid-flight; every claimed task completes before
+        this method returns.
         """
         await self._queue.release_expired()
         tasks = await self._queue.claim(
@@ -284,7 +312,17 @@ class AuditWorker:
             limit=max(1, audit_settings.worker_concurrency),
         )
         if tasks:
-            await asyncio.gather(*(self._execute_task(task) for task in tasks))
+            results = await asyncio.gather(
+                *(self._execute_task(task) for task in tasks),
+                return_exceptions=True,
+            )
+            for task, result in zip(tasks, results, strict=True):
+                if isinstance(result, BaseException):
+                    logger.error(
+                        "audit task cleanup failed",
+                        exc_info=result,
+                        extra={"task_id": str(task.id)},
+                    )
         return len(tasks)
 
     async def run_until_idle(self, *, max_batches: int = 1000) -> int:
@@ -299,6 +337,7 @@ class AuditWorker:
 
     async def run_forever(self) -> None:  # pragma: no cover - long-running loop
         logger.info("audit worker started", extra={"owner": self.owner})
+        _warn_if_pool_undersized()
         while True:
             try:
                 ran = await self.run_once()
@@ -342,7 +381,8 @@ class AuditWorker:
 
                 # Per-run wall-clock deadline: once the audit has been running
                 # longer than max_run_seconds, terminalize remaining tasks
-                # instead of starting another provider call.
+                # instead of starting another provider call. The audit itself
+                # is finalized once by this method's finally block.
                 if self._deadline_passed(audit):
                     await session.rollback()
                     await self._queue.fail(
@@ -354,7 +394,6 @@ class AuditWorker:
                             f"({audit_settings.max_run_seconds}s)"
                         ),
                     )
-                    await self._finalize_audit(audit_id)
                     return
 
                 # First task moves the audit QUEUED -> RUNNING.

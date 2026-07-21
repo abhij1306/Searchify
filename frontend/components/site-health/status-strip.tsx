@@ -1,10 +1,13 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label, Metric } from '@/components/ui/typography';
 import type { PageSummary, SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
+import { cn } from '@/lib/utils';
 import {
   PLACEHOLDER,
   canShowDiscoveredTotal,
@@ -12,18 +15,20 @@ import {
   dashboardRunNotice,
   discoveryProgressLabel,
   isDiscoveryProvisional,
+  isDiscoveryTerminal,
   statusLabel,
   type SiteHealthPhase,
 } from '@/lib/site-health/status';
 
 /**
- * Always-mounted status/progress strip of the canonical Site Health screen.
+ * Always-mounted status row of the canonical Site Health screen.
  *
- * One region that narrates the whole lifecycle in place — discovery counts
- * while discovering, selection guidance once discovery stops, analysis
- * progress counters while auditing, and the run-outcome notice
- * (`dashboardRunNotice`) for a run that did not complete cleanly. The strip
- * changes CONTENT, never the screen: no phase mounts or unmounts the region.
+ * ONE compact row (badge + narration + inline counters) that narrates the
+ * whole lifecycle in place below the score cards — discovery counts while
+ * discovering, audit progress while analyzing, and the run-outcome notice
+ * (`dashboardRunNotice`) for a run that did not complete cleanly. The row
+ * changes CONTENT, never the screen: no phase mounts or unmounts the region,
+ * and progress is never a separate panel that pushes the results around.
  * Free redaction rules apply — sample crawls never imply a hidden total.
  */
 export function StatusStrip({
@@ -170,6 +175,51 @@ function StripContent({
   );
 }
 
+/**
+ * The shared one-row shell: status badge + live narration on the left, the
+ * inline counters on the right, wrapping on narrow screens. Extra content
+ * (Free upsell, count-fetch warnings) stacks compactly underneath.
+ */
+function ProgressRow({
+  crawl,
+  narration,
+  counts,
+  children,
+}: Readonly<{
+  crawl: SiteCrawl;
+  narration: string;
+  counts: ReadonlyArray<{ label: string; value: number | null; className?: string }>;
+  children?: ReactNode;
+}>) {
+  return (
+    <Card>
+      <CardContent className="grid gap-3 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
+              {statusLabel(crawl.status)}
+            </Badge>
+            <span className="text-secondary truncate text-sm" aria-live="polite">
+              {narration}
+            </span>
+          </div>
+          <dl className="ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            {counts.map((count) => (
+              <div key={count.label} className="flex items-baseline gap-1.5">
+                <Label>{count.label}</Label>
+                <Metric className={cn('text-sm', count.className)}>
+                  {count.value ?? PLACEHOLDER}
+                </Metric>
+              </div>
+            ))}
+          </dl>
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DiscoveryStrip({
   crawl,
   entitlement,
@@ -182,54 +232,31 @@ function DiscoveryStrip({
   const provisional = isDiscoveryProvisional(crawl);
   const showTotal = canShowDiscoveredTotal(entitlement, crawl);
   const isFree = entitlement.plan_key === 'free';
-  const progressCopy = provisional
-    ? `${discoveryProgressLabel(crawl)} — scanning continues in the background`
-    : discoveryProgressLabel(crawl);
+  let narration: string;
+  if (cancelPending) {
+    narration = 'Cancelling discovery — finishing the page in flight and stopping';
+  } else if (provisional) {
+    narration = `${discoveryProgressLabel(crawl)} — scanning continues in the background`;
+  } else {
+    narration = discoveryProgressLabel(crawl);
+  }
+
+  const counts: Array<{ label: string; value: number | null }> = [
+    { label: isFree ? 'Sample URLs' : 'URLs found', value: crawl.visible_url_count },
+  ];
+  if (showTotal && crawl.total_url_count !== null) {
+    counts.push({ label: 'Total discovered', value: crawl.total_url_count });
+  }
 
   return (
-    <Card>
-      <CardContent className="grid gap-5">
-        <div className="flex items-center gap-3">
-          <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
-            {statusLabel(crawl.status)}
-          </Badge>
-          <span className="text-secondary text-sm" aria-live="polite">
-            {cancelPending
-              ? 'Cancelling discovery — finishing the page in flight and stopping'
-              : progressCopy}
-          </span>
-        </div>
-
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <div className="grid gap-1">
-            <Label>{isFree ? 'Sample URLs' : 'URLs found'}</Label>
-            <Metric className="text-2xl">{crawl.visible_url_count}</Metric>
-          </div>
-          {showTotal && crawl.total_url_count !== null ? (
-            <div className="grid gap-1">
-              <Label>Total discovered</Label>
-              <Metric className="text-2xl">{crawl.total_url_count}</Metric>
-            </div>
-          ) : null}
-          <div className="grid gap-1">
-            <Label>Discovery</Label>
-            <span className="text-secondary text-sm">{statusLabel(crawl.discovery_status)}</span>
-          </div>
-        </dl>
-
-        {isFree ? (
-          <div className="border-warning-border bg-warning-bg text-warning-text rounded-md border p-3 text-sm">
-            <p className="font-medium">
-              Free plan — we&apos;ll automatically analyze a {entitlement.sample_url_limit}-page
-              sample of your site.
-            </p>
-            <p className="text-warning-text/90 mt-0.5">
-              Upgrade to Starter to choose which pages to monitor.
-            </p>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+    <ProgressRow crawl={crawl} narration={narration} counts={counts}>
+      {isFree ? (
+        <p className="text-warning-text text-sm">
+          Free plan — we&apos;ll automatically analyze a {entitlement.sample_url_limit}-page
+          sample of your site. Upgrade to Starter to choose which pages to monitor.
+        </p>
+      ) : null}
+    </ProgressRow>
   );
 }
 
@@ -263,48 +290,36 @@ function AnalysisStrip({
   const countsKnown = summary !== null || selectedTotal !== null;
   const running = pages.filter((p) => p.analysis_status === 'running').length;
   const queued = countsKnown ? Math.max(0, selected - completed - failed - running) : null;
+  // A recrawl runs analysis of the monitored set WHILE re-discovery streams —
+  // say so, instead of pretending only one sub-process exists. Never for a
+  // sample crawl: Free copy must not imply continued full-site scanning.
+  const discovering = !crawl.sample_mode && !isDiscoveryTerminal(crawl.discovery_status);
+  let narration: string;
+  if (cancelPending) {
+    narration = 'Cancelling — finishing the page in flight and stopping';
+  } else if (discovering) {
+    narration = 'Auditing selected pages while discovery re-scans the site in the background';
+  } else {
+    narration = 'Auditing selected pages for technical and AEO health issues';
+  }
 
   return (
-    <Card>
-      <CardContent className="grid gap-5">
-        <div className="flex items-center gap-3">
-          <Badge variant="run-status" value={crawlBadgeValue(crawl.status)}>
-            {statusLabel(crawl.status)}
-          </Badge>
-          <span className="text-secondary text-sm" aria-live="polite">
-            {cancelPending
-              ? 'Cancelling analysis — finishing the page in flight and stopping'
-              : 'Auditing selected pages for technical and AEO health issues'}
-          </span>
-        </div>
-
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <CountCell label="Total pages" value={countsKnown ? selected : null} />
-          <CountCell label="Completed" value={completed} className="text-run-completed" />
-          <CountCell label="In progress" value={running} className="text-run-running" />
-          <CountCell label="Queued" value={queued} className="text-muted" />
-        </dl>
-
-        {selectedError ? (
-          <Alert tone="warning">
-            Could not load the selected-page count — progress totals may be approximate until it
-            refreshes.
-          </Alert>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CountCell({
-  label,
-  value,
-  className,
-}: Readonly<{ label: string; value: number | null; className?: string }>) {
-  return (
-    <div className="grid gap-1">
-      <Label>{label}</Label>
-      <Metric className={`text-xl ${className ?? ''}`}>{value ?? PLACEHOLDER}</Metric>
-    </div>
+    <ProgressRow
+      crawl={crawl}
+      narration={narration}
+      counts={[
+        { label: 'Total pages', value: countsKnown ? selected : null },
+        { label: 'Completed', value: completed, className: 'text-run-completed' },
+        { label: 'In progress', value: running, className: 'text-run-running' },
+        { label: 'Queued', value: queued, className: 'text-muted' },
+      ]}
+    >
+      {selectedError ? (
+        <Alert tone="warning">
+          Could not load the selected-page count — progress totals may be approximate until it
+          refreshes.
+        </Alert>
+      ) : null}
+    </ProgressRow>
   );
 }

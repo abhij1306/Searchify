@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/api/query-keys';
@@ -69,7 +69,28 @@ export function useSiteHealthScreen(projectId: string | null) {
     refetchInterval: active ? POLL_INTERVAL_MS : false,
   });
 
-  const phase: SiteHealthPhase = useMemo(() => resolveSiteHealthPhase(crawl, plan), [crawl, plan]);
+  // Per-PROJECT monitored set. Feeds BOTH the phase resolution (an active
+  // crawl with a committed monitored set is an analysis run from creation —
+  // its analyze tasks are seeded before `analysis_status` leaves 'pending')
+  // and the analysis progress totals. The dashboard quota `used` is
+  // workspace-wide, so a multi-project workspace would overcount this crawl's
+  // queue — count this project's active monitored rows instead. Selection
+  // commits write this cache directly (`useMonitoredSelection`), so a commit
+  // moves the phase forward without waiting for a refetch.
+  const monitoredQuery = useQuery({
+    ...siteHealthQueries.monitored(projectId ?? ''),
+    enabled: Boolean(projectId),
+  });
+  const projectSelectedTotal = useMemo(() => {
+    const rows = monitoredQuery.data?.monitored_urls;
+    if (!rows) return null;
+    return rows.filter((row) => row.active).length;
+  }, [monitoredQuery.data]);
+
+  const phase: SiteHealthPhase = useMemo(
+    () => resolveSiteHealthPhase(crawl, plan, (projectSelectedTotal ?? 0) > 0),
+    [crawl, plan, projectSelectedTotal],
+  );
 
   // Canonical-screen view-model: the same layout stays mounted through the
   // whole discover → select → analyze → scored flow; these two modifiers are
@@ -77,20 +98,6 @@ export function useSiteHealthScreen(projectId: string | null) {
   // renders). Derived, never stored — the crawl shape is the single source.
   const primaryAction: PrimaryAction = primaryActionForPhase(phase, active);
   const inventoryMode: InventoryMode = inventoryModeForPhase(phase);
-
-  // Per-PROJECT selected total for the analysis progress bar. The dashboard
-  // quota `used` is workspace-wide, so a multi-project workspace would
-  // overcount this crawl's queue — count this project's active monitored rows
-  // instead. Fetched only while analyzing (the set is frozen during a run).
-  const monitoredQuery = useQuery({
-    ...siteHealthQueries.monitored(projectId ?? ''),
-    enabled: Boolean(projectId) && phase === 'analyzing',
-  });
-  const projectSelectedTotal = useMemo(() => {
-    const rows = monitoredQuery.data?.monitored_urls;
-    if (!rows) return null;
-    return rows.filter((row) => row.active).length;
-  }, [monitoredQuery.data]);
   // Surface a failed monitored-count fetch rather than silently disabling the
   // analysis view: the count query is best-effort (the counters degrade to the
   // visible window), but the error is exposed so the screen can note it.
@@ -135,6 +142,19 @@ export function useSiteHealthScreen(projectId: string | null) {
       (createMutation.isSuccess &&
         createMutation.data != null &&
         crawl?.id !== createMutation.data.id));
+
+  // Once the dashboard shows the created crawl, the create mutation is
+  // consumed — reset it so its sticky isSuccess/data can't re-trigger
+  // crawlStarting if `crawl` later changes independently (a re-crawl from
+  // another tab, a cache revert). Pending and pre-confirmation states are
+  // untouched: reset only fires after the id match confirms the handoff.
+  const createdCrawlId = createMutation.isSuccess ? (createMutation.data?.id ?? null) : null;
+  useEffect(() => {
+    if (createdCrawlId != null && crawl?.id === createdCrawlId) {
+      createMutation.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- createMutation is a new object each render; keying on the ids is the stable equivalent.
+  }, [createdCrawlId, crawl?.id]);
 
   const runExport = async (format: ExportFormat, view: ExportView) => {
     if (!crawl) return;

@@ -129,7 +129,7 @@ describe('StatusStrip — analysis counters', () => {
 
     // selected(5) - completed(1) - failed(0) - running(1) = 3 queued.
     const queuedLabel = screen.getByText('Queued');
-    const queuedValue = queuedLabel.parentElement?.querySelector('.text-xl');
+    const queuedValue = queuedLabel.parentElement?.querySelector('.mono');
     expect(queuedValue?.textContent).toBe('3');
   });
 

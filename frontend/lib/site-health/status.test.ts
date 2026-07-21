@@ -302,6 +302,60 @@ describe('resolveSiteHealthPhase', () => {
       ),
     ).toBe('analyzing');
   });
+
+  it('resolves an ACTIVE crawl with a committed monitored set to analyzing from creation', () => {
+    // The reported bounce: "Start analysis" / "Re-crawl" creates a crawl whose
+    // analyze tasks are seeded at creation, but `analysis_status` stays
+    // 'pending' (and discovery re-runs) until the worker's first reconcile.
+    // Resolving that shape to 'discovering'/'selection' threw the user back to
+    // the URL list — with a monitored set, an active crawl IS an analysis run.
+    expect(resolveSiteHealthPhase(base, 'starter', true)).toBe('analyzing');
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'queued', discovery_status: 'pending' },
+        'starter',
+        true,
+      ),
+    ).toBe('analyzing');
+    // Discovery done + analysis still pending: never bounce back to selection.
+    expect(
+      resolveSiteHealthPhase({ ...base, discovery_status: 'completed' }, 'starter', true),
+    ).toBe('analyzing');
+  });
+
+  it('keeps the monitored-set rule BELOW terminal outcomes (cancel/fail/dashboard win)', () => {
+    // A cancelled crawl without data still parks in selection so the user can
+    // adjust the set and restart — the monitored set must not mask that.
+    expect(
+      resolveSiteHealthPhase(
+        {
+          ...base,
+          status: 'cancelled',
+          discovery_status: 'cancelled',
+          analysis_status: 'cancelled',
+        },
+        'starter',
+        true,
+      ),
+    ).toBe('selection');
+    expect(
+      resolveSiteHealthPhase(
+        { ...base, status: 'failed', discovery_status: 'failed' },
+        'starter',
+        true,
+      ),
+    ).toBe('terminal');
+    expect(resolveSiteHealthPhase({ ...base, status: 'completed' }, 'starter', true)).toBe(
+      'dashboard',
+    );
+  });
+
+  it('still resolves a first crawl (no monitored set) to the discovery/selection flow', () => {
+    expect(resolveSiteHealthPhase(base, 'starter', false)).toBe('discovering');
+    expect(
+      resolveSiteHealthPhase({ ...base, discovery_status: 'completed' }, 'starter', false),
+    ).toBe('selection');
+  });
 });
 
 describe('canonical-screen view-model (primaryAction / inventoryMode)', () => {
@@ -330,7 +384,9 @@ describe('canonical-screen view-model (primaryAction / inventoryMode)', () => {
   it('maps each phase onto the single inventory-section mode', () => {
     expect(inventoryModeForPhase('discovering')).toBe('discovering');
     expect(inventoryModeForPhase('selection')).toBe('selectable');
-    expect(inventoryModeForPhase('analyzing')).toBe('analyzing');
+    // Analyzing and dashboard render the SAME tabbed page browser — rows
+    // advance and scores fill in place; finishing swaps nothing.
+    expect(inventoryModeForPhase('analyzing')).toBe('scored');
     expect(inventoryModeForPhase('dashboard')).toBe('scored');
     expect(inventoryModeForPhase('empty')).toBe('none');
     expect(inventoryModeForPhase('terminal')).toBe('none');

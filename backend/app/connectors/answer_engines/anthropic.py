@@ -27,6 +27,7 @@ from app.connectors.answer_engines.contracts import (
 from app.connectors.answer_engines.errors import (
     ProviderError,
     classify_provider_status,
+    parse_retry_after,
     raise_provider_http_error,
 )
 from app.core.config.provider_catalog import (
@@ -152,13 +153,15 @@ class AnthropicAnswerEngineAdapter:
         latency_ms = int((time.monotonic() - started) * 1000)
         if response.status_code >= 400:
             error_code, retryable = classify_provider_status(response.status_code)
+            retry_after = parse_retry_after(response.headers.get("retry-after"))
             # Never log the response body verbatim (could echo the request),
-            # only the status and a short reason token.
+            # only the status, a short reason token, and the advised wait.
             logger.warning(
                 "anthropic call failed",
                 extra={
                     "status": response.status_code,
                     "error_code": error_code,
+                    "retry_after": retry_after,
                 },
             )
             raise_provider_http_error(
@@ -166,6 +169,7 @@ class AnthropicAnswerEngineAdapter:
                 prefix="Anthropic returned HTTP",
                 error_code=error_code,
                 retryable=retryable,
+                retry_after_seconds=retry_after,
             )
         try:
             payload = response.json()
