@@ -11,18 +11,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from app.core.config.brand_profile import (
-    BRAND_PROFILE_FIELD_DESCRIPTION,
-    BRAND_PROFILE_FIELD_POSITIONING,
-    BRAND_PROFILE_FIELD_PRODUCTS_SERVICES,
-    BRAND_PROFILE_FIELD_TARGET_AUDIENCE,
+    BRAND_PROFILE_FIELDS,
     BRAND_PROFILE_PRODUCT_MAX_CHARS,
     BRAND_PROFILE_PRODUCTS_MAX_COUNT,
-    BRAND_PROFILE_SOURCE_AI_SUGGESTED,
-    BRAND_PROFILE_SOURCE_MANUAL,
-    BRAND_PROFILE_SOURCE_WEB_EVIDENCE,
+    BRAND_PROFILE_SOURCE_TOKENS,
     BRAND_PROFILE_TEXT_MAX_CHARS,
 )
 from app.core.config.projects import (
@@ -34,17 +29,22 @@ from app.core.config.suggestions import brand_suggestion_settings
 from app.domain.prompts.schemas import PromptSetResponse
 
 BenchmarkMode = Literal["consumer_like", "controlled_localized", "forced_grounded"]
-BrandProfileSource = Literal[
-    BRAND_PROFILE_SOURCE_MANUAL,
-    BRAND_PROFILE_SOURCE_WEB_EVIDENCE,
-    BRAND_PROFILE_SOURCE_AI_SUGGESTED,
-]
-BrandProfileField = Literal[
-    BRAND_PROFILE_FIELD_DESCRIPTION,
-    BRAND_PROFILE_FIELD_POSITIONING,
-    BRAND_PROFILE_FIELD_PRODUCTS_SERVICES,
-    BRAND_PROFILE_FIELD_TARGET_AUDIENCE,
-]
+
+
+def _validate_brand_profile_source(value: str) -> str:
+    if value not in BRAND_PROFILE_SOURCE_TOKENS:
+        raise ValueError(f"Unknown brand profile source: {value}")
+    return value
+
+
+def _validate_brand_profile_field(value: str) -> str:
+    if value not in BRAND_PROFILE_FIELDS:
+        raise ValueError(f"Unknown brand profile field: {value}")
+    return value
+
+
+BrandProfileSource = Annotated[str, AfterValidator(_validate_brand_profile_source)]
+BrandProfileField = Annotated[str, AfterValidator(_validate_brand_profile_field)]
 
 
 # --------------------------------------------------------------------------
