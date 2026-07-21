@@ -148,11 +148,7 @@ export const competitorSuggestResponseSchema = z
   })
   .strict();
 
-export const brandProfileSourceSchema = z.enum([
-  'manual',
-  'web_evidence',
-  'ai_suggested',
-]);
+export const brandProfileSourceSchema = z.enum(['manual', 'web_evidence', 'ai_suggested']);
 
 const brandProfileFieldSourcesSchema = z
   .object({

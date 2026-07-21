@@ -167,9 +167,7 @@ describe('BrandProfilePanel', () => {
       ),
     );
 
-    renderWithProviders(
-      <BrandProfilePanel projectId={projectId} profile={existingProfile} />,
-    );
+    renderWithProviders(<BrandProfilePanel projectId={projectId} profile={existingProfile} />);
     await user.click(screen.getByRole('button', { name: /draft with ai/i }));
     await user.click(screen.getByLabelText(/confirm sending brand details/i));
     await user.click(screen.getByRole('button', { name: /^generate$/i }));

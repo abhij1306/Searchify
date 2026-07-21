@@ -65,9 +65,7 @@ export function BrandProfilePanel({
 }>) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<BrandProfileDraft>(() => profileDraft(profile));
-  const [productsInput, setProductsInput] = useState(() =>
-    profile.products_services.join(', '),
-  );
+  const [productsInput, setProductsInput] = useState(() => profile.products_services.join(', '));
   const [suggestion, setSuggestion] = useState<BrandProfileSuggestion | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -176,16 +174,23 @@ export function BrandProfilePanel({
             <Textarea
               {...field}
               value={draft.description}
-              onChange={(event) => setDraft((value) => ({ ...value, description: event.target.value }))}
+              onChange={(event) =>
+                setDraft((value) => ({ ...value, description: event.target.value }))
+              }
             />
           )}
         </Field>
-        <Field label="Positioning" hint="Include price tier, differentiation, and competitive segment.">
+        <Field
+          label="Positioning"
+          hint="Include price tier, differentiation, and competitive segment."
+        >
           {(field) => (
             <Textarea
               {...field}
               value={draft.positioning}
-              onChange={(event) => setDraft((value) => ({ ...value, positioning: event.target.value }))}
+              onChange={(event) =>
+                setDraft((value) => ({ ...value, positioning: event.target.value }))
+              }
             />
           )}
         </Field>

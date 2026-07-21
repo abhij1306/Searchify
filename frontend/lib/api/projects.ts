@@ -103,10 +103,7 @@ export const projectsApi = {
   deleteProject: (projectId: string, options?: ApiRequestOptions) =>
     apiClient.delete<void>(`/projects/${projectId}`, options),
   getBrandProfile: async (projectId: string, options?: ApiRequestOptions) => {
-    const res = await apiClient.get<BrandProfile>(
-      `/projects/${projectId}/brand-profile`,
-      options,
-    );
+    const res = await apiClient.get<BrandProfile>(`/projects/${projectId}/brand-profile`, options);
     return strictValidate(brandProfileSchema, res, 'projects.getBrandProfile');
   },
   updateBrandProfile: async (
@@ -127,11 +124,7 @@ export const projectsApi = {
       { confirm_send_evidence: true },
       options,
     );
-    return strictValidate(
-      brandProfileSuggestionSchema,
-      res,
-      'projects.suggestBrandProfile',
-    );
+    return strictValidate(brandProfileSuggestionSchema, res, 'projects.suggestBrandProfile');
   },
   acceptBrandProfileSuggestion: async (
     projectId: string,
