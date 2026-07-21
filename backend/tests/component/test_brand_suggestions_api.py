@@ -75,6 +75,8 @@ def _competitor_payload(**overrides: object) -> dict:
         "brand_aliases": ["Acme", "ACME Inc"],
         "country_code": "AU",
         "language_code": "en-AU",
+        "positioning": "Value-priced family basics",
+        "target_audience": "Budget-conscious families",
         "confirm_send_evidence": True,
         "existing_competitor_names": [],
     }
@@ -116,6 +118,7 @@ async def test_suggest_competitors_happy_path(
     assert len(fake_agent.calls) == 1
     assert "Acme Corp" in fake_agent.calls[0]["user"]
     assert "AU" in fake_agent.calls[0]["user"]
+    assert "Value-priced family basics" in fake_agent.calls[0]["user"]
 
 
 @pytest.mark.asyncio

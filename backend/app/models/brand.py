@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -51,6 +51,20 @@ class Brand(Base):
     )
 
     project: Mapped[Project] = relationship("Project", back_populates="brand")
+    profile: Mapped[BrandProfile | None] = relationship(
+        "BrandProfile",
+        back_populates="brand",
+        uselist=False,
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
+        passive_deletes=True,
+    )
+    profile_suggestions: Mapped[list[BrandProfileSuggestion]] = relationship(
+        "BrandProfileSuggestion",
+        back_populates="brand",
+        cascade=CASCADE_ALL_DELETE_ORPHAN,
+        passive_deletes=True,
+        order_by="BrandProfileSuggestion.created_at.desc()",
+    )
     aliases: Mapped[list[BrandAlias]] = relationship(
         "BrandAlias",
         back_populates="brand",
@@ -58,6 +72,101 @@ class Brand(Base):
         passive_deletes=True,
         order_by="BrandAlias.created_at",
     )
+
+
+class BrandProfile(Base):
+    """Extended brand knowledge base (1:1 with ``Brand``).
+
+    Co-authored: assisted features may draft fields, while the user remains
+    authoritative. ``sources`` records per-field provenance using the tokens
+    in ``config/brand_profile.py``. Direct ``workspace_id`` + ``project_id``
+    keys allow every query to enforce tenant scope without relying on an
+    unfiltered relationship traversal (invariant 5).
+
+    The deterministic scorer never reads this table. Assisted features consume
+    it only through the shared knowledge-base context builder.
+    """
+
+    __tablename__ = "brand_profiles"
+    __table_args__ = (UniqueConstraint("brand_id", name="uq_brand_profile_brand"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        index=True,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+    )
+    brand_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("brands.id", ondelete="CASCADE"),
+        index=True,
+    )
+    # Canonical short blurb: what the brand is / sells.
+    description: Mapped[str] = mapped_column(Text, default="")
+    # Market positioning: price tier, differentiation, how it competes.
+    positioning: Mapped[str] = mapped_column(Text, default="")
+    # JSONB array of product/service category strings.
+    products_services: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    # Who the brand serves.
+    target_audience: Mapped[str] = mapped_column(Text, default="")
+    # Per-field source tokens: {field_name: "manual" | "ai_suggested"}.
+    # Absent key = field never set. Tokens in config/brand_profile.py.
+    sources: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    # For AI-suggested fields, maps field name -> immutable suggestion UUID.
+    # Manual edits remove the corresponding entry.
+    source_artifact_ids: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    brand: Mapped[Brand] = relationship("Brand", back_populates="profile")
+
+
+class BrandProfileSuggestion(Base):
+    """Immutable default-agent draft awaiting explicit human acceptance."""
+
+    __tablename__ = "brand_profile_suggestions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        index=True,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    brand_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("brands.id", ondelete="CASCADE"),
+        index=True,
+    )
+    model_identity: Mapped[dict[str, str]] = mapped_column(JSONB)
+    prompt_template_version: Mapped[str] = mapped_column(String(64))
+    input_context_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB)
+    output: Mapped[dict[str, object]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    brand: Mapped[Brand] = relationship("Brand", back_populates="profile_suggestions")
 
 
 class BrandAlias(Base):

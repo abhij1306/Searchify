@@ -22,7 +22,7 @@ full-product surface is marked below.
 | Audit execution + queue + worker | `orchestration` + `workers` | **MVP — coded** |
 | Analysis + metrics + dashboard projection | `analysis` | **MVP — coded** |
 | Run/Executions evidence + CSV/MD export | `api/audits` + `analysis/exports` | **MVP — coded** |
-| AI-suggested prompt generation (`/generate`) | `domain/prompts` + `connectors/agent` | **Coded** — topic-driven generation via the `.env` default agent; the earliest prompts fill a set-wide pool of `GENERATION_ACTIVE_THRESHOLD` (default 20) `active` (audit/scheduled-run eligible) prompts, promoted atomically under a prompt-set advisory lock; prompts beyond the pool land `status='proposed'` until a human promotes them |
+| AI-suggested prompt generation (`/generate`) | `domain/prompts` + `connectors/agent` | **Coded** — `prompt-gen-v2` reads the curated BrandProfile plus topic descriptions with grounding rules; topic-driven generation via the `.env` default agent fills a set-wide pool of `GENERATION_ACTIVE_THRESHOLD` (default 20) `active` prompts, with later rows `proposed` until human promotion |
 | Discovery/analysis model (`DiscoveryModelConfig`) | `domain/providers` | Plumbing-only (stored, not invoked) |
 | Cross-run Visibility trend history | `analysis` | **Coded** — `GET /projects/{id}/visibility/trends` (Trends tab) |
 | Persisted execution evidence (mentions/citations + query fanout) | `analysis` | **Coded** — `GET /projects/{id}/visibility/evidence` |
@@ -33,9 +33,9 @@ full-product surface is marked below.
 | Opportunities | — | Roadmap |
 | Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
 | Issues catalog | `site_health` | **Implemented** — grouped issues + per-URL detail |
-| Brand / Competitors / E-E-A-T rich profile | — | Roadmap |
+| Brand / Competitors / E-E-A-T rich profile | `domain/projects` | **Partial** — tenant-scoped `BrandProfile` manual CRUD, immutable default-agent drafts + explicit acceptance, and shared KB context are coded; competitor profiles, E-E-A-T, and `/brand` UI remain roadmap |
 | Topics | `domain/prompts` (`topics.py`) | **Coded** — first-class `Topic` table, per-project CRUD with active/proposed counts; generation groups prompts by topic |
-| Tone/Writing Style, Memory, Knowledge Base | — | Roadmap |
+| Tone/Writing Style, Memory, broader Knowledge Base product surface | — | Roadmap |
 | GSC / GA4 / Bing integrations | — | Roadmap |
 | Agent, MCP, Settings/white-labelling | — | Roadmap |
 | HTML/JSON report renderers, S3 artifacts, Redis queue | `reporting` / infra | Roadmap |
@@ -69,7 +69,7 @@ services.
 |---|---|
 | `app/api/auth.py` | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | `app/api/workspaces.py` | `GET /workspaces`, `POST /workspaces` |
-| `app/api/projects.py` | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `GET /projects/{id}/visibility?audit_id=`, `GET /projects/{id}/visibility/trends`, `GET /projects/{id}/visibility/evidence` |
+| `app/api/projects.py` | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `GET/PUT /projects/{id}/brand-profile`, `POST /projects/{id}/brand-profile/suggest`, `POST /projects/{id}/brand-profile/suggestions/{suggestion_id}/accept`, `GET /projects/{id}/visibility?audit_id=`, `GET /projects/{id}/visibility/trends`, `GET /projects/{id}/visibility/evidence` |
 | `app/api/prompts.py` | `GET/POST /prompt-sets`, prompt CRUD (`PATCH/DELETE /prompts/{id}`), `POST /prompt-sets/{id}/import` (MVP CSV bulk-create), `POST /prompt-sets/{id}/generate` (AI topic+prompt generation via default agent), `POST /prompt-sets/{id}/prompts/bulk-status`, topics CRUD (`GET/POST /projects/{id}/topics`, `PATCH/DELETE /topics/{id}`) |
 | `app/api/provider_connections.py` | `GET/POST /provider-connections`, `PATCH/DELETE /provider-connections/{id}`, `POST /provider-connections/{id}/test`; `GET /provider-catalog` |
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
@@ -146,6 +146,8 @@ project). No integer PKs, no `user_id` columns.
 | `models/workspace.py` `Workspace`, `WorkspaceMember` | Tenant + membership | — |
 | `models/project.py` `Project` | Workspace-scoped project (brand_name, website_url, country_code, language_code, benchmark_mode, default_repetitions) | — |
 | `models/brand.py` `Brand`, `BrandAlias`, `Competitor`, `OwnedDomain`, `UnintendedDomain` | Normalized brand identity (serialized back to the dict the scorer expects) | — |
+| `models/brand.py` `BrandProfile` | Tenant-scoped curated brand knowledge base; one row per brand/project | Per-field source tokens (`manual` / `web_evidence` / `ai_suggested`) |
+| `models/brand.py` `BrandProfileSuggestion` | Immutable default-agent profile draft awaiting explicit review/acceptance | Model host/model + prompt-template version + frozen input snapshot |
 | `models/prompt.py` `PromptSet`, `Prompt` (text, theme, intent, branded, enabled, origin, `status` proposed/active/archived, `topic_id`, `normalized_text_hash` dedupe key, `generation_evidence` JSONB) | Dedicated prompt resource | `origin` (generated/manual/imported); generated rows carry model identity + `generation_run_id` in `generation_evidence` |
 | `models/prompt.py` `Topic` (project-scoped, `origin` manual/generated, unique name per project) | Topic/category grouping for prompts (`Prompt.topic_id` SET NULL on delete) | `origin` (manual/generated) |
 | `models/provider.py` `ProviderConnection` (Fernet secret), `ProviderRoute` (logical_engine + transport_provider + transport_model + is_default), `ProviderConnectionTest` (append-only), `DiscoveryModelConfig` (plumbing-only) | BYOK provider config | route carries logical+transport+model identity (invariant 10) |

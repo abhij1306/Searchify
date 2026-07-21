@@ -31,6 +31,10 @@ BRAND_CONTEXT = {
     "website_url": "https://acme.com",
     "country_code": "AU",
     "language_code": "en-AU",
+    "description": "Australian family clothing and homewares retailer.",
+    "positioning": "Value-priced everyday basics for families.",
+    "products_services": ["Clothing", "Homewares"],
+    "target_audience": "Budget-conscious Australian families.",
 }
 
 
@@ -166,10 +170,11 @@ class TestBuildCompetitorUserMessage:
         message = build_competitor_user_message(
             brand_context=BRAND_CONTEXT, existing_names=[], count=5
         )
-        assert "Brand: Acme Corp" in message
+        assert '"brand_name":"Acme Corp"' in message
         assert "Acme, ACME Inc" in message
-        assert "Website: https://acme.com" in message
-        assert "Market country: AU" in message
+        assert '"website_url":"https://acme.com"' in message
+        assert '"country_code":"AU"' in message
+        assert '"positioning":"Value-priced everyday basics for families."' in message
         assert "Suggest exactly 5 competitors." in message
         assert "do NOT duplicate" not in message
 
@@ -186,7 +191,7 @@ class TestBuildOwnedDomainUserMessage:
         message = build_owned_domain_user_message(
             brand_context=BRAND_CONTEXT, existing_domains=[], count=5
         )
-        assert "Brand: Acme Corp" in message
+        assert '"brand_name":"Acme Corp"' in message
         assert "NOT competitor domains" in message
         assert "unintended domains" in message
 
@@ -202,8 +207,7 @@ class TestBuildOwnedDomainUserMessage:
             brand_context={"brand_name": "Acme"}, existing_domains=[], count=5
         )
         assert "Brand aliases: none" in message
-        assert "Website: unspecified" in message
-        assert "Market country: unspecified" in message
+        assert '"brand_name":"Acme"' in message
 
 
 # --------------------------------------------------------------------------

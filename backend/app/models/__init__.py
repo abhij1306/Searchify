@@ -26,6 +26,8 @@ from app.models.audit import (
 from app.models.brand import (
     Brand,
     BrandAlias,
+    BrandProfile,
+    BrandProfileSuggestion,
     Competitor,
     OwnedDomain,
     UnintendedDomain,
@@ -68,6 +70,8 @@ __all__ = [
     "Base",
     "Brand",
     "BrandAlias",
+    "BrandProfile",
+    "BrandProfileSuggestion",
     "BrandMention",
     "Citation",
     "Competitor",

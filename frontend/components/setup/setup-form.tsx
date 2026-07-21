@@ -19,7 +19,7 @@ import {
   type ProjectInput,
 } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
-import type { Project } from '@/lib/api/types';
+import type { BrandProfile, Project } from '@/lib/api/types';
 import { useProjectContext } from '@/lib/project/project-context';
 import {
   benchmarkModeLabels,
@@ -82,7 +82,10 @@ function firstErrorStep(errors: FieldErrors<SetupFormValues>): number {
  * - **Edit** (`project` provided): prefills from the existing project, every
  *   step is immediately reachable, and Save is available on any step.
  */
-export function SetupForm({ project }: Readonly<{ project?: Project }>) {
+export function SetupForm({
+  project,
+  brandProfile,
+}: Readonly<{ project?: Project; brandProfile?: BrandProfile }>) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { setActiveProjectId } = useProjectContext();
@@ -144,6 +147,12 @@ export function SetupForm({ project }: Readonly<{ project?: Project }>) {
       brand_aliases: values.aliases.map((a) => a.value.trim()).filter(Boolean),
       ...(countryCode ? { country_code: countryCode } : {}),
       ...(languageCode ? { language_code: languageCode } : {}),
+      ...(brandProfile?.description ? { description: brandProfile.description } : {}),
+      ...(brandProfile?.positioning ? { positioning: brandProfile.positioning } : {}),
+      ...(brandProfile?.products_services.length
+        ? { products_services: brandProfile.products_services }
+        : {}),
+      ...(brandProfile?.target_audience ? { target_audience: brandProfile.target_audience } : {}),
       confirm_send_evidence: true as const,
     };
   };

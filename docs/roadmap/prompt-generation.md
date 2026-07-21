@@ -20,6 +20,10 @@
 >    beyond the pool land `proposed` until a user promotes them. Only `active` + `enabled`
 >    prompts are audit/scheduled-run eligible. Existing manual/active rows count toward the
 >    pool; archived rows are never auto-reactivated.
+> 4. **Curated knowledge grounding.** `prompt-gen-v2` includes the project's persisted
+>    `BrandProfile` fields and existing topic descriptions through the shared brand-knowledge
+>    serializer. The system prompt forbids inventing products, locations, audiences, or claims
+>    absent from that context.
 >
 > As-built code: `app/domain/prompts/generation.py`, `app/connectors/agent/client.py`,
 > `app/domain/prompts/topics.py`, `app/core/config/prompts.py` (count caps, system prompt,

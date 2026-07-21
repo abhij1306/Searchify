@@ -48,7 +48,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Capability | MVP | Roadmap |
 |---|---|---|
 | Auth + workspace + project switch | ✅ | |
-| Brand/project setup (aliases, owned/unintended domains, competitors, benchmark_mode) | ✅ | rich Brand/E-E-A-T profile |
+| Brand/project setup (aliases, domains, competitors, benchmark_mode) + curated Brand Knowledge editor and review-first AI drafting on persisted projects | ✅ | full `/brand` suite, competitor profiles, E-E-A-T |
 | Prompts: manual entry + CSV import + AI-generated topics/prompts (proposed → accept/archive review) | ✅ | |
 | BYOK providers + connection test (direct OpenAI/Anthropic/Google, one route per engine) | ✅ | |
 | Launch audit (multi-engine, repetitions) + cancel | ✅ | recurring schedules |
@@ -81,7 +81,8 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 - **Endpoints per screen**:
   - Auth → `/auth/register|login|logout|me`
   - Shell/switcher → `/workspaces`, `/projects`
-  - Setup → `/projects` (+ `/projects/{id}`)
+  - Setup → `/projects` (+ `/projects/{id}`), `GET/PUT /projects/{id}/brand-profile`,
+    `POST /projects/{id}/brand-profile/suggest`, and explicit suggestion acceptance
   - Prompts → `/prompt-sets`, `/prompts/{id}`, `/prompt-sets/{id}/import` (CSV),
     `/prompt-sets/{id}/generate` (AI generation), `/prompt-sets/{id}/prompts/bulk-status`
     (accept-all), `/projects/{id}/topics` + `/topics/{id}` (topic CRUD)

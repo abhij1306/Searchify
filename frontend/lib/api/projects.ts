@@ -6,13 +6,23 @@ import { z } from 'zod';
 
 import { apiClient, type ApiRequestOptions } from './client';
 import {
+  brandProfileAcceptResponseSchema,
+  brandProfileSchema,
+  brandProfileSuggestionSchema,
   competitorSuggestResponseSchema,
   ownedDomainSuggestResponseSchema,
   projectSchema,
   strictValidate,
   workspaceSchema,
 } from './schemas';
-import type { Project, Workspace } from './types';
+import type {
+  BrandProfile,
+  BrandProfileAcceptResponse,
+  BrandProfileDraft,
+  BrandProfileSuggestion,
+  Project,
+  Workspace,
+} from './types';
 
 const workspaceListSchema = z.array(workspaceSchema);
 const projectListSchema = z.array(projectSchema);
@@ -38,6 +48,10 @@ type BrandSuggestBase = {
   brand_aliases?: string[];
   country_code?: string;
   language_code?: string;
+  description?: string;
+  positioning?: string;
+  products_services?: string[];
+  target_audience?: string;
   count?: number;
   // Backend-enforced consent gate: brand evidence is only sent to the default
   // agent when this is true (422 otherwise).
@@ -54,6 +68,12 @@ export type OwnedDomainSuggestInput = BrandSuggestBase & {
 
 export type CompetitorSuggestResponse = z.infer<typeof competitorSuggestResponseSchema>;
 export type OwnedDomainSuggestResponse = z.infer<typeof ownedDomainSuggestResponseSchema>;
+export type BrandProfileField = keyof BrandProfileDraft;
+export type BrandProfileUpdateInput = Partial<BrandProfileDraft>;
+export type BrandProfileAcceptInput = {
+  accepted_fields: BrandProfileField[];
+  manual_overrides: BrandProfileUpdateInput;
+};
 
 export const projectsApi = {
   listWorkspaces: async (options?: ApiRequestOptions) => {
@@ -82,6 +102,54 @@ export const projectsApi = {
   },
   deleteProject: (projectId: string, options?: ApiRequestOptions) =>
     apiClient.delete<void>(`/projects/${projectId}`, options),
+  getBrandProfile: async (projectId: string, options?: ApiRequestOptions) => {
+    const res = await apiClient.get<BrandProfile>(
+      `/projects/${projectId}/brand-profile`,
+      options,
+    );
+    return strictValidate(brandProfileSchema, res, 'projects.getBrandProfile');
+  },
+  updateBrandProfile: async (
+    projectId: string,
+    input: BrandProfileUpdateInput,
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.put<BrandProfile>(
+      `/projects/${projectId}/brand-profile`,
+      input,
+      options,
+    );
+    return strictValidate(brandProfileSchema, res, 'projects.updateBrandProfile');
+  },
+  suggestBrandProfile: async (projectId: string, options?: ApiRequestOptions) => {
+    const res = await apiClient.post<BrandProfileSuggestion>(
+      `/projects/${projectId}/brand-profile/suggest`,
+      { confirm_send_evidence: true },
+      options,
+    );
+    return strictValidate(
+      brandProfileSuggestionSchema,
+      res,
+      'projects.suggestBrandProfile',
+    );
+  },
+  acceptBrandProfileSuggestion: async (
+    projectId: string,
+    suggestionId: string,
+    input: BrandProfileAcceptInput,
+    options?: ApiRequestOptions,
+  ) => {
+    const res = await apiClient.post<BrandProfileAcceptResponse>(
+      `/projects/${projectId}/brand-profile/suggestions/${suggestionId}/accept`,
+      input,
+      options,
+    );
+    return strictValidate(
+      brandProfileAcceptResponseSchema,
+      res,
+      'projects.acceptBrandProfileSuggestion',
+    );
+  },
   /**
    * AI competitor / owned-domain suggestions for the setup form via the
    * app-level default agent. Stateless: brand context travels in the body (the

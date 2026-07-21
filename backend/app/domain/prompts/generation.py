@@ -36,6 +36,10 @@ from app.core.config.prompts import (
     TOPIC_ORIGIN_GENERATED,
     prompt_generation_settings,
 )
+from app.domain.projects.knowledge_base import (
+    build_brand_knowledge_data,
+    serialize_brand_knowledge_context,
+)
 from app.domain.projects.shim import project_scoring_identity
 from app.domain.prompts.locks import acquire_project_lock, acquire_prompt_set_lock
 from app.domain.prompts.normalization import prompt_text_hash
@@ -124,15 +128,19 @@ def parse_generation_output(raw: str) -> tuple[list[SuggestedTopic], int]:
 def build_generation_user_message(
     *,
     brand_context: dict[str, Any],
-    existing_topics: list[str],
+    existing_topics: list[dict[str, str]],
     existing_prompts: list[str],
     count: int,
     intents: list[str],
     target_topic: str = "",
+    target_topic_description: str = "",
 ) -> str:
     """Assemble the user message with brand evidence + generation constraints."""
     competitors = [c["name"] for c in brand_context.get("competitors", [])]
     lines = [
+        serialize_brand_knowledge_context(
+            dict(brand_context.get("knowledge_base", {}))
+        ),
         f"Brand: {brand_context.get('brand_name', '')}",
         f"Brand aliases: {', '.join(brand_context.get('brand_aliases', [])) or 'none'}",
         f"Competitors: {', '.join(competitors) or 'none'}",
@@ -143,8 +151,17 @@ def build_generation_user_message(
         lines.append(
             f"Generate prompts ONLY for this topic (use it verbatim): {target_topic}"
         )
+        if target_topic_description:
+            lines.append(f"Target topic description: {target_topic_description}")
     elif existing_topics:
-        lines.append("Existing topics: " + "; ".join(existing_topics))
+        lines.append(
+            "Existing topics (reuse the exact name field when applicable): "
+            + json.dumps(
+                existing_topics,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
     if intents:
         lines.append("Restrict prompt intents to: " + ", ".join(intents))
     lines.append(f"Generate exactly {count} prompts in total across topics.")
@@ -179,6 +196,9 @@ async def _load_prompt_set_with_project(
             selectinload(PromptSet.project)
             .selectinload(Project.brand)
             .selectinload(Brand.aliases),
+            selectinload(PromptSet.project)
+            .selectinload(Project.brand)
+            .selectinload(Brand.profile),
             selectinload(PromptSet.project).selectinload(Project.competitors),
             selectinload(PromptSet.project).selectinload(Project.owned_domains),
             selectinload(PromptSet.project).selectinload(Project.unintended_domains),
@@ -504,14 +524,21 @@ async def generate_prompts(
     # 2. Brand evidence via the one existing serializer (invariant 2). Bound
     #    the existing-prompt context so the user message can't grow unbounded.
     brand_context = project_scoring_identity(project)
+    brand_context["knowledge_base"] = build_brand_knowledge_data(project)
     context_limit = prompt_generation_settings.existing_prompt_context_limit
     user_message = build_generation_user_message(
         brand_context=brand_context,
-        existing_topics=[t.name for t in project.topics],
+        existing_topics=[
+            {"name": topic.name, "description": topic.description or ""}
+            for topic in project.topics
+        ],
         existing_prompts=[p.text for p in prompt_set.prompts][:context_limit],
         count=payload.count,
         intents=[i for i in payload.intents if i],
         target_topic=target_topic.name if target_topic is not None else "",
+        target_topic_description=(
+            target_topic.description if target_topic is not None else ""
+        ),
     )
 
     # 3. The only provider I/O — after all validation. End the read

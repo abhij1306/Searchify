@@ -148,6 +148,81 @@ export const competitorSuggestResponseSchema = z
   })
   .strict();
 
+export const brandProfileSourceSchema = z.enum([
+  'manual',
+  'web_evidence',
+  'ai_suggested',
+]);
+
+const brandProfileFieldSourcesSchema = z
+  .object({
+    description: brandProfileSourceSchema.nullable(),
+    positioning: brandProfileSourceSchema.nullable(),
+    products_services: brandProfileSourceSchema.nullable(),
+    target_audience: brandProfileSourceSchema.nullable(),
+  })
+  .strict();
+
+const brandProfileSourceArtifactsSchema = z
+  .object({
+    description: uuid().nullable(),
+    positioning: uuid().nullable(),
+    products_services: uuid().nullable(),
+    target_audience: uuid().nullable(),
+  })
+  .strict();
+
+export const brandProfileDraftSchema = z
+  .object({
+    description: z.string(),
+    positioning: z.string(),
+    products_services: z.array(z.string()),
+    target_audience: z.string(),
+  })
+  .strict();
+
+export const brandProfileSchema = z
+  .object({
+    id: uuid(),
+    workspace_id: uuid(),
+    project_id: uuid(),
+    brand_id: uuid(),
+    ...brandProfileDraftSchema.shape,
+    sources: brandProfileFieldSourcesSchema,
+    source_artifact_ids: brandProfileSourceArtifactsSchema,
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+export const brandProfileSuggestionSchema = z
+  .object({
+    id: uuid(),
+    workspace_id: uuid(),
+    project_id: uuid(),
+    brand_id: uuid(),
+    draft: brandProfileDraftSchema,
+    model_identity: z.record(z.string(), z.string()),
+    prompt_template_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+export const brandProfileFieldSchema = z.enum([
+  'description',
+  'positioning',
+  'products_services',
+  'target_audience',
+]);
+
+export const brandProfileAcceptResponseSchema = z
+  .object({
+    profile: brandProfileSchema,
+    accepted_fields: z.array(brandProfileFieldSchema),
+    skipped_manual_fields: z.array(brandProfileFieldSchema),
+  })
+  .strict();
+
 // `POST /brand-suggestions/owned-domains` result: bare owned-domain strings.
 export const ownedDomainSuggestResponseSchema = z
   .object({

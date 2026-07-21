@@ -14,6 +14,7 @@ export const projectKeys = {
   all: ['projects'] as const,
   list: () => ['projects', 'list'] as const,
   detail: (projectId: string) => ['projects', 'detail', projectId] as const,
+  brandProfile: (projectId: string) => ['projects', 'brand-profile', projectId] as const,
 };
 
 export const promptKeys = {

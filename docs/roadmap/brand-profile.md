@@ -1,7 +1,10 @@
 # Roadmap — Brand / Competitors / E-E-A-T rich profile
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
-> an engineer (or agent) can start building without re-deriving the architecture. It follows
+> **Status: partially coded.** The tenant-scoped `BrandProfile` core, manual `GET/PUT`
+> endpoints, source tokens, shared deterministic knowledge-context builder, review-first
+> default-agent drafting/acceptance flow, and the persisted-project Setup editor are implemented. Richer attributes, competitor
+> profiles, E-E-A-T, evidence collection, and the frontend surface remain roadmap. This spec is written so
+> an engineer (or agent) can continue without re-deriving the architecture. It follows
 > the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
 > LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
 > [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule

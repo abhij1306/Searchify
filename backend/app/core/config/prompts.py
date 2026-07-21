@@ -32,7 +32,7 @@ TOPIC_ORIGINS: Final[frozenset[str]] = frozenset(
 )
 
 # --- Generation pipeline version (stamped into generation_evidence) --------
-GENERATOR_VERSION: Final = "prompt-gen-v1"
+GENERATOR_VERSION: Final = "prompt-gen-v2"
 
 # --- System prompt ---------------------------------------------------------
 # Neutral instruction for the default agent. The brand context is supplied in
@@ -56,6 +56,13 @@ GENERATION_SYSTEM_PROMPT: Final = (
     "explicit head-to-head comparison).\n"
     "- Reuse an existing topic name verbatim when a prompt fits it; only "
     "invent a new topic when none fits.\n"
+    "- Ground every prompt in the supplied brand knowledge, market, products, "
+    "audience, or an existing topic description. Do not invent products, "
+    "services, locations, audience segments, or claims absent from that "
+    "context.\n"
+    "- Keep prompts specific to the brand's real competitive segment and "
+    "customer needs; avoid generic category prompts that could describe an "
+    "unrelated price tier or audience.\n"
     "- Never duplicate any of the existing prompts you are shown.\n"
     "- Each prompt's intent must be one of: discovery, comparison, purchase, "
     "service, local.\n"

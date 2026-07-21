@@ -23,6 +23,7 @@ from app.domain.prompts.mappers import prompt_set_to_response
 from app.models.brand import (
     Brand,
     BrandAlias,
+    BrandProfile,
     Competitor,
     OwnedDomain,
     UnintendedDomain,
@@ -39,6 +40,7 @@ def _loaded_project_query():
     """A select over ``Project`` with all brand-identity rows eager-loaded."""
     return select(Project).options(
         selectinload(Project.brand).selectinload(Brand.aliases),
+        selectinload(Project.brand).selectinload(Brand.profile),
         selectinload(Project.competitors),
         selectinload(Project.owned_domains),
         selectinload(Project.unintended_domains),
@@ -140,6 +142,13 @@ async def create_project(
         UnintendedDomain(domain=d) for d in _clean_list(payload.unintended_domains)
     ]
     session.add(project)
+    await session.flush()
+    if project.brand is not None:
+        project.brand.profile = BrandProfile(
+            workspace_id=workspace_id,
+            project_id=project.id,
+            brand_id=project.brand.id,
+        )
     await session.commit()
     return await get_project(session, workspace_id=workspace_id, project_id=project.id)
 

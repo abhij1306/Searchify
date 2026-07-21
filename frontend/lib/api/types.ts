@@ -11,6 +11,11 @@ import type {
   auditSchema,
   auditStatusSchema,
   authResponseSchema,
+  brandProfileAcceptResponseSchema,
+  brandProfileDraftSchema,
+  brandProfileSchema,
+  brandProfileSourceSchema,
+  brandProfileSuggestionSchema,
   benchmarkModeSchema,
   citationClassificationSchema,
   executionEvidenceSchema,
@@ -74,6 +79,11 @@ import type {
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
+export type BrandProfileSource = z.infer<typeof brandProfileSourceSchema>;
+export type BrandProfileDraft = z.infer<typeof brandProfileDraftSchema>;
+export type BrandProfile = z.infer<typeof brandProfileSchema>;
+export type BrandProfileSuggestion = z.infer<typeof brandProfileSuggestionSchema>;
+export type BrandProfileAcceptResponse = z.infer<typeof brandProfileAcceptResponseSchema>;
 export type PromptIntent = z.infer<typeof promptIntentSchema>;
 export type Prompt = z.infer<typeof promptSchema>;
 export type PromptStatus = z.infer<typeof promptStatusSchema>;

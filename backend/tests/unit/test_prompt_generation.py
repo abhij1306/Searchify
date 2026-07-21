@@ -31,6 +31,13 @@ BRAND_CONTEXT = {
     "country_code": "AU",
     "language_code": "en-AU",
     "benchmark_mode": "controlled_localized",
+    "knowledge_base": {
+        "brand_name": "Acme Corp",
+        "description": "Australian footwear retailer.",
+        "positioning": "Value-priced family footwear.",
+        "products_services": ["Footwear"],
+        "target_audience": "Budget-conscious families.",
+    },
 }
 
 
@@ -143,14 +150,16 @@ class TestBuildGenerationUserMessage:
     def test_includes_brand_evidence_and_count(self) -> None:
         message = build_generation_user_message(
             brand_context=BRAND_CONTEXT,
-            existing_topics=["Footwear"],
+            existing_topics=[{"name": "Footwear", "description": "Shoes for runners"}],
             existing_prompts=["best running shoes"],
             count=5,
             intents=["discovery"],
         )
         assert "Acme Corp" in message
         assert "Globex" in message
-        assert "Existing topics: Footwear" in message
+        assert "Value-priced family footwear" in message
+        assert '"name":"Footwear"' in message
+        assert '"description":"Shoes for runners"' in message
         assert "exactly 5 prompts" in message
         assert "Restrict prompt intents to: discovery" in message
         assert "best running shoes" in message
@@ -158,7 +167,10 @@ class TestBuildGenerationUserMessage:
     def test_target_topic_replaces_topic_list(self) -> None:
         message = build_generation_user_message(
             brand_context=BRAND_CONTEXT,
-            existing_topics=["Footwear", "Apparel"],
+            existing_topics=[
+                {"name": "Footwear", "description": ""},
+                {"name": "Apparel", "description": "Clothing"},
+            ],
             existing_prompts=[],
             count=3,
             intents=[],
@@ -167,6 +179,19 @@ class TestBuildGenerationUserMessage:
         assert "ONLY for this topic" in message
         assert "Footwear" in message
         assert "Existing topics:" not in message
+
+    def test_target_topic_includes_description(self) -> None:
+        message = build_generation_user_message(
+            brand_context=BRAND_CONTEXT,
+            existing_topics=[],
+            existing_prompts=[],
+            count=3,
+            intents=[],
+            target_topic="Footwear",
+            target_topic_description="Running and everyday shoes for families.",
+        )
+        assert "Target topic description" in message
+        assert "Running and everyday shoes for families." in message
 
     def test_empty_lists_render_none_markers(self) -> None:
         message = build_generation_user_message(

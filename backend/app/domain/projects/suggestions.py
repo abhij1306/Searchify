@@ -22,6 +22,7 @@ from app.core.config.suggestions import (
     OWNED_DOMAIN_SUGGESTION_SYSTEM_PROMPT,
     brand_suggestion_settings,
 )
+from app.domain.projects.knowledge_base import serialize_brand_knowledge_context
 
 
 class SuggestionValidationError(ValueError):
@@ -169,11 +170,14 @@ def parse_owned_domain_output(
 # --------------------------------------------------------------------------
 def _brand_context_lines(brand_context: dict[str, Any]) -> list[str]:
     return [
-        f"Brand: {brand_context.get('brand_name', '')}",
+        serialize_brand_knowledge_context(
+            {
+                key: value
+                for key, value in brand_context.items()
+                if key != "brand_aliases" and value
+            }
+        ),
         f"Brand aliases: {', '.join(brand_context.get('brand_aliases', [])) or 'none'}",
-        f"Website: {brand_context.get('website_url') or 'unspecified'}",
-        f"Market country: {brand_context.get('country_code') or 'unspecified'}",
-        f"Language: {brand_context.get('language_code') or 'unspecified'}",
     ]
 
 
@@ -239,6 +243,12 @@ def _payload_brand_context(payload: Any) -> dict[str, Any]:
         "website_url": payload.website_url,
         "country_code": payload.country_code,
         "language_code": payload.language_code,
+        "description": payload.description,
+        "positioning": payload.positioning,
+        "products_services": [
+            item.strip() for item in payload.products_services if item.strip()
+        ],
+        "target_audience": payload.target_audience,
     }
 
 

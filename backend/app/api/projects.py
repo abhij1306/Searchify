@@ -14,6 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
+from app.connectors.agent.client import AgentNotConfiguredError, DefaultAgentClient
+from app.connectors.answer_engines.errors import ProviderError
 from app.core.config.analysis import (
     VISIBILITY_EVIDENCE_DEFAULT_LIMIT,
     VISIBILITY_EVIDENCE_MAX_LIMIT,
@@ -32,7 +34,28 @@ from app.domain.analysis.service import (
     get_visibility_evidence,
     get_visibility_trends,
 )
+from app.domain.projects.brand_profile import (
+    BrandProfileNotFoundError,
+    brand_profile_to_response,
+    get_brand_profile,
+    upsert_manual_brand_profile,
+)
+from app.domain.projects.brand_profile_suggestions import (
+    BrandProfileSuggestionNotFoundError,
+    BrandProfileSuggestionOutputError,
+    BrandProfileSuggestionValidationError,
+    accept_brand_profile_suggestion,
+    brand_profile_suggestion_to_response,
+    suggest_brand_profile,
+    validate_brand_profile_suggest_request,
+)
 from app.domain.projects.schemas import (
+    BrandProfileAcceptRequest,
+    BrandProfileAcceptResponse,
+    BrandProfileResponse,
+    BrandProfileSuggestionResponse,
+    BrandProfileSuggestRequest,
+    BrandProfileUpsert,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
@@ -53,6 +76,22 @@ _RES_PROJECT = "Project"
 
 _WorkspaceDep = Annotated[WorkspaceContext, Depends(require_active_workspace)]
 _SessionDep = Annotated[AsyncSession, Depends(get_db)]
+
+
+def _resolve_default_agent() -> DefaultAgentClient:
+    try:
+        return DefaultAgentClient()
+    except AgentNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "agent_not_configured",
+                "message": (
+                    "No default agent is configured. Set DEFAULT_AGENT_API_KEY "
+                    "(or MISTRALAI_API_KEY) in the backend environment."
+                ),
+            },
+        ) from exc
 
 
 async def _get_project_or_404(
@@ -84,6 +123,121 @@ async def create_project_endpoint(
         session, workspace_id=ctx.workspace_id, payload=payload
     )
     return project_to_response(project)
+
+
+@router.get(
+    "/{project_id}/brand-profile",
+    response_model=BrandProfileResponse,
+)
+async def get_brand_profile_endpoint(
+    project_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> BrandProfileResponse:
+    # Authorize through the owning project before reading the denormalized row.
+    await _get_project_or_404(session, ctx.workspace_id, project_id)
+    try:
+        profile = await get_brand_profile(
+            session, workspace_id=ctx.workspace_id, project_id=project_id
+        )
+    except BrandProfileNotFoundError as exc:
+        raise_not_found("Brand profile", cause=exc)
+    return brand_profile_to_response(profile)
+
+
+@router.put(
+    "/{project_id}/brand-profile",
+    response_model=BrandProfileResponse,
+)
+async def put_brand_profile_endpoint(
+    project_id: uuid.UUID,
+    payload: BrandProfileUpsert,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> BrandProfileResponse:
+    try:
+        profile = await upsert_manual_brand_profile(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            payload=payload,
+        )
+    except (ProjectNotFoundError, BrandProfileNotFoundError) as exc:
+        raise_not_found("Brand profile", cause=exc)
+    return brand_profile_to_response(profile)
+
+
+@router.post(
+    "/{project_id}/brand-profile/suggest",
+    response_model=BrandProfileSuggestionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def suggest_brand_profile_endpoint(
+    project_id: uuid.UUID,
+    payload: BrandProfileSuggestRequest,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> BrandProfileSuggestionResponse:
+    await _get_project_or_404(session, ctx.workspace_id, project_id)
+    try:
+        validate_brand_profile_suggest_request(payload)
+    except BrandProfileSuggestionValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "brand_profile_suggestion_invalid", "message": str(exc)},
+        ) from exc
+    agent = _resolve_default_agent()
+    try:
+        suggestion = await suggest_brand_profile(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            agent=agent,
+        )
+    except (ProjectNotFoundError, BrandProfileNotFoundError) as exc:
+        raise_not_found("Brand profile", cause=exc)
+    except BrandProfileSuggestionOutputError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "code": "brand_profile_suggestion_unparseable",
+                "message": str(exc),
+            },
+        ) from exc
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": "agent_call_failed", "message": str(exc)},
+        ) from exc
+    return brand_profile_suggestion_to_response(suggestion)
+
+
+@router.post(
+    "/{project_id}/brand-profile/suggestions/{suggestion_id}/accept",
+    response_model=BrandProfileAcceptResponse,
+)
+async def accept_brand_profile_suggestion_endpoint(
+    project_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    payload: BrandProfileAcceptRequest,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> BrandProfileAcceptResponse:
+    try:
+        return await accept_brand_profile_suggestion(
+            session,
+            workspace_id=ctx.workspace_id,
+            project_id=project_id,
+            suggestion_id=suggestion_id,
+            payload=payload,
+        )
+    except (ProjectNotFoundError, BrandProfileNotFoundError) as exc:
+        raise_not_found("Brand profile", cause=exc)
+    except BrandProfileSuggestionNotFoundError as exc:
+        raise_not_found("Brand profile suggestion", cause=exc)
+    except BrandProfileSuggestionValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "brand_profile_acceptance_invalid", "message": str(exc)},
+        ) from exc
 
 
 @router.get(

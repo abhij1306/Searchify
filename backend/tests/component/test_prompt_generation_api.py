@@ -125,7 +125,15 @@ async def _make_project_and_set(
 async def test_generate_creates_proposed_prompts_and_topics(
     client: httpx.AsyncClient, fake_agent: FakeAgent
 ) -> None:
-    _project, prompt_set_id = await _make_project_and_set(client, "gen1@example.com")
+    project, prompt_set_id = await _make_project_and_set(client, "gen1@example.com")
+    profile = await client.put(
+        f"/api/v1/projects/{project['id']}/brand-profile",
+        json={
+            "positioning": "Value-priced family footwear.",
+            "target_audience": "Budget-conscious Australian families.",
+        },
+    )
+    assert profile.status_code == 200
 
     resp = await client.post(
         f"/api/v1/prompt-sets/{prompt_set_id}/generate",
@@ -159,6 +167,7 @@ async def test_generate_creates_proposed_prompts_and_topics(
     sent = fake_agent.calls[0]["user"]
     assert "Acme Corp" in sent
     assert "Globex" in sent
+    assert "Value-priced family footwear" in sent
     assert "exactly 3 prompts" in sent
 
     # Provenance evidence is persisted but the API response never includes
@@ -201,7 +210,7 @@ async def test_generate_persists_provenance_evidence(
     for prompt in prompts:
         evidence = prompt.generation_evidence
         assert evidence is not None
-        assert evidence["generator_version"] == "prompt-gen-v1"
+        assert evidence["generator_version"] == "prompt-gen-v2"
         assert evidence["model_identity"] == {
             "transport_host": "agent.test",
             "transport_model": "fake-model",
@@ -400,6 +409,56 @@ async def test_generate_into_target_topic(
     # No new topic was created from the model's invented name.
     topics = (await client.get(f"/api/v1/projects/{project['id']}/topics")).json()
     assert [t["name"] for t in topics] == ["Pricing"]
+
+
+@pytest.mark.asyncio
+async def test_generation_reuses_existing_topic_with_description(
+    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, prompt_set_id = await _make_project_and_set(
+        client, "gen-topic-description@example.com"
+    )
+    topic = (
+        await client.post(
+            f"/api/v1/projects/{project['id']}/topics",
+            json={
+                "name": "Footwear",
+                "description": "Running and everyday shoes for families.",
+            },
+        )
+    ).json()
+    agent = FakeAgent(
+        response=json.dumps(
+            {
+                "topics": [
+                    {
+                        "name": "Footwear",
+                        "prompts": [
+                            {"text": "best family running shoes", "intent": "discovery"}
+                        ],
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setattr(prompts_api, "DefaultAgentClient", lambda: agent)
+
+    response = await client.post(
+        f"/api/v1/prompt-sets/{prompt_set_id}/generate",
+        json={"count": 1, "confirm_send_evidence": True},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert [item["id"] for item in body["topics"]] == [topic["id"]]
+    assert body["generated"][0]["topic_id"] == topic["id"]
+    assert '"name":"Footwear"' in agent.calls[0]["user"]
+    assert (
+        '"description":"Running and everyday shoes for families."'
+        in agent.calls[0]["user"]
+    )
+    topics = (await client.get(f"/api/v1/projects/{project['id']}/topics")).json()
+    assert len(topics) == 1
 
 
 def _agent_response_with_n_prompts(n: int, *, topic: str = "Bulk") -> str:

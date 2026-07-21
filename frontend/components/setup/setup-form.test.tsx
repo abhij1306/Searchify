@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 
 import { mswServer } from '@/test/msw-server';
 import { renderWithProviders } from '@/test/render';
-import type { Project } from '@/lib/api/types';
+import type { BrandProfile, Project } from '@/lib/api/types';
 
 // Stub next/navigation (unavailable in jsdom) so we can assert the redirect.
 const replace = vi.fn();
@@ -40,6 +40,31 @@ const savedProject: Project = {
   prompt_sets: [],
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
+};
+
+const brandProfile: BrandProfile = {
+  id: '11111111-1111-4111-8111-111111111111',
+  workspace_id: savedProject.workspace_id,
+  project_id: savedProject.id,
+  brand_id: '22222222-2222-4222-8222-222222222222',
+  description: 'AI visibility platform.',
+  positioning: 'Specialist AEO analytics for marketing teams.',
+  products_services: ['AEO analytics'],
+  target_audience: 'Marketing teams',
+  sources: {
+    description: 'manual',
+    positioning: 'manual',
+    products_services: 'manual',
+    target_audience: 'manual',
+  },
+  source_artifact_ids: {
+    description: null,
+    positioning: null,
+    products_services: null,
+    target_audience: null,
+  },
+  created_at: '2026-07-21T00:00:00Z',
+  updated_at: '2026-07-21T00:00:00Z',
 };
 
 beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
@@ -304,6 +329,30 @@ describe('SetupForm — AI suggestions', () => {
     expect(names).toHaveLength(2);
     expect(names[0]).toHaveValue('acme');
     expect(names[1]).toHaveValue('Globex');
+  });
+
+  it('includes curated profile context for competitor suggestions in edit mode', async () => {
+    const user = userEvent.setup();
+    let body: Record<string, unknown> | null = null;
+    mswServer.use(
+      http.post('/api/v1/brand-suggestions/competitors', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ competitors: [], dropped_duplicates: 0 });
+      }),
+    );
+
+    renderWithProviders(<SetupForm project={savedProject} brandProfile={brandProfile} />);
+    await user.click(screen.getByRole('button', { name: /competitors/i }));
+    await user.click(screen.getByRole('button', { name: /generate with ai/i }));
+    await user.click(screen.getByLabelText(/confirm sending brand details/i));
+    await user.click(screen.getByRole('button', { name: /^generate$/i }));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      positioning: brandProfile.positioning,
+      products_services: brandProfile.products_services,
+      target_audience: brandProfile.target_audience,
+    });
   });
 
   it('appends suggested owned domains without touching unintended domains', async () => {
