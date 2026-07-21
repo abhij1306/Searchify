@@ -2,6 +2,8 @@ import { Bricolage_Grotesque, IBM_Plex_Mono, Public_Sans } from 'next/font/googl
 import type { ReactNode } from 'react';
 
 import { THEME_STORAGE_KEY } from '@/lib/theme';
+import { LandingFooter } from '@/components/marketing/landing-footer';
+import { LandingNav } from '@/components/marketing/landing-nav';
 import { MarketingThemeReset } from '@/components/marketing/marketing-theme-reset';
 
 import './marketing.css';
@@ -50,7 +52,16 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
       {/* Restores the bootstrap theme on client-side exit so the dark-first
           default above stays marketing-only (see MarketingThemeReset). */}
       <MarketingThemeReset />
+      {/* Shared chrome — every route in the (marketing) group inherits the
+          aurora/grain backdrop, the nav, and the footer from this layout. */}
+      <div className="aurora" aria-hidden="true">
+        <i className="a1" />
+        <i className="a2" />
+      </div>
+      <div className="grain" aria-hidden="true" />
+      <LandingNav />
       {children}
+      <LandingFooter />
     </div>
   );
 }

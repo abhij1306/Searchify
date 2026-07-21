@@ -1,69 +1,191 @@
 'use client';
 
 import {
+  ArrowUpRight,
   BarChart3,
+  BookOpen,
+  Building2,
   ChevronDown,
+  CircleHelp,
   Eye,
   Globe,
   KeyRound,
+  Megaphone,
   Menu,
   Moon,
+  Newspaper,
+  Rocket,
+  Scale,
   Sigma,
   Sun,
   TrendingUp,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { Fragment, useEffect, useState, useSyncExternalStore } from 'react';
 
+import { GITHUB_URL } from '@/lib/marketing-content/social';
 import { applyTheme, readTheme, subscribeTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 import { LogoCube } from './logo-cube';
 
-type DropKey = 'product' | 'how';
+type DropKey = 'product' | 'resources' | 'solutions';
 
 type NavDropItem =
-  { icon: LucideIcon; title: string; desc: string } | { num: string; title: string; desc: string };
+  | { icon: LucideIcon; title: string; desc: string; href: string; external?: boolean }
+  | { num: string; title: string; desc: string; href: string };
+
+type NavDropGroup = {
+  label?: string;
+  items: readonly NavDropItem[];
+};
 
 type NavDrop = {
   key: DropKey;
   label: string;
-  href: string;
-  items: readonly NavDropItem[];
+  groups: readonly NavDropGroup[];
 };
 
 const NAV_DROPS: readonly NavDrop[] = [
   {
     key: 'product',
     label: 'Product',
-    href: '#features',
-    items: [
+    groups: [
       {
-        icon: Globe,
-        title: 'Three-engine coverage',
-        desc: 'ChatGPT, Gemini, and Claude — one audit.',
+        items: [
+          {
+            icon: Globe,
+            title: 'Three-engine coverage',
+            desc: 'ChatGPT, Gemini, and Claude — one audit.',
+            href: '/#features',
+          },
+          {
+            icon: Sigma,
+            title: 'Deterministic scoring',
+            desc: 'Same data, same score — every time.',
+            href: '/#features',
+          },
+          {
+            icon: Eye,
+            title: 'Evidence explorer',
+            desc: 'Every metric links to its raw run.',
+            href: '/#features',
+          },
+          {
+            icon: BarChart3,
+            title: 'Competitor benchmarking',
+            desc: 'Share-of-voice, prompt by prompt.',
+            href: '/#features',
+          },
+          {
+            icon: KeyRound,
+            title: 'BYOK privacy',
+            desc: 'Your keys, Fernet-encrypted at rest.',
+            href: '/#features',
+          },
+          {
+            icon: TrendingUp,
+            title: 'Repeatable trends',
+            desc: 'Visibility, period over period.',
+            href: '/#features',
+          },
+        ],
       },
-      { icon: Sigma, title: 'Deterministic scoring', desc: 'Same data, same score — every time.' },
-      { icon: Eye, title: 'Evidence explorer', desc: 'Every metric links to its raw run.' },
       {
-        icon: BarChart3,
-        title: 'Competitor benchmarking',
-        desc: 'Share-of-voice, prompt by prompt.',
+        label: 'How it works',
+        items: [
+          {
+            num: '01',
+            title: 'Define your workspace',
+            desc: 'Brand, competitors, prompts.',
+            href: '/#how-it-works',
+          },
+          {
+            num: '02',
+            title: 'Run the audit',
+            desc: 'Prompt × engine × repetition, on your keys.',
+            href: '/#how-it-works',
+          },
+          {
+            num: '03',
+            title: 'Read the evidence',
+            desc: 'Every score drills to the raw response.',
+            href: '/#how-it-works',
+          },
+        ],
       },
-      { icon: KeyRound, title: 'BYOK privacy', desc: 'Your keys, Fernet-encrypted at rest.' },
-      { icon: TrendingUp, title: 'Repeatable trends', desc: 'Visibility, period over period.' },
     ],
   },
   {
-    key: 'how',
-    label: 'How it works',
-    href: '#how-it-works',
-    items: [
-      { num: '01', title: 'Define your workspace', desc: 'Brand, competitors, prompts.' },
-      { num: '02', title: 'Run the audit', desc: 'Prompt × engine × repetition, on your keys.' },
-      { num: '03', title: 'Read the evidence', desc: 'Every score drills to the raw response.' },
+    key: 'resources',
+    label: 'Resources',
+    groups: [
+      {
+        items: [
+          {
+            icon: Newspaper,
+            title: 'Blog',
+            desc: 'AEO guides, engine notes, and audit teardowns.',
+            href: '/blog',
+          },
+          {
+            icon: CircleHelp,
+            title: 'FAQ',
+            desc: 'Straight answers on scoring, keys, and data.',
+            href: '/faq',
+          },
+          {
+            icon: Scale,
+            title: 'Compare',
+            desc: 'Searchify vs Profound, Otterly, Scrunch, Peec.',
+            href: '/compare',
+          },
+          {
+            icon: BookOpen,
+            title: 'Documentation',
+            desc: 'Open-source docs — MIT, on GitHub.',
+            href: GITHUB_URL,
+            external: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'solutions',
+    label: 'Solutions',
+    groups: [
+      {
+        items: [
+          {
+            icon: Users,
+            title: 'Agencies',
+            desc: 'Audits across every client workspace.',
+            href: '/solutions#agencies',
+          },
+          {
+            icon: Building2,
+            title: 'In-house teams',
+            desc: 'AI answers beside your classic rankings.',
+            href: '/solutions#in-house',
+          },
+          {
+            icon: Rocket,
+            title: 'Founders',
+            desc: 'See whether AI engines recommend you.',
+            href: '/solutions#founders',
+          },
+          {
+            icon: Megaphone,
+            title: 'PR & comms',
+            desc: 'Check what engines say after a campaign.',
+            href: '/solutions#pr',
+          },
+        ],
+      },
     ],
   },
 ];
@@ -81,19 +203,82 @@ function DropGlyph({ item }: { item: NavDropItem }) {
   );
 }
 
+/** True for items that leave the site (plain <a target="_blank">). */
+function isExternal(item: NavDropItem): boolean {
+  return 'external' in item && item.external === true;
+}
+
+/** Desktop dropdown panel row — internal rows use Link, external a plain <a>. */
+function DropItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () => void }) {
+  const body = (
+    <>
+      <DropGlyph item={item} />
+      <span className="d-text">
+        <b>{item.title}</b>
+        <small>{item.desc}</small>
+      </span>
+    </>
+  );
+  if (isExternal(item)) {
+    return (
+      <a
+        className="drop-item"
+        href={item.href}
+        role="menuitem"
+        target="_blank"
+        rel="noreferrer"
+        onClick={onSelect}
+      >
+        {body}
+        <ArrowUpRight className="d-ext" aria-hidden />
+      </a>
+    );
+  }
+  return (
+    <Link className="drop-item" href={item.href} role="menuitem" onClick={onSelect}>
+      {body}
+    </Link>
+  );
+}
+
+/** Mobile accordion row — same internal/external split as the desktop rows. */
+function MobileItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () => void }) {
+  const body = (
+    <>
+      <DropGlyph item={item} />
+      {item.title}
+    </>
+  );
+  if (isExternal(item)) {
+    return (
+      <a className="m-item" href={item.href} target="_blank" rel="noreferrer" onClick={onSelect}>
+        {body}
+        <ArrowUpRight className="d-ext" aria-hidden />
+      </a>
+    );
+  }
+  return (
+    <Link className="m-item" href={item.href} onClick={onSelect}>
+      {body}
+    </Link>
+  );
+}
+
 /**
- * LandingNav — sticky glass nav for the public landing page.
+ * LandingNav — sticky glass nav for the public marketing site.
  *
- * Desktop: "Product" / "How it works" open hover-intent dropdown panels (open
- * on hover AND keyboard focus; trigger click only ever opens — never closes a
- * hover-open panel — and item click + Esc close; chevron rotates, an invisible
- * bridge covers the trigger→panel gap so the pointer never loses hover).
- * ≤860px: a hamburger opens a slide-down
- * menu with tap-to-expand accordions (Esc closes it too). The bar's backdrop
- * intensifies once the page scrolls. Open state is driven from React (`.open`)
- * so `aria-expanded` stays truthful; class lists go through `cn()` so prettier
- * can't mangle conditional tokens; all transitions live in marketing.css,
- * gated behind prefers-reduced-motion.
+ * Desktop: "Product" / "Resources" / "Solutions" open hover-intent dropdown
+ * panels (open on hover AND keyboard focus; trigger click only ever opens —
+ * never closes a hover-open panel — and item click + Esc close; chevron
+ * rotates, an invisible bridge covers the trigger→panel gap so the pointer
+ * never loses hover). "Enterprise" / "Pricing" are plain links with no
+ * dropdown chrome. ≤860px: a hamburger opens a slide-down menu with
+ * tap-to-expand accordions (Esc closes it too). The bar's backdrop
+ * intensifies once the page scrolls. Open state is driven from React
+ * (`.open`) so `aria-expanded` stays truthful; class lists go through `cn()`
+ * so prettier can't mangle conditional tokens; all transitions live in
+ * marketing.css, gated behind prefers-reduced-motion. Anchors are absolute
+ * (`/#features`, `/#how-it-works`) so they resolve from any subpage.
  */
 export function LandingNav() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => 'light');
@@ -156,7 +341,7 @@ export function LandingNav() {
           <span className="by-tag">by CUBE27</span>
         </Link>
         <div className="nav-links">
-          {NAV_DROPS.map(({ key, label, href, items }) => (
+          {NAV_DROPS.map(({ key, label, groups }) => (
             <div
               className={cn('nav-item', openDrop === key && 'open')}
               key={key}
@@ -173,27 +358,39 @@ export function LandingNav() {
                 {label} <ChevronDown className="chev" aria-hidden />
               </button>
               <div className={`drop drop-${key}`} id={`drop-${key}`} role="menu">
-                {items.map((item) => (
-                  <a
-                    className="drop-item"
-                    href={href}
-                    role="menuitem"
-                    key={item.title}
-                    onClick={() => setOpenDrop(null)}
-                  >
-                    <DropGlyph item={item} />
-                    <span className="d-text">
-                      <b>{item.title}</b>
-                      <small>{item.desc}</small>
-                    </span>
-                  </a>
-                ))}
+                {groups.map((group) =>
+                  group.label ? (
+                    <div className="d-group" key={group.label}>
+                      <span className="d-group-label">{group.label}</span>
+                      <div className="d-steps">
+                        {group.items.map((item) => (
+                          <DropItemLink
+                            key={item.title}
+                            item={item}
+                            onSelect={() => setOpenDrop(null)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    group.items.map((item) => (
+                      <DropItemLink
+                        key={item.title}
+                        item={item}
+                        onSelect={() => setOpenDrop(null)}
+                      />
+                    ))
+                  ),
+                )}
               </div>
             </div>
           ))}
-          <a className="nav-link" href="#evidence">
-            Evidence
-          </a>
+          <Link className="nav-link" href="/enterprise">
+            Enterprise
+          </Link>
+          <Link className="nav-link" href="/pricing">
+            Pricing
+          </Link>
         </div>
         <div className="nav-actions">
           <button
@@ -230,7 +427,7 @@ export function LandingNav() {
         </div>
       </nav>
       <div className={cn('mobile-menu', mobileOpen && 'open')} id="mobile-menu">
-        {NAV_DROPS.map(({ key, label, href, items }) => (
+        {NAV_DROPS.map(({ key, label, groups }) => (
           <div className={cn('acc', openAcc === key && 'open')} key={key}>
             <button
               className="acc-head"
@@ -242,18 +439,23 @@ export function LandingNav() {
               {label} <ChevronDown className="chev" aria-hidden />
             </button>
             <div className="acc-body" id={`acc-${key}`}>
-              {items.map((item) => (
-                <a className="m-item" href={href} key={item.title} onClick={closeMobile}>
-                  <DropGlyph item={item} />
-                  {item.title}
-                </a>
+              {groups.map((group) => (
+                <Fragment key={group.label ?? 'items'}>
+                  {group.label ? <div className="m-label">{group.label}</div> : null}
+                  {group.items.map((item) => (
+                    <MobileItemLink key={item.title} item={item} onSelect={closeMobile} />
+                  ))}
+                </Fragment>
               ))}
             </div>
           </div>
         ))}
-        <a className="m-plain" href="#evidence" onClick={closeMobile}>
-          Evidence
-        </a>
+        <Link className="m-plain" href="/enterprise" onClick={closeMobile}>
+          Enterprise
+        </Link>
+        <Link className="m-plain" href="/pricing" onClick={closeMobile}>
+          Pricing
+        </Link>
         <div className="m-sep" />
         <Link className="m-plain" href="/login" onClick={closeMobile}>
           Sign in
