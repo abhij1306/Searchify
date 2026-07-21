@@ -80,6 +80,21 @@ test.describe('landing nav (real-engine CSS contract)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
+  test('marketing dark-first default does not leak into app routes', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/');
+    await page.evaluate(() => window.localStorage.removeItem('searchify-theme'));
+    await page.reload();
+    // Marketing default paints dark with no stored choice…
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    // …but client-side navigation away restores the shared bootstrap's
+    // choice (no stored key, OS light → light) instead of leaking dark.
+    await page.getByRole('link', { name: 'Sign in' }).first().click();
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
+
   test('nav gains the scrolled class after scrolling', async ({ page }) => {
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Main navigation' });

@@ -170,15 +170,20 @@ export function ProductVisual() {
             {EVIDENCE_ROWS.map(({ prompt, engine, dot, mentioned, citations, ago }) => (
               <div className="evidence-row" key={prompt}>
                 <span className="ev-prompt">{prompt}</span>
-                <span className="ev-engine">
-                  <span className={`engine-dot ${dot}`} />
-                  {engine}
+                {/* `display: contents` on desktop (children stay grid items);
+                    a flex `meta` cell at ≤640px so engine/badge/meta flow
+                    inline instead of overlapping in one grid area. */}
+                <span className="ev-meta-row">
+                  <span className="ev-engine">
+                    <span className={`engine-dot ${dot}`} />
+                    {engine}
+                  </span>
+                  <span className={cn('badge', mentioned ? 'badge-yes' : 'badge-no')}>
+                    {mentioned ? '✓ Mentioned' : 'Not mentioned'}
+                  </span>
+                  <span className="ev-meta">{citations}</span>
+                  <span className="ev-meta">{ago}</span>
                 </span>
-                <span className={cn('badge', mentioned ? 'badge-yes' : 'badge-no')}>
-                  {mentioned ? '✓ Mentioned' : 'Not mentioned'}
-                </span>
-                <span className="ev-meta">{citations}</span>
-                <span className="ev-meta">{ago}</span>
                 <span className="ev-chev">›</span>
               </div>
             ))}

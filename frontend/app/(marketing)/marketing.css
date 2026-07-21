@@ -8,9 +8,12 @@
    with subtle blue; light theme = CUBE27 warm paper.
    ============================================================================ */
 
-/* Smooth anchor scrolling (globals.css forces `auto` under reduced-motion). */
+/* Smooth anchor scrolling (globals.css forces `auto` under reduced-motion).
+   Scoped with :has(.mkt) so the behavior stays marketing-only — the shared
+   <html> element must not keep smooth scroll after client-side navigation
+   into app routes (the stylesheet stays loaded across route groups). */
 @media (prefers-reduced-motion: no-preference) {
-  html {
+  html:has(.mkt) {
     scroll-behavior: smooth;
   }
 }
@@ -1146,6 +1149,12 @@ html[data-theme='dark'] .mkt {
   font-size: 11.5px;
   color: var(--mkt-text-3);
 }
+/* Desktop: the wrapper generates no box, so its children remain direct grid
+   items of .evidence-row (the ≤640px media query turns it into the flex
+   `meta` cell). */
+.mkt .ev-meta-row {
+  display: contents;
+}
 .mkt .ev-chev {
   color: var(--mkt-text-3);
   font-size: 14px;
@@ -1583,10 +1592,14 @@ html[data-theme='dark'] .mkt {
   .mkt .ev-chev {
     grid-area: chev;
   }
-  .mkt .ev-engine,
-  .mkt .badge,
-  .mkt .ev-meta {
+  /* One wrapper per meta cell: multiple items in a single named grid area
+     would overlap, so they flow inline here instead. */
+  .mkt .ev-meta-row {
     grid-area: meta;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
   .mkt .ev-engine {
     display: inline-flex;

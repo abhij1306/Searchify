@@ -2,6 +2,7 @@ import { Bricolage_Grotesque, IBM_Plex_Mono, Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import { THEME_STORAGE_KEY } from '@/lib/theme';
+import { MarketingThemeReset } from '@/components/marketing/marketing-theme-reset';
 
 import './marketing.css';
 
@@ -46,6 +47,9 @@ export default function MarketingLayout({ children }: Readonly<{ children: React
   return (
     <div className={`${display.variable} ${sans.variable} ${mono.variable} mkt`}>
       <script dangerouslySetInnerHTML={{ __html: MARKETING_THEME_DEFAULT_SCRIPT }} />
+      {/* Restores the bootstrap theme on client-side exit so the dark-first
+          default above stays marketing-only (see MarketingThemeReset). */}
+      <MarketingThemeReset />
       {children}
     </div>
   );

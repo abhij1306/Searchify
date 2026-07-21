@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { authApi } from '@/lib/api/auth';
+import { setActiveWorkspaceId } from '@/lib/api/client';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
 
@@ -29,6 +30,16 @@ import { queryKeys } from '@/lib/api/query-keys';
 export function LandingSessionRedirect() {
   const router = useRouter();
 
+  // This island runs outside ProjectProvider: clear any stale X-Workspace-Id
+  // left in the shared API client by a previous session (e.g. an account
+  // switch without a full reload), so the projects call below is unscoped.
+  // A foreign workspace id would 404 and — via the inert-on-error contract —
+  // strand an authed user on the marketing page. Declared before the queries
+  // so it runs before their fetch effects.
+  useEffect(() => {
+    setActiveWorkspaceId(null);
+  }, []);
+
   const me = useQuery({
     queryKey: queryKeys.auth.me(),
     queryFn: ({ signal }) => authApi.me({ signal }),
@@ -43,7 +54,7 @@ export function LandingSessionRedirect() {
   });
 
   useEffect(() => {
-    if (projectsLoaded) {
+    if (projectsLoaded && projects) {
       router.replace(projects.length > 0 ? '/visibility' : '/setup');
     }
   }, [projectsLoaded, projects, router]);

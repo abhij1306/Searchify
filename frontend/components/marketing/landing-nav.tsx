@@ -198,6 +198,7 @@ export function LandingNav() {
         <div className="nav-actions">
           <button
             className="hamburger"
+            type="button"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
@@ -208,6 +209,7 @@ export function LandingNav() {
           </button>
           <button
             className="theme-toggle"
+            type="button"
             aria-label="Toggle color theme"
             aria-pressed={theme === 'dark'}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
