@@ -38,7 +38,8 @@
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
 | `/topics` | Dedicated Topics page (topic management already lives in the `/prompt-research` rail) | Roadmap |
-| `/writing` (Tone/Style, Memory), Knowledge Base | Writing suite | Roadmap |
+| `/knowledge-base` | Curated Brand Knowledge — description, positioning, products/services, audience, and reviewed AI drafting | **MVP** |
+| `/writing` (Tone/Style, Memory) | Writing suite | Roadmap |
 | Settings → Integrations (GSC/GA4/Bing), Agent, MCP | Integrations / Agent | Roadmap |
 
 The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live.
@@ -48,7 +49,8 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Capability | MVP | Roadmap |
 |---|---|---|
 | Auth + workspace + project switch | ✅ | |
-| Brand/project setup (aliases, domains, competitors, benchmark_mode) + curated Brand Knowledge editor and review-first AI drafting on persisted projects | ✅ | full `/brand` suite, competitor profiles, E-E-A-T |
+| Brand/project setup (aliases, domains, competitors, benchmark_mode) | ✅ | full `/brand` suite, competitor profiles, E-E-A-T |
+| Curated Brand Knowledge editor and review-first AI drafting on persisted projects | ✅ (`/knowledge-base`) | broader writing suite, memory |
 | Prompts: manual entry + CSV import + AI-generated topics/prompts (proposed → accept/archive review) | ✅ | |
 | BYOK providers + connection test (direct OpenAI/Anthropic/Google, one route per engine) | ✅ | |
 | Launch audit (multi-engine, repetitions) + cancel | ✅ | recurring schedules |

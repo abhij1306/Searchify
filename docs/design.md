@@ -320,7 +320,7 @@ Below: a link toggling login/register. No sidebar/top-bar. Theme toggle in a cor
 A "Getting Started N of 6" progress card. Grouped nav sections — **Analytics** (Visibility =
 live; LLM Analytics, Traffic = disabled "soon"), **Prompts** (Your Prompts = live; Prompt
 Research = live), **Actions** (Content, Opportunities = disabled), **On Page** (Site Health,
-Issues = live; Knowledge Base = disabled). Bottom = user-menu (avatar + email). **Top bar (52px)**:
+Issues, Knowledge Base = live). Bottom = user-menu (avatar + email). **Top bar (52px)**:
 left = "Find anything…" search placeholder; right = Export hook, Learn link, theme-toggle.
 Active nav item uses accent-subtle bg + accent-text; disabled items are muted with a "soon"
 pill. Content region scrolls independently.
@@ -334,11 +334,15 @@ country_code select + a Geographic Reach segmented control (Global / Primary mar
 repeatable rows (name + aliases + domains, add/remove). **Audit defaults**: `benchmark_mode`
 segmented (consumer_like / controlled_localized / forced_grounded) + default repetitions
 stepper. Sticky footer with Cancel + primary Save/Create. Create sets active project → routes
-to `/visibility`. For a persisted project, a separate **Brand Knowledge** card sits above the
-setup wizard: description, positioning, products/services, and target audience, with manual
-save plus a consent-gated “Draft with AI” review flow. An AI draft never applies immediately;
-unchanged accepted fields retain AI provenance and edits become manual. react-hook-form + zod;
-inline field errors.
+to `/visibility`. Setup does not own the curated knowledge profile; that lives at **Knowledge
+Base**. react-hook-form + zod; inline field errors.
+
+### 9.3.1 Knowledge Base (`/knowledge-base`)
+For a persisted project, **Knowledge Base** owns description, positioning, products/services,
+and target audience, with manual save plus a consent-gated “Draft with AI” review flow. An AI
+draft never applies immediately; unchanged accepted fields retain AI provenance and edits become
+manual. This knowledge grounds assisted competitor and prompt generation without making those
+facts part of basic project setup.
 
 ### 9.4 Prompt library (`/prompts` Your Prompts + `/prompt-research` Prompt Research)
 **Your Prompts (`/prompts`)** — read-only, score-annotated view of the active configuration:

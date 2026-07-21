@@ -79,8 +79,9 @@ function firstErrorStep(errors: FieldErrors<SetupFormValues>): number {
  *
  * - **Create** (`project` undefined): POSTs a new project, sets it active via
  *   the F5 project context, and routes to `/visibility`.
- * - **Edit** (`project` provided): prefills from the existing project, every
- *   step is immediately reachable, and Save is available on any step.
+ * - **Edit** (`project` provided): prefills from the existing project, opens
+ *   on the completed Defaults step after a refresh, every step is immediately
+ *   reachable, and Save is available on any step.
  */
 export function SetupForm({
   project,
@@ -103,7 +104,10 @@ export function SetupForm({
     defaultValues: project ? projectToFormValues(project) : emptySetupForm,
   });
 
-  const [step, setStep] = useState(0);
+  // A persisted project has already completed setup. Reopen its edit wizard
+  // on the final Defaults step so the stepper represents that state instead
+  // of misleadingly returning to Brand on every refresh.
+  const [step, setStep] = useState(isEdit ? STEPS.length - 1 : 0);
   // Furthest step reached: gates forward jumps in create mode; edit mode has
   // everything unlocked from the start.
   const [maxVisited, setMaxVisited] = useState(isEdit ? STEPS.length - 1 : 0);

@@ -67,6 +67,7 @@ describe('SidebarNav', () => {
       'Setup',
       'Site Health',
       'Issues',
+      'Knowledge Base',
     ]);
     for (const label of liveLabels) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toBeInTheDocument();

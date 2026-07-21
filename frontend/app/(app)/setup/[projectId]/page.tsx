@@ -8,7 +8,6 @@ import { useParams } from 'next/navigation';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BrandProfilePanel } from '@/components/setup/brand-profile-panel';
 import { SetupForm } from '@/components/setup/setup-form';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -68,17 +67,6 @@ export default function EditSetupPage() {
               </Link>
             </Button>
           </div>
-          {profileQuery.isLoading ? (
-            <Skeleton className="h-80 w-full" />
-          ) : profileQuery.error ? (
-            <Alert tone="danger">{setupErrorMessage(profileQuery.error)}</Alert>
-          ) : profileQuery.data ? (
-            <BrandProfilePanel
-              key={profileQuery.data.updated_at}
-              projectId={project.id}
-              profile={profileQuery.data}
-            />
-          ) : null}
           <SetupForm project={project} brandProfile={profileQuery.data} />
         </>
       ) : null}

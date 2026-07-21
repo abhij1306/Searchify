@@ -18,7 +18,7 @@ import { queryKeys } from '@/lib/api/query-keys';
 import type { BrandProfile, BrandProfileDraft, BrandProfileSuggestion } from '@/lib/api/types';
 import { setupErrorMessage } from '@/lib/setup/forms';
 
-import { GenerateBrandDialog } from './generate-brand-dialog';
+import { GenerateBrandDialog } from '@/components/setup/generate-brand-dialog';
 
 const profileFields = [
   'description',

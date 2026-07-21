@@ -235,7 +235,11 @@ describe('SetupForm — edit', () => {
 
     renderWithProviders(<SetupForm project={existing} />);
 
-    // Brand step prefilled.
+    // A persisted project opens on the completed Defaults step after a refresh.
+    expect(screen.getByLabelText(/benchmark mode/i)).toBeInTheDocument();
+
+    // Brand remains reachable and is prefilled.
+    await user.click(screen.getByRole('button', { name: /brand/i }));
     expect(screen.getByLabelText(/brand name/i)).toHaveValue('Searchify');
 
     // Edit mode unlocks every step — jump straight to Competitors.
