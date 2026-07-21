@@ -95,6 +95,23 @@ test.describe('landing nav (real-engine CSS contract)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
+  test('mobile evidence rows flow inline without overlap', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    const row = page.locator('.mkt .evidence-row').first();
+    const engine = await row.locator('.ev-engine').boundingBox();
+    const badge = await row.locator('.badge').boundingBox();
+    // Engine and badge share one flex meta row (y-aligned, no overlap);
+    // pre-fix all four meta items shared one named grid area and stacked
+    // at identical coordinates.
+    expect(engine).not.toBeNull();
+    expect(badge).not.toBeNull();
+    expect(Math.abs((engine as { y: number }).y - (badge as { y: number }).y)).toBeLessThan(4);
+    expect(
+      (engine as { x: number; width: number }).x + (engine as { width: number }).width,
+    ).toBeLessThanOrEqual((badge as { x: number }).x);
+  });
+
   test('nav gains the scrolled class after scrolling', async ({ page }) => {
     await page.goto('/');
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
