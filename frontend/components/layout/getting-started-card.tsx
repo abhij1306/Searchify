@@ -74,10 +74,10 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
       aria-label="Getting started progress"
     >
       <div className="flex items-center justify-between">
-        <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
+        <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
           Getting Started
         </span>
-        <span className="text-2xs text-secondary font-semibold">
+        <span className="text-2xs text-secondary font-mono font-semibold">
           {completed} of {total}
         </span>
       </div>
@@ -91,14 +91,14 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
         aria-label={`${completed} of ${total} steps complete`}
       >
         <div
-          className="bg-accent h-full rounded-full transition-[width]"
+          className="accent-gradient-bar h-full rounded-full transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>
 
       <Link
         href={nextStep.href}
-        className="text-accent-text mt-2.5 flex items-center gap-2 text-sm font-medium hover:underline"
+        className="focus-ring text-accent-text mt-2.5 flex items-center gap-2 rounded-sm text-sm font-medium hover:underline"
       >
         {completed === total ? (
           <>

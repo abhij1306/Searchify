@@ -613,6 +613,13 @@ samp {
   background: linear-gradient(90deg, var(--text-primary) 0%, var(--accent) 100%);
 }
 
+/* Accent-gradient progress fill (sidebar getting-started completion bar) —
+   the approved mockup's --grad-bar: primary→accent with a soft accent glow. */
+.accent-gradient-bar {
+  background: linear-gradient(90deg, var(--text-primary) 0%, var(--accent) 100%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ACCESSIBILITY — REDUCED MOTION (WCAG 2.3.3)
 ═══════════════════════════════════════════════════════════════════════ */
