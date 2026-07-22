@@ -71,7 +71,7 @@ export function PagesTable({
             onClick={() => openPage(page.site_url_id)}
             className="cursor-pointer"
           >
-            <TableCell numeric className="text-muted">
+            <TableCell numeric className="mono text-muted text-xs">
               {index + 1}
             </TableCell>
             <TableCell>

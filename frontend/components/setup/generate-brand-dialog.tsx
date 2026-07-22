@@ -75,7 +75,7 @@ export function GenerateBrandDialog({
         {error ? <SuggestErrorAlert error={error} /> : null}
         {resultSummary && !error ? <Alert tone="success">{resultSummary}</Alert> : null}
 
-        <label className="border-border bg-background-alt flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm">
+        <label className="border-border bg-well flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm">
           <input
             type="checkbox"
             checked={confirmed}

@@ -15,6 +15,7 @@ import { QuickSelectBar } from '@/components/site-health/quick-select-bar';
 import { SelectionNotices } from '@/components/site-health/selection-notices';
 import { siteHealthQueries } from '@/lib/api/site-health';
 import type { SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
+import { cn } from '@/lib/utils';
 import {
   changeInventoryFilters,
   emptyInventoryFilters,
@@ -135,7 +136,7 @@ export function InventorySelection({
       <CardContent className="grid gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-0.5">
-            <Label>Page Inventory</Label>
+            <Label className="font-mono tracking-[0.08em]">Page Inventory</Label>
             <span className="text-secondary text-sm">
               Select pages to include in your health analysis — selections persist across re-crawls.
             </span>
@@ -143,7 +144,10 @@ export function InventorySelection({
           {quota ? (
             <div className="flex items-center gap-3">
               <span
-                className={`text-sm font-medium ${quota.overLimit ? 'text-danger-text' : 'text-secondary'}`}
+                className={cn(
+                  'mono text-sm font-medium',
+                  quota.overLimit ? 'text-danger-text' : 'text-secondary',
+                )}
               >
                 {quota.staged} of {quota.limit} selected
               </span>

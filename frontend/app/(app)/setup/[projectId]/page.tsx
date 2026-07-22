@@ -52,8 +52,12 @@ export default function EditSetupPage() {
       ) : project ? (
         <>
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-foreground truncate text-lg font-semibold">
+            <div className="grid min-w-0 gap-1">
+              <span className="text-accent-text text-2xs inline-flex items-center gap-1.5 font-mono font-medium tracking-[0.08em] uppercase">
+                <span className="bg-accent size-1.5 rounded-full" aria-hidden />
+                Project setup
+              </span>
+              <h2 className="font-display text-foreground truncate text-lg font-semibold">
                 {project.brand_name || project.name}
               </h2>
               <p className="text-secondary text-sm">

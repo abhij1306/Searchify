@@ -55,7 +55,10 @@ export function DiscoveryModelCard({
         </p>
       </CardHeader>
       <CardContent className="grid gap-1.5">
-        <label htmlFor="discovery-model" className="text-secondary text-xs font-medium">
+        <label
+          htmlFor="discovery-model"
+          className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase"
+        >
           Model
         </label>
         <select

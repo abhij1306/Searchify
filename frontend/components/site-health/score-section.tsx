@@ -115,7 +115,7 @@ function ScoreCard({
           <ScoreRing value={value} size={72} label={`${label} score: ${Math.round(value)}`} />
         )}
         <div className="grid gap-0.5">
-          <Label>{label}</Label>
+          <Label className="font-mono tracking-[0.08em]">{label}</Label>
           <span className="mono text-foreground text-lg font-semibold">
             {value === null ? PLACEHOLDER : `${formatScore(value)} / 100`}
           </span>

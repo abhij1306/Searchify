@@ -41,6 +41,7 @@ export function InventoryTable({
                 disabled={disabled}
                 aria-label={`Monitor ${row.display_url}`}
                 onChange={() => onToggle(row.site_url_id)}
+                className="focus-ring accent-accent size-4 shrink-0"
               />
             </TableCell>
             <TableCell>

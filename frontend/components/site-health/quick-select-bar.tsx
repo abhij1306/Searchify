@@ -32,8 +32,10 @@ export function QuickSelectBar({
   })();
 
   return (
-    <div className="border-border-subtle bg-background-alt flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-      <span className="text-secondary text-xs font-medium">Quick select</span>
+    <div className="border-border-subtle bg-background-alt flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
+      <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
+        Quick select
+      </span>
       <Input
         type="number"
         min={1}

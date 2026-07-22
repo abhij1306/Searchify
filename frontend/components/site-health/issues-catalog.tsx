@@ -137,10 +137,10 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
               onClick={() => selectFilter(f.key)}
               aria-pressed={f.key === filter}
               className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                'focus-ring rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                 f.key === filter
-                  ? 'border-accent bg-accent-subtle text-foreground'
-                  : 'border-border text-secondary hover:text-foreground',
+                  ? 'border-accent-border bg-accent-subtle text-accent-text'
+                  : 'border-border bg-panel text-secondary hover:border-border-strong hover:text-foreground',
               )}
             >
               {f.label}
@@ -226,7 +226,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
             </Badge>
             <DimensionBadge dimension={issue.dimension} />
           </div>
-          <span className="text-muted text-xs whitespace-nowrap">
+          <span className="text-2xs text-muted font-mono whitespace-nowrap">
             {issue.affected_url_count} {issue.affected_url_count === 1 ? 'page' : 'pages'} affected
           </span>
         </div>
@@ -236,8 +236,8 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
         </div>
 
         {issue.remediation ? (
-          <div className="border-border-subtle bg-background-alt rounded-md border p-3">
-            <Label className="mb-1 block">Remediation</Label>
+          <div className="border-border-subtle bg-background-alt rounded-lg border p-3">
+            <Label className="mb-1 block font-mono tracking-[0.08em]">Remediation</Label>
             <p className="text-secondary text-sm whitespace-pre-line">{issue.remediation}</p>
           </div>
         ) : null}
@@ -252,7 +252,7 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
         </div>
 
         {expanded ? (
-          <div className="border-border-subtle rounded-md border">
+          <div className="border-border-subtle rounded-lg border">
             {detailQuery.isError ? (
               <div className="p-3">
                 <Alert tone="danger">Could not load affected URLs.</Alert>
@@ -311,7 +311,9 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
 /** AEO / Technical dimension chip. Uses the neutral badge with tinted text. */
 function DimensionBadge({ dimension }: Readonly<{ dimension: IssueDimension }>) {
   return (
-    <Badge className={cn('capitalize', dimension === 'aeo' ? 'text-accent' : 'text-info-text')}>
+    <Badge
+      className={cn('capitalize', dimension === 'aeo' ? 'text-accent-text' : 'text-info-text')}
+    >
       {dimensionLabel(dimension)}
     </Badge>
   );

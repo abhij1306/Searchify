@@ -102,10 +102,17 @@ function StripContent({
   }
 
   if (!crawl || phase === 'empty') {
+    // Midnight empty state (Phase D6): mono eyebrow + display heading. The
+    // primary action (Start discovery) stays in the page header above.
     return (
       <Card>
-        <CardContent className="py-6 text-center">
-          <p className="text-secondary text-sm">
+        <CardContent className="grid justify-items-center gap-3 py-10 text-center">
+          <span className="text-accent-text text-2xs inline-flex items-center gap-1.5 font-mono font-medium tracking-[0.08em] uppercase">
+            <span className="bg-accent size-1.5 rounded-full" aria-hidden />
+            Site health
+          </span>
+          <h2 className="font-display text-foreground text-lg font-semibold">No crawl yet</h2>
+          <p className="text-secondary max-w-md text-sm">
             Discover and analyze your site&apos;s pages for AI search optimization. Start a
             discovery to see your pages, scores, and issues here — this screen updates in place as
             the crawl progresses.
@@ -204,7 +211,7 @@ function ProgressRow({
           <dl className="ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-1">
             {counts.map((count) => (
               <div key={count.label} className="flex items-baseline gap-1.5">
-                <Label>{count.label}</Label>
+                <Label className="font-mono tracking-[0.08em]">{count.label}</Label>
                 <Metric className={cn('text-sm', count.className)}>
                   {count.value ?? PLACEHOLDER}
                 </Metric>

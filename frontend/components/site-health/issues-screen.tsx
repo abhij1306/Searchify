@@ -1,8 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 
 import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { IssuesCatalog } from '@/components/site-health/issues-catalog';
@@ -42,9 +44,21 @@ export function IssuesScreen() {
         <Alert tone="danger">Could not load Site Health. Please refresh.</Alert>
       ) : !crawl ? (
         <Card>
-          <CardContent className="text-secondary text-sm">
-            No Site Health crawl has run for this project yet. Run Site Health to discover and
-            analyze pages, then issues will appear here.
+          <CardContent className="grid justify-items-center gap-3 py-10 text-center">
+            <span className="text-accent-text text-2xs inline-flex items-center gap-1.5 font-mono font-medium tracking-[0.08em] uppercase">
+              <span className="bg-accent size-1.5 rounded-full" aria-hidden />
+              Issues
+            </span>
+            <h2 className="font-display text-foreground text-lg font-semibold">
+              No Site Health crawl yet
+            </h2>
+            <p className="text-secondary max-w-md text-sm">
+              Run Site Health to discover and analyze this project&apos;s pages — grouped issues
+              will appear here once a crawl finishes.
+            </p>
+            <Button variant="secondary" asChild>
+              <Link href="/site-health">Go to Site Health</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (

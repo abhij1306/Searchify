@@ -178,7 +178,14 @@ function ProjectContentScreen({
       {/* Composer */}
       <Card data-component-id="content-prompt-box">
         <CardContent className="flex flex-col gap-3 py-5">
-          <h2 className="text-foreground text-lg font-semibold">What can I help you create?</h2>
+          <div className="grid gap-1">
+            <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
+              New generation
+            </span>
+            <h2 className="font-display text-foreground text-lg font-semibold">
+              What can I help you create?
+            </h2>
+          </div>
           <Textarea
             ref={promptRef}
             value={prompt}
@@ -302,7 +309,7 @@ function ProjectContentScreen({
             </p>
             <div
               data-component-id="content-result-provenance"
-              className="border-border text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs"
+              className="border-border text-muted text-2xs flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 font-mono"
             >
               <span>Requested model: {detail.requested_model}</span>
               {detail.returned_model ? <span>Returned model: {detail.returned_model}</span> : null}
@@ -342,7 +349,9 @@ function ProjectContentScreen({
 
       {/* History */}
       <section data-component-id="content-history" className="flex flex-col gap-2">
-        <h2 className="text-secondary text-sm font-semibold">Recent generations</h2>
+        <h2 className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
+          Recent generations
+        </h2>
         {listQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (listQuery.data ?? []).length === 0 ? (
@@ -357,7 +366,7 @@ function ProjectContentScreen({
                   className={cn(
                     'focus-ring hover:bg-background-alt flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors',
                     item.id === selectedId
-                      ? 'border-accent-border bg-background-alt'
+                      ? 'border-accent-border bg-accent-soft/40'
                       : 'border-border',
                   )}
                 >

@@ -9,7 +9,7 @@ import { Controller, useFieldArray, useForm, useWatch, type FieldErrors } from '
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
@@ -82,6 +82,9 @@ function firstErrorStep(errors: FieldErrors<SetupFormValues>): number {
  * - **Edit** (`project` provided): prefills from the existing project, opens
  *   on the completed Defaults step after a refresh, every step is immediately
  *   reachable, and Save is available on any step.
+ *
+ * Each step renders as a midnight card (Phase D6) with a mono-eyebrow
+ * `Step N of 5` panel label above its section title.
  */
 export function SetupForm({
   project,
@@ -267,6 +270,7 @@ export function SetupForm({
       {stepId === 'brand' ? (
         <Card>
           <CardHeader>
+            <CardEyebrow>Step 1 of 5</CardEyebrow>
             <CardTitle>Brand profile</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -310,6 +314,7 @@ export function SetupForm({
       {stepId === 'market' ? (
         <Card>
           <CardHeader>
+            <CardEyebrow>Step 2 of 5</CardEyebrow>
             <CardTitle>Location &amp; language</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -340,7 +345,10 @@ export function SetupForm({
       {stepId === 'domains' ? (
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Domains</CardTitle>
+            <div className="grid gap-1">
+              <CardEyebrow>Step 3 of 5</CardEyebrow>
+              <CardTitle>Domains</CardTitle>
+            </div>
             <Button
               type="button"
               variant="secondary"
@@ -377,7 +385,10 @@ export function SetupForm({
       {stepId === 'competitors' ? (
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Competitors</CardTitle>
+            <div className="grid gap-1">
+              <CardEyebrow>Step 4 of 5</CardEyebrow>
+              <CardTitle>Competitors</CardTitle>
+            </div>
             <Button
               type="button"
               variant="secondary"
@@ -403,6 +414,7 @@ export function SetupForm({
       {stepId === 'defaults' ? (
         <Card>
           <CardHeader>
+            <CardEyebrow>Step 5 of 5</CardEyebrow>
             <CardTitle>Audit defaults</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">

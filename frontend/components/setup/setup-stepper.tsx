@@ -17,6 +17,10 @@ export type SetupStep = {
  * the user can move back (or jump forward over already-completed steps)
  * without losing entered values — react-hook-form keeps state across step
  * unmounts.
+ *
+ * CUBE27 midnight language (Phase D6): mono tabular numerals, an accent ring
+ * halo on the active circle, accent-filled completed circles with a check,
+ * and mono uppercase micro-labels under each circle.
  */
 export function SetupStepper({
   steps,
@@ -62,11 +66,11 @@ export function SetupStepper({
               <span
                 aria-hidden
                 className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors',
+                  'flex size-8 shrink-0 items-center justify-center rounded-full border-2 font-mono text-sm font-semibold tabular-nums transition-[background-color,border-color,color,box-shadow]',
                   isDone
-                    ? 'border-accent bg-accent text-white'
+                    ? 'border-accent bg-accent text-accent-fg'
                     : isCurrent
-                      ? 'border-accent text-accent-text bg-accent-soft'
+                      ? 'border-accent text-accent-text bg-accent-soft ring-accent-soft ring-4'
                       : 'border-border text-muted bg-panel',
                 )}
               >
@@ -74,7 +78,7 @@ export function SetupStepper({
               </span>
               <span
                 className={cn(
-                  'text-2xs max-w-20 text-center leading-tight font-medium whitespace-nowrap',
+                  'text-2xs text-center font-mono leading-tight font-medium tracking-[0.08em] whitespace-nowrap uppercase',
                   isCurrent
                     ? 'text-foreground font-semibold'
                     : isDone

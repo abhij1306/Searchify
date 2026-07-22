@@ -238,7 +238,7 @@ function HeaderCard({
       <CardContent className="grid gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
-            <h1 className="text-foreground text-xl font-semibold">
+            <h1 className="font-display text-foreground text-xl font-semibold">
               {detail.title ?? detail.display_url}
             </h1>
           </div>
@@ -259,7 +259,7 @@ function HeaderCard({
         </div>
         <div className="text-secondary flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
           <span className="flex items-center gap-1.5">
-            <Label>URL</Label>
+            <Label className="font-mono tracking-[0.08em]">URL</Label>
             <a
               href={detail.display_url}
               target="_blank"
@@ -270,11 +270,11 @@ function HeaderCard({
             </a>
           </span>
           <span className="flex items-center gap-1.5">
-            <Label>Last Audit</Label>
+            <Label className="font-mono tracking-[0.08em]">Last Audit</Label>
             <span>{formatAudited(detail.last_audited)}</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <Label>Status</Label>
+            <Label className="font-mono tracking-[0.08em]">Status</Label>
             <Badge variant="status" value={pageStatusBadgeValue(detail.analysis_status)}>
               {statusLabel(detail.analysis_status)}
             </Badge>
@@ -296,7 +296,7 @@ function ScoreTile({ label, value }: Readonly<{ label: string; value: number | n
         ) : (
           <ScoreRing value={value} size={64} label={`${label}: ${Math.round(value)}`} />
         )}
-        <Label>{label}</Label>
+        <Label className="font-mono tracking-[0.08em]">{label}</Label>
       </CardContent>
     </Card>
   );
@@ -356,7 +356,7 @@ function IssuesList({ issues }: Readonly<{ issues: SiteIssue[] }>) {
       <CardContent className="grid gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-foreground text-base font-semibold">All Issues ({issues.length})</h2>
-          <span className="text-2xs text-muted">Sorted by severity</span>
+          <span className="text-2xs text-muted font-mono">Sorted by severity</span>
         </div>
         {ordered.length === 0 ? (
           <p className="text-secondary text-sm">No issues detected on this page.</p>
@@ -370,7 +370,9 @@ function IssuesList({ issues }: Readonly<{ issues: SiteIssue[] }>) {
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <Badge
-                    className={cn(issue.dimension === 'aeo' ? 'text-accent' : 'text-info-text')}
+                    className={cn(
+                      issue.dimension === 'aeo' ? 'text-accent-text' : 'text-info-text',
+                    )}
                   >
                     {dimensionLabel(issue.dimension)}
                   </Badge>
@@ -417,10 +419,14 @@ function IssueHistory({ crawlId, siteUrlId }: Readonly<{ crawlId: string; siteUr
               <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex min-w-0 flex-col">
                   <span className="text-foreground truncate text-sm">{issueTitle(row)}</span>
-                  <span className="text-2xs text-muted">{formatAudited(row.created_at)}</span>
+                  <span className="text-2xs text-muted font-mono">
+                    {formatAudited(row.created_at)}
+                  </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <Badge className={cn(row.dimension === 'aeo' ? 'text-accent' : 'text-info-text')}>
+                  <Badge
+                    className={cn(row.dimension === 'aeo' ? 'text-accent-text' : 'text-info-text')}
+                  >
                     {dimensionLabel(row.dimension)}
                   </Badge>
                   <Badge variant="status" value={severityBadgeValue(row.severity)}>

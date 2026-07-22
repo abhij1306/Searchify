@@ -312,8 +312,8 @@ function ScoredInventory({
                 className={cn(
                   'rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                   t.key === tab
-                    ? 'border-accent text-foreground'
-                    : 'text-secondary hover:text-foreground border-transparent',
+                    ? 'border-accent text-foreground font-semibold'
+                    : 'text-secondary hover:text-foreground hover:bg-accent-soft/40 border-transparent',
                 )}
               >
                 {t.label}

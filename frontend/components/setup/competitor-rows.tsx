@@ -43,10 +43,10 @@ export function CompetitorRows({
       {fields.map((field, index) => (
         <div
           key={field.id}
-          className="border-border-subtle bg-well grid gap-4 rounded-md border p-4"
+          className="border-border-subtle bg-background-alt grid gap-4 rounded-lg border p-4"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
+            <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
               Competitor {index + 1}
             </span>
             <Button
