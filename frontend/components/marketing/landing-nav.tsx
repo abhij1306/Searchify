@@ -288,7 +288,7 @@ export function LandingNav() {
   const [dropLeft, setDropLeft] = useState(0);
   const navLinksRef = useRef<HTMLDivElement | null>(null);
   const triggerRefs = useRef<Partial<Record<DropKey, HTMLButtonElement>>>({});
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimer = useRef<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openAcc, setOpenAcc] = useState<DropKey | null>(null);
 
