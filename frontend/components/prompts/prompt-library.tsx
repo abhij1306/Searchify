@@ -295,7 +295,9 @@ export function PromptLibrary() {
                     )}
                   >
                     {tab.label}
-                    {count > 0 ? <span className="text-muted ml-1 text-xs">({count})</span> : null}
+                    {count > 0 ? (
+                      <span className="mono text-muted text-2xs ml-1.5">{count}</span>
+                    ) : null}
                   </button>
                 );
               })}
@@ -317,7 +319,7 @@ export function PromptLibrary() {
                 </Button>
               ) : null}
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={() => {
                   setGenerateResult(null);

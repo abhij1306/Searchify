@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Label, Metric } from '@/components/ui/typography';
+import { AccentEyebrow } from '@/components/ui/eyebrow';
+import { Label, Metric, displayHeadingLgClasses } from '@/components/ui/typography';
 import type { PageSummary, SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import {
@@ -102,10 +103,14 @@ function StripContent({
   }
 
   if (!crawl || phase === 'empty') {
+    // Midnight empty state (Phase D6): mono eyebrow + display heading. The
+    // primary action (Start discovery) stays in the page header above.
     return (
       <Card>
-        <CardContent className="py-6 text-center">
-          <p className="text-secondary text-sm">
+        <CardContent className="grid justify-items-center gap-3 py-10 text-center">
+          <AccentEyebrow>Site health</AccentEyebrow>
+          <h2 className={displayHeadingLgClasses}>No crawl yet</h2>
+          <p className="text-secondary max-w-md text-sm">
             Discover and analyze your site&apos;s pages for AI search optimization. Start a
             discovery to see your pages, scores, and issues here — this screen updates in place as
             the crawl progresses.
@@ -204,7 +209,7 @@ function ProgressRow({
           <dl className="ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-1">
             {counts.map((count) => (
               <div key={count.label} className="flex items-baseline gap-1.5">
-                <Label>{count.label}</Label>
+                <Label className="font-mono tracking-[0.08em]">{count.label}</Label>
                 <Metric className={cn('text-sm', count.className)}>
                   {count.value ?? PLACEHOLDER}
                 </Metric>

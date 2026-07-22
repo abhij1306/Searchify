@@ -2,7 +2,6 @@ import {
   ArrowRight,
   Check,
   Cloud,
-  CodeXml,
   Layers,
   Server,
   Shield,
@@ -10,20 +9,19 @@ import {
   Sigma,
   type LucideIcon,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Fragment } from 'react';
 
-import { CONTACT_EMAIL, GITHUB_URL, LICENSE_URL } from '@/lib/marketing-content/social';
+import { CONTACT_EMAIL } from '@/lib/marketing-content/social';
 
 import { ByokTrust } from './byok-trust';
 
 /**
- * Sales contact href — renders `mailto:` only once the user sets a public
- * contact email in the social content module; a placeholder anchor until then.
+ * Sales contact href — renders `mailto:` when a public contact email exists;
+ * otherwise falls back to the `/register` sign-up page so the CTA is never a
+ * dead anchor.
  */
-const CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '#';
-
-/** Architecture docs, derived from the canonical repo URL (docs/ ships in-repo). */
-const DOCS_URL = `${GITHUB_URL}/tree/main/docs`;
+const CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '/register';
 
 type OpsCard = {
   icon: LucideIcon;
@@ -72,10 +70,10 @@ const OPS_CARDS: readonly OpsCard[] = [
   },
   {
     icon: Server,
-    title: 'Self-host & openness',
-    blurb: 'The whole platform, under the MIT license.',
+    title: 'Self-host & control',
+    blurb: 'The whole platform, inside your network.',
     points: [
-      'Audit every line — full source on GitHub',
+      'Versioned scoring rules — every projection traces to persisted evidence',
       'Docker Compose topology — frontend, API, workers, PostgreSQL',
       'Typed contracts validated at runtime — Zod + Pydantic',
     ],
@@ -87,7 +85,6 @@ type DeployCard = {
   title: string;
   blurb: string;
   points: readonly string[];
-  links?: readonly { label: string; href: string }[];
 };
 
 const DEPLOY_CARDS: readonly DeployCard[] = [
@@ -105,16 +102,12 @@ const DEPLOY_CARDS: readonly DeployCard[] = [
   {
     icon: Server,
     title: 'Self-hosted',
-    blurb: 'The same MIT codebase, inside your network.',
+    blurb: 'The same platform, inside your network.',
     points: [
       'Docker Compose quickstart — web, workers, PostgreSQL',
       'Your ENCRYPTION_KEY wraps every BYOK secret',
       'Crawler + provider traffic stays inside your egress rules',
       'Typed /api/v1 contracts for internal integrations',
-    ],
-    links: [
-      { label: 'Full source on GitHub', href: GITHUB_URL },
-      { label: 'MIT license', href: LICENSE_URL },
     ],
   },
 ];
@@ -172,22 +165,21 @@ export function EnterpriseHero() {
         </h1>
         <p className="hero-sub">
           The platform security teams can verify: deterministic scoring over immutable,
-          provenance-carrying evidence — deployed in our cloud, or self-hosted from the MIT-licensed
-          codebase.
+          provenance-carrying evidence — deployed in our cloud, or self-hosted inside your network.
         </p>
         <div className="hero-ctas">
           <a className="btn btn-primary" href={CONTACT_HREF}>
             Contact sales
             <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
           </a>
-          <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-            View the codebase
-          </a>
+          <Link className="btn btn-ghost" href="/pricing">
+            Compare plans
+          </Link>
         </div>
         <div className="trust">
           <span>
-            <CodeXml strokeWidth={1.8} aria-hidden />
-            MIT open source
+            <Sigma strokeWidth={1.8} aria-hidden />
+            Deterministic scoring
           </span>
           <span className="sep" aria-hidden="true">
             ·
@@ -221,7 +213,7 @@ export function EnterpriseOps() {
             <br />
             <span className="grad-text">audit their tools.</span>
           </h2>
-          <p>Every claim below maps to the open-source codebase — bring your security review.</p>
+          <p>Every claim below maps to the running platform — bring your security review.</p>
         </div>
         <div className="cap-grid">
           {OPS_CARDS.map((card) => (
@@ -245,9 +237,8 @@ export function EnterpriseOps() {
 }
 
 /**
- * EnterpriseSelfHost — deployment band: managed cloud vs. self-hosting the
- * MIT-licensed codebase (real GitHub/license links), plus the platform data
- * flow.
+ * EnterpriseSelfHost — deployment band: managed cloud vs. self-hosting inside
+ * your network, plus the platform data flow.
  */
 export function EnterpriseSelfHost() {
   return (
@@ -277,21 +268,6 @@ export function EnterpriseSelfHost() {
                   <CheckItem key={point}>{point}</CheckItem>
                 ))}
               </div>
-              {card.links && (
-                <div className="deploy-links">
-                  {card.links.map((link) => (
-                    <a
-                      className="view-link"
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      key={link.label}
-                    >
-                      {link.label}
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -339,7 +315,7 @@ export function EnterpriseLimits() {
         </div>
         <p className="trust-note">
           Searchify does not claim SOC 2 or ISO certifications today.{' '}
-          <b>What it offers is verifiable:</b> an MIT-licensed codebase, deterministic scoring, and
+          <b>What it offers is verifiable:</b> a self-hostable platform, deterministic scoring, and
           evidence your team can audit line by line.
         </p>
       </div>
@@ -366,9 +342,9 @@ export function EnterpriseContactCta() {
             Contact sales
             <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
           </a>
-          <a className="btn btn-ghost" href={DOCS_URL} target="_blank" rel="noreferrer">
-            Read the architecture docs
-          </a>
+          <Link className="btn btn-ghost" href="/faq">
+            Read the FAQ
+          </Link>
         </div>
         <ByokTrust />
       </div>

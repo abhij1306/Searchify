@@ -3,7 +3,6 @@ import Link from 'next/link';
 
 import { ByokTrust } from '@/components/marketing/byok-trust';
 import type { Competitor } from '@/lib/marketing-content/compare';
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 
 /**
  * CompareDetailView — sync view for `/compare/[competitor]`. The route's
@@ -101,7 +100,7 @@ export function CompareDetailView({ competitor }: Readonly<{ competitor: Competi
             <h2>Where we’re different.</h2>
             <p className="slot-hint">
               {
-                '// 2–3 paragraphs: deterministic scoring, evidence drill-down, BYOK privacy, open source. Link back to the quick-facts rows above.'
+                '// 2–3 paragraphs: deterministic scoring, evidence drill-down, BYOK privacy. Link back to the quick-facts rows above.'
               }
             </p>
           </div>
@@ -135,9 +134,9 @@ export function CompareDetailView({ competitor }: Readonly<{ competitor: Competi
               Get started
               <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
             </Link>
-            <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              Star on GitHub
-            </a>
+            <Link className="btn btn-ghost" href="/faq">
+              Read the FAQ
+            </Link>
           </div>
           <ByokTrust />
         </div>

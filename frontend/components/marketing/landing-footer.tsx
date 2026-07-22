@@ -2,15 +2,9 @@ import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { COMPETITORS } from '@/lib/marketing-content/compare';
-import {
-  CONTACT_EMAIL,
-  GITHUB_URL,
-  LICENSE_URL,
-  SOCIAL_LINKS,
-  type SocialLink,
-} from '@/lib/marketing-content/social';
+import { CONTACT_EMAIL, SOCIAL_LINKS, type SocialLink } from '@/lib/marketing-content/social';
 
-import { LogoCube } from './logo-cube';
+import { LogoCube } from '@/components/ui/logo-cube';
 
 type FooterLink = {
   label: string;
@@ -49,7 +43,6 @@ const FOOTER_COLUMNS: readonly FooterColumn[] = [
       { label: 'Blog', href: '/blog' },
       { label: 'FAQ', href: '/faq' },
       { label: 'Compare', href: '/compare' },
-      { label: 'Documentation', href: GITHUB_URL, external: true },
     ],
   },
   {
@@ -77,7 +70,6 @@ const FOOTER_COLUMNS: readonly FooterColumn[] = [
     key: 'company',
     label: 'Company',
     links: [
-      { label: 'GitHub', href: GITHUB_URL, external: true },
       ...(CONTACT_EMAIL ? [{ label: 'Contact', href: `mailto:${CONTACT_EMAIL}` }] : []),
       { label: 'Sign in', href: '/login' },
       { label: 'Get started', href: '/register' },
@@ -134,12 +126,14 @@ export function LandingFooter() {
               <LogoCube size={24} />
               <span>Searchify</span>
             </Link>
-            <p className="footer-desc">Open-source AI visibility and site intelligence platform.</p>
-            <div className="social-row">
-              {SOCIAL_LINKS.map((social) => (
-                <SocialButton key={social.key} social={social} />
-              ))}
-            </div>
+            <p className="footer-desc">AI visibility and site intelligence platform.</p>
+            {SOCIAL_LINKS.length > 0 ? (
+              <div className="social-row">
+                {SOCIAL_LINKS.map((social) => (
+                  <SocialButton key={social.key} social={social} />
+                ))}
+              </div>
+            ) : null}
           </div>
           {FOOTER_COLUMNS.map((column) => (
             <div className="footer-col" key={column.key}>
@@ -153,12 +147,7 @@ export function LandingFooter() {
           ))}
         </nav>
         <div className="footer-bottom">
-          <span className="footer-copy">
-            © 2026 Searchify · A CUBE27 product ·{' '}
-            <a href={LICENSE_URL} target="_blank" rel="noreferrer">
-              MIT License
-            </a>
-          </span>
+          <span className="footer-copy">© 2026 Searchify · A CUBE27 product</span>
         </div>
       </div>
     </footer>

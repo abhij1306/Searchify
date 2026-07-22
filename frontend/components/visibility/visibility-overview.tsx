@@ -39,7 +39,7 @@ export function VisibilityOverview({
   if (visibility) {
     body = (
       <>
-        <div className="grid gap-6 lg:grid-cols-[minmax(260px,1fr)_2fr]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(260px,1fr)_2fr]">
           <VisibilityScoreCard visibility={visibility} />
           <RankingsTable visibility={visibility} />
         </div>
@@ -53,7 +53,7 @@ export function VisibilityOverview({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       {query.isError ? (
         <Alert tone="danger">
           Could not load visibility metrics for this run. Try another run or refresh.

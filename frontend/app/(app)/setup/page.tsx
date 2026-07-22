@@ -5,6 +5,8 @@ import { useEffect } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetupForm } from '@/components/setup/setup-form';
+import { AccentEyebrow } from '@/components/ui/eyebrow';
+import { displayHeadingXlClasses } from '@/components/ui/typography';
 import { useProjectContext } from '@/lib/project/project-context';
 
 /**
@@ -35,7 +37,14 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto grid max-w-3xl gap-5">
+      <div className="grid gap-1">
+        <AccentEyebrow>New project</AccentEyebrow>
+        <h2 className={displayHeadingXlClasses}>Set up your brand project</h2>
+        <p className="text-secondary text-sm">
+          Five short steps — brand, market, domains, competitors, and audit defaults.
+        </p>
+      </div>
       <SetupForm />
     </div>
   );

@@ -39,7 +39,7 @@ export function ProjectSwitcher({ className }: Readonly<{ className?: string }>)
     <Dropdown>
       <DropdownTrigger
         className={cn(
-          'focus-ring border-border bg-panel hover:bg-background-alt flex w-full items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-left transition-colors disabled:pointer-events-none disabled:opacity-50',
+          'focus-ring border-border bg-panel hover:bg-background-alt hover:border-border-strong flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-colors disabled:pointer-events-none disabled:opacity-50',
           className,
         )}
         disabled={isLoading}

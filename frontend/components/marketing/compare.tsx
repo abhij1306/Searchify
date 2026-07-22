@@ -3,10 +3,9 @@ import Link from 'next/link';
 
 import { ByokTrust } from '@/components/marketing/byok-trust';
 import { COMPETITORS } from '@/lib/marketing-content/compare';
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 
 const FAIRNESS_POINTS = [
-  'Open source, MIT — scoring rules anyone can audit',
+  'Deterministic scoring — versioned rules over persisted evidence',
   'BYOK — audits run on your own provider keys',
   'Deterministic, evidence-first scoring — no LLM-as-judge',
 ] as const;
@@ -17,7 +16,7 @@ const FACT_ROWS = [
   { key: 'Evidence', value: 'Every metric drills to the raw run' },
   { key: 'Keys', value: 'BYOK · Fernet-encrypted at rest' },
   { key: 'Site health', value: 'Technical + AEO auditing built in' },
-  { key: 'Source', value: 'MIT · self-host with Docker Compose' },
+  { key: 'Deployment', value: 'Cloud or self-host with Docker Compose' },
 ] as const;
 
 /**
@@ -91,9 +90,10 @@ export function CompareIndex() {
               in the <span className="grad-text">open.</span>
             </h2>
             <p>
-              Searchify is open source — our scoring rules, analyzer versions, and evidence pipeline
-              are public, so every claim on these pages can be checked against the code. Where a
-              competitor fact isn’t verified, the cell says so instead of guessing.
+              Searchify scores deterministically — explicit analyzer and scoring-rule versions ride
+              with every projection, so every claim on these pages can be traced to persisted
+              evidence. Where a competitor fact isn’t verified, the cell says so instead of
+              guessing.
             </p>
             <div className="audit-list">
               {FAIRNESS_POINTS.map((point) => (
@@ -134,9 +134,9 @@ export function CompareIndex() {
               Get started
               <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
             </Link>
-            <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              Star on GitHub
-            </a>
+            <Link className="btn btn-ghost" href="/faq">
+              Read the FAQ
+            </Link>
           </div>
           <ByokTrust />
         </div>

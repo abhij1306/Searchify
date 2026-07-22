@@ -1,6 +1,8 @@
 'use client';
 
 import { SetupForm } from '@/components/setup/setup-form';
+import { AccentEyebrow } from '@/components/ui/eyebrow';
+import { displayHeadingXlClasses } from '@/components/ui/typography';
 
 /**
  * `/setup/new` (F6) — explicitly create another Brand-Project.
@@ -11,7 +13,14 @@ import { SetupForm } from '@/components/setup/setup-form';
  */
 export default function NewProjectPage() {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto grid max-w-3xl gap-5">
+      <div className="grid gap-1">
+        <AccentEyebrow>New project</AccentEyebrow>
+        <h2 className={displayHeadingXlClasses}>Set up another brand project</h2>
+        <p className="text-secondary text-sm">
+          Five short steps — brand, market, domains, competitors, and audit defaults.
+        </p>
+      </div>
       <SetupForm />
     </div>
   );

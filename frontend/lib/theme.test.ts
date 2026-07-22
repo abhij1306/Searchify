@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { applyTheme, readTheme, subscribeTheme, THEME_STORAGE_KEY } from '@/lib/theme';
+import {
+  applyTheme,
+  readTheme,
+  subscribeTheme,
+  THEME_BOOTSTRAP_SCRIPT,
+  THEME_STORAGE_KEY,
+} from '@/lib/theme';
 
 describe('theme', () => {
   beforeEach(() => {
@@ -49,5 +55,79 @@ describe('theme', () => {
     });
     expect(calls).toBeGreaterThan(0);
     unsubscribe();
+  });
+});
+
+describe('THEME_BOOTSTRAP_SCRIPT (pre-hydration, dark-first)', () => {
+  // jsdom does not implement matchMedia — stub it so the suite pins that the
+  // bootstrap's dark-first fallback ignores the OS preference entirely.
+  const originalMatchMedia = window.matchMedia;
+
+  const stubOsColorScheme = (scheme: 'light' | 'dark') => {
+    window.matchMedia = ((query: string) => ({
+      matches: query === `(prefers-color-scheme: ${scheme})`,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  };
+
+  // Evaluate the exact script string the root layout injects into <script>.
+  const runBootstrap = () => {
+    new Function(THEME_BOOTSTRAP_SCRIPT)();
+  };
+
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-theme');
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    window.localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+  });
+
+  it('falls back to dark with no stored choice, even on a light OS', () => {
+    stubOsColorScheme('light');
+    runBootstrap();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('falls back to dark with no stored choice on a dark OS', () => {
+    stubOsColorScheme('dark');
+    runBootstrap();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it("honors a stored 'light' choice", () => {
+    stubOsColorScheme('dark');
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    runBootstrap();
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  it('falls back to dark when storage is unavailable', () => {
+    stubOsColorScheme('light');
+    const getItem = window.localStorage.getItem;
+    Object.defineProperty(window.localStorage, 'getItem', {
+      configurable: true,
+      value: () => {
+        throw new Error('storage unavailable');
+      },
+    });
+    try {
+      runBootstrap();
+      expect(document.documentElement.dataset.theme).toBe('dark');
+    } finally {
+      Object.defineProperty(window.localStorage, 'getItem', {
+        configurable: true,
+        value: getItem,
+      });
+    }
   });
 });

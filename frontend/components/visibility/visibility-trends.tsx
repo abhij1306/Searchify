@@ -6,9 +6,11 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendChart } from '@/components/ui/trend-chart';
+import { displayHeadingLgClasses } from '@/components/ui/typography';
 import { NO_RANKINGS_MESSAGE, RankingRowsTable } from '@/components/visibility/ranking-rows';
 import { cn } from '@/lib/utils';
 import type { VisibilityTrendPoint } from '@/lib/api/types';
@@ -70,7 +72,8 @@ export function VisibilityTrends({
     return isFiltered ? (
       <Card>
         <CardContent className="grid justify-items-center gap-2 py-12 text-center">
-          <h2 className="text-foreground text-lg font-semibold">No runs match these filters</h2>
+          <CardEyebrow>Trends</CardEyebrow>
+          <h2 className={displayHeadingLgClasses}>No runs match these filters</h2>
           <p className="text-secondary max-w-md text-sm">
             No completed audits fall inside the selected engine and date range. Widen the range or
             clear the engine filter to see more history.
@@ -80,15 +83,16 @@ export function VisibilityTrends({
     ) : (
       <Card>
         <CardContent className="grid justify-items-center gap-4 py-12 text-center">
+          <CardEyebrow>Trends</CardEyebrow>
           <div className="grid gap-1">
-            <h2 className="text-foreground text-lg font-semibold">No trend history yet</h2>
+            <h2 className={displayHeadingLgClasses}>No trend history yet</h2>
             <p className="text-secondary max-w-md text-sm">
               {hasRuns
                 ? 'This project has runs but no dashboard-ready snapshots to plot yet. Once more audits complete, their history shows up here.'
                 : 'Launch audits over time to see how your Visibility Score and Share of Voice move across runs.'}
             </p>
           </div>
-          <Button asChild variant="primary" size="md">
+          <Button asChild variant="ghost" size="md">
             <Link href="/runs">Go to Runs</Link>
           </Button>
         </CardContent>
@@ -158,9 +162,7 @@ function StatCard({ stat }: Readonly<{ stat: TrendStat }>) {
   return (
     <Card>
       <CardContent className="grid gap-1 p-4">
-        <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
-          {stat.label}
-        </span>
+        <span className={eyebrowClasses}>{stat.label}</span>
         <span className={cn('mono text-2xl font-semibold', valueClass)}>{stat.value}</span>
         <span className={cn('text-xs', deltaClass)}>{stat.delta}</span>
       </CardContent>
@@ -200,7 +202,10 @@ function TrendCard({
       </CardHeader>
       <CardContent className="grid gap-3">
         <div className="flex gap-3">
-          <div className="text-2xs text-muted flex flex-col justify-between py-1" aria-hidden>
+          <div
+            className="text-2xs text-muted flex flex-col justify-between py-1 font-mono"
+            aria-hidden
+          >
             {yLabels.map((y) => (
               <span key={y}>{y}</span>
             ))}
@@ -214,7 +219,7 @@ function TrendCard({
               className="h-[180px] w-full"
             />
             {chartPoints.length > 1 ? (
-              <div className="text-2xs text-muted mt-1 flex justify-between" aria-hidden>
+              <div className="text-2xs text-muted mt-1 flex justify-between font-mono" aria-hidden>
                 <span>{firstLabel}</span>
                 <span>{lastLabel}</span>
               </div>

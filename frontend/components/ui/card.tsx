@@ -1,10 +1,17 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { cn } from '@/lib/utils';
 
 /**
- * Card (§8) — bg-panel, border, --radius-lg, --card-padding, shadow-card.
+ * Card (§8) — bg-panel, hairline border, --radius-lg, --card-padding,
+ * shadow-card (CUBE27 midnight card treatment; all values flow from tokens).
  * Composed from header / title / description / content slots.
+ *
+ * Optional mono-eyebrow header hook: render <CardEyebrow> above <CardTitle>
+ * for the midnight panel-label pattern (IBM Plex Mono, uppercase, tracked,
+ * muted) — e.g.
+ *   <CardHeader><CardEyebrow>Visibility score</CardEyebrow><CardTitle>…
  */ export function Card({
   children,
   className,
@@ -35,6 +42,22 @@ export function CardHeader({
     >
       {children}
     </header>
+  );
+}
+
+/**
+ * CardEyebrow — optional mono-eyebrow label for card headers (the midnight
+ * panel-label pattern). Pair with CardTitle; never a heading element.
+ */
+export function CardEyebrow({
+  children,
+  className,
+  ...props
+}: Readonly<ComponentPropsWithoutRef<'span'>>) {
+  return (
+    <span {...props} className={cn(eyebrowClasses, className)}>
+      {children}
+    </span>
   );
 }
 

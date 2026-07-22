@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import type { SetupFormValues } from '@/lib/setup/forms';
 
 import { EntryList } from './entry-list';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 
 /**
  * CompetitorRows (F6) — repeatable competitor cards, each with a name plus
@@ -43,12 +44,10 @@ export function CompetitorRows({
       {fields.map((field, index) => (
         <div
           key={field.id}
-          className="border-border-subtle bg-well grid gap-4 rounded-md border p-4"
+          className="border-border-subtle bg-background-alt grid gap-4 rounded-lg border p-4"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="text-2xs text-muted font-semibold tracking-wide uppercase">
-              Competitor {index + 1}
-            </span>
+            <span className={eyebrowClasses}>Competitor {index + 1}</span>
             <Button
               type="button"
               variant="ghost"

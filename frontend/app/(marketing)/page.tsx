@@ -48,8 +48,7 @@ export const metadata: Metadata = {
  */
 export default function LandingPage() {
   return (
-    <>
-      <LandingSessionRedirect />
+    <LandingSessionRedirect>
       <main>
         <LandingHero />
         <ProductVisual />
@@ -59,6 +58,6 @@ export default function LandingPage() {
         <EvidenceBand />
         <FinalCta />
       </main>
-    </>
+    </LandingSessionRedirect>
   );
 }

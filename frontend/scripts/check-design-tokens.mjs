@@ -26,6 +26,7 @@ const requiredVars = [
   // Fonts
   'font-primary-family',
   'font-mono-family',
+  'font-display-family',
   // Surfaces
   'bg-base',
   'bg-alt',

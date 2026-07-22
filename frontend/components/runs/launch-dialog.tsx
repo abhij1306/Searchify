@@ -7,7 +7,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Input, inputClasses } from '@/components/ui/input';
 import { promptsApi } from '@/lib/api/prompts';
 import { providersApi } from '@/lib/api/providers';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -23,6 +23,8 @@ import {
   MIN_REPETITIONS,
   toggleEngine,
 } from '@/lib/runs/launch';
+
+import { filterChipClasses } from './filter-chip';
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -146,7 +148,7 @@ export function LaunchDialog({
             ) : (
               <select
                 {...props}
-                className="focus-ring border-border-strong bg-panel text-foreground h-[var(--control-height)] w-full rounded-md border px-2.5 text-sm"
+                className={inputClasses}
                 value={effectivePromptSetId ?? ''}
                 onChange={(event) => setPromptSetId(event.target.value)}
               >
@@ -180,11 +182,7 @@ export function LaunchDialog({
                     role="checkbox"
                     aria-checked={selected}
                     onClick={() => setEngines((prev) => toggleEngine(prev, engine))}
-                    className={
-                      selected
-                        ? 'focus-ring bg-accent text-accent-fg rounded-md border border-transparent px-3 py-1.5 text-sm font-medium'
-                        : 'focus-ring border-border-strong bg-panel text-foreground hover:border-accent-border rounded-md border px-3 py-1.5 text-sm font-medium'
-                    }
+                    className={filterChipClasses(selected)}
                   >
                     {ENGINE_LABELS[engine]}
                   </button>

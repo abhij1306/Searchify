@@ -3,7 +3,6 @@
 import {
   ArrowUpRight,
   BarChart3,
-  BookOpen,
   Building2,
   ChevronDown,
   CircleHelp,
@@ -25,12 +24,25 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-
-import { GITHUB_URL } from '@/lib/marketing-content/social';
+import { useQuery } from '@tanstack/react-query';
+import { authApi } from '@/lib/api/auth';
+import { projectsApi } from '@/lib/api/projects';
+import { queryKeys } from '@/lib/api/query-keys';
 import { applyTheme, readTheme, subscribeTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-import { LogoCube } from './logo-cube';
+import { LogoCube } from '@/components/ui/logo-cube';
+
+const ACTIVE_PROJECT_STORAGE_KEY = 'searchify.active-project-id';
+
+function hasStoredActiveProject(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return Boolean(window.localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
 
 type DropKey = 'product' | 'resources' | 'solutions';
 
@@ -142,13 +154,6 @@ const NAV_DROPS: readonly NavDrop[] = [
             title: 'Compare',
             desc: 'Searchify vs Profound, Otterly, Scrunch, Peec.',
             href: '/compare',
-          },
-          {
-            icon: BookOpen,
-            title: 'Documentation',
-            desc: 'Open-source docs — MIT, on GitHub.',
-            href: GITHUB_URL,
-            external: true,
           },
         ],
       },
@@ -291,6 +296,23 @@ export function LandingNav() {
   const closeTimer = useRef<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openAcc, setOpenAcc] = useState<DropKey | null>(null);
+
+  const me = useQuery({
+    queryKey: queryKeys.auth.me(),
+    queryFn: ({ signal }) => authApi.me({ signal }),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: projects } = useQuery({
+    queryKey: queryKeys.projects.list(),
+    queryFn: ({ signal }) => projectsApi.listProjects({ signal }),
+    enabled: me.isSuccess,
+  });
+
+  const isAuthenticated = me.isSuccess;
+  const dashboardHref =
+    (projects && projects.length > 0) || hasStoredActiveProject() ? '/visibility' : '/setup';
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -475,12 +497,20 @@ export function LandingNav() {
               <Moon strokeWidth={1.8} aria-hidden />
             )}
           </button>
-          <Link className="signin" href="/login">
-            Sign in
-          </Link>
-          <Link className="btn btn-primary btn-sm" href="/register">
-            Get started
-          </Link>
+          {isAuthenticated ? (
+            <Link className="btn btn-primary btn-sm" href={dashboardHref}>
+              Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link className="signin" href="/login">
+                Sign in
+              </Link>
+              <Link className="btn btn-primary btn-sm" href="/register">
+                Get started
+              </Link>
+            </>
+          )}
         </div>
       </nav>
       <div className={cn('mobile-menu', mobileOpen && 'open')} id="mobile-menu">
@@ -514,9 +544,15 @@ export function LandingNav() {
           Pricing
         </Link>
         <div className="m-sep" />
-        <Link className="m-plain" href="/login" onClick={closeMobile}>
-          Sign in
-        </Link>
+        {isAuthenticated ? (
+          <Link className="m-plain" href={dashboardHref} onClick={closeMobile}>
+            Dashboard
+          </Link>
+        ) : (
+          <Link className="m-plain" href="/login" onClick={closeMobile}>
+            Sign in
+          </Link>
+        )}
       </div>
     </div>
   );

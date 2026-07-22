@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import {
@@ -149,7 +149,8 @@ export function BrandProfilePanel({
     <Card aria-labelledby="brand-knowledge-title">
       <CardHeader className="flex-row items-start justify-between gap-4">
         <div className="grid gap-1">
-          <CardTitle id="brand-knowledge-title">Brand knowledge</CardTitle>
+          <CardEyebrow>Brand profile</CardEyebrow>
+          <CardTitle id="brand-knowledge-title">Facts &amp; positioning</CardTitle>
           <p className="text-secondary text-sm">
             Curated positioning and audience context used by competitor and prompt generation.
           </p>

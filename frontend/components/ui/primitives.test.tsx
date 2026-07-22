@@ -5,7 +5,7 @@ import { Alert } from './alert';
 import { Badge } from './badge';
 import { Button } from './button';
 import { buttonVariants } from './button-variants';
-import { Card, CardContent, CardHeader, CardTitle } from './card';
+import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from './card';
 import { Donut } from './donut';
 import { Field } from './field';
 import { Input } from './input';
@@ -19,8 +19,11 @@ describe('Button', () => {
   it('renders default variant/size classes', () => {
     render(<Button>Save</Button>);
     const btn = screen.getByRole('button', { name: 'Save' });
-    // primary variant → accent bg; md size → control-height
-    expect(btn.className).toContain('bg-accent');
+    // primary variant → midnight monochrome pill (text-primary bg, bg-base
+    // text, pill radius); md size → control-height
+    expect(btn.className).toContain('bg-foreground');
+    expect(btn.className).toContain('text-background');
+    expect(btn.className).toContain('rounded-full');
     expect(btn.className).toContain('h-[var(--control-height)]');
     // real <button> defaults to type=button (no accidental submit)
     expect(btn).toHaveAttribute('type', 'button');
@@ -47,7 +50,7 @@ describe('Button', () => {
     expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('href', '/next');
     // The button surface classes are forwarded onto the anchor.
-    expect(link.className).toContain('bg-panel');
+    expect(link.className).toContain('bg-elevated');
     // asChild must NOT inject a type attribute onto the anchor.
     expect(link).not.toHaveAttribute('type');
   });
@@ -70,8 +73,9 @@ describe('Badge', () => {
     expect(badge.className).toContain('bg-success-bg');
     expect(badge.className).toContain('text-success-text');
     expect(badge.className).toContain('border-success-border');
-    // Pill radius.
+    // Pill radius + mono chip type.
     expect(badge.className).toContain('rounded-full');
+    expect(badge.className).toContain('font-mono');
   });
 
   it('maps sentiment variant to sentiment tokens', () => {
@@ -123,6 +127,16 @@ describe('Card', () => {
     expect(screen.getByText('Visibility').tagName).toBe('H3');
     expect(screen.getByText('Body')).toBeInTheDocument();
   });
+
+  it('CardEyebrow renders the mono panel-label pattern (never a heading)', () => {
+    render(<CardEyebrow>Visibility score</CardEyebrow>);
+    const eyebrow = screen.getByText('Visibility score');
+    expect(eyebrow.tagName).toBe('SPAN');
+    expect(eyebrow.className).toContain('font-mono');
+    expect(eyebrow.className).toContain('text-2xs');
+    expect(eyebrow.className).toContain('uppercase');
+    expect(eyebrow.className).toContain('tracking-[0.08em]');
+  });
 });
 
 describe('Table (dense)', () => {
@@ -145,9 +159,10 @@ describe('Table (dense)', () => {
     );
     const headers = screen.getAllByRole('columnheader');
     expect(headers).toHaveLength(2);
-    // Sticky 32px header height + uppercase.
+    // Sticky 32px header height + uppercase mono eyebrow.
     expect(headers[0].className).toContain('h-[var(--table-header-height)]');
     expect(headers[0].className).toContain('uppercase');
+    expect(headers[0].className).toContain('font-mono');
     expect(headers[0].className).toContain('sticky');
     // Numeric header/cell align right + tabular nums.
     expect(headers[1].className).toContain('tabular-nums');
@@ -220,6 +235,20 @@ describe('ScoreRing', () => {
     render(<ScoreRing value={140} label="Overflow" />);
     expect(screen.getByRole('img', { name: 'Overflow' })).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
+  });
+
+  it('renders the display-size numeral with numeralSize="lg"', () => {
+    render(<ScoreRing value={82} size={128} numeralSize="lg" />);
+    const numeral = screen.getByText('82');
+    expect(numeral.className).toContain('text-2xl');
+    expect(numeral).toHaveAttribute('aria-hidden', 'true');
+    // The accessible label still lives on the ring, not the numeral.
+    expect(screen.getByRole('img', { name: 'Visibility score: 82%' })).toBeInTheDocument();
+  });
+
+  it('defaults to the text-lg numeral', () => {
+    render(<ScoreRing value={82} />);
+    expect(screen.getByText('82').className).toContain('text-lg');
   });
 });
 

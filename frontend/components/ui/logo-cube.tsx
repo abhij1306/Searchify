@@ -1,7 +1,9 @@
 /**
  * LogoCube — the CUBE27 isometric-cube mark (geometry lifted from the company
- * favicon) rendered with theme-aware paint classes from marketing.css so this
- * file stays hex-free (logo-tile / logo-stroke / logo-facet).
+ * favicon) rendered with theme-aware paint classes so this file stays hex-free
+ * (logo-tile / logo-stroke / logo-facet). The default paints live in
+ * app/globals.css (token-driven, theme-inverting); the marketing `.mkt` rules
+ * in marketing.css stay more specific and keep the landing's dark tile.
  */
 export function LogoCube({ size = 28 }: Readonly<{ size?: number }>) {
   return (

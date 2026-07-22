@@ -6,7 +6,8 @@ import { useMemo, useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardEyebrow, CardHeader } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { providersApi } from '@/lib/api/providers';
@@ -100,11 +101,16 @@ export function EngineCard({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <div className="grid gap-0.5">
+        <div className="grid gap-1">
+          <CardEyebrow>AI engine</CardEyebrow>
           <h3 className="text-foreground text-base font-semibold">{model.label}</h3>
-          <p className="text-secondary text-xs">
-            {transport ? `via ${TRANSPORT_LABELS[transport]}` : 'No route available'}
-          </p>
+          <div className="flex items-center gap-2">
+            {transport ? (
+              <Badge variant="neutral">via {TRANSPORT_LABELS[transport]}</Badge>
+            ) : (
+              <span className="text-muted text-xs">No route available</span>
+            )}
+          </div>
         </div>
         {configured ? (
           <Badge variant="status" value="success">
@@ -118,10 +124,10 @@ export function EngineCard({
       <CardContent className="grid gap-4">
         {route ? (
           <div className="grid gap-1.5">
-            <span className="text-secondary text-xs font-medium">Route</span>
+            <span className={eyebrowClasses}>Route</span>
             <span className="text-foreground text-sm">{route.label}</span>
             {route.default_model ? (
-              <span className="text-2xs text-muted">Model: {route.default_model}</span>
+              <span className="text-2xs text-muted font-mono">Model: {route.default_model}</span>
             ) : null}
           </div>
         ) : null}

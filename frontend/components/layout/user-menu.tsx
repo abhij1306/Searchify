@@ -35,7 +35,7 @@ export function UserMenu({ className }: Readonly<{ className?: string }>) {
     <Dropdown>
       <DropdownTrigger
         className={cn(
-          'focus-ring hover:bg-background-alt flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors',
+          'focus-ring hover:bg-background-alt flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
           className,
         )}
       >

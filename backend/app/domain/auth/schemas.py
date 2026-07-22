@@ -35,3 +35,33 @@ class AuthResponse(BaseModel):
     """
 
     user: SessionUser
+
+
+class OAuthProviderInfo(BaseModel):
+    """Public projection of one OAuth provider.
+
+    Flags + label only — client ids, client secrets, and redirect URIs are
+    never exposed (invariant 6).
+    """
+
+    provider: str
+    label: str
+    configured: bool
+
+
+class OAuthProvidersResponse(BaseModel):
+    """Listing of the cataloged OAuth providers."""
+
+    providers: list[OAuthProviderInfo]
+
+
+class OAuthStartResponse(BaseModel):
+    """Authorize URL + signed state for starting an OAuth flow.
+
+    ``session_nonce`` must be persisted by the caller in an HttpOnly, Secure,
+    SameSite=Lax cookie before redirecting to the provider.
+    """
+
+    authorize_url: str
+    state: str
+    session_nonce: str

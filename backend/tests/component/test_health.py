@@ -36,9 +36,10 @@ def test_health_route_and_router_stubs_registered() -> None:
     # fill them in place. B4 adds the provider-catalog router alongside the six
     # original stubs (7); B6 adds the executions router (8); the Site Health
     # router adds the ninth (9); the Content router adds the tenth (10); the
-    # brand-suggestions router adds the eleventh (11 total).
+    # brand-suggestions router adds the eleventh (11); the OAuth router adds
+    # the twelfth (12 total).
     from app.main import _ROUTERS
 
     paths = {getattr(route, "path", None) for route in app.routes}
     assert "/health" in paths
-    assert len(_ROUTERS) == 11
+    assert len(_ROUTERS) == 12

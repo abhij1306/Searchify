@@ -66,20 +66,22 @@ export function TopBar({ className }: Readonly<{ className?: string }>) {
         className,
       )}
     >
-      <h1 className="text-foreground min-w-0 flex-1 truncate text-sm font-semibold">{title}</h1>
+      <h1 className="font-display text-foreground min-w-0 flex-1 truncate text-base font-semibold">
+        {title}
+      </h1>
 
       <div className="flex items-center gap-1">
         {/* Export hook: placeholder disabled at MVP; wired for F10 report export. */}
         <Tooltip content="Export is available from a run (coming with reports)">
           <span>
-            <Button variant="topbar" size="sm" disabled aria-disabled="true">
+            <Button variant="ghost" size="sm" disabled aria-disabled="true">
               <Download className="size-4" aria-hidden />
               Export
             </Button>
           </span>
         </Tooltip>
 
-        <Button variant="topbar" size="sm" asChild>
+        <Button variant="ghost" size="sm" asChild>
           <a href={LEARN_URL} target="_blank" rel="noreferrer noopener">
             <ExternalLink className="size-4" aria-hidden />
             Learn

@@ -2,10 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Label } from '@/components/ui/typography';
 import { engineLabel, transportLabel } from '@/lib/providers/catalog';
 import type { ExecutionEvidence } from '@/lib/api/types';
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
+import { cn } from '@/lib/utils';
 
 /** Humanize a `score` dict key: `owned_domain_cited` → `Owned domain cited`. */
 function formatScoreKey(key: string): string {
@@ -117,7 +119,7 @@ export function EvidenceCard({
             </CardHeader>
             <CardContent className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label>Brand</Label>
+                <Label className="font-mono">Brand</Label>
                 {evidence.brand_mentioned ? (
                   <Badge className="justify-self-start" variant="status" value="success">
                     Mentioned
@@ -127,7 +129,7 @@ export function EvidenceCard({
                 )}
               </div>
               <div className="grid gap-1.5">
-                <Label>Competitors</Label>
+                <Label className="font-mono">Competitors</Label>
                 {evidence.competitors_mentioned.length === 0 ? (
                   <span className="text-muted text-sm">None mentioned</span>
                 ) : (
@@ -141,7 +143,7 @@ export function EvidenceCard({
                 )}
               </div>
               <div className="grid gap-1.5">
-                <Label>Sentiment</Label>
+                <Label className="font-mono">Sentiment</Label>
                 <span className="mono text-muted text-sm">{evidence.sentiment ?? '—'}</span>
               </div>
             </CardContent>
@@ -158,7 +160,7 @@ export function EvidenceCard({
                 <dl className="grid gap-2">
                   {scoreEntries.map(([key, value]) => (
                     <div key={key} className="flex items-baseline justify-between gap-3">
-                      <dt className="text-secondary min-w-0 truncate text-xs">
+                      <dt className={cn(eyebrowClasses, 'min-w-0 truncate')}>
                         {formatScoreKey(key)}
                       </dt>
                       <dd className="mono text-foreground min-w-0 text-right text-xs break-words">

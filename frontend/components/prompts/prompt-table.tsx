@@ -19,16 +19,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TablePagination, useTablePage } from '@/components/ui/table-pagination';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { Prompt, PromptStatus } from '@/lib/api/types';
 import { intentLabels } from '@/lib/prompts/forms';
+
+/** Rows per page on the prompt table (client-side; the list arrives whole). */
+const PAGE_SIZE = 10;
 
 /**
  * Prompt table (F7). Dense analytics table with columns text / theme / intent /
  * branded / enabled and per-row actions (edit, delete, enable/disable toggle,
  * and — when `onSetStatus` is wired — review transitions: accept a proposed
- * prompt, archive, or restore an archived one). Purely presentational — CRUD
- * is delegated to callbacks owned by the page.
+ * prompt, archive, or restore an archived one). Client-side pagination footer
+ * (mono indicator + ghost buttons) per the midnight prompts frame. Purely
+ * presentational — CRUD is delegated to callbacks owned by the page.
  */
 export function PromptTable({
   prompts,
@@ -45,8 +50,11 @@ export function PromptTable({
   onSetStatus?: (prompt: Prompt, status: PromptStatus) => void;
   busyId?: string | null;
 }>) {
+  const { page, setPage, pageCount, from, to } = useTablePage(prompts.length, PAGE_SIZE);
+  const pagedPrompts = prompts.slice(from - 1, to);
+
   return (
-    <div className="border-border rounded-lg border">
+    <div className="border-border bg-panel shadow-card overflow-hidden rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -59,7 +67,7 @@ export function PromptTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {prompts.map((prompt) => (
+          {pagedPrompts.map((prompt) => (
             <TableRow key={prompt.id}>
               <TableCell className="max-w-[520px] min-w-[240px]">
                 <Tooltip content={prompt.text}>
@@ -95,9 +103,12 @@ export function PromptTable({
                   aria-label={`${prompt.enabled ? 'Disable' : 'Enable'} prompt`}
                   disabled={busyId === prompt.id}
                   onClick={() => onToggleEnabled(prompt)}
-                  className="focus-ring border-border-strong bg-background-alt aria-checked:border-accent aria-checked:bg-accent inline-flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors disabled:opacity-50 aria-checked:justify-end"
+                  className="focus-ring border-border-strong bg-background-alt aria-checked:border-accent aria-checked:bg-accent group inline-flex h-5 w-9 items-center rounded-full border px-0.5 transition-colors disabled:opacity-50 aria-checked:justify-end"
                 >
-                  <span className="bg-panel size-4 rounded-full shadow-sm" aria-hidden />
+                  <span
+                    className="bg-muted group-aria-checked:bg-accent-fg size-4 rounded-full shadow-sm"
+                    aria-hidden
+                  />
                 </button>
               </TableCell>
               <TableCell className="text-right">
@@ -145,6 +156,15 @@ export function PromptTable({
           ))}
         </TableBody>
       </Table>
+      <TablePagination
+        page={page}
+        pageCount={pageCount}
+        from={from}
+        to={to}
+        total={prompts.length}
+        noun="prompts"
+        onPageChange={setPage}
+      />
     </div>
   );
 }

@@ -8,8 +8,10 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Textarea } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { displayHeadingLgClasses } from '@/components/ui/typography';
 import type { RunStatusValue } from '@/components/ui/badge-variants';
 import { CONTENT_PROMPT_MAX_LEN } from '@/lib/api/content';
 import { ApiError, httpErrorStatus } from '@/lib/api/errors';
@@ -153,19 +155,28 @@ function ProjectContentScreen({
     setSelectedId(null);
   };
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   const handleCopy = async () => {
     if (!detail?.output_text) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
     try {
       // Clipboard access can be denied (permissions policy, insecure
       // context) — surface a visible failure instead of an unhandled reject.
       await navigator.clipboard.writeText(detail.output_text);
       setCopyFailed(false);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
       setCopyFailed(true);
-      setTimeout(() => setCopyFailed(false), 2000);
+      timerRef.current = setTimeout(() => setCopyFailed(false), 2000);
     }
   };
 
@@ -178,7 +189,10 @@ function ProjectContentScreen({
       {/* Composer */}
       <Card data-component-id="content-prompt-box">
         <CardContent className="flex flex-col gap-3 py-5">
-          <h2 className="text-foreground text-lg font-semibold">What can I help you create?</h2>
+          <div className="grid gap-1">
+            <span className={eyebrowClasses}>New generation</span>
+            <h2 className={displayHeadingLgClasses}>What can I help you create?</h2>
+          </div>
           <Textarea
             ref={promptRef}
             value={prompt}
@@ -302,7 +316,7 @@ function ProjectContentScreen({
             </p>
             <div
               data-component-id="content-result-provenance"
-              className="border-border text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs"
+              className="border-border text-muted text-2xs flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 font-mono"
             >
               <span>Requested model: {detail.requested_model}</span>
               {detail.returned_model ? <span>Returned model: {detail.returned_model}</span> : null}
@@ -342,7 +356,10 @@ function ProjectContentScreen({
 
       {/* History */}
       <section data-component-id="content-history" className="flex flex-col gap-2">
-        <h2 className="text-secondary text-sm font-semibold">Recent generations</h2>
+        <div className="grid gap-1">
+          <span className={eyebrowClasses}>History</span>
+          <h2 className={displayHeadingLgClasses}>Recent generations</h2>
+        </div>
         {listQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (listQuery.data ?? []).length === 0 ? (
@@ -357,7 +374,7 @@ function ProjectContentScreen({
                   className={cn(
                     'focus-ring hover:bg-background-alt flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors',
                     item.id === selectedId
-                      ? 'border-accent-border bg-background-alt'
+                      ? 'border-accent-border bg-accent-soft/40'
                       : 'border-border',
                   )}
                 >

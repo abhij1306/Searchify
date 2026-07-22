@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const DROPS = [
   { key: 'product', count: 9 },
-  { key: 'resources', count: 4 },
+  { key: 'resources', count: 3 },
   { key: 'solutions', count: 4 },
 ] as const;
 
@@ -62,7 +62,9 @@ test.describe('marketing navigation (real-engine CSS contract)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
-  test('marketing dark-first default does not leak into app routes', async ({ page }) => {
+  test('app routes share the dark-first default when no choice is stored', async ({ page }) => {
+    // Even a light OS does not flip the app default: with no stored choice
+    // both the marketing surface and /login resolve to dark (stored → dark).
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/');
     await page.evaluate(() => window.localStorage.removeItem('searchify-theme'));
@@ -70,7 +72,7 @@ test.describe('marketing navigation (real-engine CSS contract)', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.getByRole('link', { name: 'Sign in' }).first().click();
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 
   test('mobile evidence rows flow inline without overlap', async ({ page }) => {

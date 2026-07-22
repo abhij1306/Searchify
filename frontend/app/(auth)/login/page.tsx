@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
+import { OAuthSection } from '@/components/auth/oauth-buttons';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -42,6 +43,8 @@ export default function LoginPage() {
       </div>
 
       {mutation.isError ? <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert> : null}
+
+      <OAuthSection />
 
       <form noValidate onSubmit={onSubmit} className="grid gap-4">
         <Field label="Email" required error={errors.email?.message}>

@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import {
   EvidenceEmpty,
   EvidenceError,
@@ -13,6 +14,7 @@ import {
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
 import type { VisibilityExecutionEvidence } from '@/lib/api/types';
 import { engineLabel } from '@/lib/providers/catalog';
+import { cn } from '@/lib/utils';
 import {
   formatExecutionDate,
   provenanceSummary,
@@ -95,7 +97,7 @@ export function MentionsCitations({ query, isFiltered, onClearFilters, limit }: 
 
 function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) {
   return (
-    <li className="border-border-subtle bg-background-alt grid gap-3 rounded-md border p-4">
+    <li className="border-border-subtle bg-background-alt grid gap-3 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-foreground truncate text-sm font-medium">
@@ -112,11 +114,11 @@ function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvid
         </span>
       </div>
 
-      <p className="text-2xs text-muted tracking-wide uppercase">{provenanceSummary(item)}</p>
+      <p className={cn(eyebrowClasses, 'font-normal')}>{provenanceSummary(item)}</p>
 
       {item.mentions.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs text-muted font-semibold tracking-wide uppercase">Mentions</p>
+          <p className={eyebrowClasses}>Mentions</p>
           <div className="flex flex-wrap gap-1.5">
             {item.mentions.map((mention, index) => (
               <Badge
@@ -133,12 +135,12 @@ function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvid
 
       {item.citations.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs text-muted font-semibold tracking-wide uppercase">Citations</p>
+          <p className={eyebrowClasses}>Citations</p>
           <ul className="grid gap-2">
             {item.citations.map((citation) => (
               <li
                 key={`${item.analysis_id}-${citation.ordinal}-${citation.url}`}
-                className="border-border-subtle bg-panel flex items-center justify-between gap-3 rounded-sm border px-3 py-2"
+                className="border-border-subtle bg-panel flex items-center justify-between gap-3 rounded-md border px-3 py-2"
               >
                 <span className="text-secondary min-w-0 truncate text-xs">
                   {citation.title?.trim() || citation.domain || citation.url}
@@ -156,7 +158,7 @@ function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvid
       ) : null}
 
       {item.artifact_id ? (
-        <p className="text-2xs text-subtle">Artifact {shortId(item.artifact_id)}</p>
+        <p className="text-2xs text-subtle font-mono">Artifact {shortId(item.artifact_id)}</p>
       ) : null}
     </li>
   );

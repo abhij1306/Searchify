@@ -38,9 +38,9 @@ describe('globals.css token set matches docs/design.md', () => {
     );
   });
 
-  it('keeps the teal-green accent (not the reference blue-violet)', () => {
-    expect(css).toMatch(/--accent:\s*#0f9d76/);
-    expect(css).toMatch(/--accent:\s*#2dd4a7/); // dark
-    expect(css).not.toMatch(/#3557f6/); // legacy light accent must not leak in
+  it('uses the midnight blue accent (legacy teal accent is gone)', () => {
+    expect(css).toMatch(/--accent:\s*#2f58ff/); // light warm-paper
+    expect(css).toMatch(/--accent:\s*#6b8aff/); // dark midnight
+    expect(css).not.toMatch(/--accent:\s*#0f9d76/); // legacy teal accent must not leak in
   });
 });

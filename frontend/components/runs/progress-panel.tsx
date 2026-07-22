@@ -49,7 +49,14 @@ export function ProgressPanel({
               {auditStatusLabel(audit.status)}
             </Badge>
             {polling ? (
-              <span className="text-muted text-xs" aria-live="polite">
+              <span
+                className="mono text-muted text-2xs inline-flex items-center gap-1.5"
+                aria-live="polite"
+              >
+                <span
+                  className="bg-accent inline-block size-1.5 animate-pulse rounded-full"
+                  aria-hidden
+                />
                 Updating…
               </span>
             ) : null}
@@ -78,19 +85,19 @@ export function ProgressPanel({
 
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="grid gap-1">
-            <Label>Requested</Label>
+            <Label className="font-mono">Requested</Label>
             <Metric className="text-xl">{audit.requested_count}</Metric>
           </div>
           <div className="grid gap-1">
-            <Label>Completed</Label>
+            <Label className="font-mono">Completed</Label>
             <Metric className="text-run-completed text-xl">{audit.completed_count}</Metric>
           </div>
           <div className="grid gap-1">
-            <Label>Failed</Label>
+            <Label className="font-mono">Failed</Label>
             <Metric className="text-run-failed text-xl">{audit.failed_count}</Metric>
           </div>
           <div className="grid gap-1">
-            <Label>Created</Label>
+            <Label className="font-mono">Created</Label>
             <span className="text-secondary text-sm">{formatDateTime(audit.created_at)}</span>
           </div>
         </dl>

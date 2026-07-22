@@ -2,7 +2,6 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { FAQ_GROUPS } from '@/lib/marketing-content/faq';
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 
 import Page from './page';
 
@@ -26,15 +25,22 @@ describe('FAQ page (public marketing `/faq`)', () => {
     }
   });
 
-  it('renders the five module groups as labelled sections with h2 headings', () => {
+  it('renders the four module groups as labelled sections with h2 headings', () => {
     render(<Page />);
 
-    expect(FAQ_GROUPS).toHaveLength(5);
+    expect(FAQ_GROUPS.map((group) => group.heading)).toEqual([
+      'Product',
+      'Privacy & keys',
+      'Site health',
+      'Account & billing',
+    ]);
     for (const group of FAQ_GROUPS) {
       const section = screen.getByRole('region', { name: group.heading });
       expect(within(section).getByRole('heading', { level: 2 })).toHaveTextContent(group.heading);
       expect(within(section).getByText(`${group.items.length} answers`)).toBeInTheDocument();
     }
+    // The open-source group is gone — the repo is private.
+    expect(screen.queryByRole('region', { name: 'Open source' })).toBeNull();
   });
 
   it('renders the group rail with an anchor link + item count per group', () => {
@@ -86,17 +92,11 @@ describe('FAQ page (public marketing `/faq`)', () => {
     expect(within(billing).getByText(/Refund terms will be published/i)).toBeInTheDocument();
   });
 
-  it('links the real GitHub URL from the open-source group', () => {
+  it('answers the self-host question under Account & billing', () => {
     render(<Page />);
 
-    const openSource = screen.getByRole('region', { name: 'Open source' });
-    expect(within(openSource).getByRole('link', { name: GITHUB_URL })).toHaveAttribute(
-      'href',
-      GITHUB_URL,
-    );
-    expect(within(openSource).getByRole('link', { name: `${GITHUB_URL}/issues` })).toHaveAttribute(
-      'href',
-      `${GITHUB_URL}/issues`,
-    );
+    const billing = screen.getByRole('region', { name: 'Account & billing' });
+    expect(within(billing).getByText('Can I self-host Searchify?')).toBeInTheDocument();
+    expect(within(billing).getByText(/Docker Compose brings up Postgres/i)).toBeInTheDocument();
   });
 });

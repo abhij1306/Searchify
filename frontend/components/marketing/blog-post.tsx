@@ -2,7 +2,6 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import type { BlogBlock, BlogPost } from '@/lib/marketing-content/blog';
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 
 import { ByokTrust } from './byok-trust';
 
@@ -99,9 +98,9 @@ export function BlogPostView({ post }: Readonly<{ post: BlogPost }>) {
               Get started
               <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
             </Link>
-            <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              Star on GitHub
-            </a>
+            <Link className="btn btn-ghost" href="/blog">
+              All posts
+            </Link>
           </div>
           <ByokTrust />
         </div>

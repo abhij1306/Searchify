@@ -26,7 +26,7 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       aria-describedby={describedBy}
-      className="border-border bg-background-alt inline-flex flex-wrap gap-1 rounded-md border p-1"
+      className="border-border bg-background-alt inline-flex flex-wrap gap-1 rounded-full border p-1"
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -38,9 +38,9 @@ export function SegmentedControl<T extends string>({
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'focus-ring rounded-sm px-3 py-1.5 text-sm font-medium transition-colors',
+              'focus-ring rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
               selected
-                ? 'bg-panel text-foreground shadow-card'
+                ? 'bg-elevated text-foreground shadow-card'
                 : 'text-secondary hover:text-foreground',
             )}
           >

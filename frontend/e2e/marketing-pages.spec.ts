@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-import { GITHUB_URL, LICENSE_URL } from '../lib/marketing-content/social';
-
 const MARKETING_PAGES = ['/pricing', '/enterprise', '/solutions', '/blog', '/compare', '/faq'];
 
 test.describe('marketing routes', () => {
@@ -30,18 +28,21 @@ test.describe('marketing routes', () => {
     const resources = page.getByRole('button', { name: 'Resources' });
     await resources.hover();
     await expect(page.locator('#desktop-nav-panel')).toBeVisible();
-    await expect(page.locator('#desktop-nav-panel').getByRole('menuitem')).toHaveCount(4);
+    await expect(page.locator('#desktop-nav-panel').getByRole('menuitem')).toHaveCount(3);
 
     const footer = page.getByRole('navigation', { name: 'Footer' });
     await expect(footer.locator('.f-col-label')).toHaveCount(5);
-    await expect(footer.getByRole('link', { name: 'Documentation' })).toHaveAttribute(
-      'href',
-      GITHUB_URL,
-    );
-    await expect(page.getByRole('link', { name: 'MIT License' })).toHaveAttribute(
-      'href',
-      LICENSE_URL,
-    );
+    // The repo is private — no Documentation/GitHub links in the footer.
+    await expect(footer.getByRole('link', { name: 'Documentation' })).toHaveCount(0);
+    await expect(footer.getByRole('link', { name: 'GitHub' })).toHaveCount(0);
+  });
+
+  test('commercial pages carry no GitHub links or MIT-license copy', async ({ page }) => {
+    for (const path of ['/pricing', '/enterprise']) {
+      await page.goto(path);
+      await expect(page.getByRole('link', { name: /github/i })).toHaveCount(0);
+      await expect(page.getByText(/MIT License/i)).toHaveCount(0);
+    }
   });
 
   test('marketing subpages keep the dark-first default', async ({ page }) => {

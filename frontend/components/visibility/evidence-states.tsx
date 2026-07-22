@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { AlertTriangle, Info, Inbox, RefreshCw, SearchX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { displayHeadingLgClasses } from '@/components/ui/typography';
 
 /**
  * Shared data-state presentations for the two evidence tabs (design.md states
@@ -51,17 +52,13 @@ export function EvidenceError({
 }: Readonly<{ title: string; onRetry: () => void }>) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
       <CardContent>
         <div className="grid justify-items-center gap-3 py-10 text-center">
+          <CardEyebrow>{title}</CardEyebrow>
           <span className="bg-danger-bg text-danger-text flex size-10 items-center justify-center rounded-full">
             <AlertTriangle className="size-5" aria-hidden />
           </span>
-          <h3 className="text-foreground text-base font-semibold">
-            Couldn&apos;t load this evidence
-          </h3>
+          <h3 className={displayHeadingLgClasses}>Couldn&apos;t load this evidence</h3>
           <p className="text-secondary max-w-xs text-sm">
             The request failed or timed out. Your filters are unchanged.
           </p>
@@ -82,17 +79,16 @@ export function EvidenceEmpty({
 }: Readonly<{ title: string; heading: string; body: string }>) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
       <CardContent>
+        {/* Midnight empty-state pattern: mono eyebrow + display heading + ghost CTA. */}
         <div className="grid justify-items-center gap-3 py-10 text-center">
+          <CardEyebrow>{title}</CardEyebrow>
           <span className="bg-neutral-bg text-muted flex size-10 items-center justify-center rounded-full">
             <Inbox className="size-5" aria-hidden />
           </span>
-          <h3 className="text-foreground text-base font-semibold">{heading}</h3>
+          <h3 className={displayHeadingLgClasses}>{heading}</h3>
           <p className="text-secondary max-w-sm text-sm">{body}</p>
-          <Button asChild variant="secondary" size="sm">
+          <Button asChild variant="ghost" size="sm">
             <Link href="/runs">View Runs</Link>
           </Button>
         </div>
@@ -108,20 +104,16 @@ export function EvidenceFilteredEmpty({
 }: Readonly<{ title: string; body: string; onClear?: () => void }>) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
       <CardContent>
         <div className="grid justify-items-center gap-3 py-10 text-center">
+          <CardEyebrow>{title}</CardEyebrow>
           <span className="bg-neutral-bg text-muted flex size-10 items-center justify-center rounded-full">
             <SearchX className="size-5" aria-hidden />
           </span>
-          <h3 className="text-foreground text-base font-semibold">
-            No results match these filters
-          </h3>
+          <h3 className={displayHeadingLgClasses}>No results match these filters</h3>
           <p className="text-secondary max-w-sm text-sm">{body}</p>
           {onClear ? (
-            <Button variant="secondary" size="sm" onClick={onClear}>
+            <Button variant="ghost" size="sm" onClick={onClear}>
               Clear filters
             </Button>
           ) : null}

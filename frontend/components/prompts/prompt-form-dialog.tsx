@@ -125,7 +125,7 @@ export function PromptFormDialog({
                   type="checkbox"
                   checked={field.value}
                   onChange={(event) => field.onChange(event.target.checked)}
-                  className="focus-ring border-border-strong size-4 rounded"
+                  className="focus-ring accent-accent size-4 shrink-0"
                 />
                 Branded
               </label>
@@ -140,7 +140,7 @@ export function PromptFormDialog({
                   type="checkbox"
                   checked={field.value}
                   onChange={(event) => field.onChange(event.target.checked)}
-                  className="focus-ring border-border-strong size-4 rounded"
+                  className="focus-ring accent-accent size-4 shrink-0"
                 />
                 Enabled
               </label>

@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -50,9 +49,12 @@ export function RankingRowsTable({ rows }: Readonly<{ rows: readonly RankingRow[
                 <span className="flex items-center gap-2">
                   <span className="text-foreground font-medium">{row.name}</span>
                   {row.is_brand ? (
-                    <Badge variant="neutral" className="normal-case">
+                    // Midnight "YOU" pill chip (mockup .you-pill): mono,
+                    // uppercase, raised-well fill — distinct from the Badge
+                    // family (no status dot).
+                    <span className="bg-well text-foreground text-2xs inline-flex items-center rounded-full px-2 py-0.5 font-mono leading-[1.4] font-semibold tracking-[0.08em] uppercase">
                       You
-                    </Badge>
+                    </span>
                   ) : null}
                 </span>
               </TableCell>

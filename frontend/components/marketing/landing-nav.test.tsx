@@ -1,9 +1,24 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 
-import { GITHUB_URL } from '@/lib/marketing-content/social';
+import { mswServer } from '@/test/msw-server';
+import { renderWithProviders } from '@/test/render';
 
 import { LandingNav } from './landing-nav';
+
+beforeAll(() => mswServer.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => {
+  mswServer.use(
+    http.get('/api/v1/auth/me', () =>
+      HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 }),
+    ),
+    http.get('/api/v1/projects', () => HttpResponse.json([])),
+  );
+});
+afterEach(() => mswServer.resetHandlers());
+afterAll(() => mswServer.close());
+
 /**
  * The desktop trigger and the mobile accordion head share a name, so pick a
  * button by the panel it controls (`drop-*` desktop, `acc-*` mobile).
@@ -24,7 +39,7 @@ function panel(id: string): HTMLElement {
 
 describe('LandingNav', () => {
   it('renders three dropdown triggers with the menu contract, plus plain Enterprise/Pricing links', () => {
-    render(<LandingNav />);
+    renderWithProviders(<LandingNav />);
 
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
 
@@ -61,8 +76,8 @@ describe('LandingNav', () => {
     expect(screen.queryByRole('link', { name: /^evidence$/i })).not.toBeInTheDocument();
   });
 
-  it('gives every dropdown item its own href (9 / 4 / 4 menuitems)', () => {
-    render(<LandingNav />);
+  it('gives every dropdown item its own href (9 / 3 / 4 menuitems)', () => {
+    renderWithProviders(<LandingNav />);
 
     // Product: the 6 feature rows (absolute anchors so they resolve from
     // subpages) + the "How it works" group's 3 numbered steps.
@@ -94,7 +109,7 @@ describe('LandingNav', () => {
       control(/^resources$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
     );
     const resources = panel('desktop-nav-panel');
-    expect(within(resources).getAllByRole('menuitem')).toHaveLength(4);
+    expect(within(resources).getAllByRole('menuitem')).toHaveLength(3);
     expect(within(resources).getByRole('menuitem', { name: /^blog/i })).toHaveAttribute(
       'href',
       '/blog',
@@ -107,11 +122,7 @@ describe('LandingNav', () => {
       'href',
       '/compare',
     );
-    // Documentation is the one external row: plain <a>, new tab, no referrer.
-    const docs = within(resources).getByRole('menuitem', { name: /^documentation/i });
-    expect(docs).toHaveAttribute('href', GITHUB_URL);
-    expect(docs).toHaveAttribute('target', '_blank');
-    expect(docs).toHaveAttribute('rel', 'noreferrer');
+    expect(within(resources).queryByRole('menuitem', { name: /^documentation/i })).toBeNull();
 
     fireEvent.mouseEnter(
       control(/^solutions$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
@@ -136,13 +147,23 @@ describe('LandingNav', () => {
     );
   });
 
+  it('keeps every nav link inside the site', () => {
+    const { container } = renderWithProviders(<LandingNav />);
+
+    const links = Array.from(container.querySelectorAll('a[href]'));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\//);
+    }
+    expect(container.querySelector('a[target="_blank"]')).toBeNull();
+  });
+
   it('mirrors the drops as mobile accordions and closes the menu on item click', () => {
-    render(<LandingNav />);
+    renderWithProviders(<LandingNav />);
 
     for (const key of ['product', 'resources', 'solutions']) {
       expect(panel(`acc-${key}`)).toHaveClass('acc-body');
     }
-    // The product accordion holds the merged set: 6 features + 3 steps.
     expect(within(panel('acc-product')).getAllByRole('link')).toHaveLength(9);
 
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
@@ -159,34 +180,24 @@ describe('LandingNav', () => {
     expect(menu).not.toHaveClass('open');
   });
 
-  // The nav's visibility rules key entirely on these class tokens
-  // (.mkt .nav-item.open .drop, .mkt .mobile-menu.open, .mkt .acc.open …),
-  // so pin the React-state → class contract — aria alone can't catch a
-  // mangled class list (jsdom never evaluates CSS selectors).
   it('drives the open-state classes the CSS keys on', () => {
-    render(<LandingNav />);
+    renderWithProviders(<LandingNav />);
 
-    // Desktop dropdown: hovering the trigger's wrapper opens it.
     const product = control(/^product$/i, 'desktop-nav-panel');
     const navItem = product.closest('.nav-item');
     expect(navItem).not.toBeNull();
     fireEvent.mouseEnter(navItem as Element);
     expect(navItem).toHaveClass('nav-item', 'open');
     expect(product).toHaveAttribute('aria-expanded', 'true');
-    // Leaving one item does not close the shared desktop hover zone: this
-    // lets the next dropdown slide in rather than flashing closed first.
+
     fireEvent.mouseLeave(navItem as Element);
     expect(navItem).toHaveClass('nav-item', 'open');
 
-    // Trigger click opens (touch / Enter-Space path; fireEvent.click
-    // dispatches no focus, so onFocusCapture can't interfere). Click only
-    // ever opens — it must not close a panel hover/focus may have opened.
     fireEvent.click(product);
     expect(navItem).toHaveClass('nav-item', 'open');
     fireEvent.click(product);
     expect(navItem).toHaveClass('nav-item', 'open');
 
-    // Mobile menu + an accordion per drop, each toggling its own open class.
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
     expect(document.getElementById('mobile-menu')).toHaveClass('mobile-menu', 'open');
     for (const [name, key] of [
@@ -202,7 +213,6 @@ describe('LandingNav', () => {
       expect(accHead.closest('.acc')).not.toHaveClass('open');
     }
 
-    // Scrolled nav: the glass backdrop intensifies via `scrolled`.
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
     Object.defineProperty(window, 'scrollY', { value: 50, configurable: true });
     fireEvent.scroll(window);
@@ -210,8 +220,14 @@ describe('LandingNav', () => {
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
   });
 
-  it('has exactly one theme toggle and working auth CTAs', () => {
-    render(<LandingNav />);
+  it('has exactly one theme toggle and working auth CTAs for signed-out users', () => {
+    mswServer.use(
+      http.get('/api/v1/auth/me', () =>
+        HttpResponse.json({ detail: 'Unauthorized' }, { status: 401 }),
+      ),
+    );
+
+    renderWithProviders(<LandingNav />);
 
     expect(screen.getAllByRole('button', { name: /toggle color theme/i })).toHaveLength(1);
 
@@ -222,5 +238,52 @@ describe('LandingNav', () => {
     const getStarteds = screen.getAllByRole('link', { name: /get started/i });
     expect(getStarteds.length).toBeGreaterThan(0);
     for (const link of getStarteds) expect(link).toHaveAttribute('href', '/register');
+  });
+
+  it('renders a Dashboard CTA linking to /visibility when signed in', async () => {
+    const sessionUser = {
+      id: '22222222-2222-4222-8222-222222222222',
+      email: 'nav@example.com',
+      role: 'owner',
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+    const proj = {
+      id: '11111111-1111-4111-8111-111111111111',
+      workspace_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      name: 'Acme',
+      brand_name: 'Acme',
+      website_url: 'https://example.com',
+      country_code: 'US',
+      language_code: 'en',
+      benchmark_mode: 'consumer_like',
+      default_repetitions: 3,
+      brand: { aliases: [] },
+      owned_domains: [],
+      unintended_domains: [],
+      competitors: [],
+      prompt_sets: [],
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    mswServer.use(
+      http.get('/api/v1/auth/me', () => HttpResponse.json({ user: sessionUser })),
+      http.get('/api/v1/projects', () => HttpResponse.json([proj])),
+    );
+
+    renderWithProviders(<LandingNav />);
+
+    await waitFor(() => {
+      const dashboardLinks = screen.getAllByRole('link', { name: /dashboard/i });
+      expect(dashboardLinks.length).toBeGreaterThan(0);
+      for (const link of dashboardLinks) {
+        expect(link).toHaveAttribute('href', '/visibility');
+      }
+    });
+
+    expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /get started/i })).toBeNull();
   });
 });

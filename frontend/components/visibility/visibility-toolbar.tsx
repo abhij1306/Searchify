@@ -19,6 +19,7 @@ import {
   type RunOption,
   type VisibilityTab,
 } from '@/lib/visibility/dashboard';
+import { cn } from '@/lib/utils';
 import {
   GRANULARITY_OPTIONS,
   RANGE_OPTIONS,
@@ -31,6 +32,12 @@ import {
 
 /** Engine filter value shared across every tab. */
 export type EngineFilter = LogicalEngine | 'all';
+
+// Midnight filter-chip language (shell-visibility-midnight mockup .pill-btn):
+// pill trigger; a non-default filter value flips the chip to the accent-soft
+// active state (blue reserved for active states, never the default surface).
+const CHIP_ACTIVE_CLASS =
+  'border-accent-border bg-accent-soft text-accent-text hover:border-accent-border hover:bg-accent-soft hover:text-accent-text';
 
 /**
  * Shared filter bar rendered ABOVE the tablist (design.md tabbed workspace).
@@ -90,14 +97,14 @@ export function VisibilityToolbar({
   const promptText = promptId === null ? 'All prompts' : (activePrompt?.label ?? 'All prompts');
 
   return (
-    <div className="flex flex-wrap items-center gap-3" data-testid="visibility-toolbar">
+    <div className="flex flex-wrap items-center gap-2.5" data-testid="visibility-toolbar">
       {showRun ? (
         <Dropdown>
           <DropdownTrigger asChild>
             <Button variant="secondary" size="sm" aria-label="Select run">
               <span className="text-muted">Run:</span>
               <span className="font-medium">{activeRun?.label ?? 'Latest'}</span>
-              <ChevronDown className="size-4" aria-hidden />
+              <ChevronDown className="text-muted size-3" aria-hidden />
             </Button>
           </DropdownTrigger>
           <DropdownContent>
@@ -117,10 +124,15 @@ export function VisibilityToolbar({
 
       <Dropdown>
         <DropdownTrigger asChild>
-          <Button variant="secondary" size="sm" aria-label="Filter by engine">
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label="Filter by engine"
+            className={cn(engine !== 'all' && CHIP_ACTIVE_CLASS)}
+          >
             <span className="text-muted">Engine:</span>
             <span className="font-medium">{engineText}</span>
-            <ChevronDown className="size-4" aria-hidden />
+            <ChevronDown className="text-muted size-3" aria-hidden />
           </Button>
         </DropdownTrigger>
         <DropdownContent>
@@ -143,10 +155,15 @@ export function VisibilityToolbar({
       {showRange ? (
         <Dropdown>
           <DropdownTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Select date range">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Select date range"
+              className={cn(range !== '90d' && CHIP_ACTIVE_CLASS)}
+            >
               <span className="text-muted">Range:</span>
               <span className="font-medium">{rangeLabel(range)}</span>
-              <ChevronDown className="size-4" aria-hidden />
+              <ChevronDown className="text-muted size-3" aria-hidden />
             </Button>
           </DropdownTrigger>
           <DropdownContent>
@@ -167,10 +184,15 @@ export function VisibilityToolbar({
       {showGranularity ? (
         <Dropdown>
           <DropdownTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Select granularity">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Select granularity"
+              className={cn(granularity !== 'run' && CHIP_ACTIVE_CLASS)}
+            >
               <span className="text-muted">Granularity:</span>
               <span className="font-medium">{granularityLabel(granularity)}</span>
-              <ChevronDown className="size-4" aria-hidden />
+              <ChevronDown className="text-muted size-3" aria-hidden />
             </Button>
           </DropdownTrigger>
           <DropdownContent>
@@ -191,10 +213,15 @@ export function VisibilityToolbar({
       {showPrompt ? (
         <Dropdown>
           <DropdownTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Filter by prompt">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Filter by prompt"
+              className={cn(promptId !== null && CHIP_ACTIVE_CLASS)}
+            >
               <span className="text-muted">Prompt:</span>
               <span className="max-w-[16ch] truncate font-medium">{promptText}</span>
-              <ChevronDown className="size-4" aria-hidden />
+              <ChevronDown className="text-muted size-3" aria-hidden />
             </Button>
           </DropdownTrigger>
           <DropdownContent>
@@ -226,8 +253,8 @@ export function VisibilityToolbar({
           >
             <span className="text-muted">Prompts:</span>
             <span className="font-medium">All prompts</span>
-            <span className="text-2xs text-muted ml-1">— coming soon</span>
-            <ChevronDown className="size-4" aria-hidden />
+            <span className="text-2xs text-muted ml-1 font-mono">— coming soon</span>
+            <ChevronDown className="text-muted size-3" aria-hidden />
           </Button>
         </Tooltip>
       ) : null}

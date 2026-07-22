@@ -7,20 +7,20 @@ export const THEME_STORAGE_KEY = 'searchify-theme';
 const THEME_TRANSITION_ATTR = 'data-theme-transition';
 
 /**
- * Inline pre-hydration bootstrap: read the persisted theme (or the OS
- * preference) and set `data-theme` on <html> BEFORE React hydrates, so the
- * first paint never flashes the wrong theme. Injected verbatim into a
- * <script> in the root layout. Kept dependency-free and self-contained.
+ * Inline pre-hydration bootstrap: read the persisted theme (or fall back to
+ * the dark-first default) and set `data-theme` on <html> BEFORE React
+ * hydrates, so the first paint never flashes the wrong theme. Fallback
+ * chain: stored choice → dark. The app is dark-first, so the OS preference
+ * is intentionally NOT consulted — only an explicit stored 'light' choice
+ * (from any ThemeToggle) opts into light. Injected verbatim into a <script>
+ * in the root layout. Kept dependency-free and self-contained.
  */
 export const THEME_BOOTSTRAP_SCRIPT = `(() => {
   try {
     var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
-    var dark = stored
-      ? stored === 'dark'
-      : window.matchMedia('(prefers-color-scheme:dark)').matches;
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'dark';
   } catch (e) {
-    document.documentElement.dataset.theme = 'light';
+    document.documentElement.dataset.theme = 'dark';
   }
 })();`;
 

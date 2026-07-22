@@ -17,7 +17,10 @@ const root = process.cwd();
 // Line budgets — split any owner that exceeds its limit.
 const lineBudgets = [
   { file: 'app/layout.tsx', maxLines: 120 },
-  { file: 'app/globals.css', maxLines: 700 },
+  // globals.css is the single token source — the aurora/grain/logo/display
+  // utilities for the auth redesign (Phase C) and the midnight values
+  // (Phase D) all land here, so the budget is raised to 800.
+  { file: 'app/globals.css', maxLines: 800 },
   { file: 'components/ui/theme-toggle.tsx', maxLines: 120 },
   { file: 'lib/theme.ts', maxLines: 160 },
   // F5 app shell: composition only — split any sub-piece that outgrows this.

@@ -1,13 +1,16 @@
 import type { HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { cn } from '@/lib/utils';
 
 /**
  * Dense analytics table (§8):
- *  - sticky 32px header (--table-header-height), --text-xs uppercase, tracking-wide
+ *  - sticky 32px header (--table-header-height); header cells are uppercase
+ *    mono eyebrows (font-mono, text-2xs, tracking-[0.08em], muted — §8
+ *    panel-label pattern)
  *  - 40px rows (--table-row-height), --text-sm cells
- *  - hover row highlight; numeric columns (add `numeric`) center-align with
- *    tabular numerals, text/date columns stay left-aligned
+ *  - hover row highlight (accent-soft tint); numeric columns (add `numeric`)
+ *    center-align with tabular numerals, text/date columns stay left-aligned
  * The wrapper is scroll-capable so the sticky header pins on vertical scroll.
  */
 export function Table({
@@ -65,7 +68,7 @@ export function TableRow({
     <tr
       {...props}
       className={cn(
-        'border-border-subtle bg-panel hover:bg-accent-soft h-[var(--table-row-height)] border-b transition-colors',
+        'border-border-subtle bg-panel hover:bg-accent-soft/40 h-[var(--table-row-height)] border-b transition-colors',
         className,
       )}
     >
@@ -84,7 +87,8 @@ export function TableHead({
     <th
       {...props}
       className={cn(
-        'border-border bg-background-alt text-muted sticky top-0 z-10 h-[var(--table-header-height)] border-b px-3 align-middle text-[length:var(--table-header-font-size)] font-semibold tracking-wide uppercase',
+        eyebrowClasses,
+        'border-border bg-background-alt sticky top-0 z-10 h-[var(--table-header-height)] border-b px-3 align-middle',
         numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}
