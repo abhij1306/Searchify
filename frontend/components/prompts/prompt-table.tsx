@@ -19,11 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TablePagination, useTablePage } from '@/components/ui/table-pagination';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { Prompt, PromptStatus } from '@/lib/api/types';
 import { intentLabels } from '@/lib/prompts/forms';
-
-import { TablePagination, useTablePage } from './table-pagination';
 
 /** Rows per page on the prompt table (client-side; the list arrives whole). */
 const PAGE_SIZE = 10;

@@ -6,16 +6,15 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 /**
- * Midnight table pagination (designs/shell-prompts-midnight.html): a mono
- * "from–to of total" page indicator plus ghost Prev/Next buttons, pinned to
- * the table card's bottom border. Local to the prompts/runs tables (a sibling
- * lives in components/runs) — a candidate for promotion into components/ui
- * once a third table paginates.
+ * Midnight table pagination (designs/shell-runs-midnight.html +
+ * shell-prompts-midnight.html): a mono "from–to of total" page indicator plus
+ * ghost Prev/Next buttons, pinned to the table card's bottom border. Shared by
+ * the runs and prompts tables (promoted from their per-screen duplicates).
  *
  * `useTablePage` owns the page state with clamp-only reconciliation: when the
- * underlying list shrinks (filters, deletes, refetches) the rendered page
- * clamps into range instead of resetting, so a background refetch never yanks
- * the user back to page 1.
+ * underlying list shrinks (filters, deletes, polling refetches) the rendered
+ * page clamps into range instead of resetting, so a background refetch never
+ * yanks the user back to page 1.
  */
 export function useTablePage(total: number, pageSize: number) {
   const [page, setPage] = useState(1);

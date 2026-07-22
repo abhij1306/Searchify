@@ -236,6 +236,20 @@ describe('ScoreRing', () => {
     expect(screen.getByRole('img', { name: 'Overflow' })).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
   });
+
+  it('renders the display-size numeral with numeralSize="lg"', () => {
+    render(<ScoreRing value={82} size={128} numeralSize="lg" />);
+    const numeral = screen.getByText('82');
+    expect(numeral.className).toContain('text-2xl');
+    expect(numeral).toHaveAttribute('aria-hidden', 'true');
+    // The accessible label still lives on the ring, not the numeral.
+    expect(screen.getByRole('img', { name: 'Visibility score: 82%' })).toBeInTheDocument();
+  });
+
+  it('defaults to the text-lg numeral', () => {
+    render(<ScoreRing value={82} />);
+    expect(screen.getByText('82').className).toContain('text-lg');
+  });
 });
 
 describe('Donut', () => {

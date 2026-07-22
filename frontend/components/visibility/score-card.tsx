@@ -1,8 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardEyebrow } from '@/components/ui/card';
-import { scoreBand, scoreBandText } from '@/components/ui/score-band';
 import { ScoreRing } from '@/components/ui/score-ring';
-import { cn } from '@/lib/utils';
 import type { RunStatusValue } from '@/components/ui/badge-variants';
 import type { AuditStatus, Visibility } from '@/lib/api/types';
 
@@ -25,34 +23,20 @@ const RUN_STATUS_BADGE: Partial<Record<AuditStatus, RunStatusValue>> = {
 export function VisibilityScoreCard({ visibility }: Readonly<{ visibility: Visibility }>) {
   const label = RUN_STATUS_LABELS[visibility.audit_status] ?? visibility.audit_status;
   const badge = RUN_STATUS_BADGE[visibility.audit_status] ?? 'completed';
-  // Same clamp ScoreRing applies, so the overlaid display numeral always
-  // matches the ring's arc and its ARIA label.
-  const clamped = Math.max(0, Math.min(100, Math.round(visibility.visibility_score)));
 
   return (
     <Card>
       <CardContent className="grid justify-items-center gap-4 text-center">
         <CardEyebrow>Visibility score</CardEyebrow>
-        <div className="relative inline-flex">
-          <ScoreRing
-            value={visibility.visibility_score}
-            size={128}
-            strokeWidth={10}
-            showValue={false}
-          />
-          {/* Midnight display numeral — larger than ScoreRing's built-in label
-              (the mockup's 31px mono); aria-hidden, the ring's svg carries the
-              accessible "Visibility score: N%" label. */}
-          <span
-            aria-hidden
-            className={cn(
-              'mono absolute inset-0 flex items-center justify-center text-2xl font-semibold',
-              scoreBandText[scoreBand(clamped)],
-            )}
-          >
-            {clamped}
-          </span>
-        </div>
+        {/* Midnight display numeral via the ring's `lg` numeral (the mockup's
+            29px mono); the ring's svg carries the accessible
+            "Visibility score: N%" label. */}
+        <ScoreRing
+          value={visibility.visibility_score}
+          size={128}
+          strokeWidth={10}
+          numeralSize="lg"
+        />
         <div className="grid gap-1">
           <p className="text-secondary text-sm">
             Your brand&apos;s visibility across LLMs for this run

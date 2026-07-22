@@ -5,6 +5,11 @@ import { scoreBand, scoreBandStroke, scoreBandText } from './score-band';
  * ScoreRing (§8) — circular progress. Color from the score-band token, center
  * shows the mono display number. Carries an ARIA label with the percentage
  * (role="img") so the value is announced to assistive tech.
+ *
+ * `numeralSize="lg"` renders the center numeral at the display size
+ * (`text-2xl`) for hero surfaces like the Visibility score card — pair it with
+ * a larger `size`/`strokeWidth`. The numeral stays `aria-hidden`; the ring's
+ * svg keeps the accessible label either way.
  */
 export function ScoreRing({
   value,
@@ -12,6 +17,7 @@ export function ScoreRing({
   strokeWidth = 8,
   label,
   showValue = true,
+  numeralSize = 'md',
   className,
 }: Readonly<{
   /** Score 0–100. */
@@ -21,6 +27,8 @@ export function ScoreRing({
   /** Accessible label; defaults to "Visibility score: N%". */
   label?: string;
   showValue?: boolean;
+  /** Center numeral size: `md` = text-lg (default), `lg` = text-2xl display. */
+  numeralSize?: 'md' | 'lg';
   className?: string;
 }>) {
   const clamped = Math.max(0, Math.min(100, Math.round(value)));
@@ -67,7 +75,8 @@ export function ScoreRing({
         <span
           aria-hidden
           className={cn(
-            'mono absolute inset-0 flex items-center justify-center text-lg font-semibold',
+            'mono absolute inset-0 flex items-center justify-center font-semibold',
+            numeralSize === 'lg' ? 'text-2xl' : 'text-lg',
             scoreBandText[band],
           )}
         >

@@ -11,10 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TablePagination, useTablePage } from '@/components/ui/table-pagination';
 import type { Audit } from '@/lib/api/types';
 import { auditBadgeValue, auditStatusLabel, formatDateTime } from '@/lib/runs/status';
-
-import { TablePagination, useTablePage } from './table-pagination';
 
 /** Rows per page on the runs table (client-side; the list arrives whole). */
 const PAGE_SIZE = 10;
