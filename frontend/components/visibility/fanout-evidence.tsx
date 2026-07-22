@@ -108,7 +108,7 @@ function PromptGroupBlock({ group }: Readonly<{ group: PromptGroup }>) {
 
 function ExecutionRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) {
   return (
-    <li className="border-border-subtle bg-background-alt grid gap-2 rounded-md border p-4">
+    <li className="border-border-subtle bg-background-alt grid gap-2 rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted text-xs">
           Execution #{item.prompt_index} · rep {item.repetition} ·{' '}
@@ -123,7 +123,9 @@ function ExecutionRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>)
         </span>
       </div>
 
-      <p className="text-2xs text-muted tracking-wide uppercase">{provenanceSummary(item)}</p>
+      <p className="text-2xs text-muted font-mono tracking-[0.08em] uppercase">
+        {provenanceSummary(item)}
+      </p>
 
       <QueryDetail item={item} />
     </li>
@@ -138,7 +140,7 @@ function QueryDetail({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) 
         {queries.map((query, index) => (
           <li
             key={`${index}-${query}`}
-            className="border-border-subtle bg-panel text-secondary rounded-sm border px-3 py-2 text-xs"
+            className="border-border-subtle bg-panel text-secondary rounded-md border px-3 py-2 font-mono text-xs"
           >
             {query}
           </li>
@@ -149,14 +151,14 @@ function QueryDetail({ item }: Readonly<{ item: VisibilityExecutionEvidence }>) 
 
   if (item.state === 'count_only') {
     return (
-      <div className="border-border-subtle bg-panel text-muted rounded-sm border px-3 py-2 text-xs">
+      <div className="border-border-subtle bg-panel text-muted rounded-md border px-3 py-2 text-xs">
         {countOnlyExplanation(item)}
       </div>
     );
   }
 
   return (
-    <div className="border-border-subtle bg-panel text-muted flex items-center gap-2 rounded-sm border px-3 py-2.5 text-xs">
+    <div className="border-border-subtle bg-panel text-muted flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs">
       <MinusCircle className="size-3.5 shrink-0" aria-hidden />
       <span>No web searches performed for this execution</span>
     </div>

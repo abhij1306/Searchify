@@ -72,7 +72,7 @@ export function VisibilityTabs({
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <div
         role="tablist"
         aria-label="Visibility views"
@@ -96,7 +96,7 @@ export function VisibilityTabs({
               onClick={() => onSelectTab(tab.id)}
               onKeyDown={onKeyDown}
               className={cn(
-                'focus-ring -mb-0.5 shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
+                'focus-ring -mb-0.5 shrink-0 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
                 selected
                   ? 'border-accent text-foreground font-semibold'
                   : 'text-secondary hover:text-foreground border-transparent',

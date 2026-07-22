@@ -106,7 +106,7 @@ export function VisibilityDashboard() {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       {activeRun ? <ActiveRunBanner run={activeRun} /> : null}
       <VisibilityToolbar
         activeTab={filters.activeTab}
