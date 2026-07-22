@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetupForm } from '@/components/setup/setup-form';
@@ -21,9 +21,22 @@ export default function SetupPage() {
   const router = useRouter();
   const { activeProjectId, isLoading } = useProjectContext();
 
+  // Whether an active project already existed when the projects query first
+  // resolved. Distinguishes "arrived on /setup with a project" (redirect to
+  // its edit form) from "just created one in the embedded form below": the
+  // create mutation sets the active project *while this page is still
+  // mounted* and then routes to `/prompts` itself — an unconditional redirect
+  // here fires in the same window and hijacks that navigation, landing fresh
+  // users on the edit form instead of `/prompts`.
+  const hadProjectOnLoad = useRef<boolean | null>(null);
+
   useEffect(() => {
-    if (activeProjectId) router.replace(`/setup/${activeProjectId}`);
-  }, [activeProjectId, router]);
+    if (isLoading) return;
+    hadProjectOnLoad.current ??= Boolean(activeProjectId);
+    if (activeProjectId && hadProjectOnLoad.current) {
+      router.replace(`/setup/${activeProjectId}`);
+    }
+  }, [activeProjectId, isLoading, router]);
 
   // While projects load — or while the redirect above is in flight — show a
   // skeleton instead of flashing the empty create form.
@@ -42,7 +55,8 @@ export default function SetupPage() {
         <AccentEyebrow>New project</AccentEyebrow>
         <h2 className={displayHeadingXlClasses}>Set up your brand project</h2>
         <p className="text-secondary text-sm">
-          Five short steps — brand, market, domains, competitors, and audit defaults.
+          Two short steps — your brand and its market. Domains, competitors, and audit defaults can
+          be refined anytime after your first run.
         </p>
       </div>
       <SetupForm />

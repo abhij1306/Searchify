@@ -110,10 +110,11 @@ function groupByTopic(
 }
 
 /**
- * Your Prompts (design.md §9.4, sidebar "Your Prompts"): the read-only,
+ * Your Prompts (design.md §9.4, sidebar "Prompts"): the read-only,
  * score-annotated view of the ACTIVE prompt configuration, grouped by topic
  * with expandable rows. Editing, review (proposed/archived), and AI generation
- * live on `/prompt-research` — the banner links there.
+ * live in the page's in-page manage mode (`/prompts?mode=manage`) — the
+ * banner links there.
  */
 export function YourPrompts() {
   const project = useActiveProject();
@@ -206,10 +207,10 @@ export function YourPrompts() {
           {topicCount === 1 ? 'topic' : 'topics'}, which are run on each audit.
         </p>
         <Link
-          href="/prompt-research"
+          href="/prompts?mode=manage"
           className={buttonVariants({ variant: 'primary', size: 'sm' })}
         >
-          Go to Prompt Research
+          Manage prompts
         </Link>
       </div>
 
@@ -234,14 +235,14 @@ export function YourPrompts() {
           <p className={eyebrowClasses}>Your prompts</p>
           <h2 className={displayHeadingXlClasses}>No active prompts yet</h2>
           <p className="text-secondary max-w-md text-sm">
-            Head to Prompt Research to add prompts manually, import a CSV, or generate prompts and
+            Switch to manage mode to add prompts manually, import a CSV, or generate prompts and
             topics with AI.
           </p>
           <Link
-            href="/prompt-research"
+            href="/prompts?mode=manage"
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
           >
-            Go to Prompt Research
+            Manage prompts
           </Link>
         </div>
       ) : visiblePrompts.length === 0 ? (

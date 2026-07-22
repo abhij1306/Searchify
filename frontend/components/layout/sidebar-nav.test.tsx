@@ -1,8 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TooltipProvider } from '@/components/ui/tooltip';
-
 vi.mock('next/navigation', () => ({
   usePathname: () => '/visibility',
 }));
@@ -11,26 +9,24 @@ import { SidebarNav } from './sidebar-nav';
 import { NAV_GROUPS } from './nav-items';
 
 function renderNav() {
-  return render(
-    <TooltipProvider>
-      <SidebarNav />
-    </TooltipProvider>,
-  );
+  return render(<SidebarNav />);
 }
 
 describe('SidebarNav', () => {
-  it('renders all four groups', () => {
+  it('renders both groups', () => {
     renderNav();
-    for (const group of ['Analytics', 'Prompts', 'Actions', 'On Page']) {
+    for (const group of ['Analyze', 'Optimize']) {
       expect(screen.getByText(group)).toBeInTheDocument();
     }
   });
 
-  it('renders live items as navigable links', () => {
+  it('renders items as navigable links', () => {
     renderNav();
-    // Visibility is live → a link pointing at /visibility.
     const visibility = screen.getByRole('link', { name: /visibility/i });
     expect(visibility).toHaveAttribute('href', '/visibility');
+    // Prompts is the single prompts surface (read view + in-page manage mode).
+    const prompts = screen.getByRole('link', { name: /prompts/i });
+    expect(prompts).toHaveAttribute('href', '/prompts');
   });
 
   it('highlights the active route', () => {
@@ -38,38 +34,36 @@ describe('SidebarNav', () => {
     const visibility = screen.getByRole('link', { name: /visibility/i });
     expect(visibility).toHaveAttribute('aria-current', 'page');
 
-    // A different live route is not marked active.
-    const prompts = screen.getByRole('link', { name: /your prompts/i });
-    expect(prompts).not.toHaveAttribute('aria-current');
+    // A different route is not marked active.
+    const runs = screen.getByRole('link', { name: /runs/i });
+    expect(runs).not.toHaveAttribute('aria-current');
   });
 
-  it('renders disabled items as non-navigable with a "soon" affordance', () => {
+  it('renders every item as a link — no disabled state or "soon" badge', () => {
     renderNav();
-    // LLM Analytics is a roadmap item — no link, and shows "soon".
-    expect(screen.queryByRole('link', { name: /llm analytics/i })).not.toBeInTheDocument();
-
-    const disabled = screen.getByText('LLM Analytics').closest('[aria-disabled="true"]');
-    expect(disabled).not.toBeNull();
-    expect(disabled).toHaveTextContent(/soon/i);
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(8);
+    for (const link of links) {
+      expect(link).not.toHaveAttribute('aria-disabled');
+    }
+    expect(screen.queryByText(/soon/i)).not.toBeInTheDocument();
   });
 
-  it('renders exactly the MVP-live items as links', () => {
+  it('renders exactly the nav model as links', () => {
     renderNav();
-    const liveLabels = NAV_GROUPS.flatMap((group) =>
-      group.items.filter((item) => item.live).map((item) => item.label),
-    );
-    expect(liveLabels).toEqual([
+    expect(NAV_GROUPS).toHaveLength(2);
+    const labels = NAV_GROUPS.flatMap((group) => group.items.map((item) => item.label));
+    expect(labels).toEqual([
       'Visibility',
-      'Your Prompts',
-      'Prompt Research',
+      'Prompts',
       'Runs',
       'Content',
-      'Setup',
       'Site Health',
       'Issues',
       'Knowledge Base',
+      'Setup',
     ]);
-    for (const label of liveLabels) {
+    for (const label of labels) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toBeInTheDocument();
     }
   });

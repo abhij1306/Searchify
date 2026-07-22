@@ -42,10 +42,12 @@ test('authenticated shell renders sidebar groups and top bar', async ({ page }) 
 
   await page.goto('/visibility');
 
-  // Sidebar groups + a live nav item. Exact match: "LLM Analytics" also
-  // contains "Analytics" and would trip strict mode otherwise.
-  await expect(page.getByText('Analytics', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /visibility/i })).toBeVisible();
+  // Sidebar groups + a nav item. Scoped to the primary nav landmark and
+  // exact-matched so page copy can't satisfy or trip the assertion.
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  await expect(nav.getByText('Analyze', { exact: true })).toBeVisible();
+  await expect(nav.getByText('Optimize', { exact: true })).toBeVisible();
+  await expect(nav.getByRole('link', { name: /visibility/i })).toBeVisible();
 
   // Project switcher shows the active brand.
   await expect(page.getByText('Acme').first()).toBeVisible();
@@ -55,7 +57,4 @@ test('authenticated shell renders sidebar groups and top bar', async ({ page }) 
   // the page can't satisfy the assertion.
   await expect(page.getByRole('banner').getByRole('heading', { name: 'Visibility' })).toBeVisible();
   await expect(page.getByRole('button', { name: /toggle color theme/i })).toBeVisible();
-
-  // A disabled roadmap item shows the "soon" affordance and is not a link.
-  await expect(page.getByRole('link', { name: /llm analytics/i })).toHaveCount(0);
 });

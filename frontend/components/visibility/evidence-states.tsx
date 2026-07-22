@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertTriangle, Info, Inbox, RefreshCw, SearchX } from 'lucide-react';
+import { Info, Inbox, RefreshCw, SearchX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { displayHeadingLgClasses } from '@/components/ui/typography';
+import { ICONS } from '@/lib/icons';
 
 /**
  * Shared data-state presentations for the two evidence tabs (design.md states
@@ -56,7 +57,7 @@ export function EvidenceError({
         <div className="grid justify-items-center gap-3 py-10 text-center">
           <CardEyebrow>{title}</CardEyebrow>
           <span className="bg-danger-bg text-danger-text flex size-10 items-center justify-center rounded-full">
-            <AlertTriangle className="size-5" aria-hidden />
+            <ICONS.warning className="size-5" aria-hidden />
           </span>
           <h3 className={displayHeadingLgClasses}>Couldn&apos;t load this evidence</h3>
           <p className="text-secondary max-w-xs text-sm">

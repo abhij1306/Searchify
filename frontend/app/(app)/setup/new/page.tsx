@@ -18,7 +18,8 @@ export default function NewProjectPage() {
         <AccentEyebrow>New project</AccentEyebrow>
         <h2 className={displayHeadingXlClasses}>Set up another brand project</h2>
         <p className="text-secondary text-sm">
-          Five short steps — brand, market, domains, competitors, and audit defaults.
+          Two short steps — your brand and its market. Domains, competitors, and audit defaults can
+          be refined anytime after your first run.
         </p>
       </div>
       <SetupForm />

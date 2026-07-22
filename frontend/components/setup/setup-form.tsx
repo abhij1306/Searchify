@@ -35,8 +35,10 @@ import {
 import { CompetitorRows } from './competitor-rows';
 import { EntryList, EntryListView } from './entry-list';
 import { GenerateBrandDialog } from './generate-brand-dialog';
+import { MarketSelect } from './market-select';
 import { SegmentedControl } from './segmented-control';
 import { SetupStepper, type SetupStep } from './setup-stepper';
+import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS } from '@/lib/setup/markets';
 
 const benchmarkOptions = benchmarkModeValues.map((value) => ({
   value,
@@ -47,8 +49,22 @@ const benchmarkOptions = benchmarkModeValues.map((value) => ({
  * The wizard's steps in order, with the form fields each validates. `fields`
  * drives both per-step validation (`trigger`) on Next and the jump-to-first-
  * error behavior on submit.
+ *
+ * Create mode is the guided two-step flow (Brand → Market); everything else
+ * is optional and lives on the edit surface. Edit mode keeps all five steps.
  */
-const STEPS = [
+const CREATE_STEPS = [
+  {
+    id: 'brand',
+    label: 'Brand',
+    fields: ['brand_name', 'website_url', 'aliases'],
+  },
+  { id: 'market', label: 'Market', fields: ['country_code', 'language_code'] },
+] as const satisfies readonly (SetupStep & {
+  fields: readonly (keyof SetupFormValues)[];
+})[];
+
+const EDIT_STEPS = [
   {
     id: 'brand',
     label: 'Brand',
@@ -62,29 +78,35 @@ const STEPS = [
   fields: readonly (keyof SetupFormValues)[];
 })[];
 
+type WizardSteps = typeof CREATE_STEPS | typeof EDIT_STEPS;
+
 /** Index of the first step that owns a field with a validation error. */
-function firstErrorStep(errors: FieldErrors<SetupFormValues>): number {
-  const index = STEPS.findIndex((step) => step.fields.some((field) => field in errors));
+function firstErrorStep(errors: FieldErrors<SetupFormValues>, steps: WizardSteps): number {
+  const index = steps.findIndex((step) => step.fields.some((field) => field in errors));
   return index === -1 ? 0 : index;
 }
 
 /**
  * SetupForm (F6) — the Brand/Project setup wizard for both create and edit.
  *
- * A horizontal stepper (Brand → Market → Domains → Competitors → Defaults)
- * with a progress line; one step renders at a time and react-hook-form keeps
- * values across steps. Next validates only the current step's fields; the
- * final submit validates everything and jumps back to the first step with an
- * error.
+ * **Create** (`project` undefined) is the guided two-step flow (Brand →
+ * Market): brand name + website URL (project name is auto-derived from the
+ * brand), then searchable country/language selects. Domains, competitors,
+ * and audit defaults keep their `emptySetupForm` defaults and are refined
+ * later on the edit surface. Submit POSTs, sets the project active, and
+ * routes to `/prompts` (the next checklist step).
  *
- * - **Create** (`project` undefined): POSTs a new project, sets it active via
- *   the F5 project context, and routes to `/visibility`.
- * - **Edit** (`project` provided): prefills from the existing project, opens
- *   on the completed Defaults step after a refresh, every step is immediately
- *   reachable, and Save is available on any step.
+ * **Edit** (`project` provided) keeps the full horizontal stepper (Brand →
+ * Market → Domains → Competitors → Defaults) with a progress line; one step
+ * renders at a time and react-hook-form keeps values across steps. Next
+ * validates only the current step's fields; the final submit validates
+ * everything and jumps back to the first step with an error. It prefills
+ * from the existing project, opens on the completed Defaults step after a
+ * refresh, every step is immediately reachable, and Save is available on
+ * any step.
  *
  * Each step renders as a midnight card (Phase D6) with a mono-eyebrow
- * `Step N of 5` panel label above its section title.
+ * `Step N of M` panel label above its section title.
  */
 export function SetupForm({
   project,
@@ -94,6 +116,7 @@ export function SetupForm({
   const queryClient = useQueryClient();
   const { setActiveProjectId } = useProjectContext();
   const isEdit = Boolean(project);
+  const steps = isEdit ? EDIT_STEPS : CREATE_STEPS;
 
   const {
     register,
@@ -110,12 +133,12 @@ export function SetupForm({
   // A persisted project has already completed setup. Reopen its edit wizard
   // on the final Defaults step so the stepper represents that state instead
   // of misleadingly returning to Brand on every refresh.
-  const [step, setStep] = useState(isEdit ? STEPS.length - 1 : 0);
+  const [step, setStep] = useState(isEdit ? steps.length - 1 : 0);
   // Furthest step reached: gates forward jumps in create mode; edit mode has
   // everything unlocked from the start.
-  const [maxVisited, setMaxVisited] = useState(isEdit ? STEPS.length - 1 : 0);
-  const isLast = step === STEPS.length - 1;
-  const stepId = STEPS[step].id;
+  const [maxVisited, setMaxVisited] = useState(isEdit ? steps.length - 1 : 0);
+  const isLast = step === steps.length - 1;
+  const stepId = steps[step].id;
 
   const goTo = (index: number) => {
     setStep(index);
@@ -123,7 +146,7 @@ export function SetupForm({
   };
 
   const onNext = async () => {
-    const valid = await trigger([...STEPS[step].fields], { shouldFocus: true });
+    const valid = await trigger([...steps[step].fields], { shouldFocus: true });
     if (valid) goTo(step + 1);
   };
 
@@ -249,7 +272,7 @@ export function SetupForm({
         return;
       }
       setActiveProjectId(saved.id);
-      router.replace('/visibility');
+      router.replace('/prompts');
     },
   });
 
@@ -257,12 +280,12 @@ export function SetupForm({
     (values) => mutation.mutateAsync(formValuesToProjectInput(values)).catch(() => undefined),
     // Full-form validation failed: jump to the earliest step that owns an
     // erroring field so the message is on screen.
-    (submitErrors) => setStep(firstErrorStep(submitErrors)),
+    (submitErrors) => setStep(firstErrorStep(submitErrors, steps)),
   );
 
   return (
     <form noValidate onSubmit={onSubmit} className="grid gap-6">
-      <SetupStepper steps={STEPS} current={step} maxVisited={maxVisited} onSelect={goTo} />
+      <SetupStepper steps={steps} current={step} maxVisited={maxVisited} onSelect={goTo} />
 
       {mutation.isError ? <Alert tone="danger">{setupErrorMessage(mutation.error)}</Alert> : null}
       {isEdit && mutation.isSuccess ? <Alert tone="success">Project saved.</Alert> : null}
@@ -270,19 +293,30 @@ export function SetupForm({
       {stepId === 'brand' ? (
         <Card>
           <CardHeader>
-            <CardEyebrow>Step 1 of 5</CardEyebrow>
+            <CardEyebrow>{`Step ${step + 1} of ${steps.length}`}</CardEyebrow>
             <CardTitle>Brand profile</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Brand name" required error={errors.brand_name?.message}>
+            <div className={isEdit ? 'grid gap-4 sm:grid-cols-2' : 'grid gap-4'}>
+              <Field
+                label="Brand name"
+                required
+                error={errors.brand_name?.message}
+                hint={isEdit ? undefined : 'The project is named after your brand.'}
+              >
                 {(props) => (
                   <Input {...props} {...register('brand_name')} placeholder="Searchify" />
                 )}
               </Field>
-              <Field label="Project name" required error={errors.name?.message}>
-                {(props) => <Input {...props} {...register('name')} placeholder="Searchify — US" />}
-              </Field>
+              {isEdit ? (
+                <Field
+                  label="Project name"
+                  error={errors.name?.message}
+                  hint="Defaults to the brand name when blank."
+                >
+                  {(props) => <Input {...props} {...register('name')} placeholder="Searchify — US" />}
+                </Field>
+              ) : null}
             </div>
             <Field
               label="Website URL"
@@ -314,28 +348,50 @@ export function SetupForm({
       {stepId === 'market' ? (
         <Card>
           <CardHeader>
-            <CardEyebrow>Step 2 of 5</CardEyebrow>
+            <CardEyebrow>{`Step ${step + 1} of ${steps.length}`}</CardEyebrow>
             <CardTitle>Location &amp; language</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Country code"
-              required
-              error={errors.country_code?.message}
-              hint="2-letter ISO code, e.g. US"
-            >
+            <Field label="Country" required error={errors.country_code?.message}>
               {(props) => (
-                <Input {...props} {...register('country_code')} placeholder="US" maxLength={2} />
+                <Controller
+                  control={control}
+                  name="country_code"
+                  render={({ field }) => (
+                    <MarketSelect
+                      id={props.id}
+                      aria-describedby={props['aria-describedby']}
+                      aria-invalid={props['aria-invalid']}
+                      ariaLabel="Country"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      options={COUNTRY_OPTIONS}
+                      placeholder="Search countries…"
+                    />
+                  )}
+                />
               )}
             </Field>
-            <Field
-              label="Language code"
-              required
-              error={errors.language_code?.message}
-              hint="e.g. en or en-US"
-            >
+            <Field label="Language" required error={errors.language_code?.message}>
               {(props) => (
-                <Input {...props} {...register('language_code')} placeholder="en" maxLength={5} />
+                <Controller
+                  control={control}
+                  name="language_code"
+                  render={({ field }) => (
+                    <MarketSelect
+                      id={props.id}
+                      aria-describedby={props['aria-describedby']}
+                      aria-invalid={props['aria-invalid']}
+                      ariaLabel="Language"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      options={LANGUAGE_OPTIONS}
+                      placeholder="Search languages…"
+                    />
+                  )}
+                />
               )}
             </Field>
           </CardContent>
@@ -346,7 +402,7 @@ export function SetupForm({
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div className="grid gap-1">
-              <CardEyebrow>Step 3 of 5</CardEyebrow>
+              <CardEyebrow>{`Step ${step + 1} of ${steps.length}`}</CardEyebrow>
               <CardTitle>Domains</CardTitle>
             </div>
             <Button
@@ -386,7 +442,7 @@ export function SetupForm({
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <div className="grid gap-1">
-              <CardEyebrow>Step 4 of 5</CardEyebrow>
+              <CardEyebrow>{`Step ${step + 1} of ${steps.length}`}</CardEyebrow>
               <CardTitle>Competitors</CardTitle>
             </div>
             <Button
@@ -414,7 +470,7 @@ export function SetupForm({
       {stepId === 'defaults' ? (
         <Card>
           <CardHeader>
-            <CardEyebrow>Step 5 of 5</CardEyebrow>
+            <CardEyebrow>{`Step ${step + 1} of ${steps.length}`}</CardEyebrow>
             <CardTitle>Audit defaults</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">

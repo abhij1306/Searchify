@@ -1,4 +1,6 @@
-import { BarChart3, Eye, Globe, KeyRound, Sigma, TrendingUp } from 'lucide-react';
+import { BarChart3, Globe, KeyRound, Sigma, TrendingUp } from 'lucide-react';
+
+import { ICONS } from '@/lib/icons';
 
 const FEATURES = [
   {
@@ -12,7 +14,7 @@ const FEATURES = [
     body: 'Mentions, citations, and share-of-voice are computed from the raw response text. Same data, same score.',
   },
   {
-    icon: Eye,
+    icon: ICONS.visibility,
     title: 'Evidence explorer',
     body: 'Every metric links to the exact run it came from. Open the raw response in Runs and check the math yourself.',
   },

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 import { NAV_GROUPS, type NavItem } from './nav-items';
@@ -13,17 +12,15 @@ import { eyebrowClasses } from '@/components/ui/eyebrow';
  * SidebarNav (F5) — grouped sidebar navigation (docs/design.md §9.2).
  *
  * Group labels are uppercase mono eyebrows (the midnight panel-label
- * pattern). MVP-live items are `<Link>`s with the mockup's pill active state
- * (accent-soft bg + accent-text, icon inherits). Roadmap items are rendered
- * but **disabled**: a non-navigable `<span>` (no href, `aria-disabled`) with
- * a muted "soon" pill and an explanatory tooltip. Highlighting matches the
+ * pattern). All items are live `<Link>`s with the mockup's pill active state
+ * (accent-soft bg + accent-text, icon inherits). Highlighting matches the
  * current route or any nested route (e.g. `/runs/[id]` highlights Runs).
  */
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function LiveItem({ item, active }: Readonly<{ item: NavItem; active: boolean }>) {
+function NavLink({ item, active }: Readonly<{ item: NavItem; active: boolean }>) {
   const Icon = item.icon;
   return (
     <Link
@@ -42,24 +39,6 @@ function LiveItem({ item, active }: Readonly<{ item: NavItem; active: boolean }>
   );
 }
 
-function DisabledItem({ item }: Readonly<{ item: NavItem }>) {
-  const Icon = item.icon;
-  return (
-    <Tooltip content={`${item.label} is coming soon`} side="right">
-      <span
-        aria-disabled="true"
-        className="text-subtle flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium"
-      >
-        <Icon className="size-4 shrink-0" aria-hidden strokeWidth={2} />
-        <span className="truncate">{item.label}</span>
-        <span className="bg-neutral-bg text-2xs text-muted ml-auto rounded-full px-1.5 py-0.5 font-mono font-semibold tracking-wide uppercase">
-          soon
-        </span>
-      </span>
-    </Tooltip>
-  );
-}
-
 export function SidebarNav({ className }: Readonly<{ className?: string }>) {
   const pathname = usePathname() ?? '';
 
@@ -71,11 +50,7 @@ export function SidebarNav({ className }: Readonly<{ className?: string }>) {
           <ul className="flex flex-col gap-0.5">
             {group.items.map((item) => (
               <li key={item.href}>
-                {item.live ? (
-                  <LiveItem item={item} active={isActive(pathname, item.href)} />
-                ) : (
-                  <DisabledItem item={item} />
-                )}
+                <NavLink item={item} active={isActive(pathname, item.href)} />
               </li>
             ))}
           </ul>

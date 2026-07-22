@@ -3,8 +3,10 @@
 import { eyebrowClasses } from '@/components/ui/eyebrow';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Check } from 'lucide-react';
 
+import { ConnectProviderDialog } from '@/components/providers/connect-provider-dialog';
 import { providersApi } from '@/lib/api/providers';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
@@ -12,20 +14,23 @@ import { useProjectContext } from '@/lib/project/project-context';
 import { cn } from '@/lib/utils';
 
 /**
- * GettingStartedCard (F5) — the "Getting Started N of 6" onboarding progress
- * card in the sidebar (docs/design.md §9.2).
+ * GettingStartedCard (F5) — the single "Getting Started N of 5" onboarding
+ * checklist in the sidebar (docs/design.md §9.2).
  *
- * The six MVP onboarding steps map to the live surfaces a user completes to get
+ * This is the ONE onboarding tracker: the old duplicate "create project" and
+ * "add brand details" steps are merged into a single "Set up your project"
+ * step, so the five steps map to the live surfaces a user completes to get
  * their first run. Completion is fully derived from live data: project +
  * prompts from the loaded project, provider from the BYOK connections list
  * (an active connection with a stored key), and run/review from the project's
- * audits (any launched → step 5; any completed → step 6). It is intentionally
+ * audits (any launched → step 4; any completed → step 5). It is intentionally
  * a light nudge, not a source of truth.
  */
-type Step = { label: string; href: string; done: boolean };
+type Step = { label: string; href: string; done: boolean; id?: string };
 
 export function GettingStartedCard({ className }: Readonly<{ className?: string }>) {
   const { activeProject } = useProjectContext();
+  const [connectOpen, setConnectOpen] = useState(false);
 
   const hasProject = Boolean(activeProject);
   const hasPrompts = (activeProject?.prompt_sets ?? []).some((set) => set.prompts.length > 0);
@@ -56,10 +61,14 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
   );
 
   const steps: Step[] = [
-    { label: 'Create your project', href: '/setup', done: hasProject },
-    { label: 'Add brand details', href: '/setup', done: hasProject },
+    { label: 'Set up your project', href: '/setup', done: hasProject },
     { label: 'Add prompts', href: '/prompts', done: hasPrompts },
-    { label: 'Connect a provider', href: '/settings?tab=providers', done: hasProvider },
+    {
+      label: 'Connect a provider',
+      href: '/settings?tab=providers',
+      done: hasProvider,
+      id: 'connect-provider',
+    },
     { label: 'Launch your first run', href: '/runs', done: hasRun },
     { label: 'Review visibility', href: '/visibility', done: hasCompletedRun },
   ];
@@ -95,19 +104,41 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
         />
       </div>
 
-      <Link
-        href={nextStep.href}
-        className="focus-ring text-accent-text mt-2.5 flex items-center gap-2 rounded-sm text-sm font-medium hover:underline"
-      >
-        {completed === total ? (
-          <>
-            <Check className="size-4 shrink-0" aria-hidden />
-            <span>All set — you&apos;re ready to run</span>
-          </>
-        ) : (
-          <span className="truncate">Next: {nextStep.label}</span>
-        )}
-      </Link>
+      {nextStep.id === 'connect-provider' ? (
+        // The connect-provider step opens the guided dialog inline; the full
+        // 3-engine management surface stays one click away in Settings.
+        <div className="mt-2.5 grid gap-1">
+          <button
+            type="button"
+            onClick={() => setConnectOpen(true)}
+            className="focus-ring text-accent-text flex items-center gap-2 rounded-sm text-sm font-medium hover:underline"
+          >
+            <span className="truncate">Next: {nextStep.label}</span>
+          </button>
+          <Link
+            href="/settings?tab=providers"
+            className="focus-ring text-muted rounded-sm text-xs hover:underline"
+          >
+            Manage all providers in Settings
+          </Link>
+        </div>
+      ) : (
+        <Link
+          href={nextStep.href}
+          className="focus-ring text-accent-text mt-2.5 flex items-center gap-2 rounded-sm text-sm font-medium hover:underline"
+        >
+          {completed === total ? (
+            <>
+              <Check className="size-4 shrink-0" aria-hidden />
+              <span>All set — you&apos;re ready to run</span>
+            </>
+          ) : (
+            <span className="truncate">Next: {nextStep.label}</span>
+          )}
+        </Link>
+      )}
+
+      <ConnectProviderDialog open={connectOpen} onOpenChange={setConnectOpen} />
     </section>
   );
 }

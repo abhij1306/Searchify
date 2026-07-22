@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
 import type { VariantProps } from 'class-variance-authority';
-import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react';
+import { Info } from 'lucide-react';
 
+import { ICONS } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 import { alertVariants } from './alert-variants';
 
 const toneIcon = {
-  danger: AlertCircle,
-  warning: TriangleAlert,
-  success: CheckCircle2,
+  danger: ICONS.danger,
+  warning: ICONS.warning,
+  success: ICONS.success,
   info: Info,
   neutral: Info,
 } as const;

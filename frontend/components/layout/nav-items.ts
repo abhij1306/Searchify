@@ -1,31 +1,18 @@
-import {
-  BarChart3,
-  FileText,
-  Gauge,
-  Layers,
-  Lightbulb,
-  ListChecks,
-  type LucideIcon,
-  MessageSquareText,
-  Route,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+import { ICONS } from '@/lib/icons';
 
 /**
- * Sidebar navigation model (F5). Grouped Analytics / Prompts / Actions / On Page
- * (docs/design.md §9.2). Only MVP-live items are navigable; everything else is
- * rendered but disabled with a "soon" affordance. This is data-only so the
- * sidebar component stays presentational and the nav is unit-testable.
+ * Sidebar navigation model (F5, simplified): two groups — Analyze / Optimize —
+ * with eight live items, all navigable. Icons come from the canonical map
+ * (`@/lib/icons`) so nav glyphs stay consistent with the rest of the app.
+ * This is data-only so the sidebar component stays presentational and the nav
+ * is unit-testable.
  */
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
-  /** Live at MVP → navigable; otherwise rendered disabled with a "soon" badge. */
-  live: boolean;
 };
 
 export type NavGroup = {
@@ -35,35 +22,22 @@ export type NavGroup = {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: 'Analytics',
+    title: 'Analyze',
     items: [
-      { label: 'Visibility', href: '/visibility', icon: Gauge, live: true },
-      { label: 'LLM Analytics', href: '/analytics', icon: BarChart3, live: false },
-      { label: 'Traffic', href: '/traffic', icon: TrendingUp, live: false },
+      { label: 'Visibility', href: '/visibility', icon: ICONS.visibility },
+      // Single prompts surface: read view by default, manage mode in-page.
+      { label: 'Prompts', href: '/prompts', icon: ICONS.prompts },
+      { label: 'Runs', href: '/runs', icon: ICONS.runs },
     ],
   },
   {
-    title: 'Prompts',
+    title: 'Optimize',
     items: [
-      { label: 'Your Prompts', href: '/prompts', icon: MessageSquareText, live: true },
-      { label: 'Prompt Research', href: '/prompt-research', icon: Sparkles, live: true },
-    ],
-  },
-  {
-    title: 'Actions',
-    items: [
-      { label: 'Runs', href: '/runs', icon: ListChecks, live: true },
-      { label: 'Content', href: '/content', icon: FileText, live: true },
-      { label: 'Opportunities', href: '/opportunities', icon: Lightbulb, live: false },
-    ],
-  },
-  {
-    title: 'On Page',
-    items: [
-      { label: 'Setup', href: '/setup', icon: Settings, live: true },
-      { label: 'Site Health', href: '/site-health', icon: ShieldCheck, live: true },
-      { label: 'Issues', href: '/issues', icon: Route, live: true },
-      { label: 'Knowledge Base', href: '/knowledge-base', icon: Layers, live: true },
+      { label: 'Content', href: '/content', icon: ICONS.content },
+      { label: 'Site Health', href: '/site-health', icon: ICONS.siteHealth },
+      { label: 'Issues', href: '/issues', icon: ICONS.issues },
+      { label: 'Knowledge Base', href: '/knowledge-base', icon: ICONS.knowledgeBase },
+      { label: 'Setup', href: '/setup', icon: ICONS.setup },
     ],
   },
 ];

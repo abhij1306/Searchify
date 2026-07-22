@@ -81,55 +81,49 @@ type UserEvents = ReturnType<typeof userEvent.setup>;
 /** Advance the wizard one step via the Next button. */
 const next = (user: UserEvents) => user.click(screen.getByRole('button', { name: /^next$/i }));
 
-/** Fill the Brand step's required fields. */
+/** Fill the Brand step's required fields (create mode derives the project name). */
 async function fillBrand(user: UserEvents) {
   await user.type(screen.getByLabelText(/brand name/i), 'Searchify');
-  await user.type(screen.getByLabelText(/project name/i), 'Searchify — US');
   await user.type(screen.getByLabelText(/website url/i), 'https://searchify.com');
 }
 
-/** Walk Brand → Market → Domains → Competitors → Defaults with valid values. */
-async function walkToDefaults(user: UserEvents) {
+/** Walk the guided create flow (Brand → Market) with valid values. */
+async function walkToMarket(user: UserEvents) {
   await fillBrand(user);
   await next(user); // → Market (US/en prefilled)
-  await next(user); // → Domains
-  await next(user); // → Competitors
-  await next(user); // → Defaults
 }
 
-describe('SetupForm — create (wizard)', () => {
-  it('renders the stepper on the Brand step and blocks Next on empty required fields', async () => {
+describe('SetupForm — create (guided)', () => {
+  it('renders the two-step guided flow and blocks Next on empty required fields', async () => {
     const user = userEvent.setup();
     renderWithProviders(<SetupForm />);
 
-    // Horizontal stepper with all five steps; Brand is current.
+    // Guided stepper has only Brand + Market; Domains/Competitors/Defaults
+    // are refined later on the edit surface.
     const stepper = screen.getByRole('list', { name: /setup steps/i });
     expect(stepper).toHaveTextContent('Brand');
     expect(stepper).toHaveTextContent('Market');
-    expect(stepper).toHaveTextContent('Domains');
-    expect(stepper).toHaveTextContent('Competitors');
-    expect(stepper).toHaveTextContent('Defaults');
+    expect(stepper).not.toHaveTextContent('Domains');
+    expect(stepper).not.toHaveTextContent('Competitors');
+    expect(stepper).not.toHaveTextContent('Defaults');
+    expect(screen.getByText('Step 1 of 2')).toBeInTheDocument();
 
-    // No Create button until the last step.
-    expect(screen.queryByRole('button', { name: /create project/i })).not.toBeInTheDocument();
+    // The project name is auto-derived, not asked.
+    expect(screen.queryByLabelText(/project name/i)).not.toBeInTheDocument();
 
     await next(user);
     expect(await screen.findByText(/brand name is required/i)).toBeInTheDocument();
-    expect(screen.getByText(/project name is required/i)).toBeInTheDocument();
     expect(screen.getByText(/website url is required/i)).toBeInTheDocument();
     // Still on the Brand step.
     expect(screen.getByLabelText(/brand name/i)).toBeInTheDocument();
   });
 
-  it('validates a competitor domain row before leaving the Competitors step', async () => {
+  it('validates a competitor domain row in edit mode before leaving the Competitors step', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<SetupForm />);
+    renderWithProviders(<SetupForm project={savedProject} />);
 
-    await fillBrand(user);
-    await next(user); // Market
-    await next(user); // Domains
-    await next(user); // Competitors
-
+    // Edit mode unlocks every step — jump straight to Competitors.
+    await user.click(screen.getByRole('button', { name: /competitors/i }));
     await user.click(screen.getByRole('button', { name: /add competitor/i }));
     await user.type(screen.getByLabelText(/competitor name/i), 'Acme');
     await user.click(screen.getByRole('button', { name: /add domain/i }));
@@ -142,7 +136,7 @@ describe('SetupForm — create (wizard)', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('walks all steps, creates the project, sets it active, and routes to /visibility', async () => {
+  it('walks both steps, creates the project with a derived name, and routes to /prompts', async () => {
     const user = userEvent.setup();
     let body: unknown;
     mswServer.use(
@@ -158,22 +152,24 @@ describe('SetupForm — create (wizard)', () => {
     await user.click(screen.getByRole('button', { name: /^add alias$/i }));
     await user.type(screen.getByLabelText(/^Brand aliases 1$/i), 'Searchify AI');
 
-    await next(user); // Market
-    await next(user); // Domains
-    await next(user); // Competitors
-    await next(user); // Defaults
+    await next(user); // Market — searchable selects default to US / English
+    expect(screen.getByLabelText(/^country$/i)).toHaveValue('United States');
+    expect(screen.getByLabelText(/^language$/i)).toHaveValue('English');
+    expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /create project/i }));
 
     await waitFor(() => expect(setActiveProjectId).toHaveBeenCalledWith(savedProject.id));
-    expect(replace).toHaveBeenCalledWith('/visibility');
+    expect(replace).toHaveBeenCalledWith('/prompts');
     expect(body).toMatchObject({
       brand_name: 'Searchify',
-      name: 'Searchify — US',
+      name: 'Searchify', // derived from the brand name
       website_url: 'https://searchify.com',
       country_code: 'US',
+      language_code: 'en',
       brand: { aliases: ['Searchify AI'] },
       benchmark_mode: 'consumer_like',
+      default_repetitions: 3,
     });
   });
 
@@ -186,7 +182,7 @@ describe('SetupForm — create (wizard)', () => {
     await user.click(screen.getByRole('button', { name: /^back$/i }));
 
     expect(screen.getByLabelText(/brand name/i)).toHaveValue('Searchify');
-    expect(screen.getByLabelText(/project name/i)).toHaveValue('Searchify — US');
+    expect(screen.getByLabelText(/website url/i)).toHaveValue('https://searchify.com');
   });
 
   it('surfaces the ApiError message inline on a failed create', async () => {
@@ -198,7 +194,7 @@ describe('SetupForm — create (wizard)', () => {
     );
 
     renderWithProviders(<SetupForm />);
-    await walkToDefaults(user);
+    await walkToMarket(user);
     await user.click(screen.getByRole('button', { name: /create project/i }));
 
     expect(await screen.findByText(/workspace limit reached/i)).toBeInTheDocument();
@@ -263,25 +259,18 @@ describe('SetupForm — edit', () => {
 describe('SetupForm — AI suggestions', () => {
   it('disables the domains Generate button until a brand name is entered', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<SetupForm />);
+    // Edit mode: every step is unlocked, and the button tracks the live
+    // brand-name value (the backend also 422s on an empty brand_name).
+    renderWithProviders(<SetupForm project={savedProject} />);
 
-    // Walk to the Domains step without a brand name is impossible (Brand step
-    // validates), so verify via edit mode with a cleared brand instead.
-    await fillBrand(user);
-    await next(user); // Market
-    await next(user); // Domains
-
+    await user.click(screen.getByRole('button', { name: /domains/i }));
     expect(screen.getByRole('button', { name: /generate with ai/i })).toBeEnabled();
 
-    // Going back and clearing the brand disables the button again.
-    await user.click(screen.getByRole('button', { name: /^back$/i }));
-    await user.click(screen.getByRole('button', { name: /^back$/i }));
-    // The step remounted; re-query the (value-preserving) input.
-    const brand = screen.getByLabelText(/brand name/i);
-    expect(brand).toHaveValue('Searchify');
-    await user.clear(brand);
-    await next(user);
-    expect(await screen.findByText(/brand name is required/i)).toBeInTheDocument();
+    // Clearing the brand on the Brand step disables the button again.
+    await user.click(screen.getByRole('button', { name: /brand/i }));
+    await user.clear(screen.getByLabelText(/brand name/i));
+    await user.click(screen.getByRole('button', { name: /domains/i }));
+    expect(screen.getByRole('button', { name: /generate with ai/i })).toBeDisabled();
   });
 
   it('appends suggested competitors after consent, skipping duplicates', async () => {
@@ -300,11 +289,8 @@ describe('SetupForm — AI suggestions', () => {
       }),
     );
 
-    renderWithProviders(<SetupForm />);
-    await fillBrand(user);
-    await next(user); // Market
-    await next(user); // Domains
-    await next(user); // Competitors
+    renderWithProviders(<SetupForm project={savedProject} />);
+    await user.click(screen.getByRole('button', { name: /competitors/i }));
 
     // A pre-existing competitor with a matching name must survive untouched
     // and suppress the duplicate suggestion.
@@ -367,10 +353,8 @@ describe('SetupForm — AI suggestions', () => {
       ),
     );
 
-    renderWithProviders(<SetupForm />);
-    await fillBrand(user);
-    await next(user); // Market
-    await next(user); // Domains
+    renderWithProviders(<SetupForm project={savedProject} />);
+    await user.click(screen.getByRole('button', { name: /domains/i }));
 
     await user.click(screen.getByRole('button', { name: /generate with ai/i }));
     await user.click(screen.getByLabelText(/confirm sending brand details to the ai provider/i));
@@ -395,10 +379,8 @@ describe('SetupForm — AI suggestions', () => {
       ),
     );
 
-    renderWithProviders(<SetupForm />);
-    await fillBrand(user);
-    await next(user); // Market
-    await next(user); // Domains
+    renderWithProviders(<SetupForm project={savedProject} />);
+    await user.click(screen.getByRole('button', { name: /domains/i }));
 
     await user.click(screen.getByRole('button', { name: /generate with ai/i }));
     await user.click(screen.getByLabelText(/confirm sending brand details to the ai provider/i));

@@ -1,4 +1,5 @@
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,6 +50,25 @@ const connection = {
   updated_at: '2026-07-18T08:00:00Z',
 };
 
+// Served to the connect dialog that step 3 opens (v2 direct routes).
+const catalog = {
+  transports: ['openai', 'anthropic', 'google'],
+  engines: [
+    {
+      logical_engine: 'chatgpt',
+      routes: [{ transport_provider: 'openai', default_model: 'gpt-5.4' }],
+    },
+    {
+      logical_engine: 'gemini',
+      routes: [{ transport_provider: 'google', default_model: 'gemini-flash-latest' }],
+    },
+    {
+      logical_engine: 'claude',
+      routes: [{ transport_provider: 'anthropic', default_model: 'claude-sonnet-4-6' }],
+    },
+  ],
+};
+
 const audit = {
   id: '66666666-6666-4666-8666-666666666666',
   workspace_id: project.workspace_id,
@@ -85,27 +105,40 @@ describe('GettingStartedCard', () => {
     activeProject = null;
   });
 
-  it('shows 0 of 6 with no project and never fetches', () => {
+  it('shows 0 of 5 with no project and never fetches', () => {
     // No handlers registered: an unexpected fetch would fail the suite
     // (onUnhandledRequest: 'error').
     renderWithProviders(<GettingStartedCard />);
-    expect(screen.getByRole('progressbar')).toHaveAccessibleName('0 of 6 steps complete');
-    expect(screen.getByText(/next: create your project/i)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAccessibleName('0 of 5 steps complete');
+    const next = screen.getByRole('link', { name: /next: set up your project/i });
+    expect(next).toHaveAttribute('href', '/setup');
   });
 
-  it('counts a configured provider connection as step 4 done', async () => {
+  it('links the prompts step to the prompts page when no prompts exist', async () => {
+    activeProject = { ...project, prompt_sets: [] } as unknown as Project;
+    handlers({ connections: [connection] });
+
+    renderWithProviders(<GettingStartedCard />);
+
+    await findProgress(/1 of 5 steps complete/);
+    const next = screen.getByRole('link', { name: /next: add prompts/i });
+    expect(next).toHaveAttribute('href', '/prompts');
+  });
+
+  it('counts a configured provider connection as step 3 done', async () => {
     activeProject = project;
     handlers({ connections: [connection] });
 
     renderWithProviders(<GettingStartedCard />);
 
-    // project + brand + prompts + provider = 4; next step is the first run.
-    await findProgress(/4 of 6 steps complete/);
+    // project setup + prompts + provider = 3; next step is the first run.
+    await findProgress(/3 of 5 steps complete/);
     const next = screen.getByRole('link', { name: /next: launch your first run/i });
     expect(next).toHaveAttribute('href', '/runs');
   });
 
-  it('ignores inactive or keyless connections and links step 4 to provider settings', async () => {
+  it('ignores inactive or keyless connections and opens the connect dialog from step 3', async () => {
+    const user = userEvent.setup();
     activeProject = project;
     handlers({
       connections: [
@@ -113,25 +146,36 @@ describe('GettingStartedCard', () => {
         { ...connection, id: '55555555-5555-4555-8555-555555555556', api_key_set: false },
       ],
     });
+    mswServer.use(http.get('/api/v1/provider-catalog', () => HttpResponse.json(catalog)));
 
     renderWithProviders(<GettingStartedCard />);
 
-    await findProgress(/3 of 6 steps complete/);
-    const next = screen.getByRole('link', { name: /next: connect a provider/i });
-    expect(next).toHaveAttribute('href', '/settings?tab=providers');
+    await findProgress(/2 of 5 steps complete/);
+    // The step is a button that opens the guided connect dialog inline (Task
+    // 3.2) instead of linking away to Settings. Full 3-engine management
+    // stays reachable as a secondary affordance (asserted before opening —
+    // the modal dialog aria-hides the card behind it).
+    expect(screen.getByRole('link', { name: /manage all providers in settings/i })).toHaveAttribute(
+      'href',
+      '/settings?tab=providers',
+    );
+
+    const next = screen.getByRole('button', { name: /next: connect a provider/i });
+    await user.click(next);
+    expect(await screen.findByRole('dialog', { name: 'Connect a provider' })).toBeInTheDocument();
   });
 
-  it('marks all six steps done once a run has completed', async () => {
+  it('marks all five steps done once a run has completed', async () => {
     activeProject = project;
     handlers({ connections: [connection], audits: [audit] });
 
     renderWithProviders(<GettingStartedCard />);
 
-    await findProgress(/6 of 6 steps complete/);
+    await findProgress(/5 of 5 steps complete/);
     expect(screen.getByText(/all set — you're ready to run/i)).toBeInTheDocument();
   });
 
-  it('counts a launched-but-unfinished run as step 5 only', async () => {
+  it('counts a launched-but-unfinished run as step 4 only', async () => {
     activeProject = project;
     handlers({
       connections: [connection],
@@ -140,7 +184,7 @@ describe('GettingStartedCard', () => {
 
     renderWithProviders(<GettingStartedCard />);
 
-    await findProgress(/5 of 6 steps complete/);
+    await findProgress(/4 of 5 steps complete/);
     expect(screen.getByRole('link', { name: /next: review visibility/i })).toHaveAttribute(
       'href',
       '/visibility',
