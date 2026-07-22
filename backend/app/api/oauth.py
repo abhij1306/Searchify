@@ -69,7 +69,7 @@ async def oauth_start(provider: str) -> OAuthStartResponse:
     """Build the provider authorize URL with a signed, stateless state token."""
     _require_known_provider(provider)
     _require_configured_provider(provider)
-    state = create_oauth_state(provider)
+    state, session_nonce = create_oauth_state(provider)
     query = urlencode(
         {
             "client_id": getattr(oauth_settings, f"{provider}_client_id"),
@@ -80,7 +80,11 @@ async def oauth_start(provider: str) -> OAuthStartResponse:
         }
     )
     authorize_url = f"{OAUTH_AUTHORIZE_URLS[provider]}?{query}"
-    return OAuthStartResponse(authorize_url=authorize_url, state=state)
+    return OAuthStartResponse(
+        authorize_url=authorize_url,
+        state=state,
+        session_nonce=session_nonce,
+    )
 
 
 @router.get("/{provider}/callback")

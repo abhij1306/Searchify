@@ -2,11 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { COMPETITORS } from '@/lib/marketing-content/compare';
-import {
-  CONTACT_EMAIL,
-  SOCIAL_LINKS,
-  type SocialLink,
-} from '@/lib/marketing-content/social';
+import { CONTACT_EMAIL, SOCIAL_LINKS, type SocialLink } from '@/lib/marketing-content/social';
 
 import { LogoCube } from '@/components/ui/logo-cube';
 

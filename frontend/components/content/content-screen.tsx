@@ -155,19 +155,28 @@ function ProjectContentScreen({
     setSelectedId(null);
   };
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   const handleCopy = async () => {
     if (!detail?.output_text) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
     try {
       // Clipboard access can be denied (permissions policy, insecure
       // context) — surface a visible failure instead of an unhandled reject.
       await navigator.clipboard.writeText(detail.output_text);
       setCopyFailed(false);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
       setCopyFailed(true);
-      setTimeout(() => setCopyFailed(false), 2000);
+      timerRef.current = setTimeout(() => setCopyFailed(false), 2000);
     }
   };
 
@@ -347,7 +356,10 @@ function ProjectContentScreen({
 
       {/* History */}
       <section data-component-id="content-history" className="flex flex-col gap-2">
-        <h2 className={eyebrowClasses}>Recent generations</h2>
+        <div className="grid gap-1">
+          <span className={eyebrowClasses}>History</span>
+          <h2 className={displayHeadingLgClasses}>Recent generations</h2>
+        </div>
         {listQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (listQuery.data ?? []).length === 0 ? (

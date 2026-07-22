@@ -7,7 +7,7 @@ import Page from './page';
 
 // Plain render — the page is a sync RSC with no client islands, so it needs
 // no providers and no MSW.
-const EXPECTED_CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '#';
+const EXPECTED_CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '/register';
 
 describe('Enterprise page (public marketing `/enterprise`)', () => {
   it('renders exactly one h1 and no product-name subheadings', () => {
@@ -66,7 +66,7 @@ describe('Enterprise page (public marketing `/enterprise`)', () => {
     expect(within(limits).getAllByText('Custom')).toHaveLength(6);
   });
 
-  it('renders the contact CTA with the mailto-or-placeholder href', () => {
+  it('renders the contact CTA with a real destination, never href="#"', () => {
     render(<Page />);
 
     const cta = screen.getByRole('region', { name: 'Contact sales' });
@@ -74,6 +74,8 @@ describe('Enterprise page (public marketing `/enterprise`)', () => {
     expect(contacts.length).toBeGreaterThan(0);
     for (const contact of contacts) {
       expect(contact).toHaveAttribute('href', EXPECTED_CONTACT_HREF);
+      // The CTA must never degrade to a dead anchor.
+      expect(contact).not.toHaveAttribute('href', '#');
     }
     expect(within(cta).getByRole('link', { name: /contact sales/i })).toBeInTheDocument();
   });

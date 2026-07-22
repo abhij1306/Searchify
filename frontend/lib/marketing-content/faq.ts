@@ -134,7 +134,8 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
         q: 'Can I self-host Searchify?',
         a:
           'Yes. Docker Compose brings up Postgres, the FastAPI backend, the workers, and the ' +
-          'Next.js frontend. Self-hosting is delivered under the Enterprise plan — contact us for access.',
+          'Next.js frontend — free on your own infrastructure. You pay only your own AI provider ' +
+          'usage on your own keys.',
       },
       {
         q: 'What’s the refund policy?',

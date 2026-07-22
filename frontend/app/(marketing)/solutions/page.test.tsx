@@ -60,9 +60,7 @@ describe('Solutions page (public marketing `/solutions`)', () => {
 
     const founders = screen.getByRole('region', { name: 'For founders' });
     expect(within(founders).getByText(/free sample Site Health crawl/i)).toBeInTheDocument();
-    expect(
-      within(founders).getByText(/self-host when you outgrow the cloud/i),
-    ).toBeInTheDocument();
+    expect(within(founders).getByText(/self-host when you outgrow the cloud/i)).toBeInTheDocument();
     expect(within(founders).getByRole('link', { name: /run a free sample/i })).toHaveAttribute(
       'href',
       '/register',

@@ -232,7 +232,7 @@ export function YourPrompts() {
       {activePrompts.length === 0 ? (
         <div className="border-border bg-panel grid place-items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
           <p className={eyebrowClasses}>Your prompts</p>
-          <p className={displayHeadingXlClasses}>No active prompts yet</p>
+          <h2 className={displayHeadingXlClasses}>No active prompts yet</h2>
           <p className="text-secondary max-w-md text-sm">
             Head to Prompt Research to add prompts manually, import a CSV, or generate prompts and
             topics with AI.

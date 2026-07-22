@@ -17,10 +17,11 @@ import { CONTACT_EMAIL } from '@/lib/marketing-content/social';
 import { ByokTrust } from './byok-trust';
 
 /**
- * Sales contact href — renders `mailto:` only once the user sets a public
- * contact email in the social content module; a placeholder anchor until then.
+ * Sales contact href — renders `mailto:` when a public contact email exists;
+ * otherwise falls back to the `/register` sign-up page so the CTA is never a
+ * dead anchor.
  */
-const CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '#';
+const CONTACT_HREF = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : '/register';
 
 type OpsCard = {
   icon: LucideIcon;

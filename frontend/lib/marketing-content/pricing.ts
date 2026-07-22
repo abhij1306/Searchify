@@ -147,7 +147,7 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
   },
   {
     dimension: 'Support',
-    free: 'Community — [TODO(user)]',
+    free: 'Community forum',
     starter: 'Product support',
     pro: 'Priority support',
     enterprise: 'Tailored support',

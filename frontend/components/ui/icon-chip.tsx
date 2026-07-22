@@ -15,6 +15,7 @@ export function IconChip({
   return (
     <span
       {...props}
+      aria-hidden="true"
       className={cn(
         'bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full',
         className,

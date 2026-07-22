@@ -97,8 +97,6 @@ describe('FAQ page (public marketing `/faq`)', () => {
 
     const billing = screen.getByRole('region', { name: 'Account & billing' });
     expect(within(billing).getByText('Can I self-host Searchify?')).toBeInTheDocument();
-    expect(
-      within(billing).getByText(/Self-hosting is delivered under the Enterprise plan/i),
-    ).toBeInTheDocument();
+    expect(within(billing).getByText(/Docker Compose brings up Postgres/i)).toBeInTheDocument();
   });
 });

@@ -71,36 +71,52 @@ def decode_access_token(token: str) -> dict[str, str | int]:
     return dict(decoded.claims)
 
 
-def create_oauth_state(provider: str) -> str:
-    """Mint a signed, short-lived OAuth state token (CSRF/nonce guard).
+def create_oauth_state(provider: str) -> tuple[str, str]:
+    """Mint a signed, short-lived OAuth state token bound to a session nonce.
 
-    Stateless: the state carries the provider plus a random nonce and is
-    validated by signature + expiry on the callback, so no server-side
-    storage is needed.
+    Returns ``(state_token, session_nonce)`` — the caller must persist
+    ``session_nonce`` in an HttpOnly, Secure, SameSite=Lax cookie before
+    redirecting to the provider.  The nonce is embedded inside the signed JWT
+    so that :func:`decode_oauth_state` can validate the binding on callback.
+
+    The token is single-use by convention: the caller must clear the cookie
+    after a successful decode so replayed callbacks are rejected.
     """
-    expires_at = datetime.now(UTC) + timedelta(
-        seconds=oauth_settings.state_ttl_seconds
-    )
+    session_nonce = secrets.token_urlsafe(32)
+    expires_at = datetime.now(UTC) + timedelta(seconds=oauth_settings.state_ttl_seconds)
     payload = {
         "sub": "oauth-state",
         "provider": provider,
         "nonce": secrets.token_urlsafe(16),
+        "session_nonce": session_nonce,
         "exp": expires_at,
     }
-    return jwt.encode(
+    state_token = jwt.encode(
         {"alg": settings.jwt_algorithm},
         payload,
         _jwt_key(),
         algorithms=[settings.jwt_algorithm],
     )
+    return state_token, session_nonce
 
 
-def decode_oauth_state(token: str, provider: str) -> dict[str, str | int]:
+def decode_oauth_state(
+    token: str,
+    provider: str,
+    session_nonce: str,
+) -> dict[str, str | int]:
     """Decode + validate an OAuth state token for ``provider``.
 
-    Raises ``TokenDecodeError`` on an invalid/expired token or when the token
-    was minted for a different provider (or is not an OAuth state token).
+    ``session_nonce`` must match the value stored in the browser's HttpOnly
+    cookie — this binds the callback to the browser session that initiated the
+    flow.  The caller must delete the cookie after a successful decode so the
+    nonce cannot be replayed.
+
+    Raises ``TokenDecodeError`` on an invalid/expired token, provider
+    mismatch, or session-nonce mismatch.
     """
+    if not session_nonce:
+        raise TokenDecodeError("Missing OAuth session nonce")
     try:
         decoded = jwt.decode(
             token,
@@ -113,6 +129,8 @@ def decode_oauth_state(token: str, provider: str) -> dict[str, str | int]:
     claims = dict(decoded.claims)
     if claims.get("sub") != "oauth-state" or claims.get("provider") != provider:
         raise TokenDecodeError("OAuth state provider mismatch")
+    if not secrets.compare_digest(claims.get("session_nonce", ""), session_nonce):
+        raise TokenDecodeError("OAuth session nonce mismatch")
     return claims
 
 

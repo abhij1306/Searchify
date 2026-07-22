@@ -67,8 +67,7 @@ export const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }
   },
   {
     dimension: 'Price transparency',
-    searchify:
-      'Free self-host option on your own infrastructure — hosted plans [TODO(user)].',
+    searchify: 'Free self-host option on your own infrastructure — hosted plans [TODO(user)].',
   },
 ];
 

@@ -9,16 +9,24 @@ import { THEME_STORAGE_KEY } from '@/lib/theme';
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
- * MarketingThemeReset — undoes the marketing dark-first default on the way
- * out. The (marketing) layout's inline script paints `data-theme='dark'` on
- * <html> when the visitor has no stored choice; on client-side navigation to
- * a non-marketing route that attribute would otherwise leak into app
- * surfaces (the shared bootstrap only re-runs on a full page load). On
- * unmount this restores exactly what the bootstrap would have chosen:
- * stored choice → dark (dark-first; the OS preference is not consulted).
+ * MarketingThemeReset — handles the marketing dark-first default on mount and
+ * restores the global bootstrap theme choice on unmount.
+ *
+ * On mount (such as client-side SPA navigation back to a marketing route),
+ * if the visitor has no stored choice, it ensures `data-theme='dark'` is active.
+ * On unmount (navigating away to app/auth routes), it restores the stored choice
+ * or defaults to dark.
  */
 export function MarketingThemeReset() {
   useIsomorphicLayoutEffect(() => {
+    try {
+      if (!window.localStorage.getItem(THEME_STORAGE_KEY)) {
+        document.documentElement.dataset.theme = 'dark';
+      }
+    } catch {
+      /* storage unavailable — leave the shared bootstrap choice alone */
+    }
+
     return () => {
       try {
         const stored = window.localStorage.getItem(THEME_STORAGE_KEY);

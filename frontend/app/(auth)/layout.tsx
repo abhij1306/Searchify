@@ -33,8 +33,11 @@ export default function AuthLayout({ children }: Readonly<{ children: ReactNode 
             {/* Compact value statement per the mock's 390px frame — the
                 single-h1 rule keeps this a <p> (pages own the only h1). */}
             <p className="text-center">
-              <span className="text-accent-text font-mono text-2xs font-medium tracking-[0.16em] uppercase">
-                <span aria-hidden="true" className="bg-accent mr-2 inline-block size-1.5 rounded-full" />
+              <span className="text-accent-text text-2xs font-mono font-medium tracking-[0.16em] uppercase">
+                <span
+                  aria-hidden="true"
+                  className="bg-accent mr-2 inline-block size-1.5 rounded-full"
+                />
                 Answer-engine optimization
               </span>
               <span className="font-display text-foreground mt-2 block text-lg font-bold tracking-tight">

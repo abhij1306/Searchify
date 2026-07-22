@@ -56,7 +56,12 @@ class OAuthProvidersResponse(BaseModel):
 
 
 class OAuthStartResponse(BaseModel):
-    """Authorize URL + signed state for starting an OAuth flow."""
+    """Authorize URL + signed state for starting an OAuth flow.
+
+    ``session_nonce`` must be persisted by the caller in an HttpOnly, Secure,
+    SameSite=Lax cookie before redirecting to the provider.
+    """
 
     authorize_url: str
     state: str
+    session_nonce: str

@@ -18,10 +18,11 @@ import { Button } from '@/components/ui/button';
  */
 export function useTablePage(total: number, pageSize: number) {
   const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const to = Math.min(total, safePage * pageSize);
+  const safePageSize = Math.max(1, pageSize);
+  const pageCount = Math.max(1, Math.ceil(total / safePageSize));
+  const safePage = Math.max(1, Math.min(page, pageCount));
+  const from = total === 0 ? 0 : (safePage - 1) * safePageSize + 1;
+  const to = Math.min(total, safePage * safePageSize);
   return { page: safePage, setPage, pageCount, from, to };
 }
 

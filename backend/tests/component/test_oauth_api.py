@@ -134,10 +134,11 @@ async def test_start_configured_provider_builds_authorize_url(
     assert values["client_secret"] not in url
     assert values["client_secret"] not in resp.text
 
-    # The returned state is a valid signed token bound to the provider.
-    claims = decode_oauth_state(body["state"], "google")
+    # The returned state is a valid signed token bound to the provider and session.
+    claims = decode_oauth_state(body["state"], "google", body["session_nonce"])
     assert claims["provider"] == "google"
     assert claims["sub"] == "oauth-state"
+    assert claims["session_nonce"] == body["session_nonce"]
 
 
 @pytest.mark.asyncio
