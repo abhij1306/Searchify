@@ -58,11 +58,9 @@ export function AuthWordmark({ compact = false }: Readonly<{ compact?: boolean }
       >
         Searchify
       </span>
-      {compact ? null : (
-        <span className="border-border text-muted text-2xs rounded-full border px-2 py-0.5 font-mono tracking-[0.18em] uppercase">
-          By CUBE27
-        </span>
-      )}
+      <span className="border-border text-muted text-2xs rounded-full border px-2 py-0.5 font-mono tracking-[0.18em] uppercase">
+        By CUBE27
+      </span>
     </Link>
   );
 }

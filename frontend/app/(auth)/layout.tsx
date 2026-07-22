@@ -1,3 +1,4 @@
+import { KeyRound, Lock } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { AuthBrandPanel, AuthWordmark } from '@/components/auth/brand-panel';
@@ -27,10 +28,36 @@ export default function AuthLayout({ children }: Readonly<{ children: ReactNode 
           <ThemeToggle />
         </div>
         <div className="flex w-full max-w-[420px] flex-col items-center gap-6">
-          <div className="min-[900px]:hidden">
+          <div className="flex flex-col items-center gap-4 min-[900px]:hidden">
             <AuthWordmark compact />
+            {/* Compact value statement per the mock's 390px frame — the
+                single-h1 rule keeps this a <p> (pages own the only h1). */}
+            <p className="text-center">
+              <span className="text-accent-text font-mono text-2xs font-medium tracking-[0.16em] uppercase">
+                <span aria-hidden="true" className="bg-accent mr-2 inline-block size-1.5 rounded-full" />
+                Answer-engine optimization
+              </span>
+              <span className="font-display text-foreground mt-2 block text-lg font-bold tracking-tight">
+                See how <span className="text-gradient">AI answers</span> talk about your brand.
+              </span>
+            </p>
           </div>
           <Card className="shadow-card w-full max-w-[400px] p-6">{children}</Card>
+          {/* BYOK trust microcopy under the card (mock: auth-trust-microcopy,
+              shown on both the desktop and 390px frames). */}
+          <div className="text-muted flex items-center justify-center gap-2 font-mono text-[11px]">
+            <span className="inline-flex items-center gap-1.5">
+              <KeyRound className="size-[13px]" strokeWidth={1.8} aria-hidden />
+              Bring your own API keys
+            </span>
+            <span aria-hidden="true" className="opacity-60">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Lock className="size-[13px]" strokeWidth={1.8} aria-hidden />
+              Encrypted at rest
+            </span>
+          </div>
         </div>
       </main>
     </div>
