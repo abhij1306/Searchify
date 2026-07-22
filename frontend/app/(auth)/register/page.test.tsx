@@ -32,13 +32,20 @@ afterEach(() => {
 afterAll(() => mswServer.close());
 
 describe('RegisterPage', () => {
-  it('renders the OAuth buttons and the email divider above the form', () => {
+  it('renders email as the only sign-up path (no OAuth buttons or divider)', () => {
     renderWithProviders(<RegisterPage />);
 
-    expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with github/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with apple/i })).toBeInTheDocument();
-    expect(screen.getByText(/or continue with email/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with google/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with github/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with apple/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/or continue with email/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument();
   });
 
   it('shows validation errors and does not call the API on empty submit', async () => {

@@ -32,30 +32,20 @@ afterEach(() => {
 afterAll(() => mswServer.close());
 
 describe('LoginPage', () => {
-  it('renders the OAuth buttons and the email divider above the form', () => {
+  it('renders email as the only sign-in path (no OAuth buttons or divider)', () => {
     renderWithProviders(<LoginPage />);
 
-    expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with github/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with apple/i })).toBeInTheDocument();
-    expect(screen.getByText(/or continue with email/i)).toBeInTheDocument();
-  });
-
-  it('shows a coming-soon notice when the OAuth provider is not configured (503)', async () => {
-    const user = userEvent.setup();
-    mswServer.use(
-      http.get('/api/v1/auth/oauth/google/start', () =>
-        HttpResponse.json(
-          { detail: { code: 'oauth_provider_not_configured', provider: 'google' } },
-          { status: 503 },
-        ),
-      ),
-    );
-
-    renderWithProviders(<LoginPage />);
-    await user.click(screen.getByRole('button', { name: /continue with google/i }));
-
-    expect(await screen.findByText(/google sign-in is coming soon/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with google/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with github/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /continue with apple/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/or continue with email/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('shows validation errors and does not call the API on empty submit', async () => {
@@ -77,16 +67,19 @@ describe('LoginPage', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('logs in and redirects to the authed landing on success', async () => {
+  it('logs in and routes to /setup when the workspace has no projects', async () => {
     const user = userEvent.setup();
-    mswServer.use(http.post('/api/v1/auth/login', () => HttpResponse.json({ user: sessionUser })));
+    mswServer.use(
+      http.post('/api/v1/auth/login', () => HttpResponse.json({ user: sessionUser })),
+      http.get('/api/v1/projects', () => HttpResponse.json([])),
+    );
 
     renderWithProviders(<LoginPage />);
     await user.type(screen.getByLabelText(/email/i), 'user@example.com');
     await user.type(screen.getByLabelText(/password/i), 'sup3rsecret');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/setup'));
   });
 
   it('surfaces the ApiError message inline on a 401', async () => {

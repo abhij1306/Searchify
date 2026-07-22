@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import Link from 'next/link';
 
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown';
 import { authApi } from '@/lib/api/auth';
 import { useSession } from '@/lib/auth/session-guard';
+import { ICONS } from '@/lib/icons';
 import { cn, emailInitials } from '@/lib/utils';
 
 /**
@@ -55,7 +56,7 @@ export function UserMenu({ className }: Readonly<{ className?: string }>) {
         <DropdownSeparator className="bg-border-subtle my-1 h-px" />
         <DropdownItem asChild>
           <Link href="/settings">
-            <Settings className="size-4 shrink-0" aria-hidden />
+            <ICONS.settings className="size-4 shrink-0" aria-hidden />
             <span>Settings</span>
           </Link>
         </DropdownItem>

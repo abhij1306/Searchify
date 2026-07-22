@@ -1,24 +1,19 @@
-'use client';
-
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { PromptLibrary } from '@/components/prompts/prompt-library';
+import { redirect } from 'next/navigation';
 
 /**
- * Prompt Research screen (design.md §9.4 sidebar "Prompt Research").
- *
- * The prompt management + AI-generation workspace: topics rail, Active /
- * Proposed / Archived review tabs, manual entry, CSV import, and the
- * consent-gated "Generate prompts & topics" dialog. The read-only,
- * score-annotated view of the configured prompts lives on `/prompts`
- * ("Your Prompts"). The page title renders in the top bar (F5), so there is
- * no in-page header.
+ * `/prompt-research` — retired as a standalone page. The prompt management
+ * workspace now lives on `/prompts` as an in-page "Manage prompts" mode; this
+ * redirect keeps old links and bookmarks working (and lands in manage mode
+ * directly when the deep link asks for it).
  */
-export default function PromptResearchPage() {
-  return (
-    <TooltipProvider>
-      <div className="grid gap-6">
-        <PromptLibrary />
-      </div>
-    </TooltipProvider>
-  );
+export default async function PromptResearchPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { mode } = await searchParams;
+  // A repeated query param arrives as an array — treat any `manage` value as
+  // manage mode rather than dropping the deep link to the default view.
+  const managing = Array.isArray(mode) ? mode.includes('manage') : mode === 'manage';
+  redirect(managing ? '/prompts?mode=manage' : '/prompts');
 }

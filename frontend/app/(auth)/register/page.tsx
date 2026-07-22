@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
-import { OAuthSection } from '@/components/auth/oauth-buttons';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -16,7 +15,10 @@ import { useAuthMutation } from '@/lib/auth/use-auth-mutation';
 /**
  * Register page (F4). Mirrors the login page: react-hook-form + zod client
  * validation (with a confirm-password match rule), inline `ApiError`, and — on
- * success — priming the `me` cache and redirecting to the authed landing.
+ * success — priming the `me` cache and routing straight to `/setup` (no
+ * projects yet) or `/visibility`. Email is the only sign-up path for now; the
+ * OAuth buttons stay in `components/auth/oauth-buttons.tsx` until the backend
+ * providers are configured.
  */
 export default function RegisterPage() {
   const {
@@ -42,8 +44,6 @@ export default function RegisterPage() {
       </div>
 
       {mutation.isError ? <Alert tone="danger">{authErrorMessage(mutation.error)}</Alert> : null}
-
-      <OAuthSection />
 
       <form noValidate onSubmit={onSubmit} className="grid gap-4">
         <Field label="Email" required error={errors.email?.message}>

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { ConnectProviderDialog } from '@/components/providers/connect-provider-dialog';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -85,6 +86,7 @@ export function LaunchDialog({
   const [promptSetId, setPromptSetId] = useState<string | null>(null);
   const [engines, setEngines] = useState<LogicalEngine[]>([]);
   const [repetitions, setRepetitions] = useState(DEFAULT_REPETITIONS);
+  const [connectOpen, setConnectOpen] = useState(false);
 
   // Resolve the effective prompt set: the explicit selection, else the first.
   const effectivePromptSetId = promptSetId ?? promptSets[0]?.id ?? null;
@@ -115,101 +117,114 @@ export function LaunchDialog({
   const selectedEngines = new Set(engines);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Launch an audit"
-      description="Run your prompts across the selected AI engines and measure your brand's visibility."
-      footer={
-        <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => launchMutation.mutate()}
-            disabled={!ready || launchMutation.isPending}
-          >
-            {launchMutation.isPending ? 'Launching…' : 'Launch audit'}
-          </Button>
-        </>
-      }
-    >
-      <div className="grid gap-5">
-        {launchMutation.isError ? (
-          <Alert tone="danger">{errorMessage(launchMutation.error)}</Alert>
-        ) : null}
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Launch an audit"
+        description="Run your prompts across the selected AI engines and measure your brand's visibility."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => launchMutation.mutate()}
+              disabled={!ready || launchMutation.isPending}
+            >
+              {launchMutation.isPending ? 'Launching…' : 'Launch audit'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-5">
+          {launchMutation.isError ? (
+            <Alert tone="danger">{errorMessage(launchMutation.error)}</Alert>
+          ) : null}
 
-        <Field label="Prompt set" required>
-          {(props) =>
-            noPromptSets ? (
-              <p className="text-muted text-sm">
-                No prompt set yet. Add prompts on the Prompts screen first.
-              </p>
+          <Field label="Prompt set" required>
+            {(props) =>
+              noPromptSets ? (
+                <p className="text-muted text-sm">
+                  No prompt set yet. Add prompts on the Prompts screen first.
+                </p>
+              ) : (
+                <select
+                  {...props}
+                  className={inputClasses}
+                  value={effectivePromptSetId ?? ''}
+                  onChange={(event) => setPromptSetId(event.target.value)}
+                >
+                  {promptSets.map((set) => (
+                    <option key={set.id} value={set.id}>
+                      {set.name}
+                      {typeof set.prompt_count === 'number' ? ` (${set.prompt_count})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )
+            }
+          </Field>
+
+          <fieldset className="grid gap-2">
+            <legend className="text-secondary text-xs font-medium">
+              Engines <span className="text-danger">*</span>
+            </legend>
+            {noEngines ? (
+              <div className="grid gap-2">
+                <p className="text-muted text-sm">
+                  No configured engines. Connect a provider to launch an audit.
+                </p>
+                <div>
+                  <Button variant="secondary" onClick={() => setConnectOpen(true)}>
+                    Connect a provider
+                  </Button>
+                </div>
+              </div>
             ) : (
-              <select
+              <div className="flex flex-wrap gap-2">
+                {configuredEngines.map((engine) => {
+                  const selected = selectedEngines.has(engine);
+                  return (
+                    <button
+                      key={engine}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={selected}
+                      onClick={() => setEngines((prev) => toggleEngine(prev, engine))}
+                      className={filterChipClasses(selected)}
+                    >
+                      {ENGINE_LABELS[engine]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </fieldset>
+
+          <Field
+            label="Repetitions"
+            hint={`How many times to run each prompt per engine (${MIN_REPETITIONS}–${MAX_REPETITIONS}).`}
+          >
+            {(props) => (
+              <Input
                 {...props}
-                className={inputClasses}
-                value={effectivePromptSetId ?? ''}
-                onChange={(event) => setPromptSetId(event.target.value)}
-              >
-                {promptSets.map((set) => (
-                  <option key={set.id} value={set.id}>
-                    {set.name}
-                    {typeof set.prompt_count === 'number' ? ` (${set.prompt_count})` : ''}
-                  </option>
-                ))}
-              </select>
-            )
-          }
-        </Field>
+                type="number"
+                min={MIN_REPETITIONS}
+                max={MAX_REPETITIONS}
+                value={repetitions}
+                onChange={(event) => setRepetitions(Number(event.target.value))}
+                onBlur={() => setRepetitions((prev) => clampRepetitions(prev))}
+                className="w-28"
+              />
+            )}
+          </Field>
+        </div>
+      </Dialog>
 
-        <fieldset className="grid gap-2">
-          <legend className="text-secondary text-xs font-medium">
-            Engines <span className="text-danger">*</span>
-          </legend>
-          {noEngines ? (
-            <p className="text-muted text-sm">
-              No configured engines. Add a provider key on the Providers screen first.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {configuredEngines.map((engine) => {
-                const selected = selectedEngines.has(engine);
-                return (
-                  <button
-                    key={engine}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={selected}
-                    onClick={() => setEngines((prev) => toggleEngine(prev, engine))}
-                    className={filterChipClasses(selected)}
-                  >
-                    {ENGINE_LABELS[engine]}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </fieldset>
-
-        <Field
-          label="Repetitions"
-          hint={`How many times to run each prompt per engine (${MIN_REPETITIONS}–${MAX_REPETITIONS}).`}
-        >
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              min={MIN_REPETITIONS}
-              max={MAX_REPETITIONS}
-              value={repetitions}
-              onChange={(event) => setRepetitions(Number(event.target.value))}
-              onBlur={() => setRepetitions((prev) => clampRepetitions(prev))}
-              className="w-28"
-            />
-          )}
-        </Field>
-      </div>
-    </Dialog>
+      {/* Guided BYOK connect (Task 3.2). Saving a key invalidates the shared
+          connections query, so `configuredEngines` above reflects it. */}
+      <ConnectProviderDialog open={connectOpen} onOpenChange={setConnectOpen} />
+    </>
   );
 }

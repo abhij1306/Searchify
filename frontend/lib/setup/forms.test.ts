@@ -48,6 +48,11 @@ describe('setupFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts a blank project name (guided create derives it from the brand)', () => {
+    const result = setupFormSchema.safeParse({ ...base, name: '' });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects a missing brand name and an invalid website URL', () => {
     const result = setupFormSchema.safeParse({ ...base, brand_name: '  ', website_url: 'notaurl' });
     expect(result.success).toBe(false);
@@ -136,6 +141,12 @@ describe('mappers', () => {
     expect(input.benchmark_mode).toBe(project.benchmark_mode);
     expect(input.default_repetitions).toBe(project.default_repetitions);
     expect(input.unintended_domains).toEqual(project.unintended_domains);
+  });
+
+  it('derives the project name from the brand name when blank', () => {
+    const input = formValuesToProjectInput({ ...emptySetupForm, brand_name: '  Searchify  ' });
+    expect(input.name).toBe('Searchify');
+    expect(input.brand_name).toBe('Searchify');
   });
 });
 

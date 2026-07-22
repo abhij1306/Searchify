@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Check, Copy, Loader2, RefreshCw, Sparkles, X } from 'lucide-react';
+import { Check, Copy, RefreshCw, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -25,6 +25,7 @@ import {
   useContentGenerations,
 } from '@/lib/content/use-content-generations';
 import { ContentMarkdown } from '@/lib/content/markdown';
+import { ICONS } from '@/lib/icons';
 import { useActiveProject } from '@/lib/project/project-context';
 import { cn } from '@/lib/utils';
 
@@ -243,7 +244,7 @@ function ProjectContentScreen({
         <Card data-component-id="content-generating-panel">
           <CardContent className="flex items-center gap-4 py-6">
             <div role="status" aria-label="Generating content" className="flex items-center gap-3">
-              <Loader2 className="text-accent size-5 animate-spin" aria-hidden />
+              <ICONS.spinner className="text-accent size-5 animate-spin" aria-hidden />
               <span className="text-secondary text-sm">Generating your content…</span>
             </div>
             <div className="ml-auto">
@@ -265,7 +266,7 @@ function ProjectContentScreen({
         <Card data-component-id="content-error-panel">
           <CardContent className="flex flex-col gap-3 py-5">
             <div role="alert" className="text-danger-text flex items-start gap-2 text-sm">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <ICONS.warning className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 {mutationError
                   ? actionErrorMessage(mutationError)

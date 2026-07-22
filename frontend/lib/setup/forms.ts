@@ -49,7 +49,9 @@ export const benchmarkModeLabels: Record<BenchmarkMode, string> = {
 
 export const setupFormSchema = z.object({
   brand_name: z.string().trim().min(1, 'Brand name is required.'),
-  name: z.string().trim().min(1, 'Project name is required.'),
+  // Optional at validation: create mode never asks for it and the mapper
+  // derives it from the brand name; edit mode keeps the input visible.
+  name: z.string().trim(),
   website_url: z
     .string()
     .trim()
@@ -126,9 +128,12 @@ export function projectToFormValues(project: Project): SetupFormValues {
 
 /** Flatten validated form values into the backend `ProjectInput` payload. */
 export function formValuesToProjectInput(values: SetupFormValues): ProjectInput {
+  const brandName = values.brand_name.trim();
   return {
-    name: values.name.trim(),
-    brand_name: values.brand_name.trim(),
+    // The backend requires a non-empty project name; derive it from the brand
+    // when the form didn't collect one (guided create mode).
+    name: values.name.trim() || brandName,
+    brand_name: brandName,
     website_url: values.website_url.trim(),
     country_code: values.country_code.trim().toUpperCase(),
     language_code: values.language_code.trim(),
