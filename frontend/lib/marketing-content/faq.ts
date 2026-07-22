@@ -1,10 +1,8 @@
-import { GITHUB_URL } from './social';
-
 /**
- * FAQ content for /faq — five groups matching the approved mockup.
+ * FAQ content for /faq — four groups matching the approved mockup.
  *
- * Answers are grounded in README.md, docs/site-health.md, and the MIT
- * LICENSE; account/billing answers stay '[TODO(user)]' until the user fills
+ * Answers are grounded in README.md and docs/site-health.md;
+ * account/billing answers stay '[TODO(user)]' until the user fills
  * them in.
  */
 
@@ -25,7 +23,7 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
       {
         q: 'What is Searchify?',
         a:
-          'Searchify is an open-source AI visibility and site intelligence platform. It runs ' +
+          'Searchify is an AI visibility and site intelligence platform. It runs ' +
           'repeatable audits of your brand across ChatGPT, Gemini, and Claude using your own ' +
           'provider keys, scores the results deterministically, and keeps the persisted evidence ' +
           'behind every number. A built-in, security-bounded crawler also audits your site’s ' +
@@ -129,8 +127,14 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
       {
         q: 'How much does Searchify cost?',
         a:
-          'Searchify is open source under the MIT license and free to self-host — you pay only ' +
+          'Self-hosting the full stack is free on your own infrastructure — you pay only ' +
           'your own AI provider usage on your own keys. Hosted plan details will be published before launch.',
+      },
+      {
+        q: 'Can I self-host Searchify?',
+        a:
+          'Yes. Docker Compose brings up Postgres, the FastAPI backend, the workers, and the ' +
+          'Next.js frontend. Self-hosting is delivered under the Enterprise plan — contact us for access.',
       },
       {
         q: 'What’s the refund policy?',
@@ -139,33 +143,6 @@ export const FAQ_GROUPS: readonly FaqGroup[] = [
       {
         q: 'How do I get an invoice?',
         a: 'Invoice options will be published with hosted-plan availability.',
-      },
-    ],
-  },
-  {
-    heading: 'Open source',
-    items: [
-      {
-        q: 'Is Searchify really open source?',
-        a:
-          'Yes — MIT licensed, all of it. Backend, frontend, workers, scoring rules, ' +
-          `migrations, and docs live in one public repo: ${GITHUB_URL}. Star it, fork it, or ` +
-          'read the scoring code before you trust a number.',
-      },
-      {
-        q: 'Can I self-host Searchify?',
-        a:
-          'Yes. Docker Compose brings up Postgres, the FastAPI backend, the workers, and the ' +
-          'Next.js frontend. Run the Alembic migrations, start the frontend, register a user — ' +
-          'a workspace is created automatically — then connect a provider key and launch your ' +
-          'first audit. The full quick start is in the repo README.',
-      },
-      {
-        q: 'Where do I report bugs or request features?',
-        a:
-          `File an issue on GitHub — ${GITHUB_URL}/issues. Bugs, feature requests, and docs ` +
-          'fixes all land in the same tracker. Contributions are welcome; the conventions and ' +
-          'review checklist are in CONTRIBUTING.md.',
       },
     ],
   },

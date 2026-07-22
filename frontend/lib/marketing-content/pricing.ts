@@ -87,7 +87,7 @@ export const PRICING_TIERS: readonly PricingTier[] = [
     cta: { label: 'Explore Enterprise', href: '/enterprise' },
     features: [
       'Everything in Pro, plus:',
-      'Self-host option — MIT-licensed codebase, Docker Compose quick start',
+      'Self-host option — Docker Compose deployment inside your network',
       'Strict workspace isolation with UUID identifiers throughout',
       'Custom volumes, seats, and retention',
       'Support options tailored to your team',
@@ -147,7 +147,7 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
   },
   {
     dimension: 'Support',
-    free: 'Community — GitHub issues',
+    free: 'Community — [TODO(user)]',
     starter: 'Product support',
     pro: 'Priority support',
     enterprise: 'Tailored support',

@@ -4,7 +4,7 @@ import { BlogIndex } from '@/components/marketing/blog';
 
 const DESCRIPTION =
   'Essays, release notes, and field reports on answer-engine optimization — ' +
-  'evidence-first, open source, and straight from the team building Searchify.';
+  'evidence-first, and straight from the team building Searchify.';
 
 // NOTE: no openGraph.images / metadataBase yet — there is no canonical public
 // domain for the app, and OG image URLs must be absolute. Add both once the

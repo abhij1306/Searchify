@@ -54,9 +54,9 @@ export const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }
       'time, and never returned in API responses, logged, or sent as part of a prompt.',
   },
   {
-    dimension: 'Open source / self-host',
+    dimension: 'Self-host',
     searchify:
-      'MIT-licensed — self-host the full stack (Postgres, FastAPI backend, audit workers, ' +
+      'Self-host the full stack (Postgres, FastAPI backend, audit workers, ' +
       'Next.js frontend) with Docker Compose.',
   },
   {
@@ -67,7 +67,8 @@ export const SEARCHIFY_COLUMN: readonly { dimension: string; searchify: string }
   },
   {
     dimension: 'Price transparency',
-    searchify: 'Open source under MIT and free to self-host — hosted plans [TODO(user)].',
+    searchify:
+      'Free self-host option on your own infrastructure — hosted plans [TODO(user)].',
   },
 ];
 

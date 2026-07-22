@@ -4,7 +4,7 @@ import { FaqGroups } from '@/components/marketing/faq';
 
 const DESCRIPTION =
   'The short version of how Searchify works — engines, scoring, keys, site health, ' +
-  'billing, and the open-source bits.';
+  'billing, and self-hosting.';
 
 // NOTE: no openGraph.images / metadataBase yet — there is no canonical public
 // domain for the app, and OG image URLs must be absolute. Add both once the
@@ -47,7 +47,7 @@ export default function FaqPage() {
           </h1>
           <p className="hero-sub">
             The short version of how Searchify works — engines, scoring, keys, site health, billing,
-            and the open-source bits.
+            and self-hosting.
           </p>
         </div>
       </header>

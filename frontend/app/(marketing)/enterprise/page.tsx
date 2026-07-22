@@ -11,7 +11,7 @@ import {
 const DESCRIPTION =
   'Enterprise Searchify: deterministic, auditable AI-visibility scoring over immutable, ' +
   'provenance-carrying evidence. BYOK with Fernet-encrypted write-only keys, UUID workspace ' +
-  'isolation, PostgreSQL-durable queues — cloud or self-hosted under MIT.';
+  'isolation, PostgreSQL-durable queues — cloud or self-hosted inside your network.';
 
 // NOTE: no openGraph.images / metadataBase yet — there is no canonical public
 // domain for the app, and OG image URLs must be absolute. Add both once the

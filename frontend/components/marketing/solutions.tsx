@@ -152,7 +152,7 @@ const FOUNDERS_MAPPINGS = [
   'Free sample Site Health crawl — deterministic, seeded, capped URLs',
   'BYOK keeps audit usage on your own provider accounts, at provider rates',
   'Deterministic scoring you can recompute from the raw response',
-  'MIT open source — self-host when you outgrow the cloud',
+  'Self-host when you outgrow the cloud — Docker Compose, inside your network',
 ] as const;
 
 const PR_PAINS = [

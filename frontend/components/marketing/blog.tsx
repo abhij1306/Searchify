@@ -1,8 +1,7 @@
-import { ArrowRight, Github, KeyRound, PenLine } from 'lucide-react';
+import { ArrowRight, KeyRound, PenLine, Sigma } from 'lucide-react';
 import Link from 'next/link';
 
 import { BLOG_EMPTY_STATE, POSTS, type BlogPost } from '@/lib/marketing-content/blog';
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 
 /**
  * BlogIndex — /blog below the shared chrome. Copy and structure are verbatim
@@ -118,9 +117,9 @@ function EmptyState() {
               Get started
               <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
             </Link>
-            <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              Star on GitHub
-            </a>
+            <Link className="btn btn-ghost" href="/faq">
+              Read the FAQ
+            </Link>
           </div>
         </div>
       </section>
@@ -140,7 +139,7 @@ export function BlogIndex() {
           </h1>
           <p className="hero-sub">
             Essays, release notes, and field reports on answer-engine optimization — evidence-first,
-            open source, and straight from the team building Searchify.
+            and straight from the team building Searchify.
           </p>
         </div>
       </header>
@@ -167,9 +166,9 @@ export function BlogIndex() {
               Get started
               <ArrowRight className="arr" size={15} strokeWidth={2.2} aria-hidden />
             </Link>
-            <a className="btn btn-ghost" href={GITHUB_URL} target="_blank" rel="noreferrer">
-              Star on GitHub
-            </a>
+            <Link className="btn btn-ghost" href="/faq">
+              Read the FAQ
+            </Link>
           </div>
           <div className="trust">
             <span>
@@ -180,8 +179,8 @@ export function BlogIndex() {
               ·
             </span>
             <span>
-              <Github strokeWidth={1.8} aria-hidden />
-              Open source · MIT
+              <Sigma strokeWidth={1.8} aria-hidden />
+              Deterministic scoring
             </span>
           </div>
         </div>

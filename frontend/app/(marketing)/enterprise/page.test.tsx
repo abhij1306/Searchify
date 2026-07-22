@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { CONTACT_EMAIL, GITHUB_URL, LICENSE_URL } from '@/lib/marketing-content/social';
+import { CONTACT_EMAIL } from '@/lib/marketing-content/social';
 
 import Page from './page';
 
@@ -39,17 +39,20 @@ describe('Enterprise page (public marketing `/enterprise`)', () => {
     expect(within(ops).getByText(/Zod \+ Pydantic/i)).toBeInTheDocument();
   });
 
-  it('links the MIT license and GitHub source with real hrefs', () => {
+  it('renders no GitHub/MIT links, keeps the self-host card, and points the hero ghost at /pricing', () => {
     render(<Page />);
 
-    expect(screen.getByRole('link', { name: 'Full source on GitHub' })).toHaveAttribute(
+    // The repo is private — no GitHub or MIT-license links anywhere.
+    expect(screen.queryByRole('link', { name: /github|MIT license/i })).toBeNull();
+
+    // The self-host deployment card still renders.
+    const deploy = screen.getByRole('region', { name: 'Deployment options' });
+    expect(within(deploy).getByRole('heading', { name: 'Self-hosted' })).toBeInTheDocument();
+
+    // The hero ghost CTA now routes to the pricing page.
+    expect(screen.getByRole('link', { name: /compare plans/i })).toHaveAttribute(
       'href',
-      GITHUB_URL,
-    );
-    expect(screen.getByRole('link', { name: 'MIT license' })).toHaveAttribute('href', LICENSE_URL);
-    expect(screen.getByRole('link', { name: /view the codebase/i })).toHaveAttribute(
-      'href',
-      GITHUB_URL,
+      '/pricing',
     );
   });
 

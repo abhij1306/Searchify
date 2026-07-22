@@ -3,7 +3,6 @@
 import {
   ArrowUpRight,
   BarChart3,
-  BookOpen,
   Building2,
   ChevronDown,
   CircleHelp,
@@ -26,7 +25,6 @@ import {
 import Link from 'next/link';
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
-import { GITHUB_URL } from '@/lib/marketing-content/social';
 import { applyTheme, readTheme, subscribeTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -142,13 +140,6 @@ const NAV_DROPS: readonly NavDrop[] = [
             title: 'Compare',
             desc: 'Searchify vs Profound, Otterly, Scrunch, Peec.',
             href: '/compare',
-          },
-          {
-            icon: BookOpen,
-            title: 'Documentation',
-            desc: 'Open-source docs — MIT, on GitHub.',
-            href: GITHUB_URL,
-            external: true,
           },
         ],
       },

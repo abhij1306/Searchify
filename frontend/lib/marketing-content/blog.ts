@@ -32,7 +32,6 @@ export type BlogEmptyState = {
 export const BLOG_EMPTY_STATE: BlogEmptyState = {
   heading: 'First posts are on the way.',
   body:
-    'We’re writing about AEO, evidence-first scoring, and building Searchify in the open. ' +
-    'Until then, the best way to follow along is to watch the repo on GitHub — or register ' +
-    'and try the product yourself.',
+    'We’re writing about AEO, evidence-first scoring, and how teams measure AI visibility. ' +
+    'Until then, the best way to follow along is to register and try the product yourself.',
 };

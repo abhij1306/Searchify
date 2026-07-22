@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { GITHUB_URL } from '@/lib/marketing-content/social';
-
 import { LandingNav } from './landing-nav';
 /**
  * The desktop trigger and the mobile accordion head share a name, so pick a
@@ -61,7 +59,7 @@ describe('LandingNav', () => {
     expect(screen.queryByRole('link', { name: /^evidence$/i })).not.toBeInTheDocument();
   });
 
-  it('gives every dropdown item its own href (9 / 4 / 4 menuitems)', () => {
+  it('gives every dropdown item its own href (9 / 3 / 4 menuitems)', () => {
     render(<LandingNav />);
 
     // Product: the 6 feature rows (absolute anchors so they resolve from
@@ -94,7 +92,7 @@ describe('LandingNav', () => {
       control(/^resources$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
     );
     const resources = panel('desktop-nav-panel');
-    expect(within(resources).getAllByRole('menuitem')).toHaveLength(4);
+    expect(within(resources).getAllByRole('menuitem')).toHaveLength(3);
     expect(within(resources).getByRole('menuitem', { name: /^blog/i })).toHaveAttribute(
       'href',
       '/blog',
@@ -107,11 +105,8 @@ describe('LandingNav', () => {
       'href',
       '/compare',
     );
-    // Documentation is the one external row: plain <a>, new tab, no referrer.
-    const docs = within(resources).getByRole('menuitem', { name: /^documentation/i });
-    expect(docs).toHaveAttribute('href', GITHUB_URL);
-    expect(docs).toHaveAttribute('target', '_blank');
-    expect(docs).toHaveAttribute('rel', 'noreferrer');
+    // The external Documentation row is gone — the repo is private.
+    expect(within(resources).queryByRole('menuitem', { name: /^documentation/i })).toBeNull();
 
     fireEvent.mouseEnter(
       control(/^solutions$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
@@ -134,6 +129,19 @@ describe('LandingNav', () => {
       'href',
       '/solutions#pr',
     );
+  });
+
+  it('keeps every nav link inside the site', () => {
+    const { container } = render(<LandingNav />);
+
+    // Every anchor the nav renders (wordmark, desktop rows, mobile accordion
+    // rows, auth CTAs) resolves to an in-site path — nothing opens externally.
+    const links = Array.from(container.querySelectorAll('a[href]'));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\//);
+    }
+    expect(container.querySelector('a[target="_blank"]')).toBeNull();
   });
 
   it('mirrors the drops as mobile accordions and closes the menu on item click', () => {

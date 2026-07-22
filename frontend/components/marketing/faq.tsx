@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { FAQ_GROUPS, type FaqGroup } from '@/lib/marketing-content/faq';
 
 /**
- * FAQ body for `/faq` — the sticky group rail plus the five question groups
+ * FAQ body for `/faq` — the sticky group rail plus the four question groups
  * from the content module (visual spec: /code/.plans/designs/page-faq.html).
  *
  * The accordion is native <details>/<summary> on purpose: it substitutes the
@@ -20,7 +20,6 @@ const GROUP_ANCHORS: Record<string, string> = {
   'Privacy & keys': 'faq-privacy',
   'Site health': 'faq-site-health',
   'Account & billing': 'faq-billing',
-  'Open source': 'faq-open-source',
 };
 
 function groupAnchor(group: FaqGroup): string {
@@ -33,8 +32,7 @@ function groupAnchor(group: FaqGroup): string {
 
 // Answers are plain strings from the content module. Two inline transforms
 // keep them faithful to the mockup: bare '[TODO(user)]' placeholders render
-// as the dashed todo-tag pill, and bare URLs (the module embeds the repo URL
-// in the open-source answers) render as real links.
+// as the dashed todo-tag pill, and bare URLs render as real links.
 const INLINE_TOKEN_RE = /\[TODO\(user\)\]|https?:\/\/\S+/g;
 // Sentence punctuation straight after a URL belongs to the prose, not the href.
 const TRAILING_PUNCT_RE = /[.,;:!?)]+$/;
@@ -71,7 +69,7 @@ function AnswerText({ text }: { text: string }) {
   return nodes;
 }
 
-/** FaqGroups — the "On this page" rail + the five <details> accordion groups. */
+/** FaqGroups — the "On this page" rail + the four <details> accordion groups. */
 export function FaqGroups() {
   return (
     <div className="faq-layout container">

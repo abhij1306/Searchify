@@ -6,7 +6,7 @@ import { ByokTrust } from '@/components/marketing/byok-trust';
 import { PricingCta, PricingTable, PricingTiers } from '@/components/marketing/pricing';
 
 const DESCRIPTION =
-  'Pricing for Searchify, the open-source AI visibility and site intelligence platform: ' +
+  'Pricing for Searchify, the AI visibility and site intelligence platform: ' +
   'free sample crawl, Starter monitoring with quota-controlled URLs, Pro for benchmarking ' +
   'teams, Enterprise — every plan runs on your own ChatGPT, Gemini, and Claude keys.';
 

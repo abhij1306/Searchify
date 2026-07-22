@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const DROPS = [
   { key: 'product', count: 9 },
-  { key: 'resources', count: 4 },
+  { key: 'resources', count: 3 },
   { key: 'solutions', count: 4 },
 ] as const;
 
