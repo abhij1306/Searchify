@@ -28,7 +28,7 @@ import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'rea
 import { applyTheme, readTheme, subscribeTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-import { LogoCube } from './logo-cube';
+import { LogoCube } from '@/components/ui/logo-cube';
 
 type DropKey = 'product' | 'resources' | 'solutions';
 

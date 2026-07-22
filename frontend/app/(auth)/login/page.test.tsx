@@ -32,6 +32,32 @@ afterEach(() => {
 afterAll(() => mswServer.close());
 
 describe('LoginPage', () => {
+  it('renders the OAuth buttons and the email divider above the form', () => {
+    renderWithProviders(<LoginPage />);
+
+    expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue with github/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue with apple/i })).toBeInTheDocument();
+    expect(screen.getByText(/or continue with email/i)).toBeInTheDocument();
+  });
+
+  it('shows a coming-soon notice when the OAuth provider is not configured (503)', async () => {
+    const user = userEvent.setup();
+    mswServer.use(
+      http.get('/api/v1/auth/oauth/google/start', () =>
+        HttpResponse.json(
+          { detail: { code: 'oauth_provider_not_configured', provider: 'google' } },
+          { status: 503 },
+        ),
+      ),
+    );
+
+    renderWithProviders(<LoginPage />);
+    await user.click(screen.getByRole('button', { name: /continue with google/i }));
+
+    expect(await screen.findByText(/google sign-in is coming soon/i)).toBeInTheDocument();
+  });
+
   it('shows validation errors and does not call the API on empty submit', async () => {
     const user = userEvent.setup();
     const loginHandler = vi.fn();

@@ -22,6 +22,7 @@ import type {
   executionSchema,
   executionStatusSchema,
   logicalEngineSchema,
+  oauthStartResponseSchema,
   projectSchema,
   promptGenerateResponseSchema,
   promptIntentSchema,
@@ -77,6 +78,10 @@ import type {
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+// OAuth provider ids are a request-input union (not a response payload), so
+// they stay a plain literal type rather than a `z.infer`.
+export type OAuthProvider = 'google' | 'github' | 'apple';
+export type OAuthStartResponse = z.infer<typeof oauthStartResponseSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
 export type BrandProfileSource = z.infer<typeof brandProfileSourceSchema>;
 export type BrandProfileDraft = z.infer<typeof brandProfileDraftSchema>;

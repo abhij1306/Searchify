@@ -18,6 +18,7 @@
   /* Fonts */
   --font-sans: var(--font-primary-family);
   --font-mono: var(--font-mono-family);
+  --font-display: var(--font-display-family);
 
   /* Surfaces */
   --color-background: var(--bg-base);
@@ -187,6 +188,10 @@
   /* Fonts */
   --font-primary-family: var(--font-sans), system-ui, sans-serif;
   --font-mono-family: var(--font-mono), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  /* Display family for wordmarks + the auth brand headline. Phase D1 loads
+     Bricolage Grotesque in app/layout.tsx; until then this falls back to the
+     primary stack. */
+  --font-display-family: 'Bricolage Grotesque', var(--font-primary-family);
 
   /* Surfaces */
   --bg-base: #f7f8f7;
@@ -543,6 +548,69 @@ samp {
 ::selection {
   background: color-mix(in srgb, var(--accent) 24%, transparent);
   color: var(--text-primary);
+}
+
+/* ─── Brand utilities — LogoCube default paints + auth split-screen ────
+   The marketing `.mkt` paint rules in marketing.css stay more specific and
+   keep the landing's dark tile; these defaults invert per theme (matching
+   the marketing light treatment) so the mark renders correctly anywhere
+   outside `.mkt` (auth split-screen, app shell). */
+.logo-tile {
+  fill: var(--text-primary);
+}
+.logo-stroke {
+  stroke: var(--bg-panel);
+}
+.logo-facet {
+  fill: var(--accent);
+}
+
+/* Accent gradient text (auth brand headline "AI answers") — blue family
+   once the midnight token values land. */
+.text-gradient {
+  background: linear-gradient(92deg, var(--accent-text) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Auth split-screen atmosphere — layered token-driven radial glows
+   (aurora) plus a hex-free fractal-noise grain overlay. The drift motion is
+   capped to 1ms by the global prefers-reduced-motion rule. */
+.auth-aurora {
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+  filter: blur(90px);
+  background:
+    radial-gradient(52% 60% at 18% 30%, var(--accent-subtle), transparent 62%),
+    radial-gradient(44% 55% at 84% 18%, var(--accent-soft), transparent 62%),
+    radial-gradient(40% 55% at 80% 70%, var(--info-bg), transparent 65%);
+  animation: auth-aurora-drift 22s cubic-bezier(0.22, 0.68, 0.28, 1) infinite alternate;
+}
+
+@keyframes auth-aurora-drift {
+  from {
+    transform: translate3d(-2.5%, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.5%, 3%, 0) scale(1.05);
+  }
+}
+
+.auth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Share-of-voice brand fill (auth mini stat card) — primary→accent bar
+   gradient echoing the landing hero's product visual. */
+.auth-sov-brand {
+  background: linear-gradient(90deg, var(--text-primary) 0%, var(--accent) 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

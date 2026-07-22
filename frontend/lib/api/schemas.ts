@@ -41,6 +41,13 @@ export const sessionUserSchema = z
 // cookie, never the body. Fail loud on any extra key.
 export const authResponseSchema = z.object({ user: sessionUserSchema }).strict();
 
+// OAuth start scaffold (Phase B backend): a configured provider answers
+// `{ authorize_url, state }`; unconfigured providers answer 503 before this
+// schema is ever parsed.
+export const oauthStartResponseSchema = z
+  .object({ authorize_url: z.string().min(1), state: z.string().min(1) })
+  .strict();
+
 // Backend `WorkspaceResponse` is `{ id, name, role, created_at, updated_at }` —
 // no slug; the caller's membership `role` is carried instead.
 export const workspaceSchema = z

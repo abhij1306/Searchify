@@ -8,7 +8,7 @@ import {
   type SocialLink,
 } from '@/lib/marketing-content/social';
 
-import { LogoCube } from './logo-cube';
+import { LogoCube } from '@/components/ui/logo-cube';
 
 type FooterLink = {
   label: string;
