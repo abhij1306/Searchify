@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, inputClasses } from '@/components/ui/input';
 import { httpErrorStatus } from '@/lib/api/errors';
 import type { PromptGenerateInput } from '@/lib/api/prompts';
 import type { PromptGenerateResponse, Topic } from '@/lib/api/types';
@@ -119,7 +119,7 @@ export function GeneratePromptsDialog({
             value={topicId}
             onChange={(event) => setTopicId(event.target.value)}
             aria-label="Topic"
-            className="focus-ring border-border-strong bg-panel text-foreground block w-full rounded-md border px-2.5 py-1.5 text-sm"
+            className={inputClasses}
           >
             <option value="">Let AI propose topics</option>
             {topics.map((topic) => (

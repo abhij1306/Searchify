@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, inputClasses } from '@/components/ui/input';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { Topic } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
@@ -86,10 +86,12 @@ export function TopicRail({
           so nothing from the right pane can overlap it. */}
       <nav
         aria-label="Topics"
-        className="border-border bg-panel hidden min-w-0 content-start gap-1 overflow-hidden rounded-lg border p-2 md:sticky md:top-4 md:grid"
+        className="border-border bg-panel shadow-card hidden min-w-0 content-start gap-1 overflow-hidden rounded-lg border p-2 md:sticky md:top-4 md:grid"
       >
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-secondary text-xs font-semibold tracking-wide uppercase">Topics</h3>
+          <h3 className="text-muted text-2xs font-mono font-medium tracking-[0.08em] uppercase">
+            Topics
+          </h3>
           <Button
             variant="ghost"
             size="icon"
@@ -177,7 +179,10 @@ function TopicSelect({
   const labelId = useId();
   return (
     <div className="mb-1 grid gap-1.5 md:hidden">
-      <span id={labelId} className="text-secondary text-xs font-semibold tracking-wide uppercase">
+      <span
+        id={labelId}
+        className="text-muted text-2xs font-mono font-medium tracking-[0.08em] uppercase"
+      >
         Topics
       </span>
       <div className="relative">
@@ -185,7 +190,7 @@ function TopicSelect({
           aria-labelledby={labelId}
           value={selectedTopicId ?? ''}
           onChange={(event) => onSelect(event.target.value === '' ? null : event.target.value)}
-          className="focus-ring border-border-strong bg-panel text-foreground block h-[var(--control-height)] w-full appearance-none rounded-md border px-2.5 pr-9 text-sm"
+          className={cn(inputClasses, 'appearance-none pr-9')}
         >
           <option value="">All topics</option>
           {topics.map((topic) => (
@@ -224,7 +229,7 @@ function TopicItem({
   return (
     <div
       className={cn(
-        'group flex items-center gap-1 rounded-md pr-1',
+        'group flex items-center gap-1 rounded-full pr-1',
         selected ? 'bg-accent-subtle' : 'hover:bg-background-alt',
       )}
     >
@@ -233,7 +238,7 @@ function TopicItem({
         onClick={onSelect}
         aria-current={selected ? 'true' : undefined}
         className={cn(
-          'focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
+          'focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5 text-left text-sm',
           selected ? 'text-accent-text font-medium' : 'text-foreground',
         )}
       >
@@ -241,7 +246,7 @@ function TopicItem({
           <span className="min-w-0 flex-1 truncate">{label}</span>
         </Tooltip>
         {typeof activeCount === 'number' ? (
-          <span className="text-secondary shrink-0 text-xs tabular-nums">
+          <span className="mono text-muted text-2xs shrink-0">
             {activeCount}
             {proposedCount ? (
               <span className="text-accent-text" title={`${proposedCount} proposed`}>

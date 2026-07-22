@@ -18,9 +18,9 @@ import { executionBadgeValue, executionStatusLabel } from '@/lib/runs/status';
 /**
  * Executions table for a run (F10, design.md §9.7).
  *
- * One row per execution/queue task: prompt index + repetition, the engine badge
- * (logical + transport), status badge, and latency (mono). Succeeded rows link
- * to the evidence page for that execution.
+ * One row per execution/queue task: prompt index + repetition (mono), the
+ * engine badge (logical + transport), status badge, and latency (mono).
+ * Succeeded rows link to the evidence page for that execution.
  */
 export function ExecutionsTable({
   auditId,
@@ -41,8 +41,8 @@ export function ExecutionsTable({
         {executions.map((execution) => (
           <TableRow key={execution.id}>
             <TableCell>
-              <span className="text-foreground text-sm">#{execution.prompt_index + 1}</span>
-              <span className="text-muted ml-2 text-xs">rep {execution.repetition}</span>
+              <span className="mono text-foreground text-sm">#{execution.prompt_index + 1}</span>
+              <span className="mono text-muted ml-2 text-xs">rep {execution.repetition}</span>
             </TableCell>
             <TableCell>
               <span className="text-foreground text-sm">

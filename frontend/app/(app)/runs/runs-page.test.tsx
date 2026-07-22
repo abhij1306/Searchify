@@ -90,13 +90,51 @@ describe('RunsPage', () => {
 
     renderWithProviders(<RunsPage />);
 
-    expect(await screen.findByText('Running')).toBeInTheDocument();
-    const row = screen.getByText('Running').closest('tr')!;
+    // Scope to the table — the "Running" status filter chip carries the same
+    // label as the run-status badge.
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Running')).toBeInTheDocument();
+    const row = within(table).getByText('Running').closest('tr')!;
     expect(within(row).getByText('6')).toBeInTheDocument();
     expect(within(row).getByRole('link', { name: 'View' })).toHaveAttribute(
       'href',
       `/runs/${AUDIT_ID}`,
     );
+    // Mono page indicator on the pagination footer.
+    expect(screen.getByText('1–1 of 1 runs')).toBeInTheDocument();
+  });
+
+  it('filters the runs list by status chip', async () => {
+    const user = userEvent.setup();
+    mswServer.use(
+      http.get('/api/v1/audits', () =>
+        HttpResponse.json([
+          audit({ status: 'completed' }),
+          audit({
+            id: 'abababab-abab-4bab-8bab-abababababab',
+            status: 'failed',
+            failed_count: 6,
+          }),
+        ]),
+      ),
+    );
+
+    renderWithProviders(<RunsPage />);
+
+    const table = await screen.findByRole('table');
+    // Both rows listed ("Completed"/"Failed" also name header cells + chips,
+    // so assert on the row links).
+    expect(within(table).getAllByRole('link', { name: 'View' })).toHaveLength(2);
+
+    // The chips carry mono counts and toggle the visible rows.
+    const chips = screen.getByRole('group', { name: 'Filter by status' });
+    expect(within(chips).getByRole('button', { name: /all/i })).toHaveTextContent('2');
+    await user.click(within(chips).getByRole('button', { name: /failed/i }));
+
+    const links = within(table).getAllByRole('link', { name: 'View' });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/runs/abababab-abab-4bab-8bab-abababababab');
+    expect(screen.getByText('1–1 of 1 runs')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no runs', async () => {

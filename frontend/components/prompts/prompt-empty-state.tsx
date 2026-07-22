@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 
 /**
  * Empty state (F7) — shown when the active project's prompt set has no prompts.
- * A centered call-to-action card that invites adding the first prompt or
- * importing a CSV.
+ * Midnight empty-state pattern: mono eyebrow + display heading + ghost CTAs
+ * inviting the first manual prompt or a CSV import.
  */
 export function PromptEmptyState({
   onAdd,
@@ -18,18 +18,21 @@ export function PromptEmptyState({
       <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
         <MessageSquarePlus className="size-6" aria-hidden />
       </span>
-      <div className="max-w-sm">
-        <h3 className="text-foreground text-base font-semibold">No prompts yet</h3>
+      <div className="grid max-w-sm gap-1">
+        <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
+          Prompt library
+        </p>
+        <h3 className="font-display text-foreground text-xl font-semibold">No prompts yet</h3>
         <p className="text-secondary mt-1 text-sm">
           Add the questions you want to track across AI engines. Enter them one at a time or import
           a CSV.
         </p>
       </div>
       <div className="flex gap-2">
-        <Button variant="primary" onClick={onAdd}>
+        <Button variant="ghost" onClick={onAdd}>
           Add prompt
         </Button>
-        <Button variant="secondary" onClick={onImport}>
+        <Button variant="ghost" onClick={onImport}>
           Import CSV
         </Button>
       </div>
