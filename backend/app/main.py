@@ -13,6 +13,7 @@ from app.api.auth import router as auth_router
 from app.api.brand_suggestions import router as brand_suggestions_router
 from app.api.content import router as content_router
 from app.api.executions import router as executions_router
+from app.api.oauth import router as oauth_router
 from app.api.projects import router as projects_router
 from app.api.prompts import router as prompts_router
 from app.api.provider_connections import (
@@ -55,6 +56,7 @@ def _sanitize_correlation_id(value: str) -> str:
 # owns its own paths; the prefix keeps the whole surface under /api/v1.
 _ROUTERS = (
     auth_router,
+    oauth_router,
     workspaces_router,
     projects_router,
     brand_suggestions_router,
