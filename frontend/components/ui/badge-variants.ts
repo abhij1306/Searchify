@@ -48,6 +48,6 @@ export type SentimentValue = keyof typeof sentimentBadge;
 export type ClassificationValue = keyof typeof classificationBadge;
 export type RunStatusValue = keyof typeof runStatusBadge;
 
-/** Shared pill shape/typography for every badge family. */
+/** Shared pill shape/typography for every badge family (mono per the midnight chip language). */
 export const badgeBase =
-  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-2xs font-semibold leading-[1.4] tracking-wide capitalize';
+  'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-2xs font-semibold leading-[1.4] tracking-wide capitalize';
