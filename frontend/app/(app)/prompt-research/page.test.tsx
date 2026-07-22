@@ -25,4 +25,11 @@ describe('PromptResearchPage', () => {
     ).rejects.toThrow('NEXT_REDIRECT /prompts?mode=manage');
     expect(redirectMock).toHaveBeenCalledWith('/prompts?mode=manage');
   });
+
+  it('keeps manage mode when the mode param is repeated (array value)', async () => {
+    await expect(
+      PromptResearchPage({ searchParams: Promise.resolve({ mode: ['manage', 'foo'] }) }),
+    ).rejects.toThrow('NEXT_REDIRECT /prompts?mode=manage');
+    expect(redirectMock).toHaveBeenCalledWith('/prompts?mode=manage');
+  });
 });

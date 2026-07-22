@@ -12,5 +12,8 @@ export default async function PromptResearchPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { mode } = await searchParams;
-  redirect(mode === 'manage' ? '/prompts?mode=manage' : '/prompts');
+  // A repeated query param arrives as an array — treat any `manage` value as
+  // manage mode rather than dropping the deep link to the default view.
+  const managing = Array.isArray(mode) ? mode.includes('manage') : mode === 'manage';
+  redirect(managing ? '/prompts?mode=manage' : '/prompts');
 }
