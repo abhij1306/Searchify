@@ -15,19 +15,16 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * a non-marketing route that attribute would otherwise leak into app
  * surfaces (the shared bootstrap only re-runs on a full page load). On
  * unmount this restores exactly what the bootstrap would have chosen:
- * stored choice → OS preference → light.
+ * stored choice → dark (dark-first; the OS preference is not consulted).
  */
 export function MarketingThemeReset() {
   useIsomorphicLayoutEffect(() => {
     return () => {
       try {
         const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-        const dark = stored
-          ? stored === 'dark'
-          : window.matchMedia('(prefers-color-scheme:dark)').matches;
-        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'dark';
       } catch {
-        document.documentElement.dataset.theme = 'light';
+        document.documentElement.dataset.theme = 'dark';
       }
     };
   }, []);

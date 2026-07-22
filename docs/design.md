@@ -10,25 +10,31 @@
 
 - **`frontend/app/globals.css` is the single source of truth** for tokens. Components consume
   **bridged Tailwind semantic tokens only** — never raw hex (enforced by the no-raw-hex guard).
-- **Aesthetic**: dense, clean **B2B analytics** — a calm neutral canvas, tight 4px rhythm, thin
-  borders, restrained shadows, one confident accent, and **tabular monospace numerals** for all
-  metrics. Original palette (not a clone of the reference).
-- **Both themes are always defined.** Light is the default; dark is a full sibling hierarchy.
+- **Aesthetic**: dense, clean **B2B analytics** in the **CUBE27 midnight** language — a
+  near-black canvas (dark-first), tight 4px rhythm, hairline borders, restrained shadows, one
+  confident **blue accent** reserved for links, active states, focus rings, and charts, and
+  **tabular monospace numerals** for all metrics. The light theme is the warm-paper sibling.
+- **Both themes are always defined.** Dark is the default; light is a full sibling hierarchy.
   Every text-on-surface pair meets **WCAG AA contrast ≥ 4.5:1**.
 
 ## 2. Theme model
 
 Two explicit surface hierarchies, lowest → highest elevation. `:root` = light,
 `html[data-theme='dark']` = dark. A pre-hydration script sets `data-theme` to avoid flashing.
+**Dark is the default**: with no stored choice the bootstrap resolves to dark (stored choice →
+dark; the OS preference is not consulted — only an explicit toggle opts into light). Light is a
+full sibling hierarchy, not an afterthought.
 
-**Light surface hierarchy:** `bg-base #f7f8f7` → `bg-alt #eef0ee` → `bg-panel #ffffff` →
-`bg-elevated #ffffff` → `bg-well #e2e5e2`. Sidebar `#f2f4f2`.
+**Dark surface hierarchy (CUBE27 midnight):** `bg-base #050505` → `bg-alt #0a0a0a` →
+`bg-panel #111114` → `bg-elevated #16161a` → `bg-well #1c1c21`. Sidebar `#0a0a0a`.
 
-**Dark surface hierarchy:** `bg-base #0e0f0e` → `bg-alt #161816` → `bg-panel #1d1f1d` →
-`bg-elevated #242724` → `bg-well #2e312e`. Sidebar `#131513`.
+**Light surface hierarchy (warm paper):** `bg-base #fafaf7` → `bg-alt #efefea` →
+`bg-panel #ffffff` → `bg-elevated #ffffff` → `bg-well #f2f2ec`. Sidebar `#f5f5f0`.
 
-Accent is a **teal-green** (`#0f9d76` light / `#2dd4a7` dark) — distinct from the reference's
-blue-violet — reflecting the AEO "visibility" brand.
+Accent is a **blue** (`#2f58ff` light / `#6b8aff` dark) — the CUBE27 brand accent, shared with
+the marketing landing — reserved for links, active states, focus rings, and data visualization.
+Semantic hues (status, sentiment, citation, run, score-band) are unchanged semantically; owned
+citations keep their green identity in both themes.
 
 ## 3. Token values — LIGHT (`:root`)
 
@@ -39,43 +45,46 @@ blue-violet — reflecting the AEO "visibility" brand.
   /* Fonts */
   --font-primary-family: var(--font-sans), system-ui, sans-serif;
   --font-mono-family: var(--font-mono), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  /* Display family for wordmarks + page-level headings (Bricolage Grotesque
+     600/700 loaded as --font-brand-display in app/layout.tsx). */
+  --font-display-family: var(--font-brand-display), 'Bricolage Grotesque', var(--font-primary-family);
 
   /* Surfaces */
-  --bg-base: #f7f8f7;
-  --bg-alt: #eef0ee;
+  --bg-base: #fafaf7;
+  --bg-alt: #efefea;
   --bg-panel: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-well: #e2e5e2;
-  --bg-sidebar: #f2f4f2;
-  --surface-overlay: rgba(255, 255, 255, 0.88);
+  --bg-well: #f2f2ec;
+  --bg-sidebar: #f5f5f0;
+  --surface-overlay: rgba(250, 250, 247, 0.88);
 
   /* Borders */
-  --border-subtle: #edefed;
-  --border: #e2e5e2;
-  --border-strong: #d0d4d0;
+  --border-subtle: #edece5;
+  --border: #e2e0d8;
+  --border-strong: #cfcbc0;
   --border-focus: var(--accent);
 
   /* Text — all verified ≥ 4.5:1 on bg-base/bg-panel */
-  --text-primary: #1d211f;   /* 14.8:1 on #ffffff */
-  --text-secondary: #4c524f; /* 8.0:1  */
-  --text-muted: #6f756f;     /* 4.9:1  */
-  --text-subtle: #9aa09a;    /* decorative only (icons/dividers), not body text */
+  --text-primary: #0f1117;   /* 18.9:1 on #ffffff, 18.0:1 on #fafaf7 */
+  --text-secondary: #4b4d58; /* 8.4:1 on #ffffff, 8.0:1 on #fafaf7  */
+  --text-muted: #6d6f7a;     /* 5.0:1 on #ffffff, 4.8:1 on #fafaf7  */
+  --text-subtle: #a6a6ad;    /* decorative only (icons/dividers), not body text */
 
-  /* Accent — teal-green */
-  --accent: #0f9d76;
-  --accent-hover: #0c8563;
-  --accent-fg: #ffffff;         /* on accent bg: 4.6:1 */
-  --accent-subtle: rgba(15, 157, 118, 0.10);
-  --accent-soft: rgba(15, 157, 118, 0.06);
-  --accent-border: rgba(15, 157, 118, 0.28);
-  --accent-text: #0b6f52;       /* accent as text on light: 5.2:1 */
+  /* Accent — blue */
+  --accent: #2f58ff;
+  --accent-hover: #1e3fd0;
+  --accent-fg: #ffffff;         /* on accent bg: 5.3:1 */
+  --accent-subtle: rgba(47, 88, 255, 0.10);
+  --accent-soft: rgba(47, 88, 255, 0.06);
+  --accent-border: rgba(47, 88, 255, 0.30);
+  --accent-text: #1e3fd0;       /* accent as text on light: 7.8:1 on #ffffff */
 
   /* Semantic status — text values ≥ 4.5:1 on their bg */
   --success: #059669; --success-bg: #ecfdf5; --success-border: #a7f3d0; --success-text: #065f46;
   --warning: #d97706; --warning-bg: #fffbeb; --warning-border: #fcd34d; --warning-text: #92400e;
   --danger:  #dc2626; --danger-bg:  #fef2f2; --danger-border:  #fca5a5; --danger-text:  #991b1b;
   --info:    #2563eb; --info-bg:    #eff6ff; --info-border:    #bfdbfe; --info-text:    #1d4ed8;
-  --neutral-bg: rgba(29, 33, 31, 0.045);
+  --neutral-bg: rgba(15, 17, 23, 0.045);
 
   /* Sentiment (positive / neutral / negative) */
   --sentiment-positive: #059669; --sentiment-positive-bg: #ecfdf5; --sentiment-positive-text: #065f46;
@@ -112,64 +121,64 @@ blue-violet — reflecting the AEO "visibility" brand.
   --shadow-elevated-value: 0 18px 42px rgba(18, 22, 20, 0.08), 0 0 0 1px rgba(18, 22, 20, 0.04);
   --shadow-lg-value: 0 22px 56px rgba(18, 22, 20, 0.10), 0 0 0 1px rgba(18, 22, 20, 0.05);
   --shadow-modal: 0 24px 60px rgba(18, 22, 20, 0.16);
-  --focus-ring: 0 0 0 3px rgba(15, 157, 118, 0.20);
+  --focus-ring: 0 0 0 3px rgba(47, 88, 255, 0.22);
   --overlay-scrim: rgba(0, 0, 0, 0.32);
 
   /* Skeleton */
-  --skeleton-base: #ededeb;
-  --skeleton-highlight: #fafafa;
+  --skeleton-base: #edece4;
+  --skeleton-highlight: #fafaf7;
 }
 ```
 
 ## 4. Token values — DARK (`html[data-theme='dark']`)
 
 Only the tokens that change are overridden; the type scale, spacing, radii, and structural
-tokens (§5–§7) are shared. Dark surfaces are pure neutral-green-tinted gray, zero blue cast.
+tokens (§5–§7) are shared. Dark surfaces are the CUBE27 midnight near-black scale.
 
 ```css
 html[data-theme='dark'] {
   color-scheme: dark;
 
   /* Surfaces */
-  --bg-base: #0e0f0e;
-  --bg-alt: #161816;
-  --bg-panel: #1d1f1d;
-  --bg-elevated: #242724;
-  --bg-well: #2e312e;
-  --bg-sidebar: #131513;
-  --surface-overlay: rgba(14, 15, 14, 0.94);
+  --bg-base: #050505;
+  --bg-alt: #0a0a0a;
+  --bg-panel: #111114;
+  --bg-elevated: #16161a;
+  --bg-well: #1c1c21;
+  --bg-sidebar: #0a0a0a;
+  --surface-overlay: rgba(5, 5, 5, 0.92);
 
   /* Borders */
-  --border-subtle: #1e201e;
-  --border: #2a2d2a;
-  --border-strong: #383c38;
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
 
   /* Text — verified ≥ 4.5:1 on bg-base/bg-panel */
-  --text-primary: #e8ebe8;   /* 14.1:1 on #1d1f1d */
-  --text-secondary: #9ca39c; /* 6.0:1  */
-  --text-muted: #6b716b;     /* decorative-leaning; use secondary for body */
-  --text-subtle: #474b47;    /* decorative only */
+  --text-primary: #fafafa;   /* 18.1:1 on #111114, 19.5:1 on #050505 */
+  --text-secondary: #a1a1aa; /* 7.4:1 on #111114, 8.0:1 on #050505  */
+  --text-muted: #85858f;     /* 5.2:1 on #111114, 5.6:1 on #050505  */
+  --text-subtle: #52525b;    /* decorative only */
 
-  /* Accent — teal-green brightened for dark */
-  --accent: #2dd4a7;
-  --accent-hover: #4fe0ba;
-  --accent-fg: #06231a;         /* dark text on bright accent: 7.9:1 */
-  --accent-subtle: rgba(45, 212, 167, 0.14);
-  --accent-soft: rgba(45, 212, 167, 0.08);
-  --accent-border: rgba(45, 212, 167, 0.32);
-  --accent-text: #58e0bb;       /* accent as text on dark: 8.4:1 */
+  /* Accent — blue */
+  --accent: #6b8aff;
+  --accent-hover: #9db2ff;
+  --accent-fg: #0a0a0a;         /* dark text on bright accent: 6.3:1 */
+  --accent-subtle: rgba(107, 138, 255, 0.14);
+  --accent-soft: rgba(107, 138, 255, 0.08);
+  --accent-border: rgba(107, 138, 255, 0.34);
+  --accent-text: #9db2ff;       /* accent as text on dark: 9.9:1 on #050505 */
 
   /* Semantic status */
-  --success: #3ecf8e; --success-bg: rgba(62, 207, 142, 0.10); --success-border: rgba(62, 207, 142, 0.24); --success-text: #5fdaa2;
-  --warning: #f5a623; --warning-bg: rgba(245, 166, 35, 0.10); --warning-border: rgba(245, 166, 35, 0.24); --warning-text: #f7b854;
-  --danger:  #ff6b6b; --danger-bg:  rgba(255, 107, 107, 0.10);--danger-border:  rgba(255, 107, 107, 0.24);--danger-text:  #ff8f8f;
-  --info:    #6ba5ff; --info-bg:    rgba(107, 165, 255, 0.10);--info-border:    rgba(107, 165, 255, 0.24);--info-text:    #8fbcff;
+  --success: #3ecf8e; --success-bg: rgba(62, 207, 142, 0.12); --success-border: rgba(62, 207, 142, 0.28); --success-text: #5fdaa2;
+  --warning: #f5a623; --warning-bg: rgba(245, 166, 35, 0.12); --warning-border: rgba(245, 166, 35, 0.28); --warning-text: #f7b854;
+  --danger:  #ff6b6b; --danger-bg:  rgba(255, 107, 107, 0.12);--danger-border:  rgba(255, 107, 107, 0.28);--danger-text:  #ff8f8f;
+  --info:    #6ba5ff; --info-bg:    rgba(107, 165, 255, 0.12);--info-border:    rgba(107, 165, 255, 0.28);--info-text:    #8fbcff;
   --neutral-bg: rgba(255, 255, 255, 0.04);
 
   /* Sentiment */
-  --sentiment-positive: #3ecf8e; --sentiment-positive-bg: rgba(62, 207, 142, 0.10); --sentiment-positive-text: #5fdaa2;
+  --sentiment-positive: #3ecf8e; --sentiment-positive-bg: rgba(62, 207, 142, 0.12); --sentiment-positive-text: #5fdaa2;
   --sentiment-neutral:  #9ca39c; --sentiment-neutral-bg:  rgba(255, 255, 255, 0.05); --sentiment-neutral-text:  #9ca39c;
-  --sentiment-negative: #ff6b6b; --sentiment-negative-bg: rgba(255, 107, 107, 0.10); --sentiment-negative-text: #ff8f8f;
+  --sentiment-negative: #ff6b6b; --sentiment-negative-bg: rgba(255, 107, 107, 0.12); --sentiment-negative-text: #ff8f8f;
   --value-placeholder: var(--text-subtle);
 
   /* Citation classification */
@@ -200,20 +209,24 @@ html[data-theme='dark'] {
   --shadow-elevated-value: 0 12px 28px rgba(0, 0, 0, 0.7);
   --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.8);
   --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.9);
-  --focus-ring: 0 0 0 3px rgba(45, 212, 167, 0.28);
+  --focus-ring: 0 0 0 3px rgba(107, 138, 255, 0.35);
   --overlay-scrim: rgba(0, 0, 0, 0.55);
 
   /* Skeleton */
-  --skeleton-base: #232623;
-  --skeleton-highlight: #2b2e2b;
+  --skeleton-base: #16161a;
+  --skeleton-highlight: #1c1c21;
 }
 ```
 
 ## 5. Type scale (px), weights, tracking, line-heights
 
-Sans = a Geist-class variable sans (`--font-sans`); mono = a Geist-Mono-class variable mono
-with **tabular numerals** (`font-variant-numeric: tabular-nums`) — mono is used for **every
-metric, percentage, count, position, and timestamp** so columns align.
+Sans = **Public Sans** (`--font-sans` → `--font-primary-family`); mono = **IBM Plex Mono**
+400/500/600 (`--font-mono` → `--font-mono-family`) with **tabular numerals**
+(`font-variant-numeric: tabular-nums`) — mono is used for **every metric, percentage, count,
+position, and timestamp** so columns align. Display = **Bricolage Grotesque** 600/700, loaded
+in `app/layout.tsx` as the `--font-brand-display` next/font variable and exposed to components
+via `--font-display-family` → the bridged `font-display` utility — for the wordmark, page-level
+headings, and the auth brand headline (the same trio as the marketing landing).
 
 | Token | Size | Line-height | Tracking | Weight | Use |
 |---|---|---|---|---|---|
@@ -259,6 +272,9 @@ bridged names (`bg-background`, `text-foreground`, `border-border`, `bg-accent`,
 
 ```css
 @theme inline {
+  --font-sans: var(--font-primary-family);
+  --font-mono: var(--font-mono-family);
+  --font-display: var(--font-display-family); /* Bricolage via --font-brand-display */
   --color-background: var(--bg-base);
   --color-panel: var(--bg-panel);
   --color-foreground: var(--text-primary);
@@ -310,10 +326,19 @@ The app is a fixed **left sidebar (240px)** + **top bar (52px)** + scrolling con
 (centered, no shell).
 
 ### 9.1 Auth (`/login`, `/register`)
-Centered single card (max-width 400px) on `bg-base`, `shadow-card`, `--radius-xl`. Logo mark +
-"Searchify" wordmark at top. Fields (`field` primitive): email, password (+ confirm/name on
-register). Primary full-width `button`. Inline `ApiError` above the form (danger alert).
-Below: a link toggling login/register. No sidebar/top-bar. Theme toggle in a corner.
+**Split-screen shell** (shared `(auth)` route-group layout). At ≥900px a two-column grid
+[5fr 6fr]: the **brand panel** (`bg-panel`, hairline right border, token-driven aurora glows +
+grain overlay) carries the LogoCube + display-font "Searchify" wordmark with a mono uppercase
+"By CUBE27" chip, a mono uppercase eyebrow, a `font-display` brand headline with an
+accent-gradient phrase, three proof points, a static decorative mini stat card (visibility
+score sparkline + share-of-voice bars, aria-hidden), and a mono footer strip. The **form
+panel** centers the auth card (max-width 400px, `shadow-card`); below 900px only the form
+panel renders with a compact wordmark row above the card. Three OAuth `button`s (Google,
+GitHub, Apple — coming-soon wired, 503 → accessible inline notice) sit above an email divider;
+fields (`field` primitive): email, password (+ confirm/name on register). Primary full-width
+`button`. Inline `ApiError` above the form (danger alert). Below: a link toggling
+login/register. No sidebar/top-bar. Theme toggle in the top-right corner. The pages own the
+single h1 — brand-panel wordmarks are spans and the headline is a `<p>`.
 
 ### 9.2 App Shell (`(app)/layout.tsx`)
 **Left sidebar (240px, `bg-sidebar`)**: top = project-switcher (brand avatar + name, dropdown).
@@ -423,7 +448,12 @@ the `—` placeholder.
 1. Author `:root` (light) + `html[data-theme='dark']` (dark) with **all** tokens from §3–§4.
 2. Add the `@theme inline` bridge (§7) — components use bridged tokens only.
 3. **No raw hex outside the two theme blocks** (no-raw-hex guard).
-4. **Both themes always defined**; `data-theme` set pre-hydration.
+4. **Both themes always defined**; `data-theme` set pre-hydration; **dark is the default**
+   (stored choice → dark; the OS preference is not consulted).
 5. Mono font gets `font-variant-numeric: tabular-nums`; all metrics use mono.
 6. Ship `prefers-reduced-motion`, `forced-colors`, and `print` rules.
+7. Load Public Sans / IBM Plex Mono / Bricolage Grotesque via next/font in `app/layout.tsx`
+   (`--font-sans`, `--font-mono`, `--font-brand-display`); expose Bricolage through the
+   `--font-display-family` token → bridged `font-display` utility. Never name a next/font
+   variable `--font-display` — that name is the bridged `@theme` token.
 
