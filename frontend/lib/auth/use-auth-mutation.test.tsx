@@ -125,7 +125,11 @@ describe('useAuthMutation', () => {
     await waitFor(() => expect(result.current.mutation.isPending).toBe(true));
     expect(replace).not.toHaveBeenCalled();
 
-    respond?.(HttpResponse.json([]));
+    // isPending flips before the MSW handler has necessarily assigned
+    // `respond` — wait for the request to actually arrive before resolving.
+    await waitFor(() => expect(respond).toBeTypeOf('function'));
+    if (!respond) throw new Error('Projects request did not start');
+    respond(HttpResponse.json([]));
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/setup'));
     await waitFor(() => expect(result.current.mutation.isPending).toBe(false));
   });

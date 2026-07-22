@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 /**
  * MarketSelect (F6) — a lightweight searchable select (combobox) for the
  * guided setup's Market step: an Input whose focus/typing opens a filtered
- * option list. Click or ArrowUp/ArrowDown + Enter to pick; Escape or blur
- * closes and reverts the text to the selected option's label.
+ * option list. Click or ArrowUp/ArrowDown + Enter to pick; blur commits a
+ * typed text that exactly matches an option and otherwise reverts to the
+ * selected label; Escape always reverts.
  *
  * Built on the standard Input + midnight dropdown tokens (bg-elevated,
  * shadow-elevated) rather than the Radix menu so typing focus never leaves
@@ -27,6 +28,7 @@ export function MarketSelect({
   placeholder,
   'aria-describedby': ariaDescribedBy,
   'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: Readonly<{
   id?: string;
   ariaLabel: string;
@@ -37,6 +39,7 @@ export function MarketSelect({
   placeholder?: string;
   'aria-describedby'?: string;
   'aria-invalid'?: boolean;
+  'aria-required'?: boolean;
 }>) {
   const listId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +67,21 @@ export function MarketSelect({
     setOpen(false);
   };
 
-  const close = () => {
+  const close = ({ commitExact = false }: { commitExact?: boolean } = {}) => {
+    // On blur, a typed text that exactly matches an option (label or code) is
+    // a completed selection — commit it rather than silently discarding it.
+    // Escape passes commitExact: false and always reverts.
+    if (commitExact && query !== null) {
+      const q = query.trim().toLowerCase();
+      const exact = options.find(
+        (option) => option.label.toLowerCase() === q || option.value.toLowerCase() === q,
+      );
+      if (exact) {
+        commit(exact);
+        onBlur?.();
+        return;
+      }
+    }
     setOpen(false);
     setQuery(null);
     onBlur?.();
@@ -82,6 +99,7 @@ export function MarketSelect({
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         autoComplete="off"
         placeholder={placeholder}
         value={text}
@@ -115,7 +133,9 @@ export function MarketSelect({
           // Defer so an option mousedown (which preventDefaults and keeps
           // focus) wins over the close.
           setTimeout(() => {
-            if (!containerRef.current?.contains(document.activeElement)) close();
+            if (!containerRef.current?.contains(document.activeElement)) {
+              close({ commitExact: true });
+            }
           }, 0);
         }}
       />

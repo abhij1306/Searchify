@@ -362,6 +362,7 @@ export function SetupForm({
                       id={props.id}
                       aria-describedby={props['aria-describedby']}
                       aria-invalid={props['aria-invalid']}
+                      aria-required
                       ariaLabel="Country"
                       value={field.value}
                       onChange={field.onChange}
@@ -383,6 +384,7 @@ export function SetupForm({
                       id={props.id}
                       aria-describedby={props['aria-describedby']}
                       aria-invalid={props['aria-invalid']}
+                      aria-required
                       ariaLabel="Language"
                       value={field.value}
                       onChange={field.onChange}

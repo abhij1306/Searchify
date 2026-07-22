@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS } from '@/lib/setup/markets';
@@ -8,16 +9,25 @@ import { MarketSelect } from './market-select';
 
 function renderSelect(overrides?: Partial<Parameters<typeof MarketSelect>[0]>) {
   const onChange = vi.fn();
-  const utils = render(
-    <MarketSelect
-      ariaLabel="Country"
-      value="US"
-      onChange={onChange}
-      options={COUNTRY_OPTIONS}
-      placeholder="Search countries…"
-      {...overrides}
-    />,
-  );
+  // Stateful harness: mirrors react-hook-form round-tripping the committed
+  // value back into the `value` prop.
+  function Harness() {
+    const [value, setValue] = useState(overrides?.value ?? 'US');
+    return (
+      <MarketSelect
+        ariaLabel="Country"
+        options={COUNTRY_OPTIONS}
+        placeholder="Search countries…"
+        {...overrides}
+        value={value}
+        onChange={(next) => {
+          onChange(next);
+          setValue(next);
+        }}
+      />
+    );
+  }
+  const utils = render(<Harness />);
   return { onChange, ...utils };
 }
 
@@ -77,7 +87,21 @@ describe('MarketSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('discards uncommitted text on blur without firing onChange', async () => {
+  it('discards uncommitted text on blur when it matches no option', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderSelect();
+
+    const input = screen.getByRole('combobox', { name: /^country$/i });
+    await user.click(input);
+    await user.type(input, 'xyz');
+    await user.tab();
+
+    expect(onChange).not.toHaveBeenCalled();
+    await screen.findByDisplayValue('United States');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('commits an exact label match on blur instead of discarding it', async () => {
     const user = userEvent.setup();
     const { onChange } = renderSelect();
 
@@ -86,9 +110,8 @@ describe('MarketSelect', () => {
     await user.type(input, 'France');
     await user.tab();
 
-    expect(onChange).not.toHaveBeenCalled();
-    await screen.findByDisplayValue('United States');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledWith('FR');
+    await screen.findByDisplayValue('France');
   });
 
   it('renders the raw code for an off-list stored value instead of a blank field', () => {

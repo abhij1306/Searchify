@@ -13,11 +13,8 @@ import { errorMessage, type useEngineConnection } from '@/lib/providers/use-engi
  * wire); this component is the single home for that invariant's copy.
  */
 export function EngineConnectionFields({
-  id,
   state,
 }: Readonly<{
-  /** Overrides the Field-generated input id (EngineCard keys it by engine). */
-  id?: string;
   state: ReturnType<typeof useEngineConnection>;
 }>) {
   const { configured, apiKey, setApiKey, saveMutation, testResult } = state;
@@ -31,7 +28,6 @@ export function EngineConnectionFields({
         {(props) => (
           <Input
             {...props}
-            id={id ?? props.id}
             type="password"
             autoComplete="off"
             placeholder={configured ? '•••••••• stored' : 'Paste your API key'}

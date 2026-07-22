@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardEyebrow, CardHeader } from '@/components/ui/card';
@@ -30,8 +28,6 @@ export function EngineCard({
   const connectionState = useEngineConnection({ model, connections });
   const { route, transport, connection, configured, apiKey, saveMutation, testMutation, busy } =
     connectionState;
-
-  const keyFieldId = useMemo(() => `key-${model.logical_engine}`, [model.logical_engine]);
 
   return (
     <Card>
@@ -67,7 +63,7 @@ export function EngineCard({
           </div>
         ) : null}
 
-        <EngineConnectionFields id={keyFieldId} state={connectionState} />
+        <EngineConnectionFields state={connectionState} />
 
         <div className="flex items-center gap-2">
           <Button
