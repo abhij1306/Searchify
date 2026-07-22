@@ -28,7 +28,7 @@
 | `/blog`, `/blog/[slug]` | Public marketing blog index and statically generated posts (`notFound()` for unknown slugs) | **MVP** |
 | `/compare`, `/compare/[competitor]` | Public marketing comparison index and statically generated comparison pages (`notFound()` for unknown slugs) | **MVP** |
 | `/faq` | Public marketing FAQ (native disclosure controls) | **MVP** |
-| `/login`, `/register` | Auth | **MVP** |
+| `/login`, `/register` | Auth — split-screen (brand panel ≥900px + form panel) with OAuth buttons (Google/GitHub/Apple) wired to the flagged backend scaffold (503 → inline "coming soon") | **MVP** |
 | `(app)/layout.tsx` | App shell (sidebar + top bar + project switcher) | **MVP** |
 | `/setup` | Brand/Project setup | **MVP** |
 | `/prompts` | Your Prompts — read-only active prompts grouped by topic with measured visibility; links to Prompt Research | **MVP** |
@@ -68,7 +68,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 
 | Subsystem | Files (target) | Owns |
 |---|---|---|
-| Shell + auth | `(auth)/*`, `(app)/layout.tsx`, `session-guard.tsx`, `app-shell`, `sidebar-nav`, `top-bar`, `project-switcher` | Session, guard, nav, project context |
+| Shell + auth | `(auth)/*`, `(app)/layout.tsx`, `session-guard.tsx`, `app-shell`, `sidebar-nav`, `top-bar`, `project-switcher`, `components/auth/oauth-buttons.tsx`, `components/ui/logo-cube.tsx` | Session, guard, nav, project context, OAuth buttons (coming-soon), brand cube |
 | API contract layer | `lib/api/{client,errors,query-client,query-keys,schemas,types,index}.ts` + per-domain modules | Transport, zod contracts, retry policy |
 | Setup | `/setup` + `lib/api/projects.ts` | Brand/project create + edit |
 | Prompts | `/prompts` (Your Prompts) + `/prompt-research` + `lib/api/prompts.ts` + `lib/api/topics.ts` | Your Prompts: topic-grouped read-only view with evidence-derived visibility scores. Prompt Research: prompt CRUD, CSV import, topic rail (create/delete/filter), AI generation dialog (consent-gated), proposed/active/archived status tabs with accept/archive actions |
@@ -86,7 +86,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
   `X-Request-ID`, `AbortSignal` support, `credentials:'include'`, `cache:'no-store'`, bounded
   network retry for GET/idempotent only, JSON enforcement.
 - **Endpoints per screen**:
-  - Auth → `/auth/register|login|logout|me`
+  - Auth → `/auth/register|login|logout|me` + `/auth/oauth/providers|{provider}/start|{provider}/callback` (scaffold behind `OAUTH_*` flags; 503 until configured)
   - Shell/switcher → `/workspaces`, `/projects`
   - Setup → `/projects` (+ `/projects/{id}`), `GET/PUT /projects/{id}/brand-profile`,
     `POST /projects/{id}/brand-profile/suggest`, and explicit suggestion acceptance
