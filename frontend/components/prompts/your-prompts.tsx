@@ -8,9 +8,11 @@ import { Fragment, useMemo, useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button-variants';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Input } from '@/components/ui/input';
 import { scoreBand, scoreBandText } from '@/components/ui/score-band';
 import { Skeleton } from '@/components/ui/skeleton';
+import { displayHeadingXlClasses } from '@/components/ui/typography';
 import {
   Table,
   TableBody,
@@ -229,12 +231,8 @@ export function YourPrompts() {
 
       {activePrompts.length === 0 ? (
         <div className="border-border bg-panel grid place-items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
-          <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-            Your prompts
-          </p>
-          <p className="font-display text-foreground text-xl font-semibold">
-            No active prompts yet
-          </p>
+          <p className={eyebrowClasses}>Your prompts</p>
+          <p className={displayHeadingXlClasses}>No active prompts yet</p>
           <p className="text-secondary max-w-md text-sm">
             Head to Prompt Research to add prompts manually, import a CSV, or generate prompts and
             topics with AI.

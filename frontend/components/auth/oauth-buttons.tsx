@@ -8,7 +8,6 @@ import { authApi } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/errors';
 import type { OAuthProvider } from '@/lib/api/types';
 import { assignLocation } from '@/lib/navigate';
-import { cn } from '@/lib/utils';
 
 /**
  * OAuthSection — social sign-in buttons (Google / GitHub / Apple) stacked
@@ -100,7 +99,7 @@ export function OAuthSection() {
             key={provider.id}
             variant="secondary"
             size="lg"
-            className={cn('w-full gap-2.5')}
+            className="w-full gap-2.5"
             disabled={pending !== null}
             onClick={() => void startOAuth(provider)}
           >

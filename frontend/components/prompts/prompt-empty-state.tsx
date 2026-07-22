@@ -3,6 +3,9 @@
 import { MessageSquarePlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
+import { IconChip } from '@/components/ui/icon-chip';
+import { displayHeadingXlClasses } from '@/components/ui/typography';
 
 /**
  * Empty state (F7) — shown when the active project's prompt set has no prompts.
@@ -15,14 +18,12 @@ export function PromptEmptyState({
 }: Readonly<{ onAdd: () => void; onImport: () => void }>) {
   return (
     <div className="border-border bg-panel flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed px-6 py-16 text-center">
-      <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
+      <IconChip>
         <MessageSquarePlus className="size-6" aria-hidden />
-      </span>
+      </IconChip>
       <div className="grid max-w-sm gap-1">
-        <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-          Prompt library
-        </p>
-        <h3 className="font-display text-foreground text-xl font-semibold">No prompts yet</h3>
+        <p className={eyebrowClasses}>Prompt library</p>
+        <h3 className={displayHeadingXlClasses}>No prompts yet</h3>
         <p className="text-secondary mt-1 text-sm">
           Add the questions you want to track across AI engines. Enter them one at a time or import
           a CSV.

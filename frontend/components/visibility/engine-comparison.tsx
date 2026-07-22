@@ -113,14 +113,15 @@ function EngineStat({ label, value }: Readonly<{ label: string; value: string }>
 
 function ShareOfVoiceCard({ visibility }: Readonly<{ visibility: Visibility }>) {
   const rows = sortedRankings(visibility.rankings).filter((row) => (row.mention_count ?? 0) > 0);
-  const total = rows.reduce((sum, row) => sum + (row.mention_count ?? 0), 0);
-  // Same ARIA summary contract the donut figure exposed.
-  const summary =
-    total > 0
-      ? rows
-          .map((row) => `${row.name} ${Math.round(((row.mention_count ?? 0) / total) * 100)}%`)
-          .join(', ')
-      : 'No data';
+  // Same ARIA summary contract the donut figure exposed — and derived from
+  // the SAME source as the bars/numerals (share_of_voice), so a row with no
+  // share data is omitted from the summary instead of being announced with a
+  // mention-derived share its (zero-width) bar doesn't show.
+  const shares = rows.flatMap((row) => {
+    const pct = sovPercent(row);
+    return pct === null ? [] : [`${row.name} ${pct}%`];
+  });
+  const summary = shares.length > 0 ? shares.join(', ') : 'No data';
 
   return (
     <Card>
@@ -146,11 +147,15 @@ function ShareOfVoiceCard({ visibility }: Readonly<{ visibility: Visibility }>) 
   );
 }
 
+/** Clamped 0–100 bar/announced percent for a SOV row; null when the run has no share data. */
+function sovPercent(row: RankingRow): number | null {
+  return row.share_of_voice === null
+    ? null
+    : Math.max(0, Math.min(100, Math.round(row.share_of_voice * 100)));
+}
+
 function ShareOfVoiceRow({ row }: Readonly<{ row: RankingRow }>) {
-  const pct =
-    row.share_of_voice === null
-      ? 0
-      : Math.max(0, Math.min(100, Math.round(row.share_of_voice * 100)));
+  const pct = sovPercent(row) ?? 0;
   return (
     <div className="grid grid-cols-[92px_1fr_44px] items-center gap-3">
       <span

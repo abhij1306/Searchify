@@ -12,7 +12,7 @@ import { CursorPager } from '@/components/ui/cursor-pager';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScoreRing } from '@/components/ui/score-ring';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Label } from '@/components/ui/typography';
+import { Label, displayHeadingXlClasses } from '@/components/ui/typography';
 import { ApiError } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/api/query-keys';
 import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
@@ -238,9 +238,7 @@ function HeaderCard({
       <CardContent className="grid gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
-            <h1 className="font-display text-foreground text-xl font-semibold">
-              {detail.title ?? detail.display_url}
-            </h1>
+            <h1 className={displayHeadingXlClasses}>{detail.title ?? detail.display_url}</h1>
           </div>
           <Button
             size="sm"

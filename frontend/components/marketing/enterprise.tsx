@@ -84,7 +84,6 @@ type DeployCard = {
   title: string;
   blurb: string;
   points: readonly string[];
-  links?: readonly { label: string; href: string }[];
 };
 
 const DEPLOY_CARDS: readonly DeployCard[] = [
@@ -268,21 +267,6 @@ export function EnterpriseSelfHost() {
                   <CheckItem key={point}>{point}</CheckItem>
                 ))}
               </div>
-              {card.links && (
-                <div className="deploy-links">
-                  {card.links.map((link) => (
-                    <a
-                      className="view-link"
-                      href={link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      key={link.label}
-                    >
-                      {link.label}
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>

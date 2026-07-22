@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SetupForm } from '@/components/setup/setup-form';
+import { AccentEyebrow } from '@/components/ui/eyebrow';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
 import { setupErrorMessage } from '@/lib/setup/forms';
@@ -53,10 +54,7 @@ export default function EditSetupPage() {
         <>
           <div className="flex items-center justify-between gap-3">
             <div className="grid min-w-0 gap-1">
-              <span className="text-accent-text text-2xs inline-flex items-center gap-1.5 font-mono font-medium tracking-[0.08em] uppercase">
-                <span className="bg-accent size-1.5 rounded-full" aria-hidden />
-                Project setup
-              </span>
+              <AccentEyebrow>Project setup</AccentEyebrow>
               <h2 className="font-display text-foreground truncate text-lg font-semibold">
                 {project.brand_name || project.name}
               </h2>

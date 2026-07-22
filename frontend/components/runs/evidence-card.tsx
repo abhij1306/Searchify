@@ -2,10 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Label } from '@/components/ui/typography';
 import { engineLabel, transportLabel } from '@/lib/providers/catalog';
 import type { ExecutionEvidence } from '@/lib/api/types';
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
+import { cn } from '@/lib/utils';
 
 /** Humanize a `score` dict key: `owned_domain_cited` → `Owned domain cited`. */
 function formatScoreKey(key: string): string {
@@ -158,7 +160,7 @@ export function EvidenceCard({
                 <dl className="grid gap-2">
                   {scoreEntries.map(([key, value]) => (
                     <div key={key} className="flex items-baseline justify-between gap-3">
-                      <dt className="text-muted text-2xs min-w-0 truncate font-mono font-medium tracking-[0.08em] uppercase">
+                      <dt className={cn(eyebrowClasses, 'min-w-0 truncate')}>
                         {formatScoreKey(key)}
                       </dt>
                       <dd className="mono text-foreground min-w-0 text-right text-xs break-words">

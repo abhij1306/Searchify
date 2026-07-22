@@ -2251,16 +2251,6 @@ html[data-theme='dark'] .mkt {
   color: var(--mkt-text-2);
 }
 
-.mkt .deploy-links {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid var(--mkt-border);
-}
-
 .mkt .arch-flow {
   display: flex;
   align-items: center;

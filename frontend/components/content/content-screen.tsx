@@ -8,8 +8,10 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Textarea } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { displayHeadingLgClasses } from '@/components/ui/typography';
 import type { RunStatusValue } from '@/components/ui/badge-variants';
 import { CONTENT_PROMPT_MAX_LEN } from '@/lib/api/content';
 import { ApiError, httpErrorStatus } from '@/lib/api/errors';
@@ -179,12 +181,8 @@ function ProjectContentScreen({
       <Card data-component-id="content-prompt-box">
         <CardContent className="flex flex-col gap-3 py-5">
           <div className="grid gap-1">
-            <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-              New generation
-            </span>
-            <h2 className="font-display text-foreground text-lg font-semibold">
-              What can I help you create?
-            </h2>
+            <span className={eyebrowClasses}>New generation</span>
+            <h2 className={displayHeadingLgClasses}>What can I help you create?</h2>
           </div>
           <Textarea
             ref={promptRef}
@@ -349,9 +347,7 @@ function ProjectContentScreen({
 
       {/* History */}
       <section data-component-id="content-history" className="flex flex-col gap-2">
-        <h2 className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-          Recent generations
-        </h2>
+        <h2 className={eyebrowClasses}>Recent generations</h2>
         {listQuery.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : (listQuery.data ?? []).length === 0 ? (

@@ -2,6 +2,7 @@
 
 import { Check } from 'lucide-react';
 
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { cn } from '@/lib/utils';
 
 export type SetupStep = {
@@ -78,7 +79,8 @@ export function SetupStepper({
               </span>
               <span
                 className={cn(
-                  'text-2xs text-center font-mono leading-tight font-medium tracking-[0.08em] whitespace-nowrap uppercase',
+                  eyebrowClasses,
+                  'text-center leading-tight whitespace-nowrap',
                   isCurrent
                     ? 'text-foreground font-semibold'
                     : isDone

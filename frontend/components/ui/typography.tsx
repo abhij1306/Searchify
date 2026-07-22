@@ -2,6 +2,15 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * Display-heading recipes (Bricolage via `--font-display`) from the midnight
+ * redesign: `displayHeadingLgClasses` for panel / empty-state headings,
+ * `displayHeadingXlClasses` for page titles. These are class recipes, not
+ * components — the call site keeps whichever heading element is semantic.
+ */
+export const displayHeadingLgClasses = 'font-display text-foreground text-lg font-semibold';
+export const displayHeadingXlClasses = 'font-display text-foreground text-xl font-semibold';
+
 /** Page heading with optional uppercase kicker/eyebrow. */
 export function PageTitle({
   children,

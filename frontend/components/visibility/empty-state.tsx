@@ -3,6 +3,8 @@ import { Rocket } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardEyebrow } from '@/components/ui/card';
+import { IconChip } from '@/components/ui/icon-chip';
+import { displayHeadingLgClasses } from '@/components/ui/typography';
 
 /**
  * Empty state for a project with no completed runs (design.md §9.6): a
@@ -20,13 +22,11 @@ export function VisibilityEmptyState({
     <Card>
       <CardContent className="grid justify-items-center gap-4 py-12 text-center">
         <CardEyebrow>Visibility</CardEyebrow>
-        <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
+        <IconChip>
           <Rocket className="size-6" aria-hidden />
-        </span>
+        </IconChip>
         <div className="grid gap-1">
-          <h2 className="font-display text-foreground text-lg font-semibold">
-            No completed runs yet
-          </h2>
+          <h2 className={displayHeadingLgClasses}>No completed runs yet</h2>
           <p className="text-secondary max-w-md text-sm">
             {hasActiveRun
               ? 'An audit is running now. Once it completes, its Visibility Score, per-engine comparison and rankings show up here automatically.'

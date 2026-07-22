@@ -44,10 +44,12 @@ citations keep their green identity in both themes.
 
   /* Fonts */
   --font-primary-family: var(--font-sans), system-ui, sans-serif;
-  --font-mono-family: var(--font-mono), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  --font-mono-family:
+    var(--font-mono), ui-monospace, "Cascadia Code", "Fira Code", monospace;
   /* Display family for wordmarks + page-level headings (Bricolage Grotesque
      600/700 loaded as --font-brand-display in app/layout.tsx). */
-  --font-display-family: var(--font-brand-display), 'Bricolage Grotesque', var(--font-primary-family);
+  --font-display-family:
+    var(--font-brand-display), "Bricolage Grotesque", var(--font-primary-family);
 
   /* Surfaces */
   --bg-base: #fafaf7;
@@ -65,61 +67,99 @@ citations keep their green identity in both themes.
   --border-focus: var(--accent);
 
   /* Text — all verified ≥ 4.5:1 on bg-base/bg-panel */
-  --text-primary: #0f1117;   /* 18.9:1 on #ffffff, 18.0:1 on #fafaf7 */
+  --text-primary: #0f1117; /* 18.9:1 on #ffffff, 18.0:1 on #fafaf7 */
   --text-secondary: #4b4d58; /* 8.4:1 on #ffffff, 8.0:1 on #fafaf7  */
-  --text-muted: #6d6f7a;     /* 5.0:1 on #ffffff, 4.8:1 on #fafaf7  */
-  --text-subtle: #a6a6ad;    /* decorative only (icons/dividers), not body text */
+  --text-muted: #6d6f7a; /* 5.0:1 on #ffffff, 4.8:1 on #fafaf7  */
+  --text-subtle: #a6a6ad; /* decorative only (icons/dividers), not body text */
 
   /* Accent — blue */
   --accent: #2f58ff;
   --accent-hover: #1e3fd0;
-  --accent-fg: #ffffff;         /* on accent bg: 5.3:1 */
-  --accent-subtle: rgba(47, 88, 255, 0.10);
+  --accent-fg: #ffffff; /* on accent bg: 5.3:1 */
+  --accent-subtle: rgba(47, 88, 255, 0.1);
   --accent-soft: rgba(47, 88, 255, 0.06);
-  --accent-border: rgba(47, 88, 255, 0.30);
-  --accent-text: #1e3fd0;       /* accent as text on light: 7.8:1 on #ffffff */
+  --accent-border: rgba(47, 88, 255, 0.3);
+  --accent-text: #1e3fd0; /* accent as text on light: 7.8:1 on #ffffff */
 
   /* Semantic status — text values ≥ 4.5:1 on their bg */
-  --success: #059669; --success-bg: #ecfdf5; --success-border: #a7f3d0; --success-text: #065f46;
-  --warning: #d97706; --warning-bg: #fffbeb; --warning-border: #fcd34d; --warning-text: #92400e;
-  --danger:  #dc2626; --danger-bg:  #fef2f2; --danger-border:  #fca5a5; --danger-text:  #991b1b;
-  --info:    #2563eb; --info-bg:    #eff6ff; --info-border:    #bfdbfe; --info-text:    #1d4ed8;
+  --success: #059669;
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+  --success-text: #065f46;
+  --warning: #d97706;
+  --warning-bg: #fffbeb;
+  --warning-border: #fcd34d;
+  --warning-text: #92400e;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-border: #fca5a5;
+  --danger-text: #991b1b;
+  --info: #2563eb;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --info-text: #1d4ed8;
   --neutral-bg: rgba(15, 17, 23, 0.045);
 
   /* Sentiment (positive / neutral / negative) */
-  --sentiment-positive: #059669; --sentiment-positive-bg: #ecfdf5; --sentiment-positive-text: #065f46;
-  --sentiment-neutral:  #6f756f; --sentiment-neutral-bg:  #f1f2f1; --sentiment-neutral-text:  #4c524f;
-  --sentiment-negative: #dc2626; --sentiment-negative-bg: #fef2f2; --sentiment-negative-text: #991b1b;
+  --sentiment-positive: #059669;
+  --sentiment-positive-bg: #ecfdf5;
+  --sentiment-positive-text: #065f46;
+  --sentiment-neutral: #6f756f;
+  --sentiment-neutral-bg: #f1f2f1;
+  --sentiment-neutral-text: #4c524f;
+  --sentiment-negative: #dc2626;
+  --sentiment-negative-bg: #fef2f2;
+  --sentiment-negative-text: #991b1b;
   /* MVP: sentiment is NOT computed — render the neutral "—" placeholder token below. */
   --value-placeholder: var(--text-subtle);
 
   /* Citation classification (owned / competitor / third-party) */
-  --citation-owned: #0f9d76;      --citation-owned-bg: rgba(15, 157, 118, 0.10);  --citation-owned-text: #0b6f52;
-  --citation-competitor: #d97706; --citation-competitor-bg: #fffbeb;              --citation-competitor-text: #92400e;
-  --citation-third-party: #6366f1;--citation-third-party-bg: #eef2ff;             --citation-third-party-text: #4338ca;
+  --citation-owned: #0f9d76;
+  --citation-owned-bg: rgba(15, 157, 118, 0.1);
+  --citation-owned-text: #0b6f52;
+  --citation-competitor: #d97706;
+  --citation-competitor-bg: #fffbeb;
+  --citation-competitor-text: #92400e;
+  --citation-third-party: #6366f1;
+  --citation-third-party-bg: #eef2ff;
+  --citation-third-party-text: #4338ca;
 
   /* Run status (audit lifecycle) */
-  --run-draft:      #6f756f; --run-draft-bg:      #f1f2f1;
-  --run-queued:     #2563eb; --run-queued-bg:     #eff6ff;
-  --run-running:    #0f9d76; --run-running-bg:    rgba(15, 157, 118, 0.12);
-  --run-analyzing:  #7c3aed; --run-analyzing-bg:  #f5f3ff;
-  --run-completed:  #059669; --run-completed-bg:  #ecfdf5;
-  --run-partial:    #d97706; --run-partial-bg:    #fffbeb;
-  --run-failed:     #dc2626; --run-failed-bg:     #fef2f2;
-  --run-cancelled:  #6f756f; --run-cancelled-bg:  #f1f2f1;
+  --run-draft: #6f756f;
+  --run-draft-bg: #f1f2f1;
+  --run-queued: #2563eb;
+  --run-queued-bg: #eff6ff;
+  --run-running: #0f9d76;
+  --run-running-bg: rgba(15, 157, 118, 0.12);
+  --run-analyzing: #7c3aed;
+  --run-analyzing-bg: #f5f3ff;
+  --run-completed: #059669;
+  --run-completed-bg: #ecfdf5;
+  --run-partial: #d97706;
+  --run-partial-bg: #fffbeb;
+  --run-failed: #dc2626;
+  --run-failed-bg: #fef2f2;
+  --run-cancelled: #6f756f;
+  --run-cancelled-bg: #f1f2f1;
 
   /* Score bands (visibility %) — low→high */
-  --score-low:      #dc2626; --score-low-bg:      #fef2f2;  /* 0–24%   */
-  --score-mid:      #d97706; --score-mid-bg:      #fffbeb;  /* 25–49%  */
-  --score-good:     #2563eb; --score-good-bg:     #eff6ff;  /* 50–74%  */
-  --score-high:     #059669; --score-high-bg:     #ecfdf5;  /* 75–100% */
+  --score-low: #dc2626;
+  --score-low-bg: #fef2f2; /* 0–24%   */
+  --score-mid: #d97706;
+  --score-mid-bg: #fffbeb; /* 25–49%  */
+  --score-good: #2563eb;
+  --score-good-bg: #eff6ff; /* 50–74%  */
+  --score-high: #059669;
+  --score-high-bg: #ecfdf5; /* 75–100% */
 
   /* Shadows / elevation */
   --shadow-xs-value: 0 1px 0 rgba(18, 22, 20, 0.04);
   --shadow-sm-value: 0 1px 2px rgba(18, 22, 20, 0.05);
   --shadow-card-value: 0 12px 28px rgba(18, 22, 20, 0.04);
-  --shadow-elevated-value: 0 18px 42px rgba(18, 22, 20, 0.08), 0 0 0 1px rgba(18, 22, 20, 0.04);
-  --shadow-lg-value: 0 22px 56px rgba(18, 22, 20, 0.10), 0 0 0 1px rgba(18, 22, 20, 0.05);
+  --shadow-elevated-value:
+    0 18px 42px rgba(18, 22, 20, 0.08), 0 0 0 1px rgba(18, 22, 20, 0.04);
+  --shadow-lg-value:
+    0 22px 56px rgba(18, 22, 20, 0.1), 0 0 0 1px rgba(18, 22, 20, 0.05);
   --shadow-modal: 0 24px 60px rgba(18, 22, 20, 0.16);
   --focus-ring: 0 0 0 3px rgba(47, 88, 255, 0.22);
   --overlay-scrim: rgba(0, 0, 0, 0.32);
@@ -136,7 +176,7 @@ Only the tokens that change are overridden; the type scale, spacing, radii, and 
 tokens (§5–§7) are shared. Dark surfaces are the CUBE27 midnight near-black scale.
 
 ```css
-html[data-theme='dark'] {
+html[data-theme="dark"] {
   color-scheme: dark;
 
   /* Surfaces */
@@ -154,53 +194,89 @@ html[data-theme='dark'] {
   --border-strong: rgba(255, 255, 255, 0.14);
 
   /* Text — verified ≥ 4.5:1 on bg-base/bg-panel */
-  --text-primary: #fafafa;   /* 18.1:1 on #111114, 19.5:1 on #050505 */
+  --text-primary: #fafafa; /* 18.1:1 on #111114, 19.5:1 on #050505 */
   --text-secondary: #a1a1aa; /* 7.4:1 on #111114, 8.0:1 on #050505  */
-  --text-muted: #85858f;     /* 5.2:1 on #111114, 5.6:1 on #050505  */
-  --text-subtle: #52525b;    /* decorative only */
+  --text-muted: #85858f; /* 5.2:1 on #111114, 5.6:1 on #050505  */
+  --text-subtle: #52525b; /* decorative only */
 
   /* Accent — blue */
   --accent: #6b8aff;
   --accent-hover: #9db2ff;
-  --accent-fg: #0a0a0a;         /* dark text on bright accent: 6.3:1 */
+  --accent-fg: #0a0a0a; /* dark text on bright accent: 6.3:1 */
   --accent-subtle: rgba(107, 138, 255, 0.14);
   --accent-soft: rgba(107, 138, 255, 0.08);
   --accent-border: rgba(107, 138, 255, 0.34);
-  --accent-text: #9db2ff;       /* accent as text on dark: 9.9:1 on #050505 */
+  --accent-text: #9db2ff; /* accent as text on dark: 9.9:1 on #050505 */
 
   /* Semantic status */
-  --success: #3ecf8e; --success-bg: rgba(62, 207, 142, 0.12); --success-border: rgba(62, 207, 142, 0.28); --success-text: #5fdaa2;
-  --warning: #f5a623; --warning-bg: rgba(245, 166, 35, 0.12); --warning-border: rgba(245, 166, 35, 0.28); --warning-text: #f7b854;
-  --danger:  #ff6b6b; --danger-bg:  rgba(255, 107, 107, 0.12);--danger-border:  rgba(255, 107, 107, 0.28);--danger-text:  #ff8f8f;
-  --info:    #6ba5ff; --info-bg:    rgba(107, 165, 255, 0.12);--info-border:    rgba(107, 165, 255, 0.28);--info-text:    #8fbcff;
+  --success: #3ecf8e;
+  --success-bg: rgba(62, 207, 142, 0.12);
+  --success-border: rgba(62, 207, 142, 0.28);
+  --success-text: #5fdaa2;
+  --warning: #f5a623;
+  --warning-bg: rgba(245, 166, 35, 0.12);
+  --warning-border: rgba(245, 166, 35, 0.28);
+  --warning-text: #f7b854;
+  --danger: #ff6b6b;
+  --danger-bg: rgba(255, 107, 107, 0.12);
+  --danger-border: rgba(255, 107, 107, 0.28);
+  --danger-text: #ff8f8f;
+  --info: #6ba5ff;
+  --info-bg: rgba(107, 165, 255, 0.12);
+  --info-border: rgba(107, 165, 255, 0.28);
+  --info-text: #8fbcff;
   --neutral-bg: rgba(255, 255, 255, 0.04);
 
   /* Sentiment */
-  --sentiment-positive: #3ecf8e; --sentiment-positive-bg: rgba(62, 207, 142, 0.12); --sentiment-positive-text: #5fdaa2;
-  --sentiment-neutral:  #9ca39c; --sentiment-neutral-bg:  rgba(255, 255, 255, 0.05); --sentiment-neutral-text:  #9ca39c;
-  --sentiment-negative: #ff6b6b; --sentiment-negative-bg: rgba(255, 107, 107, 0.12); --sentiment-negative-text: #ff8f8f;
+  --sentiment-positive: #3ecf8e;
+  --sentiment-positive-bg: rgba(62, 207, 142, 0.12);
+  --sentiment-positive-text: #5fdaa2;
+  --sentiment-neutral: #9ca39c;
+  --sentiment-neutral-bg: rgba(255, 255, 255, 0.05);
+  --sentiment-neutral-text: #9ca39c;
+  --sentiment-negative: #ff6b6b;
+  --sentiment-negative-bg: rgba(255, 107, 107, 0.12);
+  --sentiment-negative-text: #ff8f8f;
   --value-placeholder: var(--text-subtle);
 
   /* Citation classification */
-  --citation-owned: #2dd4a7;       --citation-owned-bg: rgba(45, 212, 167, 0.12);  --citation-owned-text: #58e0bb;
-  --citation-competitor: #f5a623;  --citation-competitor-bg: rgba(245, 166, 35, 0.12); --citation-competitor-text: #f7b854;
-  --citation-third-party: #8b8fff; --citation-third-party-bg: rgba(139, 143, 255, 0.12); --citation-third-party-text: #a9adff;
+  --citation-owned: #2dd4a7;
+  --citation-owned-bg: rgba(45, 212, 167, 0.12);
+  --citation-owned-text: #58e0bb;
+  --citation-competitor: #f5a623;
+  --citation-competitor-bg: rgba(245, 166, 35, 0.12);
+  --citation-competitor-text: #f7b854;
+  --citation-third-party: #8b8fff;
+  --citation-third-party-bg: rgba(139, 143, 255, 0.12);
+  --citation-third-party-text: #a9adff;
 
   /* Run status */
-  --run-draft:      #9ca39c; --run-draft-bg:      rgba(255, 255, 255, 0.05);
-  --run-queued:     #6ba5ff; --run-queued-bg:     rgba(107, 165, 255, 0.12);
-  --run-running:    #2dd4a7; --run-running-bg:    rgba(45, 212, 167, 0.14);
-  --run-analyzing:  #a78bfa; --run-analyzing-bg:  rgba(167, 139, 250, 0.14);
-  --run-completed:  #3ecf8e; --run-completed-bg:  rgba(62, 207, 142, 0.12);
-  --run-partial:    #f5a623; --run-partial-bg:    rgba(245, 166, 35, 0.12);
-  --run-failed:     #ff6b6b; --run-failed-bg:     rgba(255, 107, 107, 0.12);
-  --run-cancelled:  #9ca39c; --run-cancelled-bg:  rgba(255, 255, 255, 0.05);
+  --run-draft: #9ca39c;
+  --run-draft-bg: rgba(255, 255, 255, 0.05);
+  --run-queued: #6ba5ff;
+  --run-queued-bg: rgba(107, 165, 255, 0.12);
+  --run-running: #2dd4a7;
+  --run-running-bg: rgba(45, 212, 167, 0.14);
+  --run-analyzing: #a78bfa;
+  --run-analyzing-bg: rgba(167, 139, 250, 0.14);
+  --run-completed: #3ecf8e;
+  --run-completed-bg: rgba(62, 207, 142, 0.12);
+  --run-partial: #f5a623;
+  --run-partial-bg: rgba(245, 166, 35, 0.12);
+  --run-failed: #ff6b6b;
+  --run-failed-bg: rgba(255, 107, 107, 0.12);
+  --run-cancelled: #9ca39c;
+  --run-cancelled-bg: rgba(255, 255, 255, 0.05);
 
   /* Score bands */
-  --score-low:  #ff6b6b; --score-low-bg:  rgba(255, 107, 107, 0.12);
-  --score-mid:  #f5a623; --score-mid-bg:  rgba(245, 166, 35, 0.12);
-  --score-good: #6ba5ff; --score-good-bg: rgba(107, 165, 255, 0.12);
-  --score-high: #3ecf8e; --score-high-bg: rgba(62, 207, 142, 0.12);
+  --score-low: #ff6b6b;
+  --score-low-bg: rgba(255, 107, 107, 0.12);
+  --score-mid: #f5a623;
+  --score-mid-bg: rgba(245, 166, 35, 0.12);
+  --score-good: #6ba5ff;
+  --score-good-bg: rgba(107, 165, 255, 0.12);
+  --score-high: #3ecf8e;
+  --score-high-bg: rgba(62, 207, 142, 0.12);
 
   /* Shadows — deep blacks */
   --shadow-xs-value: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -228,15 +304,15 @@ in `app/layout.tsx` as the `--font-brand-display` next/font variable and exposed
 via `--font-display-family` → the bridged `font-display` utility — for the wordmark, page-level
 headings, and the auth brand headline (the same trio as the marketing landing).
 
-| Token | Size | Line-height | Tracking | Weight | Use |
-|---|---|---|---|---|---|
-| `--text-2xs` | 10px (0.625rem) | 1.2 | 0.06em | 600 | uppercase micro-labels |
-| `--text-xs` | 11px (0.6875rem) | 1.35 | 0.025em | 500 | captions, timestamps, table headers |
-| `--text-sm` | 13px (0.8125rem) | 1.45 | 0em | 400 | secondary body, table cells |
-| `--text-base` | 14px (0.875rem) | 1.5 | 0em | 400 | primary body |
-| `--text-lg` | 17px (1.0625rem) | 1.35 | -0.01em | 600 | section / card headings |
-| `--text-xl` | 21px (1.3125rem) | 1.25 | -0.02em | 600 | page headings |
-| `--text-2xl` | 29px (1.8125rem) | 1.15 | -0.02em | 700 | display (Visibility Score, hero) |
+| Token         | Size             | Line-height | Tracking | Weight | Use                                 |
+| ------------- | ---------------- | ----------- | -------- | ------ | ----------------------------------- |
+| `--text-2xs`  | 10px (0.625rem)  | 1.2         | 0.06em   | 600    | uppercase micro-labels              |
+| `--text-xs`   | 11px (0.6875rem) | 1.35        | 0.025em  | 500    | captions, timestamps, table headers |
+| `--text-sm`   | 13px (0.8125rem) | 1.45        | 0em      | 400    | secondary body, table cells         |
+| `--text-base` | 14px (0.875rem)  | 1.5         | 0em      | 400    | primary body                        |
+| `--text-lg`   | 17px (1.0625rem) | 1.35        | -0.01em  | 600    | section / card headings             |
+| `--text-xl`   | 21px (1.3125rem) | 1.25        | -0.02em  | 600    | page headings                       |
+| `--text-2xl`  | 29px (1.8125rem) | 1.15        | -0.02em  | 700    | display (Visibility Score, hero)    |
 
 - **display** = `--text-2xl`; **heading** = `--text-xl`/`--text-lg`; **body** =
   `--text-base`/`--text-sm`; **label** = `--text-xs`/`--text-2xs` (uppercase).
@@ -274,7 +350,9 @@ bridged names (`bg-background`, `text-foreground`, `border-border`, `bg-accent`,
 @theme inline {
   --font-sans: var(--font-primary-family);
   --font-mono: var(--font-mono-family);
-  --font-display: var(--font-display-family); /* Bricolage via --font-brand-display */
+  --font-display: var(
+    --font-display-family
+  ); /* Bricolage via --font-brand-display */
   --color-background: var(--bg-base);
   --color-panel: var(--bg-panel);
   --color-foreground: var(--text-primary);
@@ -282,12 +360,16 @@ bridged names (`bg-background`, `text-foreground`, `border-border`, `bg-accent`,
   --color-muted: var(--text-muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
-  --color-success: var(--success); /* + warning/danger/info + *-bg/*-border/*-text */
-  --color-sentiment-positive: var(--sentiment-positive); /* + neutral/negative */
-  --color-citation-owned: var(--citation-owned);         /* + competitor/third-party */
-  --color-run-completed: var(--run-completed);           /* + every run-status */
-  --color-score-high: var(--score-high);                 /* + low/mid/good */
-  --shadow-card: var(--shadow-card-value);               /* + xs/sm/elevated/lg/modal */
+  --color-success: var(
+    --success
+  ); /* + warning/danger/info + *-bg/*-border/*-text */
+  --color-sentiment-positive: var(
+    --sentiment-positive
+  ); /* + neutral/negative */
+  --color-citation-owned: var(--citation-owned); /* + competitor/third-party */
+  --color-run-completed: var(--run-completed); /* + every run-status */
+  --color-score-high: var(--score-high); /* + low/mid/good */
+  --shadow-card: var(--shadow-card-value); /* + xs/sm/elevated/lg/modal */
   /* type sizes, radii, tracking, line-heights bridged here too (see §5–§6) */
 }
 ```
@@ -300,25 +382,25 @@ components use bridged tokens only (no-raw-hex guard); **both themes are always 
 
 All CVA-driven, token-only, Radix where relevant, lucide icons.
 
-| Primitive | Notes |
-|---|---|
-| `button` | every variant is a **pill** (`--radius-full`). Primary = **monochrome pill** — `bg-foreground` (the `--text-primary` token: white on midnight, near-black on warm paper) with `text-background` (`--bg-base`); blue accent stays reserved for links, active states, focus rings, and charts. Secondary = raised `bg-elevated` + hairline border + hover lift; neutral = `bg-background-alt`; ghost = transparent with an accent-soft hover fill; destructive = `--danger` fill; topbar kept for API compat (the top bar uses ghost). Sizes sm/md/lg/icon; `asChild`; icon slot. |
-| `badge` | variants map to tokens: `status` (success/warning/danger/info), `sentiment` (positive/neutral/negative), `classification` (owned/competitor/third-party), `run-status` (all 8). Pill radius. |
-| `table` (dense) | sticky 32px header (mono eyebrow: `--text-2xs` uppercase, 0.08em tracking, muted), 40px rows, `--text-sm` cells, mono tabular numerals for numeric columns, accent-soft hover row highlight, sortable header carets. |
-| `table-pagination` | client-side page state (`useTablePage`, clamp-only reconciliation so refetches never reset the page) + a mono "from–to of total" indicator with ghost Prev/Next pinned to the table card's bottom border. |
-| `card` | `bg-panel`, hairline `border`, `--radius-lg`, `--card-padding`, `shadow-card`; header/title/description/content slots + optional `CardEyebrow` mono panel label (uppercase `--text-2xs`, never a heading). |
-| `score-ring` | circular progress; color from score-band token; center = mono display number (`numeralSize`: `md` = `--text-lg` default, `lg` = `--text-2xl` display for hero surfaces); ARIA label with %. |
-| `donut` | segmented ring for per-engine / citation-share; legend; ARIA. |
-| `trend-chart` | line/area chart. **Built but unused in MVP** (roadmap trend view); render + ARIA only. |
-| `tabs` / `segmented` | Radix tabs + a pill segmented control (`--segmented-bg`, active = accent-fg on accent). |
-| `sidebar` | grouped nav (Analytics / Prompts / Actions / On Page); active item = accent-subtle bg + accent-text; disabled items = muted + "soon". |
-| `top-bar` | search placeholder, Export hook, Learn link, project-switcher, theme-toggle, user-menu. |
-| `input` / `field` | 34px height, `border`, `--radius-md`, focus = `--focus-ring`; `field` wraps label + help + error. |
-| `dialog` | Radix modal; `--overlay-scrim`, `bg-elevated`, `shadow-modal`, `--radius-xl`. |
-| `dropdown` | Radix menu; `bg-elevated`, `border`, `shadow-elevated`. |
-| `tooltip` | Radix; `bg-well`/inverse, `--text-xs`. |
-| `skeleton` | `--skeleton-base` → `--skeleton-highlight` shimmer. |
-| `history-drawer` | right-side Radix drawer for run history / execution list. |
+| Primitive            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `button`             | every variant is a **pill** (`--radius-full`). Primary = **monochrome pill** — `bg-foreground` (the `--text-primary` token: white on midnight, near-black on warm paper) with `text-background` (`--bg-base`); blue accent stays reserved for links, active states, focus rings, and charts. Secondary = raised `bg-elevated` + hairline border + hover lift; neutral = `bg-background-alt`; ghost = transparent with an accent-soft hover fill; destructive = `--danger` fill. Sizes sm/md/lg/icon; `asChild`; icon slot. |
+| `badge`              | variants map to tokens: `status` (success/warning/danger/info), `sentiment` (positive/neutral/negative), `classification` (owned/competitor/third-party), `run-status` (all 8). Pill radius.                                                                                                                                                                                                                                                                                                                               |
+| `table` (dense)      | sticky 32px header (mono eyebrow: `--text-2xs` uppercase, 0.08em tracking, muted), 40px rows, `--text-sm` cells, mono tabular numerals for numeric columns, accent-soft hover row highlight, sortable header carets.                                                                                                                                                                                                                                                                                                       |
+| `table-pagination`   | client-side page state (`useTablePage`, clamp-only reconciliation so refetches never reset the page) + a mono "from–to of total" indicator with ghost Prev/Next pinned to the table card's bottom border.                                                                                                                                                                                                                                                                                                                  |
+| `card`               | `bg-panel`, hairline `border`, `--radius-lg`, `--card-padding`, `shadow-card`; header/title/description/content slots + optional `CardEyebrow` mono panel label (uppercase `--text-2xs`, never a heading).                                                                                                                                                                                                                                                                                                                 |
+| `score-ring`         | circular progress; color from score-band token; center = mono display number (`numeralSize`: `md` = `--text-lg` default, `lg` = `--text-2xl` display for hero surfaces); ARIA label with %.                                                                                                                                                                                                                                                                                                                                |
+| `donut`              | segmented ring for per-engine / citation-share; legend; ARIA.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `trend-chart`        | line/area chart. **Built but unused in MVP** (roadmap trend view); render + ARIA only.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `tabs` / `segmented` | Radix tabs + a pill segmented control (`--segmented-bg`, active = accent-fg on accent).                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `sidebar`            | grouped nav (Analytics / Prompts / Actions / On Page); active item = accent-subtle bg + accent-text; disabled items = muted + "soon".                                                                                                                                                                                                                                                                                                                                                                                      |
+| `top-bar`            | search placeholder, Export hook, Learn link, project-switcher, theme-toggle, user-menu.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `input` / `field`    | 34px height, `border`, `--radius-md`, focus = `--focus-ring`; `field` wraps label + help + error.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `dialog`             | Radix modal; `--overlay-scrim`, `bg-elevated`, `shadow-modal`, `--radius-xl`.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `dropdown`           | Radix menu; `bg-elevated`, `border`, `shadow-elevated`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tooltip`            | Radix; `bg-well`/inverse, `--text-xs`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `skeleton`           | `--skeleton-base` → `--skeleton-highlight` shimmer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `history-drawer`     | right-side Radix drawer for run history / execution list.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## 9. Per-screen layout prose (seven application screens)
 
@@ -327,6 +409,7 @@ The app is a fixed **left sidebar (240px)** + **top bar (52px)** + scrolling con
 (centered, no shell).
 
 ### 9.1 Auth (`/login`, `/register`)
+
 **Split-screen shell** (shared `(auth)` route-group layout). At ≥900px a two-column grid
 [5fr 6fr]: the **brand panel** (`bg-panel`, hairline right border, token-driven aurora glows +
 grain overlay) carries the LogoCube + display-font "Searchify" wordmark with a mono uppercase
@@ -342,6 +425,7 @@ login/register. No sidebar/top-bar. Theme toggle in the top-right corner. The pa
 single h1 — brand-panel wordmarks are spans and the headline is a `<p>`.
 
 ### 9.2 App Shell (`(app)/layout.tsx`)
+
 **Left sidebar (240px, `bg-sidebar`)**: top = brand row (LogoCube + display-font "Searchify"
 over a mono uppercase "by CUBE27" sub-tag), then the project-switcher (brand avatar + name,
 dropdown). A "Getting Started N of 6" progress card (accent-gradient completion fill).
@@ -355,6 +439,7 @@ header block); right = Export hook, Learn link, theme-toggle. Active nav item is
 pill. Content region scrolls independently.
 
 ### 9.3 Brand/Project setup (`/setup`)
+
 A five-step wizard (Brand → Market → Domains → Competitors → Defaults) on `bg-base`: a
 horizontal stepper (numbered accent active rings + mono numerals, connector progress line)
 above one step `card` at a time — each with a mono-eyebrow `Step N of 5` panel label;
@@ -363,14 +448,16 @@ react-hook-form keeps values across steps and Next validates only the current st
 Alternative names (alias chips with ✕ + "Add alternative name" input, Enter-to-add), an
 "Exact match only" toggle. **Market**: country_code select + a Geographic Reach segmented
 control (Global / Primary market / Nationwide / Regional / Local). **Domains**: owned domains
-+ unintended domains chip inputs. **Competitors**: repeatable rows (name + aliases + domains,
-add/remove). **Defaults**: `benchmark_mode` segmented (consumer_like / controlled_localized /
-forced_grounded) + default repetitions stepper. Footer pager with Back + Next; the final step
-(and every step in edit mode) offers the primary Save/Create. Create sets active project →
-routes to `/visibility`. Setup does not own the curated knowledge profile; that lives at
-**Knowledge Base**. react-hook-form + zod; inline field errors jump to the first failing step.
+
+- unintended domains chip inputs. **Competitors**: repeatable rows (name + aliases + domains,
+  add/remove). **Defaults**: `benchmark_mode` segmented (consumer_like / controlled_localized /
+  forced_grounded) + default repetitions stepper. Footer pager with Back + Next; the final step
+  (and every step in edit mode) offers the primary Save/Create. Create sets active project →
+  routes to `/visibility`. Setup does not own the curated knowledge profile; that lives at
+  **Knowledge Base**. react-hook-form + zod; inline field errors jump to the first failing step.
 
 ### 9.3.1 Knowledge Base (`/knowledge-base`)
+
 For a persisted project, **Knowledge Base** owns description, positioning, products/services,
 and target audience, with manual save plus a consent-gated “Draft with AI” review flow. An AI
 draft never applies immediately; unchanged accepted fields retain AI provenance and edits become
@@ -382,6 +469,7 @@ save). The no-project state is the standard empty-state card (mono eyebrow + ico
 display heading + ghost "Go to Setup" CTA).
 
 ### 9.4 Prompt library (`/prompts` Your Prompts + `/prompt-research` Prompt Research)
+
 **Your Prompts (`/prompts`)** — read-only, score-annotated view of the active configuration:
 a summary banner ("N visibility prompts across M topics" + "Go to Prompt Research" button),
 search, and a dense table grouped by topic with expandable group rows. Columns: expander,
@@ -406,6 +494,7 @@ that parses in-browser, previews rows, then persists via `/prompt-sets/{id}/impo
 state: mono eyebrow + icon chip + display heading + ghost CTAs (add manually or import a CSV).
 
 ### 9.5 Provider Settings (`/providers`)
+
 Grid of three per-engine `card`s, one **direct** transport each (ChatGPT/OpenAI,
 Gemini/Google, Claude/Anthropic). Each card shows its fixed route + default model, an API-key
 `input` (masked, write-only — never shows a stored secret), a "Test connection" `button`
@@ -417,11 +506,13 @@ selection card (plumbing-only; stored, not invoked). Unconfigured engines show a
 configured" state.
 
 ### 9.6 Visibility workspace (`/visibility`)
+
 ONE workspace shell: a **shared filter bar** (run selector defaulting to the latest completed
 audit, logical engine, prompt, date range, granularity) above an accessible **four-tab**
 tablist — **Overview** (default), **Trends**, **Mentions & Citations**, **Query Fanout**. Only
 one panel renders at a time; the active tab is mirrored in `?tab=`. There are **no Sources /
 Topics / Sentiment tabs** and no disabled / "coming soon" tabs.
+
 - **Overview**: two-column grid. **Left card — Visibility**: mono panel-label eyebrow, the
   run's **Visibility Score** inside a `score-ring` (`numeralSize="lg"` — the `--text-2xl`
   display numeral, score-band colored), subtitle "Your brand's visibility across LLMs for this
@@ -440,6 +531,7 @@ Topics / Sentiment tabs** and no disabled / "coming soon" tabs.
 Empty state (no completed runs): a "Launch your first audit" card linking to `/runs`.
 
 ### 9.7 Run/Executions explorer (`/runs`, `/runs/[runId]`, `.../executions/[executionId]`)
+
 **`/runs`**: pill status filter chips (mono counts, accent-soft active) above a list `table`
 of audits (status badge via run-status token, requested/completed/
 failed mono counts, created timestamp) with the shared `table-pagination` footer, + a
@@ -478,4 +570,3 @@ the `—` placeholder.
    (`--font-sans`, `--font-mono`, `--font-brand-display`); expose Bricolage through the
    `--font-display-family` token → bridged `font-display` utility. Never name a next/font
    variable `--font-display` — that name is the bridged `@theme` token.
-

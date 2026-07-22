@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Input } from '@/components/ui/input';
 import type { BulkSelectMode } from '@/lib/site-health/use-monitored-selection';
 
@@ -33,9 +34,7 @@ export function QuickSelectBar({
 
   return (
     <div className="border-border-subtle bg-background-alt flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
-      <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-        Quick select
-      </span>
+      <span className={eyebrowClasses}>Quick select</span>
       <Input
         type="number"
         min={1}

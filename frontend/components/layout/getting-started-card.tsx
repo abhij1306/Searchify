@@ -1,5 +1,6 @@
 'use client';
 
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
@@ -74,9 +75,7 @@ export function GettingStartedCard({ className }: Readonly<{ className?: string 
       aria-label="Getting started progress"
     >
       <div className="flex items-center justify-between">
-        <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-          Getting Started
-        </span>
+        <span className={eyebrowClasses}>Getting Started</span>
         <span className="text-2xs text-secondary font-mono font-semibold">
           {completed} of {total}
         </span>

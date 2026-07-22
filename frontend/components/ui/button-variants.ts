@@ -24,8 +24,6 @@ export const buttonVariants = cva(
         ghost:
           'border-transparent bg-transparent text-secondary hover:bg-accent-soft hover:text-foreground',
         destructive: 'border-transparent bg-danger text-accent-fg hover:opacity-90',
-        topbar:
-          'border-transparent bg-transparent text-secondary hover:bg-accent-soft hover:text-foreground',
       },
       size: {
         sm: 'h-[var(--control-height-sm)] px-2.5 text-xs',

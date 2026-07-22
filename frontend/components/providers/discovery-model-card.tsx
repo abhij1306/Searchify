@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { inputClasses } from '@/components/ui/input';
 import { discoveryModelOptions, type DiscoveryModelOption } from '@/lib/providers/catalog';
 import type { ProviderCatalog } from '@/lib/api/types';
@@ -55,10 +56,7 @@ export function DiscoveryModelCard({
         </p>
       </CardHeader>
       <CardContent className="grid gap-1.5">
-        <label
-          htmlFor="discovery-model"
-          className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase"
-        >
+        <label htmlFor="discovery-model" className={eyebrowClasses}>
           Model
         </label>
         <select

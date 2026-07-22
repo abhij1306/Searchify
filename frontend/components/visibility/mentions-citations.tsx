@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import {
   EvidenceEmpty,
   EvidenceError,
@@ -13,6 +14,7 @@ import {
 import { classificationBadgeValue, classificationLabel } from '@/lib/runs/status';
 import type { VisibilityExecutionEvidence } from '@/lib/api/types';
 import { engineLabel } from '@/lib/providers/catalog';
+import { cn } from '@/lib/utils';
 import {
   formatExecutionDate,
   provenanceSummary,
@@ -112,15 +114,11 @@ function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvid
         </span>
       </div>
 
-      <p className="text-2xs text-muted font-mono tracking-[0.08em] uppercase">
-        {provenanceSummary(item)}
-      </p>
+      <p className={cn(eyebrowClasses, 'font-normal')}>{provenanceSummary(item)}</p>
 
       {item.mentions.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-            Mentions
-          </p>
+          <p className={eyebrowClasses}>Mentions</p>
           <div className="flex flex-wrap gap-1.5">
             {item.mentions.map((mention, index) => (
               <Badge
@@ -137,9 +135,7 @@ function ExecutionEvidenceRow({ item }: Readonly<{ item: VisibilityExecutionEvid
 
       {item.citations.length > 0 ? (
         <div className="grid gap-1.5">
-          <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-            Citations
-          </p>
+          <p className={eyebrowClasses}>Citations</p>
           <ul className="grid gap-2">
             {item.citations.map((citation) => (
               <li

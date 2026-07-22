@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardEyebrow } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { ScoreRing } from '@/components/ui/score-ring';
 import type { RunStatusValue } from '@/components/ui/badge-variants';
 import type { AuditStatus, Visibility } from '@/lib/api/types';
@@ -49,17 +50,13 @@ export function VisibilityScoreCard({ visibility }: Readonly<{ visibility: Visib
         </div>
         <dl className="border-border-subtle grid w-full grid-cols-2 gap-3 border-t pt-4 text-center">
           <div>
-            <dt className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-              Completed
-            </dt>
+            <dt className={eyebrowClasses}>Completed</dt>
             <dd className="mono text-foreground text-lg font-semibold">
               {visibility.total_completed}
             </dd>
           </div>
           <div>
-            <dt className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-              Failed
-            </dt>
+            <dt className={eyebrowClasses}>Failed</dt>
             <dd className="mono text-foreground text-lg font-semibold">
               {visibility.total_failed}
             </dd>

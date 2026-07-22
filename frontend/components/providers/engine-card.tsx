@@ -7,6 +7,7 @@ import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardEyebrow, CardHeader } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { providersApi } from '@/lib/api/providers';
@@ -123,9 +124,7 @@ export function EngineCard({
       <CardContent className="grid gap-4">
         {route ? (
           <div className="grid gap-1.5">
-            <span className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-              Route
-            </span>
+            <span className={eyebrowClasses}>Route</span>
             <span className="text-foreground text-sm">{route.label}</span>
             {route.default_model ? (
               <span className="text-2xs text-muted font-mono">Model: {route.default_model}</span>

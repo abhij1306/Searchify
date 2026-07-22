@@ -4,6 +4,7 @@ import { MinusCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import {
   EvidenceEmpty,
   EvidenceError,
@@ -13,6 +14,7 @@ import {
   type EvidenceTabProps,
 } from '@/components/visibility/evidence-states';
 import { engineLabel } from '@/lib/providers/catalog';
+import { cn } from '@/lib/utils';
 import type { VisibilityExecutionEvidence } from '@/lib/api/types';
 import {
   countOnlyExplanation,
@@ -123,9 +125,7 @@ function ExecutionRow({ item }: Readonly<{ item: VisibilityExecutionEvidence }>)
         </span>
       </div>
 
-      <p className="text-2xs text-muted font-mono tracking-[0.08em] uppercase">
-        {provenanceSummary(item)}
-      </p>
+      <p className={cn(eyebrowClasses, 'font-normal')}>{provenanceSummary(item)}</p>
 
       <QueryDetail item={item} />
     </li>

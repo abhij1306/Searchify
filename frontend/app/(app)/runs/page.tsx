@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LaunchDialog } from '@/components/runs/launch-dialog';
 import { FilterChip } from '@/components/runs/filter-chip';
 import { RunsTable } from '@/components/runs/runs-table';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
+import { displayHeadingXlClasses } from '@/components/ui/typography';
 import { queryKeys } from '@/lib/api/query-keys';
 import { runsApi } from '@/lib/api/runs';
 import type { Audit } from '@/lib/api/types';
@@ -110,10 +112,8 @@ export default function RunsPage() {
       ) : audits.length === 0 ? (
         <Card>
           <CardContent className="grid justify-items-center gap-3 py-16 text-center">
-            <p className="text-2xs text-muted font-mono font-medium tracking-[0.08em] uppercase">
-              Runs
-            </p>
-            <p className="font-display text-foreground text-xl font-semibold">No runs yet</p>
+            <p className={eyebrowClasses}>Runs</p>
+            <p className={displayHeadingXlClasses}>No runs yet</p>
             <p className="text-secondary max-w-md text-sm">
               Launch your first audit to measure how AI engines answer questions about your brand.
             </p>

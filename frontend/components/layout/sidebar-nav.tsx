@@ -7,6 +7,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 import { NAV_GROUPS, type NavItem } from './nav-items';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 
 /**
  * SidebarNav (F5) — grouped sidebar navigation (docs/design.md §9.2).
@@ -66,9 +67,7 @@ export function SidebarNav({ className }: Readonly<{ className?: string }>) {
     <nav aria-label="Primary" className={cn('flex flex-col gap-5', className)}>
       {NAV_GROUPS.map((group) => (
         <div key={group.title} className="flex flex-col gap-1">
-          <p className="text-2xs text-muted px-2.5 font-mono font-medium tracking-[0.08em] uppercase">
-            {group.title}
-          </p>
+          <p className={cn(eyebrowClasses, 'px-2.5')}>{group.title}</p>
           <ul className="flex flex-col gap-0.5">
             {group.items.map((item) => (
               <li key={item.href}>

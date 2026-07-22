@@ -1,5 +1,6 @@
 import type { HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { cn } from '@/lib/utils';
 
 /**
@@ -86,7 +87,8 @@ export function TableHead({
     <th
       {...props}
       className={cn(
-        'border-border bg-background-alt text-muted text-2xs sticky top-0 z-10 h-[var(--table-header-height)] border-b px-3 align-middle font-mono font-medium tracking-[0.08em] uppercase',
+        eyebrowClasses,
+        'border-border bg-background-alt sticky top-0 z-10 h-[var(--table-header-height)] border-b px-3 align-middle',
         numeric ? 'text-center tabular-nums' : 'text-left',
         className,
       )}

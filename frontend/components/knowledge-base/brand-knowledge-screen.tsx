@@ -14,6 +14,9 @@ import { useActiveProject } from '@/lib/project/project-context';
 import { setupErrorMessage } from '@/lib/setup/forms';
 
 import { BrandProfilePanel } from './brand-profile-panel';
+import { AccentEyebrow } from '@/components/ui/eyebrow';
+import { IconChip } from '@/components/ui/icon-chip';
+import { displayHeadingLgClasses, displayHeadingXlClasses } from '@/components/ui/typography';
 
 /**
  * Workspace-owned editor for the curated brand knowledge used by assisted
@@ -41,13 +44,11 @@ export function BrandKnowledgeScreen() {
         <Card>
           <CardContent className="grid justify-items-center gap-4 py-12 text-center">
             <CardEyebrow>Knowledge base</CardEyebrow>
-            <span className="bg-accent-subtle text-accent-text flex size-12 items-center justify-center rounded-full">
+            <IconChip>
               <BookOpen className="size-6" aria-hidden />
-            </span>
+            </IconChip>
             <div className="grid gap-1">
-              <h2 className="font-display text-foreground text-lg font-semibold">
-                Create a project first
-              </h2>
+              <h2 className={displayHeadingLgClasses}>Create a project first</h2>
               <p className="text-secondary max-w-md text-sm">
                 Brand knowledge belongs to a project. Set one up, then curate the facts and
                 positioning Searchify uses to ground assisted features.
@@ -82,11 +83,8 @@ export function BrandKnowledgeScreen() {
   return (
     <div className="mx-auto grid max-w-3xl gap-5">
       <div className="grid gap-1">
-        <span className="text-accent-text text-2xs inline-flex items-center gap-1.5 font-mono font-medium tracking-[0.08em] uppercase">
-          <span className="bg-accent size-1.5 rounded-full" aria-hidden />
-          Knowledge base
-        </span>
-        <h2 className="font-display text-foreground text-xl font-semibold">Brand knowledge</h2>
+        <AccentEyebrow>Knowledge base</AccentEyebrow>
+        <h2 className={displayHeadingXlClasses}>Brand knowledge</h2>
         <p className="text-secondary text-sm">
           Maintain the facts and positioning that Searchify uses to ground assisted features.
         </p>

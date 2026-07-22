@@ -5,6 +5,7 @@ import { useId, useState } from 'react';
 
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { eyebrowClasses } from '@/components/ui/eyebrow';
 import { Input, inputClasses } from '@/components/ui/input';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { Topic } from '@/lib/api/types';
@@ -89,9 +90,7 @@ export function TopicRail({
         className="border-border bg-panel shadow-card hidden min-w-0 content-start gap-1 overflow-hidden rounded-lg border p-2 md:sticky md:top-4 md:grid"
       >
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-muted text-2xs font-mono font-medium tracking-[0.08em] uppercase">
-            Topics
-          </h3>
+          <h3 className={eyebrowClasses}>Topics</h3>
           <Button
             variant="ghost"
             size="icon"
@@ -179,10 +178,7 @@ function TopicSelect({
   const labelId = useId();
   return (
     <div className="mb-1 grid gap-1.5 md:hidden">
-      <span
-        id={labelId}
-        className="text-muted text-2xs font-mono font-medium tracking-[0.08em] uppercase"
-      >
+      <span id={labelId} className={eyebrowClasses}>
         Topics
       </span>
       <div className="relative">
