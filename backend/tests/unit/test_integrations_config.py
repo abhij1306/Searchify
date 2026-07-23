@@ -11,6 +11,9 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.core.config.integrations import (
+    BING_API_BASE_URL,
+    DATASET_BING_PAGE_DAILY,
+    DATASET_BING_QUERY_DAILY,
     DATASET_GA4_CHANNEL_DAILY,
     DATASET_GA4_LANDING_DAILY,
     DATASET_GA4_REFERRER_DAILY,
@@ -20,6 +23,7 @@ from app.core.config.integrations import (
     GA4_API_BASE_URL,
     GSC_API_BASE_URL,
     INTEGRATION_APPROVED_ENDPOINT_HOSTS,
+    INTEGRATION_CLIENT_BUILDERS,
     INTEGRATION_DATASET_TEMPLATES,
     INTEGRATION_GRANT_STATUSES,
     INTEGRATION_IMPORTER_VERSION,
@@ -27,6 +31,7 @@ from app.core.config.integrations import (
     INTEGRATION_OAUTH_REVOKE_URLS,
     INTEGRATION_OAUTH_SCOPES,
     INTEGRATION_OAUTH_TOKEN_URLS,
+    INTEGRATION_PROVIDER_BING,
     INTEGRATION_PROVIDER_GA4,
     INTEGRATION_PROVIDER_GSC,
     INTEGRATION_PROVIDER_TRANSPORT,
@@ -103,8 +108,13 @@ def test_google_grant_combines_gsc_and_ga4_scopes() -> None:
     assert "https://www.googleapis.com/auth/webmasters.readonly" in google_scopes
     assert "https://www.googleapis.com/auth/analytics.readonly" in google_scopes
     assert len(google_scopes) == 2
-    # The Microsoft grant stays refreshable ahead of the I12 scope pinning.
-    assert "offline_access" in INTEGRATION_OAUTH_SCOPES[INTEGRATION_TRANSPORT_MICROSOFT]
+    # The Microsoft grant carries the pinned Bing Webmaster scope (I12)
+    # and stays refreshable via offline_access.
+    microsoft_scopes = INTEGRATION_OAUTH_SCOPES[INTEGRATION_TRANSPORT_MICROSOFT]
+    assert "offline_access" in microsoft_scopes
+    assert "https://webmaster.bing.com/api/webmaster.manage" in microsoft_scopes
+    # bingads.manage is the ADS API scope — never requested here.
+    assert all("bingads" not in scope for scope in microsoft_scopes)
 
 
 def test_dataset_templates_match_pinned_c1() -> None:
@@ -127,6 +137,8 @@ def test_dataset_templates_match_pinned_c1() -> None:
             INTEGRATION_PROVIDER_GA4,
             ("landingPage", "sessionSource", "sessionMedium", "date"),
         ),
+        DATASET_BING_PAGE_DAILY: (INTEGRATION_PROVIDER_BING, ("page", "date")),
+        DATASET_BING_QUERY_DAILY: (INTEGRATION_PROVIDER_BING, ("query", "date")),
     }
     assert set(INTEGRATION_DATASET_TEMPLATES) == set(expected)
     for dataset, (provider, dimensions) in expected.items():
@@ -136,8 +148,19 @@ def test_dataset_templates_match_pinned_c1() -> None:
         assert template.dimensions == dimensions
         if provider == INTEGRATION_PROVIDER_GSC:
             assert template.metrics == ("clicks", "impressions", "ctr", "position")
-        else:
+        elif provider == INTEGRATION_PROVIDER_GA4:
             assert template.metrics == ("sessions", "engagedSessions", "conversions")
+        else:
+            assert template.metrics == ("clicks", "impressions")
+    # The Bing api_method literals are the pinned endpoint names.
+    assert (
+        INTEGRATION_DATASET_TEMPLATES[DATASET_BING_PAGE_DAILY].api_method
+        == "GetPageStats"
+    )
+    assert (
+        INTEGRATION_DATASET_TEMPLATES[DATASET_BING_QUERY_DAILY].api_method
+        == "GetQueryStats"
+    )
 
 
 def test_pack_dimension_key_single_bare_multi_joined_in_order() -> None:
@@ -167,6 +190,15 @@ def test_allow_list_covers_provider_api_hosts_and_is_host_only() -> None:
         assert "://" not in host and "/" not in host
     assert urlsplit(GSC_API_BASE_URL).hostname in INTEGRATION_APPROVED_ENDPOINT_HOSTS
     assert urlsplit(GA4_API_BASE_URL).hostname in INTEGRATION_APPROVED_ENDPOINT_HOSTS
+    assert urlsplit(BING_API_BASE_URL).hostname in INTEGRATION_APPROVED_ENDPOINT_HOSTS
+
+
+def test_client_builder_registry_covers_every_provider() -> None:
+    # The worker's dispatch seam resolves through this config-owned map.
+    assert set(INTEGRATION_CLIENT_BUILDERS) == INTEGRATION_PROVIDERS
+    for provider, builder in INTEGRATION_CLIENT_BUILDERS.items():
+        client = builder(transport=None)
+        assert client is not None, provider
 
 
 def test_importer_version_token() -> None:

@@ -1,0 +1,23 @@
+{
+  "dimensionHeaders": [
+    {"name": "sessionSource"},
+    {"name": "sessionMedium"},
+    {"name": "date"}
+  ],
+  "metricHeaders": [
+    {"name": "sessions", "type": "TYPE_INTEGER"},
+    {"name": "engagedSessions", "type": "TYPE_INTEGER"},
+    {"name": "conversions", "type": "TYPE_INTEGER"}
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {"value": "google"},
+        {"value": "organic"},
+        {"value": "20260720"}
+      ],
+      "metricValues": [{"value": "35"}, {"value": "26"}, {"value": "2"}]
+    }
+  ],
+  "rowCount": 1
+}

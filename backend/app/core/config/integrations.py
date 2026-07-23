@@ -16,9 +16,9 @@
 # this file and never logged (invariant 6).
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,15 +75,28 @@ INTEGRATION_OAUTH_REVOKE_URLS: Final[dict[str, str]] = {
 }
 # Minimal scope set per transport (spec section 7). The ONE Google grant
 # combines the GSC + GA4 read scopes so a single consent yields both
-# connections (spec section 2/3). The Bing Webmaster read-scope literal is
-# pinned from Microsoft docs at task I12 (plan R3); ``offline_access`` keeps
-# the Microsoft grant refreshable.
+# connections (spec section 2/3). The Microsoft grant carries the Bing
+# Webmaster API scope pinned from Microsoft docs at I12 (plan R3):
+# ``webmaster.manage`` on the ``https://webmaster.bing.com/api/`` audience —
+# the delegated scope Microsoft documents for the Bing Webmaster API on the
+# Microsoft identity platform (learn.microsoft.com Q&A #2337353; the Bing
+# Webmaster OAuth doc learn.microsoft.com/bingwebmaster/oauth2 documents
+# Bearer-token auth and the bare ``webmaster.manage`` form against Bing's
+# own www.bing.com/webmasters/OAuth endpoints, which this transport does
+# NOT use — the grant rides login.microsoftonline.com, so the v2.0
+# fully-qualified form is required). Microsoft documents NO narrower
+# read-only webmaster scope (``bingads.manage`` is the ADS API — rejected).
+# ``offline_access`` stays: the identity platform v2.0 issues a refresh
+# token only when it is requested.
 INTEGRATION_OAUTH_SCOPES: Final[dict[str, tuple[str, ...]]] = {
     INTEGRATION_TRANSPORT_GOOGLE: (
         "https://www.googleapis.com/auth/webmasters.readonly",
         "https://www.googleapis.com/auth/analytics.readonly",
     ),
-    INTEGRATION_TRANSPORT_MICROSOFT: ("offline_access",),
+    INTEGRATION_TRANSPORT_MICROSOFT: (
+        "offline_access",
+        "https://webmaster.bing.com/api/webmaster.manage",
+    ),
 }
 
 # OAuth callback path (the provider-registered redirect target; ``provider``
@@ -105,12 +118,21 @@ GSC_SEARCH_ANALYTICS_PATH: Final = (
 GSC_DOMAIN_PROPERTY_PREFIX: Final = "sc-domain:"
 GA4_API_BASE_URL: Final = "https://analyticsdata.googleapis.com"
 GA4_RUN_REPORT_PATH: Final = "/v1beta/properties/{property_ref}:runReport"
-# Bing Webmaster API host/path literals are pinned from Microsoft docs at I12
-# (plan R3).
+# Bing Webmaster API v1 literals, pinned from Microsoft docs at I12 (plan
+# R3): host ``ssl.bing.com``, JSON endpoint root
+# ``/webmaster/api.svc/json/`` (learn.microsoft.com
+# /dotnet/api/microsoft.bing.webmaster.api.interfaces.iwebmasterapi and
+# /bingwebmaster/getting-access). Read endpoints are GET
+# ``{root}GetPageStats|GetQueryStats?siteUrl=...`` authenticated with the
+# OAuth Bearer token (learn.microsoft.com/bingwebmaster/oauth2); the cheap
+# authenticated grant probe is ``GetSites`` (the caller's verified-site
+# list — the analogue of the GSC ``GET /webmasters/v3/sites`` probe).
+BING_API_BASE_URL: Final = "https://ssl.bing.com"
+BING_API_JSON_ROOT: Final = "/webmaster/api.svc/json/"
+BING_SITES_PROBE_METHOD: Final = "GetSites"
 
 # Approved-endpoint allow-list (SSRF policy, master plan section 15):
-# integration clients must reject any URL whose host is not in this set. The
-# Bing API host is added when its literal is pinned at I12.
+# integration clients must reject any URL whose host is not in this set.
 INTEGRATION_APPROVED_ENDPOINT_HOSTS: Final[frozenset[str]] = frozenset(
     {
         "accounts.google.com",
@@ -118,6 +140,7 @@ INTEGRATION_APPROVED_ENDPOINT_HOSTS: Final[frozenset[str]] = frozenset(
         "www.googleapis.com",
         "analyticsdata.googleapis.com",
         "login.microsoftonline.com",
+        "ssl.bing.com",
     }
 )
 
@@ -211,9 +234,15 @@ DATASET_GA4_CHANNEL_DAILY: Final = "ga4_channel_daily"
 DATASET_GA4_SOURCE_MEDIUM_DAILY: Final = "ga4_source_medium_daily"
 DATASET_GA4_REFERRER_DAILY: Final = "ga4_referrer_daily"
 DATASET_GA4_LANDING_DAILY: Final = "ga4_landing_daily"
+DATASET_BING_PAGE_DAILY: Final = "bing_page_daily"
+DATASET_BING_QUERY_DAILY: Final = "bing_query_daily"
 
 _GSC_SEARCH_ANALYTICS_METRICS: Final = ("clicks", "impressions", "ctr", "position")
 _GA4_SESSION_METRICS: Final = ("sessions", "engagedSessions", "conversions")
+# Bing stats endpoints carry click/impression counts only in this pass
+# (I12 derivation mapping; the average-position fields the API also
+# returns are roadmap).
+_BING_STATS_METRICS: Final = ("clicks", "impressions")
 
 
 @dataclass(frozen=True)
@@ -277,6 +306,26 @@ INTEGRATION_DATASET_TEMPLATES: Final[dict[str, IntegrationDatasetTemplate]] = {
         api_method="runReport",
         dimensions=("landingPage", "sessionSource", "sessionMedium", "date"),
         metrics=_GA4_SESSION_METRICS,
+    ),
+    # Bing Webmaster stats (I12). ``api_method`` is the pinned endpoint
+    # literal under ``BING_API_JSON_ROOT``; the Bing stats API takes no
+    # date-range parameters, so derivation projects the imported rows onto
+    # the run's window. The leading dimension is the page URL
+    # (``GetPageStats``) or the query text (``GetQueryStats``) — both are
+    # carried in the response's ``Query`` field.
+    DATASET_BING_PAGE_DAILY: IntegrationDatasetTemplate(
+        dataset=DATASET_BING_PAGE_DAILY,
+        provider=INTEGRATION_PROVIDER_BING,
+        api_method="GetPageStats",
+        dimensions=("page", "date"),
+        metrics=_BING_STATS_METRICS,
+    ),
+    DATASET_BING_QUERY_DAILY: IntegrationDatasetTemplate(
+        dataset=DATASET_BING_QUERY_DAILY,
+        provider=INTEGRATION_PROVIDER_BING,
+        api_method="GetQueryStats",
+        dimensions=("query", "date"),
+        metrics=_BING_STATS_METRICS,
     ),
 }
 
@@ -416,6 +465,44 @@ INTEGRATION_QUEUE_SPEC: Final[PostgresQueueSpec[IntegrationSyncRun]] = (
         max_attempts_error=ERROR_MAX_ATTEMPTS,
     )
 )
+
+
+# --- Provider -> data-API client dispatch registry (I11/I12) -----------------
+# The integration worker's ``_build_client`` seam resolves each provider's
+# data-API client through THIS config-owned registry (invariant 1: the
+# provider vocabulary + dispatch live here, not in worker code). Builders
+# are lazy so this config module never imports a connector at runtime (the
+# same circular-import guard as ``_integration_sync_run_model``). Each
+# builder accepts the ``transport`` test seam and returns a client exposing
+# the shared paging contract — ``query_search_analytics(access_token=,
+# property_ref=, dimensions=, start_date=, end_date=, start_row=)`` ->
+# a page carrying ``payload`` + ``rows`` — mirroring the GSC reference
+# client (app/connectors/integrations/gsc.py).
+
+
+def _gsc_client_builder(*, transport: Any = None) -> Any:
+    from app.connectors.integrations.gsc import build_gsc_client
+
+    return build_gsc_client(transport=transport)
+
+
+def _ga4_client_builder(*, transport: Any = None) -> Any:
+    from app.connectors.integrations.ga4 import build_ga4_client
+
+    return build_ga4_client(transport=transport)
+
+
+def _bing_client_builder(*, transport: Any = None) -> Any:
+    from app.connectors.integrations.bing import build_bing_client
+
+    return build_bing_client(transport=transport)
+
+
+INTEGRATION_CLIENT_BUILDERS: Final[dict[str, Callable[..., Any]]] = {
+    INTEGRATION_PROVIDER_GSC: _gsc_client_builder,
+    INTEGRATION_PROVIDER_GA4: _ga4_client_builder,
+    INTEGRATION_PROVIDER_BING: _bing_client_builder,
+}
 
 
 def unpack_dimension_key(dataset: str, dimension_key: str) -> tuple[str, ...] | None:

@@ -49,7 +49,6 @@ from app.core.config.integrations import (
     EVENT_INTEGRATION_SYNC_STARTED,
     GRANT_STATUS_CONNECTED,
     GRANT_STATUS_NEEDS_REAUTH,
-    INTEGRATION_PROVIDER_GA4,
     INTEGRATION_PROVIDER_GSC,
     INTEGRATION_QUEUE_SPEC,
     INTEGRATION_TRANSPORT_GOOGLE,
@@ -710,7 +709,9 @@ async def test_payload_too_large_fails(
 
 @pytest.mark.asyncio
 async def test_unsupported_provider_fails_clean(session_factory, db_session) -> None:
-    seed = await _seed_graph(db_session, provider=INTEGRATION_PROVIDER_GA4)
+    # A provider with no client in the config-owned dispatch registry
+    # (gsc/ga4/bing all have one since I11/I12) fails terminally.
+    seed = await _seed_graph(db_session, provider="netscape")
     run = await _enqueue_run(db_session, seed)
     fake = _ProviderFake()
 

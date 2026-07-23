@@ -1,0 +1,21 @@
+{
+  "dimensionHeaders": [
+    {"name": "fullReferrer"},
+    {"name": "date"}
+  ],
+  "metricHeaders": [
+    {"name": "sessions", "type": "TYPE_INTEGER"},
+    {"name": "engagedSessions", "type": "TYPE_INTEGER"},
+    {"name": "conversions", "type": "TYPE_INTEGER"}
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {"value": "https://chatgpt.com/"},
+        {"value": "20260721"}
+      ],
+      "metricValues": [{"value": "6"}, {"value": "4"}, {"value": "1"}]
+    }
+  ],
+  "rowCount": 1
+}

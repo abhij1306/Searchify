@@ -82,9 +82,11 @@ class _FakeOAuthServer:
         *,
         google_token_status: int = 200,
         google_token_payload: dict | None = None,
+        microsoft_token_status: int = 200,
     ) -> None:
         self.google_token_status = google_token_status
         self.google_token_payload = google_token_payload or _google_tokens()
+        self.microsoft_token_status = microsoft_token_status
         self.requests: list[httpx.Request] = []
 
     @property
@@ -103,6 +105,14 @@ class _FakeOAuthServer:
         if host == "www.googleapis.com":
             return httpx.Response(200, json=_fixture("gsc_sites_response.json"))
         if host == "login.microsoftonline.com" and request.url.path.endswith("/token"):
+            if self.microsoft_token_status != 200:
+                return httpx.Response(
+                    self.microsoft_token_status,
+                    json={
+                        "error": "temporarily_unavailable",
+                        "error_description": "microsoft boom",
+                    },
+                )
             return httpx.Response(200, json=_fixture("microsoft_token_response.json"))
         return httpx.Response(404, json={"error": "unexpected"})
 
@@ -358,7 +368,11 @@ async def test_microsoft_connect_attaches_bing_connection(
     )
     query = parse_qs(urlsplit(location).query)
     assert query["client_id"] == [_MS_CLIENT_ID]
-    assert query["scope"] == ["offline_access"]
+    # The pinned Bing Webmaster scope (I12) + offline_access for refresh.
+    assert set(query["scope"][0].split(" ")) == {
+        "offline_access",
+        "https://webmaster.bing.com/api/webmaster.manage",
+    }
     # Google-only offline/consent params are not sent to Microsoft.
     assert "access_type" not in query
     assert _MS_CLIENT_SECRET not in location
@@ -372,9 +386,61 @@ async def test_microsoft_connect_attaches_bing_connection(
     expected = _fixture("microsoft_token_response.json")
     assert decrypt_secret(grant.access_token_encrypted) == expected["access_token"]
     assert decrypt_secret(grant.refresh_token_encrypted) == expected["refresh_token"]
+    assert set(grant.granted_scopes) == {
+        "offline_access",
+        "https://webmaster.bing.com/api/webmaster.manage",
+    }
     connections = await _connections(db_session)
     assert [c.provider for c in connections] == ["bing"]
     assert connections[0].grant_id == grant.id
+
+
+@pytest.mark.asyncio
+async def test_bing_reconnect_keeps_single_grant_and_connection(
+    client: httpx.AsyncClient,
+    db_session,
+    _oauth_credentials: None,
+    _fake_oauth: _FakeOAuthServer,
+) -> None:
+    """A second Bing consent rotates tokens on the ONE Microsoft grant."""
+    await _register(client, "int-bing-reconnect@example.com")
+    await _callback(client, "bing", _state_from_start(await _start(client, "bing")))
+    (grant,) = await _grants(db_session)
+    grant_id = grant.id
+
+    state2 = _state_from_start(await _start(client, "bing"))
+    callback2 = await _callback(client, "bing", state2)
+    assert "connected=bing" in callback2.headers["location"]
+
+    # Find-or-create: still ONE microsoft_oauth grant, ONE bing connection.
+    grants = await _grants(db_session)
+    assert [g.id for g in grants] == [grant_id]
+    connections = await _connections(db_session)
+    assert [c.provider for c in connections] == ["bing"]
+    assert len(_fake_oauth.token_calls()) == 2
+
+
+@pytest.mark.asyncio
+async def test_bing_exchange_failure_landing(
+    client: httpx.AsyncClient,
+    db_session,
+    _oauth_credentials: None,
+    _fake_oauth: _FakeOAuthServer,
+) -> None:
+    await _register(client, "int-bing-xfail@example.com")
+    _fake_oauth.microsoft_token_status = 400
+    state = _state_from_start(await _start(client, "bing"))
+    callback = await _callback(client, "bing", state)
+    assert callback.status_code == 302
+    assert (
+        callback.headers["location"]
+        == "/settings?tab=integrations&error=oauth_exchange_failed"
+    )
+    assert await _grants(db_session) == []
+    assert await _connections(db_session) == []
+    # The state was consumed before the exchange — a retry is a replay.
+    retry = await _callback(client, "bing", state)
+    assert "oauth_state_invalid" in retry.headers["location"]
 
 
 @pytest.mark.asyncio

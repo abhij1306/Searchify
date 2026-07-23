@@ -16,6 +16,19 @@ single writer of ``IntegrationMetricRow`` (invariant 3).
   ``dimension_key`` packs ALL declared dimension values — date included,
   in template order — via the config-owned ``pack_dimension_key``
   (contract C1, invariant 2; analytics consumers peel the trailing date).
+  The artifact row shape is the shared provider contract the clients
+  normalize into (``{"rows": [{"keys": [...], "<metric>": ...}]}`` — GSC
+  natively, GA4/Bing by client-side mapping, I11/I12); the metrics copied
+  onto the row are exactly the dataset template's declared metric tokens
+  (GSC clicks/impressions/ctr/position, GA4 sessions/engagedSessions/
+  conversions, Bing clicks/impressions) — the mapping stays
+  dataset-template-driven with no per-provider branches here.
+- **Window projection** — a row whose parsed date falls OUTSIDE the
+  run's ``[window_start, window_end]`` is dropped (I12): the Bing stats
+  endpoints take no date-range parameters and return their full trailing
+  window, so the window the run was enqueued for is enforced at
+  projection time. GSC/GA4 honor the window server-side, so the filter
+  is a no-op for them.
 - **Idempotent** — rows insert via ``ON CONFLICT DO NOTHING`` on the
   identity tuple, so a retried derivation (resume-after-crash) is a dedup
   no-op, never an overwrite. A re-sync writes NEW rows at the higher
@@ -119,8 +132,10 @@ def build_metric_row_values(
     """Transform one artifact's payload rows into metric-row column values.
 
     Pure (no DB). A payload row whose ``keys`` do not match the template's
-    declared dimension arity, or whose date value is unparseable, is
-    skipped — malformed provider data is dropped, never guessed.
+    declared dimension arity, whose date value is unparseable, or whose
+    date falls outside the run's window (window projection — see the
+    module docstring) is skipped — malformed or out-of-window provider
+    data is dropped, never guessed.
     """
     payload = artifact.payload or {}
     payload_rows = payload.get("rows") or []
@@ -134,6 +149,8 @@ def build_metric_row_values(
             continue
         row_date = _parse_row_date(str(keys[date_index]))
         if row_date is None:
+            continue
+        if row_date < run.window_start or row_date > run.window_end:
             continue
         metrics = {
             name: payload_row[name] for name in template.metrics if name in payload_row

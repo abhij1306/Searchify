@@ -31,6 +31,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.connectors.integrations import bing as bing_connector
 from app.connectors.integrations import oauth as integration_oauth
 from app.core.config.integrations import (
     ERROR_PROVIDER_API,
@@ -447,26 +448,27 @@ async def run_connection_test(
     grant = await _get_grant(
         session, workspace_id=workspace_id, grant_id=connection.grant_id
     )
-    client = integration_oauth.build_oauth_client(grant.transport)
 
     status = TEST_STATUS_OK
     error_code = ""
     detail = "Connection succeeded"
     try:
+        access_token = decrypt_secret(grant.access_token_encrypted)
         if grant.transport == INTEGRATION_TRANSPORT_GOOGLE:
-            access_token = decrypt_secret(grant.access_token_encrypted)
+            client = integration_oauth.build_oauth_client(grant.transport)
             await client.probe_access_token(access_token=access_token)
         else:
-            # The Bing data-API probe host literal is pinned from Microsoft
-            # docs at I12 (plan R3). Until then a Microsoft grant is
-            # validated by a refresh round-trip against the token endpoint;
-            # the returned bundle is deliberately DISCARDED (never persisted
-            # — a probe is not a credential rotation). Microsoft refresh
-            # tokens rotate with an overlap window, so the stored grant's
-            # refresh token remains valid after the probe.
-            refresh_token = decrypt_secret(grant.refresh_token_encrypted)
-            await client.refresh(refresh_token=refresh_token)
-    except integration_oauth.IntegrationOAuthError as exc:
+            # Real cheap authenticated probe against the pinned Bing host
+            # (I12, replacing the refresh round-trip placeholder): the
+            # ``GetSites`` verified-site list validates the Microsoft
+            # grant's access token. The grant is untouched — a probe is
+            # not a credential rotation.
+            bing_client = bing_connector.build_bing_client()
+            await bing_client.probe_access_token(access_token=access_token)
+    except (
+        integration_oauth.IntegrationOAuthError,
+        bing_connector.BingApiError,
+    ) as exc:
         status = TEST_STATUS_FAILED
         error_code = exc.error_code
         detail = str(exc)[:1024]

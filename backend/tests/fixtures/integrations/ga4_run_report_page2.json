@@ -1,0 +1,18 @@
+{
+  "dimensionHeaders": [
+    {"name": "sessionDefaultChannelGroup"},
+    {"name": "date"}
+  ],
+  "metricHeaders": [
+    {"name": "sessions", "type": "TYPE_INTEGER"},
+    {"name": "engagedSessions", "type": "TYPE_INTEGER"},
+    {"name": "conversions", "type": "TYPE_INTEGER"}
+  ],
+  "rows": [
+    {
+      "dimensionValues": [{"value": "Direct"}, {"value": "20260721"}],
+      "metricValues": [{"value": "18"}, {"value": "11"}, {"value": "0"}]
+    }
+  ],
+  "rowCount": 3
+}

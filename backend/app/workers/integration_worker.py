@@ -1,5 +1,6 @@
 # Integration sync worker: claims IntegrationSyncRun queue rows and pages the
-# provider data APIs (GSC first; GA4/Bing dispatch lands with I11/I12).
+# provider data APIs (GSC / GA4 / Bing) behind the config-owned dispatch
+# registry (``INTEGRATION_CLIENT_BUILDERS`` — the ``_build_client`` seam).
 #
 # A separate process (the ``integration-worker`` compose service). It mirrors
 # ``ContentWorker`` exactly on the queue mechanics — claim via the generic
@@ -35,20 +36,19 @@ import hashlib
 import json
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from typing import Protocol
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.connectors.integrations import oauth as integration_oauth
-from app.connectors.integrations.gsc import (
-    GscApiError,
-    GscClient,
-    GscQueryPage,
-    build_gsc_client,
-)
+from app.connectors.integrations.bing import BingApiError
+from app.connectors.integrations.ga4 import Ga4ApiError
+from app.connectors.integrations.gsc import GscApiError
 from app.core.config.integrations import (
     ERROR_GRANT_AUTH_FAILED,
     ERROR_PAYLOAD_TOO_LARGE,
@@ -60,8 +60,8 @@ from app.core.config.integrations import (
     EVENT_INTEGRATION_SYNC_STARTED,
     GRANT_STATUS_CONNECTED,
     GRANT_STATUS_NEEDS_REAUTH,
+    INTEGRATION_CLIENT_BUILDERS,
     INTEGRATION_DATASET_TEMPLATES,
-    INTEGRATION_PROVIDER_GSC,
     INTEGRATION_QUEUE_SPEC,
     IntegrationDatasetTemplate,
     integration_settings,
@@ -95,11 +95,42 @@ def _utcnow() -> datetime:
 
 
 class _UnsupportedProviderError(RuntimeError):
-    """The run's provider has no data-API client yet (GA4/Bing: I11/I12)."""
+    """The run's provider has no data-API client in the config registry."""
 
 
 class _PayloadTooLargeError(RuntimeError):
     """A fetched page exceeds the inline-payload cap (rejected, not truncated)."""
+
+
+class _ClientPage(Protocol):
+    """One fetched provider page (every provider client's return shape)."""
+
+    payload: dict
+    rows: tuple[dict, ...]
+
+
+class _DataClient(Protocol):
+    """The uniform paging contract the worker dispatches through.
+
+    Mirrors the GSC reference client: every provider client exposes this
+    one method + signature and returns a page carrying ``payload``/``rows``.
+    """
+
+    async def query_search_analytics(
+        self,
+        *,
+        access_token: str,
+        property_ref: str,
+        dimensions: Sequence[str],
+        start_date: date,
+        end_date: date,
+        start_row: int,
+    ) -> _ClientPage: ...
+
+
+# The classified provider-error taxonomy every client raises (GSC-shaped:
+# config-owned error token + retryable + Retry-After advice).
+_PROVIDER_API_ERRORS = (GscApiError, Ga4ApiError, BingApiError)
 
 
 @dataclass(frozen=True)
@@ -313,9 +344,8 @@ class IntegrationWorker:
                     # Lost lease or cancelled at a page boundary: not ours to
                     # finalize — nothing more is written.
                     return
-        except GscApiError as exc:
-            # Provider-error taxonomy is GSC-shaped today; the I11/I12
-            # clients raise their classified equivalents here.
+        except _PROVIDER_API_ERRORS as exc:
+            # Every provider client raises the same classified taxonomy.
             await self._handle_provider_error(ctx, exc)
             return
         except _PayloadTooLargeError as exc:
@@ -333,13 +363,19 @@ class IntegrationWorker:
 
         await self._finalize_success(ctx)
 
-    def _build_client(self, provider: str) -> GscClient:
-        """Provider -> data-API client dispatch (GSC; the I11 registry grows this)."""
-        if provider == INTEGRATION_PROVIDER_GSC:
-            return build_gsc_client(transport=self._transport)
-        raise _UnsupportedProviderError(
-            f"no data-API client for provider {provider!r}"
-        )
+    def _build_client(self, provider: str) -> _DataClient:
+        """Provider -> data-API client dispatch via the config-owned registry.
+
+        ``INTEGRATION_CLIENT_BUILDERS`` (config, invariant 1) maps each
+        provider to its lazy client builder; an unmapped provider fails the
+        run terminally (no retry burn).
+        """
+        builder = INTEGRATION_CLIENT_BUILDERS.get(provider)
+        if builder is None:
+            raise _UnsupportedProviderError(
+                f"no data-API client for provider {provider!r}"
+            )
+        return builder(transport=self._transport)
 
     # --- Token refresh (serialized per grant, spec section 2) --------------
 
@@ -474,7 +510,7 @@ class IntegrationWorker:
         self,
         ctx: _RunContext,
         *,
-        client: GscClient,
+        client: _DataClient,
         template: IntegrationDatasetTemplate,
         access_token: str,
     ) -> bool:
@@ -555,7 +591,7 @@ class IntegrationWorker:
         ctx: _RunContext,
         *,
         template: IntegrationDatasetTemplate,
-        page: GscQueryPage,
+        page: _ClientPage,
         start_row: int,
     ) -> bool:
         """Write ONE immutable artifact for one fetched page (owner-gated)."""
@@ -611,7 +647,9 @@ class IntegrationWorker:
 
     # --- Terminal accounting -------------------------------------------------
 
-    async def _handle_provider_error(self, ctx: _RunContext, exc: GscApiError) -> None:
+    async def _handle_provider_error(
+        self, ctx: _RunContext, exc: GscApiError | Ga4ApiError | BingApiError
+    ) -> None:
         if exc.error_code == ERROR_GRANT_AUTH_FAILED:
             await self._mark_grant_needs_reauth(ctx)
             await self._queue.fail(

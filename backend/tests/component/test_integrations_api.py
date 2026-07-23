@@ -22,6 +22,7 @@ import httpx
 import pytest
 from sqlalchemy import select
 
+from app.connectors.integrations import bing as bing_connector
 from app.connectors.integrations import oauth as integration_oauth
 from app.core.security import decrypt_secret, encrypt_secret
 from app.models.integrations import (
@@ -123,6 +124,10 @@ class _FakeProvider:
             return httpx.Response(
                 self.probe_status, json=_fixture("gsc_sites_response.json")
             )
+        if host == "ssl.bing.com":
+            return httpx.Response(
+                self.probe_status, json=_fixture("bing_sites_response.json")
+            )
         if host == "oauth2.googleapis.com" and request.url.path == "/revoke":
             return httpx.Response(self.revoke_status)
         if host == "login.microsoftonline.com" and request.url.path.endswith("/token"):
@@ -131,6 +136,9 @@ class _FakeProvider:
 
     def probe_calls(self) -> list[httpx.Request]:
         return [r for r in self.requests if r.url.host == "www.googleapis.com"]
+
+    def bing_probe_calls(self) -> list[httpx.Request]:
+        return [r for r in self.requests if r.url.host == "ssl.bing.com"]
 
     def revoke_calls(self) -> list[httpx.Request]:
         return [r for r in self.requests if r.url.path == "/revoke"]
@@ -148,7 +156,11 @@ def _fake_provider(monkeypatch: pytest.MonkeyPatch) -> _FakeProvider:
             transport_kind, transport=fake.transport
         )
 
+    def _build_bing(*, transport=None):
+        return bing_connector.BingClient(transport=fake.transport)
+
     monkeypatch.setattr(integration_oauth, "build_oauth_client", _build)
+    monkeypatch.setattr(bing_connector, "build_bing_client", _build_bing)
     return fake
 
 
@@ -233,7 +245,7 @@ async def test_probe_ok_google(
 
 
 @pytest.mark.asyncio
-async def test_probe_ok_microsoft_via_refresh_roundtrip(
+async def test_probe_ok_microsoft_via_bing_get_sites(
     client: httpx.AsyncClient, db_session, _fake_provider: _FakeProvider
 ) -> None:
     await _register(client, "mgmt-test-ms@example.com")
@@ -245,17 +257,39 @@ async def test_probe_ok_microsoft_via_refresh_roundtrip(
     resp = await client.post(f"{_BASE}/{bing.id}/test")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
-    # Microsoft grants probe through a non-persisting refresh round-trip.
-    (token_call,) = _fake_provider.token_calls()
-    form = parse_qs(token_call.content.decode("utf-8"))
-    assert form["grant_type"] == ["refresh_token"]
-    assert form["refresh_token"] == [_FAKE_REFRESH]
+    # Microsoft grants probe through a real authenticated call against the
+    # pinned Bing host (GetSites — I12), never a token-endpoint round-trip.
+    (probe,) = _fake_provider.bing_probe_calls()
+    assert probe.url.path.endswith("/GetSites")
+    assert probe.headers["authorization"] == f"Bearer {_FAKE_ACCESS}"
+    assert _fake_provider.token_calls() == []
     # The stored grant is untouched by the probe (no rotation persisted).
     grant = (
         await db_session.execute(select(IntegrationOAuthGrant))
     ).scalar_one()
     assert decrypt_secret(grant.refresh_token_encrypted) == _FAKE_REFRESH
     assert grant.status == "connected"
+
+
+@pytest.mark.asyncio
+async def test_probe_failed_microsoft_maps_grant_auth_failed(
+    client: httpx.AsyncClient, db_session, _fake_provider: _FakeProvider
+) -> None:
+    await _register(client, "mgmt-test-ms-401@example.com")
+    ws = await _workspace_id(db_session)
+    _grant, connections = await _seed_grant(
+        db_session, workspace_id=ws, transport="microsoft_oauth", providers=("bing",)
+    )
+    (bing,) = connections
+    _fake_provider.probe_status = 401
+    resp = await client.post(f"{_BASE}/{bing.id}/test")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["error_code"] == "grant_auth_failed"
+    events = await _events(db_session)
+    assert [e.event_type for e in events] == ["integration.tested"]
+    assert events[0].payload["error_code"] == "grant_auth_failed"
 
 
 @pytest.mark.asyncio
