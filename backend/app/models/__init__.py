@@ -68,6 +68,7 @@ from app.models.site_health import (
     SiteUrlObservation,
     WorkspaceSiteHealthEntitlement,
 )
+from app.models.traffic import TrafficPageStat, TrafficQueryStat, TrafficSnapshot
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
@@ -124,6 +125,9 @@ __all__ = [
     "SiteUrlObservation",
     "WorkspaceSiteHealthEntitlement",
     "Topic",
+    "TrafficPageStat",
+    "TrafficQueryStat",
+    "TrafficSnapshot",
     "UnintendedDomain",
     "User",
     "Workspace",

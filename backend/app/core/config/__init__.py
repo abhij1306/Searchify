@@ -71,6 +71,14 @@ class Settings(BaseSettings):
         default="replace-with-32-byte-minimum-secret",
         validation_alias=AliasChoices("ENCRYPTION_KEY", "encryption_key"),
     )
+    # HMAC key for the opaque ``session_id_hash`` stamped on sanitized
+    # referral events (LLM Analytics, invariant 6). Env-injected deployment
+    # secret — resolved only inside the referral sanitization pass, never
+    # logged and never placed in a DTO.
+    referral_hash_salt: str = Field(
+        default="replace-with-64-byte-random-secret",
+        validation_alias=AliasChoices("REFERRAL_HASH_SALT", "referral_hash_salt"),
+    )
 
     # --- Integrations OAuth client credentials (GSC/GA4/Bing connect) ---
     # Env-injected deployment secrets for the integrations OAuth transports
@@ -179,6 +187,8 @@ def _check_secret_defaults() -> None:
         issues.append("jwt_secret_key is set to a default value")
     if settings.encryption_key in _INSECURE_DEFAULTS:
         issues.append("encryption_key is set to a default value")
+    if settings.referral_hash_salt in _INSECURE_DEFAULTS:
+        issues.append("referral_hash_salt is set to a default value")
     if not issues:
         return
     msg = (
