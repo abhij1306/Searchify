@@ -61,6 +61,7 @@ class ImportSeed:
     property_ref: str
     dataset: str
     metric_row_ids: list[uuid.UUID] = field(default_factory=list)
+    provider: str = INTEGRATION_PROVIDER_GA4
 
 
 async def seed_workspace_project(
@@ -87,13 +88,17 @@ async def seed_ga4_import(
     resync_seq: int = 0,
     property_ref: str = DEFAULT_PROPERTY_REF,
     connection: IntegrationConnection | None = None,
+    provider: str = INTEGRATION_PROVIDER_GA4,
 ) -> ImportSeed:
-    """Seed one GA4 import graph down to a single-page import artifact.
+    """Seed one import graph down to a single-page import artifact.
 
     The sync run is seeded in a TERMINAL status (a completed sync) so a
     re-sync of the same window at a higher ``resync_seq`` never collides
     with the active-window partial unique index. An existing ``connection``
     may be passed to seed a second run/artifact on the same connection.
+    ``provider`` selects the connection/artifact/row provider (GSC rides
+    the same Google grant/transport as GA4) so traffic tests can seed GSC
+    page/query imports with the same helper.
     """
     template = INTEGRATION_DATASET_TEMPLATES[dataset]
     if connection is None:
@@ -110,9 +115,9 @@ async def seed_ga4_import(
         connection = IntegrationConnection(
             workspace_id=workspace_id,
             grant_id=grant.id,
-            provider=INTEGRATION_PROVIDER_GA4,
-            label="ga4 connection",
-            account_ref="ga4-account-1",
+            provider=provider,
+            label=f"{provider} connection",
+            account_ref=f"{provider}-account-1",
         )
         session.add(connection)
         await session.flush()
@@ -134,7 +139,7 @@ async def seed_ga4_import(
         workspace_id=workspace_id,
         sync_run_id=run.id,
         connection_id=connection.id,
-        provider=INTEGRATION_PROVIDER_GA4,
+        provider=provider,
         dataset=dataset,
         query_snapshot={
             "dimensions": list(template.dimensions),
@@ -155,6 +160,7 @@ async def seed_ga4_import(
         artifact_id=artifact.id,
         property_ref=property_ref,
         dataset=dataset,
+        provider=provider,
     )
 
 
@@ -167,12 +173,15 @@ async def seed_metric_row(
     metrics: dict | None = None,
     resync_seq: int = 0,
     dataset: str | None = None,
+    provider: str | None = None,
 ) -> IntegrationMetricRow:
     """Seed one derived metric row under the seed's artifact.
 
     ``dimension_values`` MUST be in the dataset template's declared order
     (date included, per the C1 template); the key is packed by the
     config-owned ``pack_dimension_key`` — never re-implemented here.
+    ``provider`` defaults to the seed's provider so GSC imports seed GSC
+    rows.
     """
     row_dataset = dataset or seed.dataset
     template = INTEGRATION_DATASET_TEMPLATES[row_dataset]
@@ -185,7 +194,7 @@ async def seed_metric_row(
         workspace_id=seed.workspace_id,
         project_id=seed.project_id,
         property_ref=seed.property_ref,
-        provider=INTEGRATION_PROVIDER_GA4,
+        provider=provider or seed.provider,
         dataset=row_dataset,
         date=row_date,
         dimension_key=pack_dimension_key(dimension_values),

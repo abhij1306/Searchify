@@ -6,10 +6,11 @@ call after derivation in I9) over a freshly derived artifact, drain the
 analytics worker, and assert the full chain ran end to end — ingest
 projected the referral events, classify classified them, and both
 window-level refreshes were enqueued (``analytics_snapshot_refresh`` by the
-classify executor, ``traffic_snapshot_refresh`` by the hook itself). The two
-snapshot kinds land in A7/A8, so their rows terminal-fail
-``executor_not_wired`` here — the chain LINKS (enqueue + routing) are what
-this test pins. Requires a real Postgres.
+classify executor, ``traffic_snapshot_refresh`` by the hook itself). The
+``analytics_snapshot_refresh`` kind lands in A8, so its row terminal-fails
+``executor_not_wired`` here; ``traffic_snapshot_refresh`` is wired (A7) and
+succeeds. The chain LINKS (enqueue + routing) are what this test pins.
+Requires a real Postgres.
 """
 
 from __future__ import annotations
@@ -100,8 +101,8 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
 
     worker = AnalyticsWorker(session_factory=session_factory, owner="chain-test")
     # ingest -> classify -> analytics_snapshot_refresh + the hook's
-    # traffic_snapshot_refresh (the two refresh kinds fail not-wired until
-    # A7/A8 — terminal, no retry burn).
+    # traffic_snapshot_refresh (analytics_snapshot_refresh fails not-wired
+    # until A8 — terminal, no retry burn; traffic_snapshot_refresh is wired).
     assert await worker.run_until_idle() == 4
 
     async with session_factory() as session:
@@ -162,8 +163,10 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
             "window_start": DEFAULT_WINDOW[0].isoformat(),
             "window_end": DEFAULT_WINDOW[1].isoformat(),
         }
-        assert traffic_refresh[0].status == TASK_STATUS_FAILED
-        assert traffic_refresh[0].error_code == ERROR_EXECUTOR_NOT_WIRED
+        # Wired in A7: the executor ran (the seeded rows are all
+        # ga4_referrer_daily, which Traffic does not consume — an empty
+        # projection is still a successful refresh).
+        assert traffic_refresh[0].status == TASK_STATUS_SUCCEEDED
 
     # The hook is dedup-safe: re-firing it for the same artifact enqueues
     # nothing (deterministic idempotency keys, invariant 8).

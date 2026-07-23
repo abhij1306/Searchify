@@ -18,8 +18,12 @@ from typing import Final
 # The GA4 dataset ids are OWNED by config/integrations.py (cross-workstream
 # contract C1) and imported here — never re-literalized (invariant 2).
 from app.core.config.integrations import (
+    DATASET_GA4_CHANNEL_DAILY,
+    DATASET_GA4_LANDING_DAILY,
     DATASET_GA4_REFERRER_DAILY,
     DATASET_GA4_SOURCE_MEDIUM_DAILY,
+    DATASET_GSC_PAGE_DAILY,
+    DATASET_GSC_QUERY_DAILY,
 )
 
 # --- Projection window + granularity ----------------------------------------
@@ -56,6 +60,24 @@ TRAFFIC_GA4_ORGANIC_CHANNEL_GROUPS: Final[frozenset[str]] = frozenset(
 # The C1 GA4 referral-dimension datasets the referral ingest (A5) reads.
 TRAFFIC_GA4_REFERRAL_DATASETS: Final[frozenset[str]] = frozenset(
     {DATASET_GA4_REFERRER_DAILY, DATASET_GA4_SOURCE_MEDIUM_DAILY}
+)
+
+# --- Consumed datasets (the snapshot projection's read set, contract C1) -----
+# The dataset ids the ``traffic_snapshot_refresh`` executor reads from
+# ``IntegrationMetricRow`` (A7): the GSC page/query dailies (totals + page /
+# query stats) and the GA4 channel / source-medium / landing dailies (the
+# inclusion rule + page GA4 metrics). ``ga4_referrer_daily`` is OWNED by the
+# A5 referral ingest and deliberately absent — folding it in would
+# double-count the AI sessions already measured via the source-medium
+# dataset.
+TRAFFIC_CONSUMED_DATASETS: Final[frozenset[str]] = frozenset(
+    {
+        DATASET_GSC_PAGE_DAILY,
+        DATASET_GSC_QUERY_DAILY,
+        DATASET_GA4_CHANNEL_DAILY,
+        DATASET_GA4_SOURCE_MEDIUM_DAILY,
+        DATASET_GA4_LANDING_DAILY,
+    }
 )
 
 # --- Sort whitelists (``?sort=`` hits stored aggregates only, invariant 7) ---

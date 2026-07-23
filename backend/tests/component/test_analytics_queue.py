@@ -44,10 +44,10 @@ from app.core.config.task_queue import (
     TASK_STATUS_SUCCEEDED,
 )
 from app.domain.analytics.enqueue import (
+    enqueue_analytics_snapshot_refresh,
     enqueue_ingest_referrals,
     enqueue_post_sync_projections,
     enqueue_referral_retention_sweep,
-    enqueue_traffic_snapshot_refresh,
 )
 from app.models.analytics import AnalyticsTask
 from app.models.integrations import (
@@ -493,7 +493,7 @@ async def test_analytics_worker_unwired_kind_fails_loud(
     async with session_factory() as session:
         workspace_id, project_id = await _seed_workspace_project(session)
     async with session_factory() as session:
-        task_id = await enqueue_traffic_snapshot_refresh(
+        task_id = await enqueue_analytics_snapshot_refresh(
             session,
             workspace_id=workspace_id,
             project_id=project_id,
@@ -503,8 +503,8 @@ async def test_analytics_worker_unwired_kind_fails_loud(
         await session.commit()
     assert task_id is not None
 
-    # A kind whose executor has not landed yet (traffic_snapshot_refresh
-    # lands in A7) maps to the not-wired stub in the dispatch table.
+    # A kind whose executor has not landed yet (analytics_snapshot_refresh
+    # lands in A8) maps to the not-wired stub in the dispatch table.
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
     assert await worker.run_until_idle() == 1
 
