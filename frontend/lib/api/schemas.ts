@@ -1267,6 +1267,319 @@ export const contentGenerationDetailSchema = z
   .strict();
 
 // ---------------------------------------------------------------------------
+// Integrations (GSC / GA4 / Bing), Traffic, and LLM Analytics
+//
+// Contract source: approved plan `/.plans/v1-integrations-traffic-analytics.md`
+// (§2 contracts C2–C4, §5 F1–F3) + specs `docs/roadmap/integrations.md`,
+// `docs/roadmap/traffic.md`, `docs/roadmap/llm-analytics.md`. Every object is
+// `.strict()` so an unexpected key fails loud (drift policy §6). No token field
+// ever appears on a connection DTO — a leaked `access_token` / `refresh_token`
+// is a contract violation that must throw (invariant 6).
+// ---------------------------------------------------------------------------
+
+// Logical integration providers (the surfaces a workspace connects).
+export const integrationProviderSchema = z.enum(['gsc', 'ga4', 'bing']);
+
+// Grant lifecycle (`IntegrationOAuthGrant.status`). `pending_revocation` is
+// disconnect-requested with the remote revoke not yet confirmed (encrypted
+// tokens deliberately retained); `revoked` is fully torn down.
+export const integrationGrantStatusSchema = z.enum([
+  'connected',
+  'needs_reauth',
+  'pending_revocation',
+  'revoked',
+  'error',
+]);
+
+// Why a sync run was enqueued (`IntegrationSyncRun.sync_kind`).
+export const integrationSyncKindSchema = z.enum(['scheduled', 'on_demand', 'backfill']);
+
+// `IntegrationSyncRun` IS a queue row (same shared queue-row contract as
+// `AuditTask` / `SiteCrawlTask` / `ContentGeneration`), so the wire statuses
+// are the queue statuses — the same vocabulary as
+// `siteCrawlTaskStatusSchema` / `contentGenerationStatusSchema`.
+export const integrationSyncRunStatusSchema = z.enum([
+  'queued',
+  'leased',
+  'running',
+  'retry_wait',
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+
+// `GET /integrations` row: a connection joined to its grant's status +
+// granted scopes. Tokens live encrypted on the grant and are NEVER serialized
+// (invariant 6) — any `*_token` key on the wire fails strict validation.
+export const integrationConnectionSchema = z
+  .object({
+    id: uuid(),
+    workspace_id: uuid(),
+    grant_id: uuid(),
+    provider: integrationProviderSchema,
+    label: z.string(),
+    account_ref: z.string(),
+    grant_status: integrationGrantStatusSchema,
+    granted_scopes: z.array(z.string()),
+    last_synced_at: z.string().nullable(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+// The list endpoint returns a bare array of connections (never wrapped).
+export const integrationConnectionListSchema = z.array(integrationConnectionSchema);
+
+// `POST /integrations/{id}/test` — cheap authenticated probe result (status +
+// error_code, never the token). `error_code` is '' on success.
+export const integrationTestResultSchema = z
+  .object({
+    connection_id: uuid(),
+    status: z.string(),
+    error_code: z.string(),
+    detail: z.string(),
+    tested_at: z.string(),
+  })
+  .strict();
+
+// Sync-run history/detail projection (status, window, row counts — invariant
+// 7: a read-only projection of the queue row). `row_count` is the number of
+// imported rows; `error_code` / `error_detail` are '' when there is no error.
+export const integrationSyncRunSchema = z
+  .object({
+    id: uuid(),
+    connection_id: uuid(),
+    sync_kind: integrationSyncKindSchema,
+    status: integrationSyncRunStatusSchema,
+    window_start: z.string(),
+    window_end: z.string(),
+    row_count: z.number().int(),
+    resync_seq: z.number().int(),
+    error_code: z.string(),
+    error_detail: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    completed_at: z.string().nullable(),
+  })
+  .strict();
+
+// `GET /integrations/{id}/syncs` — bare array of run projections.
+export const integrationSyncRunListSchema = z.array(integrationSyncRunSchema);
+
+// 202 enqueue identity (C3) — one per queued run. The frontend polls
+// `GET /integrations/{connection_id}/syncs/{sync_run_id}` until terminal.
+export const integrationSyncEnqueueSchema = z
+  .object({
+    sync_run_id: uuid(),
+    connection_id: uuid(),
+    status: integrationSyncRunStatusSchema,
+  })
+  .strict();
+
+// `POST /projects/{id}/traffic/sync` fans out to every active mapped GSC/GA4
+// connection of the project, so the 202 carries one C3 enqueue object per
+// queued run — a bare array ("{sync_run_id, connection_id, status} per run").
+export const trafficSyncEnqueueResponseSchema = z.array(integrationSyncEnqueueSchema);
+
+// ---------------------------------------------------------------------------
+// Traffic (projection over persisted TrafficSnapshot / stat rows — no
+// read-time recomputation and no provider calls anywhere, invariant 7)
+// ---------------------------------------------------------------------------
+
+// Snapshot bucket granularity shared by the Traffic and LLM Analytics
+// projections (`TrafficSnapshot` / `AnalyticsSnapshot.granularity`).
+export const snapshotGranularitySchema = z.enum(['day', 'week', 'month']);
+
+// One dated point of a metric series. A `null` value is an UNAVAILABLE bucket
+// and renders as a chart gap — never coerced to a misleading zero.
+export const metricSeriesPointSchema = z
+  .object({
+    date: z.string(),
+    value: z.number().nullable(),
+  })
+  .strict();
+
+export const metricSeriesSchema = z.array(metricSeriesPointSchema);
+
+// Window totals. `ctr` / `position` are null when undefined (zero
+// impressions); `sessions` / `conversions` are null when no GA4 connection
+// feeds the window — the frontend never invents a number.
+export const trafficTotalsSchema = z
+  .object({
+    impressions: z.number().int(),
+    clicks: z.number().int(),
+    ctr: z.number().nullable(),
+    position: z.number().nullable(),
+    sessions: z.number().int().nullable(),
+    conversions: z.number().int().nullable(),
+  })
+  .strict();
+
+// `GET /projects/{id}/traffic` — headline projection for the persisted
+// snapshot matching (window, granularity). An absent snapshot yields an empty
+// payload (empty series, zeroed/null totals), never a recomputation.
+export const trafficDashboardSchema = z
+  .object({
+    project_id: uuid(),
+    window_start: z.string(),
+    window_end: z.string(),
+    granularity: snapshotGranularitySchema,
+    totals: trafficTotalsSchema,
+    series: z
+      .object({
+        impressions: metricSeriesSchema,
+        clicks: metricSeriesSchema,
+        ctr: metricSeriesSchema,
+        position: metricSeriesSchema,
+        sessions: metricSeriesSchema,
+        conversions: metricSeriesSchema,
+      })
+      .strict(),
+    formula_version: z.string(),
+    normalization_version: z.string(),
+  })
+  .strict();
+
+// One persisted per-page stat row (`TrafficPageStat`). `site_url_id` is the
+// optional join to the crawled SiteUrl (SET NULL — unmatched pages are still
+// valid measured pages). Metrics carry the same nullability as the totals.
+export const trafficPageRowSchema = z
+  .object({
+    canonical_url: z.string(),
+    site_url_id: uuid().nullable(),
+    impressions: z.number().int(),
+    clicks: z.number().int(),
+    ctr: z.number().nullable(),
+    position: z.number().nullable(),
+    sessions: z.number().int().nullable(),
+    conversions: z.number().int().nullable(),
+  })
+  .strict();
+
+// One persisted per-query stat row (`TrafficQueryStat`; the key is the
+// normalized query string — NFKC/casefold/whitespace at projection time).
+export const trafficQueryRowSchema = z
+  .object({
+    normalized_query: z.string(),
+    impressions: z.number().int(),
+    clicks: z.number().int(),
+    ctr: z.number().nullable(),
+    position: z.number().nullable(),
+  })
+  .strict();
+
+// Keyset envelopes (C4) — the site-health cursor-page convention.
+export const trafficPagesPageSchema = cursorPageSchema(trafficPageRowSchema);
+export const trafficQueriesPageSchema = cursorPageSchema(trafficQueryRowSchema);
+
+// ---------------------------------------------------------------------------
+// LLM Analytics (projection over ReferralClassification + MetricSnapshot —
+// deterministic only, no LLM in any metric, invariant 9)
+// ---------------------------------------------------------------------------
+
+// AI-referral source vocabulary (config-owned rule table on the backend).
+export const aiSourceSchema = z.enum([
+  'chatgpt',
+  'gemini',
+  'claude',
+  'perplexity',
+  'copilot',
+  'google_ai_overview',
+  'other',
+]);
+
+// Deterministic confidence bucket + which signal fired the matched rule
+// (fixed referrer → utm → user_agent priority).
+export const referralConfidenceSchema = z.enum(['exact', 'heuristic']);
+export const referralMatchSignalSchema = z.enum(['referrer', 'utm', 'user_agent']);
+
+// Visibility ↔ referral correlation summary. Below the minimum aligned-sample
+// size the backend reports `insufficient_data` with a NULL coefficient —
+// never a fabricated number (invariant 9). The UI renders `—` for that state.
+export const analyticsCorrelationSchema = z
+  .object({
+    state: z.enum(['ok', 'insufficient_data']),
+    coefficient: z.number().nullable(),
+    sample_size: z.number().int(),
+  })
+  .strict();
+
+// Per-`ai_source` referral breakdown row.
+export const analyticsSourceBreakdownRowSchema = z
+  .object({
+    ai_source: aiSourceSchema,
+    sessions: z.number().int(),
+    share: z.number().nullable(),
+  })
+  .strict();
+
+// Per-engine visibility series (folded from persisted MetricSnapshot rows;
+// `logical_engine` is the audited engine vocabulary, invariant 10).
+export const analyticsEngineVisibilitySchema = z
+  .object({
+    logical_engine: z.string(),
+    series: metricSeriesSchema,
+  })
+  .strict();
+
+// `GET /projects/{id}/llm-analytics` — headline AEO Insights projection:
+// referral volume/share series, per-source breakdown, per-engine visibility
+// series, and the correlation summary. Empty history → empty payload.
+export const llmAnalyticsSchema = z
+  .object({
+    project_id: uuid(),
+    window_start: z.string(),
+    window_end: z.string(),
+    granularity: snapshotGranularitySchema,
+    referral_volume: metricSeriesSchema,
+    referral_share: metricSeriesSchema,
+    sources: z.array(analyticsSourceBreakdownRowSchema),
+    engine_visibility: z.array(analyticsEngineVisibilitySchema),
+    correlation: analyticsCorrelationSchema,
+    analyzer_version: z.string(),
+    formula_version: z.string(),
+  })
+  .strict();
+
+// One classified referral drill-down row (ReferralClassification joined to
+// its ReferralEvent). URLs/UA are sanitized before persistence on the
+// backend; `logical_engine` is null when the source has no audited-engine
+// mapping, and `match_signal` is null when no rule fired (non-AI referral).
+export const analyticsReferralRowSchema = z
+  .object({
+    id: uuid(),
+    occurred_at: z.string(),
+    landing_url: z.string(),
+    referrer_host: z.string().nullable(),
+    is_ai_referral: z.boolean(),
+    ai_source: aiSourceSchema,
+    logical_engine: z.string().nullable(),
+    confidence: referralConfidenceSchema,
+    match_signal: referralMatchSignalSchema.nullable(),
+  })
+  .strict();
+
+// Keyset envelope (C4) for the referrals drill-down.
+export const analyticsReferralsPageSchema = cursorPageSchema(analyticsReferralRowSchema);
+
+// One theme-level visibility rollup row (grouped by the frozen
+// theme/intent of the audited prompts). Rates/score are null when the
+// underlying metric is absent (no fabricated numbers).
+export const llmAnalyticsThemeRowSchema = z
+  .object({
+    theme: z.string(),
+    intent: promptIntentSchema,
+    total_completed: z.number().int(),
+    brand_mention_rate: z.number().nullable(),
+    visibility_score: z.number().nullable(),
+    share_of_voice: z.number().nullable(),
+  })
+  .strict();
+
+// `GET /projects/{id}/llm-analytics/themes` — bare array of rollup rows.
+export const llmAnalyticsThemeListSchema = z.array(llmAnalyticsThemeRowSchema);
+
+// ---------------------------------------------------------------------------
 // strictValidate — fail loud on any schema drift (drift policy §6)
 // ---------------------------------------------------------------------------
 

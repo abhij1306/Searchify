@@ -391,4 +391,29 @@ describe('TrendChart (cross-run Visibility trend)', () => {
     expect(chart.querySelector('path.stroke-accent')).toBeNull();
     expect(chart.querySelector('.fill-accent-soft')).toBeNull();
   });
+
+  it('scales count metrics against a custom domainMax instead of clamping to 100', () => {
+    const data = [
+      { label: 'Jun', value: 250 },
+      { label: 'Jul', value: 500 },
+    ];
+    const { unmount } = render(<TrendChart label="Clicks trend" data={data} domainMax={500} />);
+    let chart = screen.getByRole('img', {
+      name: 'Clicks trend: Trend from Jun (250) to Jul (500)',
+    });
+    let dots = chart.querySelectorAll('circle.fill-accent');
+    // height 120, padding 8 → innerHeight 104: 250/500 → y=60, 500/500 → y=8.
+    expect(dots[0]).toHaveAttribute('cy', '60');
+    expect(dots[1]).toHaveAttribute('cy', '8');
+    unmount();
+
+    // Default domain (100) is unchanged: the same counts clamp to the top.
+    render(<TrendChart label="Clicks trend" data={data} />);
+    chart = screen.getByRole('img', {
+      name: 'Clicks trend: Trend from Jun (250) to Jul (500)',
+    });
+    dots = chart.querySelectorAll('circle.fill-accent');
+    expect(dots[0]).toHaveAttribute('cy', '8');
+    expect(dots[1]).toHaveAttribute('cy', '8');
+  });
 });

@@ -35,8 +35,10 @@ const valueText = (v: number | null) => (v === null ? 'unavailable' : `${v}`);
  * the design system.
  *
  * Behavior:
- *   - Deterministic 0–100 Y scaling (a Visibility Score / percentage is already
- *     0–100), independent of the data's own max, so two charts are comparable.
+ *   - Deterministic fixed-domain Y scaling (default 0–100: a Visibility Score /
+ *     percentage is already on that scale), independent of the data's own max,
+ *     so two charts are comparable. Pass `domainMax` to scale count metrics
+ *     (impressions, clicks, sessions) truthfully instead of clamping them.
  *   - Valid empty rendering (no points) and single-point rendering (a lone dot,
  *     no misleading slope).
  *   - UNAVAILABLE points (`value: null`) become gaps: the line/area path splits
@@ -51,29 +53,38 @@ export function TrendChart({
   height = 120,
   label,
   className,
+  domainMax = 100,
 }: Readonly<{
   data: TrendPoint[];
   width?: number;
   height?: number;
   label?: string;
   className?: string;
+  /**
+   * Top of the Y domain (default 100 — the percentage / Visibility Score
+   * scale). Values above it are clamped; must be positive (a non-positive
+   * value falls back to the default so the chart can never divide by zero).
+   */
+  domainMax?: number;
 }>) {
   const padding = 8;
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
 
-  // Deterministic 0–100 domain: a percentage / Visibility Score is already on
-  // that scale, so we never rescale to the data's own max (keeps charts
-  // comparable and single points positioned truthfully).
-  const DOMAIN_MAX = 100;
-  const clamp = (v: number) => Math.max(0, Math.min(DOMAIN_MAX, v));
+  // Deterministic fixed domain: we never rescale to the data's own max (keeps
+  // charts comparable and single points positioned truthfully). The default
+  // 0–100 scale fits percentages / Visibility Scores; count metrics pass a
+  // larger `domainMax`.
+  const effectiveDomainMax = domainMax > 0 ? domainMax : 100;
+  const clamp = (v: number) => Math.max(0, Math.min(effectiveDomainMax, v));
   const stepX = data.length > 1 ? innerWidth / (data.length - 1) : 0;
 
   // Geometry per point. A null value has no y (it is a gap): its x is still
   // reserved so the axis stays evenly spaced.
   const points = data.map((d, i) => {
     const x = data.length > 1 ? padding + i * stepX : width / 2;
-    const y = d.value === null ? null : padding + innerHeight * (1 - clamp(d.value) / DOMAIN_MAX);
+    const y =
+      d.value === null ? null : padding + innerHeight * (1 - clamp(d.value) / effectiveDomainMax);
     return { x, y, value: d.value };
   });
 
