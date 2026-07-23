@@ -186,6 +186,9 @@ ERROR_OAUTH_NOT_CONFIGURED: Final = "oauth_not_configured"
 # partial active-window index rejected a duplicate in-flight run (409).
 ERROR_SYNC_WINDOW_INVALID: Final = "sync_window_invalid"
 ERROR_SYNC_ACTIVE_WINDOW_CONFLICT: Final = "sync_active_window_conflict"
+# Sync worker (I6): a fetched page exceeded the inline-payload cap — the
+# payload is rejected, never truncated (see ``max_inline_payload_bytes``).
+ERROR_PAYLOAD_TOO_LARGE: Final = "payload_too_large"
 # Property-mapping writes (I8): provider != the referenced connection's
 # provider (422), the property does not resolve to one of the project's
 # owned domains (422), and the (workspace, provider, property_ref) slot
@@ -320,9 +323,17 @@ class IntegrationSettings(BaseSettings):
     # --- Queue lease/heartbeat -------------------------------------------------
     lease_ttl_seconds: float = Field(default=120.0, gt=0)
     heartbeat_interval_seconds: float = Field(default=30.0, gt=0)
+    # Worker loop idle sleep (content/site-health poll knob analogue).
+    poll_interval_seconds: float = Field(default=1.0, gt=0)
+    # Retry backoff for retryable provider/refresh failures (I6).
+    retry_base_delay_seconds: float = Field(default=30.0, gt=0)
+    retry_max_delay_seconds: float = Field(default=900.0, gt=0)
 
-    # --- OAuth state nonce lifetime --------------------------------------------
+    # --- OAuth state nonce lifetime + token refresh ----------------------------
     state_ttl_seconds: int = Field(default=600, gt=0)
+    # An access token expiring within this skew counts as near-expiry and is
+    # refreshed (serialized per grant, spec section 2) before provider I/O.
+    token_refresh_skew_seconds: float = Field(default=300.0, ge=0)
 
     # --- Import payload cap ------------------------------------------------------
     # Payloads are inline JSONB this pass (S3 offload keyed by payload_hash is
@@ -351,6 +362,10 @@ class IntegrationSettings(BaseSettings):
                 "sync_late_data_revision_days must not exceed "
                 "sync_backfill_max_days"
             )
+        if self.retry_max_delay_seconds < self.retry_base_delay_seconds:
+            raise ValueError(
+                "retry_max_delay_seconds must not be below retry_base_delay_seconds"
+            )
         return self
 
     def requests_per_minute(self, provider: str) -> int:
@@ -358,6 +373,16 @@ class IntegrationSettings(BaseSettings):
         if provider not in INTEGRATION_PROVIDERS:
             raise ValueError(f"unknown integration provider: {provider!r}")
         return getattr(self, f"{provider}_requests_per_minute")
+
+    def retry_delay(
+        self, attempt: int, retry_after_seconds: float | None = None
+    ) -> float:
+        """Seconds before the next attempt: Retry-After if advised, else
+        deterministic exponential backoff capped at the max (no RNG)."""
+        cap = self.retry_max_delay_seconds
+        if retry_after_seconds is not None:
+            return min(retry_after_seconds, cap)
+        return min(self.retry_base_delay_seconds * (2 ** max(0, attempt - 1)), cap)
 
 
 integration_settings = IntegrationSettings()
@@ -391,3 +416,28 @@ INTEGRATION_QUEUE_SPEC: Final[PostgresQueueSpec[IntegrationSyncRun]] = (
         max_attempts_error=ERROR_MAX_ATTEMPTS,
     )
 )
+
+
+def unpack_dimension_key(dataset: str, dimension_key: str) -> tuple[str, ...] | None:
+    """Inverse of ``pack_dimension_key`` for one dataset's declared template.
+
+    This module owns the ``dimension_key`` packing format (contract C1,
+    invariant 2), so the UNPACK lives here too. The key is split from the
+    RIGHT against the template's declared arity, peeling the always-trailing
+    ``date`` value without breaking on a ``" | "`` inside a free-form
+    leading value (e.g. a ``fullReferrer``/page URL). Returns the FULL
+    tuple in declared dimension order (the trailing element is the
+    provider's date value; the parsed date already lives on the metric
+    row), or ``None`` when the dataset is unknown or the key does not
+    unpack into the declared arity — an un-mappable key is skipped by the
+    caller, never guessed.
+    """
+    template = INTEGRATION_DATASET_TEMPLATES.get(dataset)
+    if template is None:
+        return None
+    parts = dimension_key.rsplit(
+        DIMENSION_KEY_SEPARATOR, len(template.dimensions) - 1
+    )
+    if len(parts) != len(template.dimensions):
+        return None
+    return tuple(parts)

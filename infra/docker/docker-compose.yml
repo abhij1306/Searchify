@@ -154,5 +154,45 @@ services:
     healthcheck:
       disable: true
 
+  # Integrations sync worker: claims integration_sync_runs queue rows, pages
+  # the provider data APIs (GSC/GA4/Bing) with the grant's OAuth token, and
+  # writes immutable import artifacts + derived metric rows.
+  integration-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.integration_worker"]
+    healthcheck:
+      disable: true
+
+  # Integrations dispatcher: the one-owner periodic scheduler — enqueues a
+  # scheduled sync run per active connection per cadence (deduped by the
+  # active-window index) and retries pending_revocation grant revokes.
+  integration-dispatcher:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *backend_env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.integration_dispatcher"]
+    healthcheck:
+      disable: true
+
 volumes:
   pg_data:
