@@ -16,12 +16,11 @@
 # persisted rows (invariant 7), so this worker takes no transport; the test
 # seam is the executor mapping override instead.
 #
-# A3 SCOPE: this is the queue-spine SKELETON. The dispatch table maps every
-# kind to a not-yet-wired stub that raises ``ExecutorNotWiredError`` (stamped
-# as terminal ``executor_not_wired``, never retried); A5 (ingest_referrals),
-# A6 (classify_referrals, referral_retention_sweep), A7
-# (traffic_snapshot_refresh) and A8 (analytics_snapshot_refresh) replace the
-# stubs with the real executors.
+# DISPATCH TABLE: kinds without a landed executor map to a stub that raises
+# ``ExecutorNotWiredError`` (stamped as terminal ``executor_not_wired``,
+# never retried). A5 wired ``ingest_referrals``; A6 (classify_referrals,
+# referral_retention_sweep), A7 (traffic_snapshot_refresh) and A8
+# (analytics_snapshot_refresh) replace the remaining stubs as they land.
 from __future__ import annotations
 
 import asyncio
@@ -52,6 +51,7 @@ from app.core.config.task_queue import (
 )
 from app.core.database import SessionLocal
 from app.core.telemetry import configure_logging
+from app.domain.analytics.ingest import ingest_referrals
 from app.models.analytics import AnalyticsTask
 from app.orchestration.postgres_task_queue import PostgresTaskQueue
 
@@ -78,7 +78,7 @@ type AnalyticsExecutor = Callable[
 async def _executor_not_wired(
     session_factory: async_sessionmaker[AsyncSession], task: AnalyticsTask
 ) -> None:
-    # TODO(A5/A6/A7/A8): those tasks register the real executor for this kind
+    # TODO(A6/A7/A8): those tasks register the real executor for this kind
     # in ``EXECUTORS`` below; until then every claimed row fails loud.
     raise ExecutorNotWiredError(
         f"analytics task kind {task.task_kind!r} has no registered executor"
@@ -86,10 +86,10 @@ async def _executor_not_wired(
 
 
 # Kind dispatch table (invariant 2: one owner of kind -> executor routing).
-# A3 maps every kind to the not-wired stub; A5/A6/A7/A8 substitute the real
-# executors as they land.
+# Each executor-landing task substitutes its real executor for the stub on
+# its own line: A5 wired ingest_referrals; A6/A7/A8 wire the rest.
 EXECUTORS: dict[str, AnalyticsExecutor] = {
-    ANALYTICS_TASK_KIND_INGEST_REFERRALS: _executor_not_wired,
+    ANALYTICS_TASK_KIND_INGEST_REFERRALS: ingest_referrals,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS: _executor_not_wired,
     ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH: _executor_not_wired,
     ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH: _executor_not_wired,

@@ -14,7 +14,12 @@ from app.models.analysis import (
     MetricSnapshot,
     ResponseAnalysis,
 )
-from app.models.analytics import AnalyticsTask
+from app.models.analytics import (
+    AnalyticsSnapshot,
+    AnalyticsTask,
+    ReferralClassification,
+    ReferralEvent,
+)
 from app.models.audit import (
     Audit,
     AuditEngineSnapshot,
@@ -74,6 +79,7 @@ from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
 __all__ = [
+    "AnalyticsSnapshot",
     "AnalyticsTask",
     "Audit",
     "AuditEngineSnapshot",
@@ -110,6 +116,8 @@ __all__ = [
     "ProviderConnectionTest",
     "ProviderRoute",
     "RawResponseArtifact",
+    "ReferralClassification",
+    "ReferralEvent",
     "ResponseAnalysis",
     "MonitoredSiteUrl",
     "SiteCrawl",

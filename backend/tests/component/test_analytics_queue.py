@@ -44,6 +44,7 @@ from app.core.config.task_queue import (
     TASK_STATUS_SUCCEEDED,
 )
 from app.domain.analytics.enqueue import (
+    enqueue_classify_referrals,
     enqueue_ingest_referrals,
     enqueue_post_sync_projections,
     enqueue_referral_retention_sweep,
@@ -492,7 +493,7 @@ async def test_analytics_worker_unwired_kind_fails_loud(
     async with session_factory() as session:
         workspace_id, project_id = await _seed_workspace_project(session)
     async with session_factory() as session:
-        task_id = await enqueue_ingest_referrals(
+        task_id = await enqueue_classify_referrals(
             session,
             workspace_id=workspace_id,
             project_id=project_id,
@@ -501,7 +502,8 @@ async def test_analytics_worker_unwired_kind_fails_loud(
         await session.commit()
     assert task_id is not None
 
-    # The A3 skeleton dispatch table maps every kind to the not-wired stub.
+    # A kind whose executor has not landed yet (classify_referrals lands in
+    # A6) maps to the not-wired stub in the dispatch table.
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
     assert await worker.run_until_idle() == 1
 
