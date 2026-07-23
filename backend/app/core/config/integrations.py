@@ -99,6 +99,10 @@ GSC_API_BASE_URL: Final = "https://www.googleapis.com"
 GSC_SEARCH_ANALYTICS_PATH: Final = (
     "/webmasters/v3/sites/{property_ref}/searchAnalytics/query"
 )
+# GSC domain-wide property refs carry this provider literal prefix
+# ("sc-domain:example.com"); URL-prefix properties are plain URLs. Used by
+# the mapping service to resolve a property ref to its bare host.
+GSC_DOMAIN_PROPERTY_PREFIX: Final = "sc-domain:"
 GA4_API_BASE_URL: Final = "https://analyticsdata.googleapis.com"
 GA4_RUN_REPORT_PATH: Final = "/v1beta/properties/{property_ref}:runReport"
 # Bing Webmaster API host/path literals are pinned from Microsoft docs at I12
@@ -178,6 +182,17 @@ ERROR_GRANT_AUTH_FAILED: Final = "grant_auth_failed"
 ERROR_OAUTH_STATE_INVALID: Final = "oauth_state_invalid"
 ERROR_OAUTH_EXCHANGE_FAILED: Final = "oauth_exchange_failed"
 ERROR_OAUTH_NOT_CONFIGURED: Final = "oauth_not_configured"
+# Sync enqueue (I5/I7): the window body failed validation (422) and the
+# partial active-window index rejected a duplicate in-flight run (409).
+ERROR_SYNC_WINDOW_INVALID: Final = "sync_window_invalid"
+ERROR_SYNC_ACTIVE_WINDOW_CONFLICT: Final = "sync_active_window_conflict"
+# Property-mapping writes (I8): provider != the referenced connection's
+# provider (422), the property does not resolve to one of the project's
+# owned domains (422), and the (workspace, provider, property_ref) slot
+# already has an ACTIVE owner (409).
+ERROR_MAPPING_PROVIDER_MISMATCH: Final = "mapping_provider_mismatch"
+ERROR_MAPPING_PROPERTY_NOT_OWNED: Final = "mapping_property_not_owned"
+ERROR_MAPPING_ACTIVE_OWNER_CONFLICT: Final = "mapping_active_owner_conflict"
 
 # --- Versioning ----------------------------------------------------------------
 # Versions the artifact -> IntegrationMetricRow transform code (NOT the data
@@ -297,6 +312,10 @@ class IntegrationSettings(BaseSettings):
     sync_page_size: int = Field(default=25000, gt=0)
     sync_request_timeout_seconds: float = Field(default=60.0, gt=0)
     sync_max_attempts: int = Field(default=4, gt=0)
+    # Upper bound on resync_seq allocation retries after a unique conflict.
+    # The connection-row FOR UPDATE lock makes a collision practically
+    # unreachable; the bound guarantees the allocation loop terminates.
+    sync_resync_alloc_max_attempts: int = Field(default=8, gt=0)
 
     # --- Queue lease/heartbeat -------------------------------------------------
     lease_ttl_seconds: float = Field(default=120.0, gt=0)

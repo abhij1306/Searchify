@@ -25,17 +25,37 @@ from app.api.deps import (
     require_active_workspace,
 )
 from app.core.config.integrations import (
+    ERROR_MAPPING_ACTIVE_OWNER_CONFLICT,
+    ERROR_MAPPING_PROPERTY_NOT_OWNED,
+    ERROR_MAPPING_PROVIDER_MISMATCH,
     ERROR_OAUTH_EXCHANGE_FAILED,
     ERROR_OAUTH_NOT_CONFIGURED,
     ERROR_OAUTH_STATE_INVALID,
+    ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+    ERROR_SYNC_WINDOW_INVALID,
     INTEGRATION_OAUTH_CALLBACK_PATH,
     INTEGRATION_OAUTH_LANDING_PATH,
     INTEGRATION_PROVIDERS,
+    SYNC_KIND_ON_DEMAND,
 )
 from app.core.http_errors import raise_not_found
+from app.domain.integrations.mappings import (
+    MappingActiveOwnerConflictError,
+    MappingNotFoundError,
+    MappingPropertyNotOwnedError,
+    MappingProviderMismatchError,
+    create_mapping,
+    disable_mapping,
+    list_mappings,
+)
 from app.domain.integrations.schemas import (
     IntegrationConnectionResponse,
+    IntegrationPropertyMappingCreate,
+    IntegrationPropertyMappingResponse,
+    IntegrationSyncEnqueueResponse,
+    IntegrationSyncRunResponse,
     IntegrationTestResponse,
+    SyncWindowRequest,
 )
 from app.domain.integrations.service import (
     IntegrationConnectionNotFoundError,
@@ -48,6 +68,15 @@ from app.domain.integrations.service import (
     run_connection_test,
     start_connect,
 )
+from app.domain.integrations.sync import (
+    ActiveWindowConflictError,
+    SyncRunNotFoundError,
+    SyncWindowInvalidError,
+    enqueue_sync_run,
+    get_sync_run,
+    list_sync_runs,
+)
+from app.domain.projects.service import ProjectNotFoundError
 from app.models.user import User
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
@@ -58,6 +87,9 @@ _SessionDep = Annotated[AsyncSession, Depends(get_db)]
 
 _RES_PROVIDER = "Integration provider"
 _RES_CONNECTION = "Integration connection"
+_RES_SYNC_RUN = "Integration sync run"
+_RES_MAPPING = "Integration property mapping"
+_RES_PROJECT = "Project"
 
 
 def _require_known_provider(provider: str) -> None:
@@ -177,3 +209,170 @@ async def delete_integration_endpoint(
         )
     except IntegrationConnectionNotFoundError as exc:
         raise_not_found(_RES_CONNECTION, cause=exc)
+
+
+# --- Sync runs (spec §5: enqueue 202 / history + detail projections) ----------
+
+
+@router.post(
+    "/{connection_id}/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=IntegrationSyncEnqueueResponse,
+)
+async def enqueue_sync_endpoint(
+    connection_id: uuid.UUID,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+    payload: SyncWindowRequest | None = None,
+) -> IntegrationSyncEnqueueResponse:
+    """Enqueue an on-demand sync run (202 + the run identity, contract C3).
+
+    No body → the config default trailing window; an explicit window body is
+    validated and clamped to the backfill budget. A run for the same window
+    that is still active is a 409 (spec §5); a completed window re-syncs
+    with a bumped ``resync_seq``.
+    """
+    try:
+        run = await enqueue_sync_run(
+            session,
+            workspace_id=ctx.workspace_id,
+            connection_id=connection_id,
+            sync_kind=SYNC_KIND_ON_DEMAND,
+            window_start=payload.window_start if payload else None,
+            window_end=payload.window_end if payload else None,
+        )
+    except IntegrationConnectionNotFoundError as exc:
+        raise_not_found(_RES_CONNECTION, cause=exc)
+    except SyncWindowInvalidError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=ERROR_SYNC_WINDOW_INVALID,
+        ) from exc
+    except ActiveWindowConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+        ) from exc
+    return IntegrationSyncEnqueueResponse(
+        sync_run_id=run.id, connection_id=run.connection_id, status=run.status
+    )
+
+
+@router.get(
+    "/{connection_id}/syncs",
+    response_model=list[IntegrationSyncRunResponse],
+)
+async def list_syncs_endpoint(
+    connection_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> list[IntegrationSyncRunResponse]:
+    """Sync-run history for the connection (projection only, invariant 7)."""
+    try:
+        return await list_sync_runs(
+            session, workspace_id=ctx.workspace_id, connection_id=connection_id
+        )
+    except IntegrationConnectionNotFoundError as exc:
+        raise_not_found(_RES_CONNECTION, cause=exc)
+
+
+@router.get(
+    "/{connection_id}/syncs/{sync_run_id}",
+    response_model=IntegrationSyncRunResponse,
+)
+async def get_sync_endpoint(
+    connection_id: uuid.UUID,
+    sync_run_id: uuid.UUID,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> IntegrationSyncRunResponse:
+    """One sync run's detail projection (the poll target after a 202)."""
+    try:
+        return await get_sync_run(
+            session,
+            workspace_id=ctx.workspace_id,
+            connection_id=connection_id,
+            sync_run_id=sync_run_id,
+        )
+    except IntegrationConnectionNotFoundError as exc:
+        raise_not_found(_RES_CONNECTION, cause=exc)
+    except SyncRunNotFoundError as exc:
+        raise_not_found(_RES_SYNC_RUN, cause=exc)
+
+
+# --- Property mappings (spec §3: the property→project bridge) -----------------
+
+
+@router.get(
+    "/{connection_id}/mappings",
+    response_model=list[IntegrationPropertyMappingResponse],
+)
+async def list_mappings_endpoint(
+    connection_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> list[IntegrationPropertyMappingResponse]:
+    """List the connection's property mappings (any status)."""
+    try:
+        return await list_mappings(
+            session, workspace_id=ctx.workspace_id, connection_id=connection_id
+        )
+    except IntegrationConnectionNotFoundError as exc:
+        raise_not_found(_RES_CONNECTION, cause=exc)
+
+
+@router.post(
+    "/{connection_id}/mappings",
+    status_code=status.HTTP_201_CREATED,
+    response_model=IntegrationPropertyMappingResponse,
+)
+async def create_mapping_endpoint(
+    connection_id: uuid.UUID,
+    payload: IntegrationPropertyMappingCreate,
+    ctx: _WorkspaceDep,
+    session: _SessionDep,
+) -> IntegrationPropertyMappingResponse:
+    """Create one ACTIVE property→project mapping (write-time validated).
+
+    404 for a cross-workspace connection/project (invariant 5); 422 when the
+    provider mismatches the connection or the property does not resolve to
+    one of the project's owned domains; 409 when the
+    ``(workspace, provider, property_ref)`` slot already has an active owner.
+    """
+    try:
+        return await create_mapping(
+            session,
+            workspace_id=ctx.workspace_id,
+            connection_id=connection_id,
+            provider=payload.provider,
+            property_ref=payload.property_ref,
+            project_id=payload.project_id,
+        )
+    except IntegrationConnectionNotFoundError as exc:
+        raise_not_found(_RES_CONNECTION, cause=exc)
+    except ProjectNotFoundError as exc:
+        raise_not_found(_RES_PROJECT, cause=exc)
+    except MappingProviderMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=ERROR_MAPPING_PROVIDER_MISMATCH,
+        ) from exc
+    except MappingPropertyNotOwnedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=ERROR_MAPPING_PROPERTY_NOT_OWNED,
+        ) from exc
+    except MappingActiveOwnerConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=ERROR_MAPPING_ACTIVE_OWNER_CONFLICT,
+        ) from exc
+
+
+@router.delete("/mappings/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def disable_mapping_endpoint(
+    mapping_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
+) -> None:
+    """Disable a mapping (a status flip, never a row delete)."""
+    try:
+        await disable_mapping(
+            session, workspace_id=ctx.workspace_id, mapping_id=mapping_id
+        )
+    except MappingNotFoundError as exc:
+        raise_not_found(_RES_MAPPING, cause=exc)
