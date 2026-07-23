@@ -13,6 +13,7 @@ from app.api.auth import router as auth_router
 from app.api.brand_suggestions import router as brand_suggestions_router
 from app.api.content import router as content_router
 from app.api.executions import router as executions_router
+from app.api.integrations import router as integrations_router
 from app.api.oauth import router as oauth_router
 from app.api.projects import router as projects_router
 from app.api.prompts import router as prompts_router
@@ -67,6 +68,7 @@ _ROUTERS = (
     executions_router,
     site_health_router,
     content_router,
+    integrations_router,
 )
 
 

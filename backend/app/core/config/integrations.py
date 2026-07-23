@@ -154,6 +154,12 @@ EVENT_INTEGRATION_SYNC_STARTED: Final = "integration.sync_started"
 EVENT_INTEGRATION_SYNC_FINISHED: Final = "integration.sync_finished"
 EVENT_INTEGRATION_REAUTH_REQUIRED: Final = "integration.reauth_required"
 EVENT_INTEGRATION_REVOKED: Final = "integration.revoked"
+# A connection was removed while its shared grant stays live for the
+# remaining connections (no remote revoke — spec section 5).
+EVENT_INTEGRATION_DISCONNECTED: Final = "integration.disconnected"
+# The remote revoke of the LAST connection's grant failed: tokens are
+# retained and the grant moves to ``pending_revocation`` for a later retry.
+EVENT_INTEGRATION_REVOKE_FAILED: Final = "integration.revoke_failed"
 
 # --- Error tokens --------------------------------------------------------------
 # The queue-level ``max_attempts_exceeded`` token stays shared in
@@ -164,6 +170,14 @@ ERROR_TOKEN_REFRESH_FAILED: Final = "token_refresh_failed"
 ERROR_PROVIDER_API: Final = "provider_api_error"
 ERROR_RATE_LIMITED: Final = "rate_limited"
 ERROR_UNAPPROVED_ENDPOINT: Final = "unapproved_endpoint"
+# A probe/exchange was rejected by the provider as unauthorized (HTTP
+# 401/403): the grant token no longer validates.
+ERROR_GRANT_AUTH_FAILED: Final = "grant_auth_failed"
+# OAuth connect-flow callback codes (the ``error=<code>`` query param of the
+# contract-C2 302 landing on /settings?tab=integrations).
+ERROR_OAUTH_STATE_INVALID: Final = "oauth_state_invalid"
+ERROR_OAUTH_EXCHANGE_FAILED: Final = "oauth_exchange_failed"
+ERROR_OAUTH_NOT_CONFIGURED: Final = "oauth_not_configured"
 
 # --- Versioning ----------------------------------------------------------------
 # Versions the artifact -> IntegrationMetricRow transform code (NOT the data
