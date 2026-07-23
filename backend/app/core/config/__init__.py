@@ -72,6 +72,37 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ENCRYPTION_KEY", "encryption_key"),
     )
 
+    # --- Integrations OAuth client credentials (GSC/GA4/Bing connect) ---
+    # Env-injected deployment secrets for the integrations OAuth transports
+    # (Google covers GSC+GA4 on one shared grant; Microsoft covers Bing).
+    # Resolved only inside the OAuth exchange/refresh paths; never logged and
+    # never placed in a DTO (invariant 6). Empty = provider not configured.
+    integration_google_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_GOOGLE_CLIENT_ID", "integration_google_client_id"
+        ),
+    )
+    integration_google_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_GOOGLE_CLIENT_SECRET", "integration_google_client_secret"
+        ),
+    )
+    integration_microsoft_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_MICROSOFT_CLIENT_ID", "integration_microsoft_client_id"
+        ),
+    )
+    integration_microsoft_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_MICROSOFT_CLIENT_SECRET",
+            "integration_microsoft_client_secret",
+        ),
+    )
+
     # --- Database ---
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/searchify",

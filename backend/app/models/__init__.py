@@ -33,6 +33,16 @@ from app.models.brand import (
     UnintendedDomain,
 )
 from app.models.content import ContentGeneration, ContentGenerationAttempt
+from app.models.integrations import (
+    IntegrationConnection,
+    IntegrationEvent,
+    IntegrationImportArtifact,
+    IntegrationMetricRow,
+    IntegrationOAuthGrant,
+    IntegrationOAuthState,
+    IntegrationPropertyMapping,
+    IntegrationSyncRun,
+)
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
@@ -79,6 +89,14 @@ __all__ = [
     "ContentGeneration",
     "ContentGenerationAttempt",
     "DiscoveryModelConfig",
+    "IntegrationConnection",
+    "IntegrationEvent",
+    "IntegrationImportArtifact",
+    "IntegrationMetricRow",
+    "IntegrationOAuthGrant",
+    "IntegrationOAuthState",
+    "IntegrationPropertyMapping",
+    "IntegrationSyncRun",
     "MetricSnapshot",
     "OwnedDomain",
     "Project",
