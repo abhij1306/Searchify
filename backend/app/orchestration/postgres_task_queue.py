@@ -38,6 +38,7 @@ from app.core.config.task_queue import (
 if TYPE_CHECKING:
     # Type-only: the queue is generic over the concrete queue-row models (the
     # ``PostgresQueueSpec`` constraint); nothing here imports them at runtime.
+    from app.models.analytics import AnalyticsTask
     from app.models.audit import AuditTask
     from app.models.content import ContentGeneration
     from app.models.integrations import IntegrationSyncRun
@@ -51,7 +52,13 @@ def _utcnow() -> datetime:
 
 
 class PostgresTaskQueue[
-    T: ("AuditTask", "SiteCrawlTask", "ContentGeneration", "IntegrationSyncRun")
+    T: (
+        "AuditTask",
+        "SiteCrawlTask",
+        "ContentGeneration",
+        "IntegrationSyncRun",
+        "AnalyticsTask",
+    )
 ]:
     """``TaskQueue[T]`` backed by Postgres ``FOR UPDATE SKIP LOCKED``.
 

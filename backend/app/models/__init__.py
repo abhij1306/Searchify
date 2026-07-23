@@ -14,6 +14,7 @@ from app.models.analysis import (
     MetricSnapshot,
     ResponseAnalysis,
 )
+from app.models.analytics import AnalyticsTask
 from app.models.audit import (
     Audit,
     AuditEngineSnapshot,
@@ -73,6 +74,7 @@ from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
 __all__ = [
+    "AnalyticsTask",
     "Audit",
     "AuditEngineSnapshot",
     "AuditEvent",
