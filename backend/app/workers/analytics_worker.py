@@ -18,9 +18,10 @@
 #
 # DISPATCH TABLE: kinds without a landed executor map to a stub that raises
 # ``ExecutorNotWiredError`` (stamped as terminal ``executor_not_wired``,
-# never retried). A5 wired ``ingest_referrals``; A6 (classify_referrals,
-# referral_retention_sweep), A7 (traffic_snapshot_refresh) and A8
-# (analytics_snapshot_refresh) replace the remaining stubs as they land.
+# never retried). A5 wired ``ingest_referrals``; A6 wired
+# ``classify_referrals`` + ``referral_retention_sweep``; A7
+# (traffic_snapshot_refresh) and A8 (analytics_snapshot_refresh) replace the
+# remaining stubs as they land.
 from __future__ import annotations
 
 import asyncio
@@ -52,6 +53,10 @@ from app.core.config.task_queue import (
 from app.core.database import SessionLocal
 from app.core.telemetry import configure_logging
 from app.domain.analytics.ingest import ingest_referrals
+from app.domain.analytics.tasks import (
+    run_classify_referrals,
+    run_referral_retention_sweep,
+)
 from app.models.analytics import AnalyticsTask
 from app.orchestration.postgres_task_queue import PostgresTaskQueue
 
@@ -87,13 +92,14 @@ async def _executor_not_wired(
 
 # Kind dispatch table (invariant 2: one owner of kind -> executor routing).
 # Each executor-landing task substitutes its real executor for the stub on
-# its own line: A5 wired ingest_referrals; A6/A7/A8 wire the rest.
+# its own line: A5 wired ingest_referrals; A6 wired classify_referrals +
+# referral_retention_sweep; A7/A8 wire the rest.
 EXECUTORS: dict[str, AnalyticsExecutor] = {
     ANALYTICS_TASK_KIND_INGEST_REFERRALS: ingest_referrals,
-    ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS: _executor_not_wired,
+    ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS: run_classify_referrals,
     ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH: _executor_not_wired,
     ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH: _executor_not_wired,
-    ANALYTICS_TASK_KIND_REFERRAL_RETENTION_SWEEP: _executor_not_wired,
+    ANALYTICS_TASK_KIND_REFERRAL_RETENTION_SWEEP: run_referral_retention_sweep,
 }
 
 

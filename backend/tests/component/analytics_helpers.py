@@ -14,10 +14,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config.analysis import ANALYZER_VERSION
+from app.core.config.analytics import (
+    AI_REFERRAL_RULE_VERSION,
+    AI_SOURCE_OTHER,
+    REFERRAL_SANITIZE_VERSION,
+)
 from app.core.config.integrations import (
     DATASET_GA4_REFERRER_DAILY,
     GRANT_STATUS_CONNECTED,
@@ -27,6 +33,7 @@ from app.core.config.integrations import (
     pack_dimension_key,
 )
 from app.core.config.task_queue import TASK_STATUS_SUCCEEDED
+from app.models.analytics import ReferralClassification, ReferralEvent
 from app.models.integrations import (
     IntegrationConnection,
     IntegrationImportArtifact,
@@ -190,3 +197,72 @@ async def seed_metric_row(
     await session.flush()
     seed.metric_row_ids.append(row.id)
     return row
+
+
+async def seed_referral_event(
+    session: AsyncSession,
+    *,
+    seed: ImportSeed,
+    occurred_at: datetime,
+    referrer_host: str = "",
+    referrer_url: str = "",
+    landing_url: str = "",
+    utm_source: str = "",
+    utm_medium: str = "",
+    utm_campaign: str = "",
+    user_agent: str = "",
+) -> ReferralEvent:
+    """Seed one ReferralEvent directly (bypassing the ingest projection).
+
+    For the classify/retention tests that need events with exact signals or
+    exact ``occurred_at`` values without driving the metric-row ingest. The
+    ``content_hash`` is a random unique token (dedupe is not under test
+    here); ``sanitize_version`` is stamped like the real projection.
+    """
+    event = ReferralEvent(
+        workspace_id=seed.workspace_id,
+        project_id=seed.project_id,
+        source=INTEGRATION_PROVIDER_GA4,
+        import_id=seed.artifact_id,
+        occurred_at=occurred_at,
+        landing_url=landing_url,
+        referrer_host=referrer_host,
+        referrer_url=referrer_url,
+        utm_source=utm_source,
+        utm_medium=utm_medium,
+        utm_campaign=utm_campaign,
+        user_agent=user_agent,
+        session_id_hash="",
+        raw=None,
+        content_hash=uuid.uuid4().hex * 2,
+        sanitize_version=REFERRAL_SANITIZE_VERSION,
+    )
+    session.add(event)
+    await session.flush()
+    return event
+
+
+async def seed_referral_classification(
+    session: AsyncSession,
+    *,
+    event: ReferralEvent,
+    is_ai_referral: bool = False,
+    ai_source: str = AI_SOURCE_OTHER,
+) -> ReferralClassification:
+    """Seed one classification row directly (retention tests only).
+
+    The classify executor is the single WRITER in production; tests seed the
+    row straight to set up delete-fixtures without running the chain.
+    """
+    classification = ReferralClassification(
+        workspace_id=event.workspace_id,
+        project_id=event.project_id,
+        referral_event_id=event.id,
+        is_ai_referral=is_ai_referral,
+        ai_source=ai_source,
+        rule_version=AI_REFERRAL_RULE_VERSION,
+        analyzer_version=ANALYZER_VERSION,
+    )
+    session.add(classification)
+    await session.flush()
+    return classification

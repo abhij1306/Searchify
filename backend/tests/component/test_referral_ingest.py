@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config.analytics import (
+    ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS,
     ANALYTICS_TASK_KIND_INGEST_REFERRALS,
     ERROR_EXECUTOR_NOT_WIRED,
@@ -35,7 +36,11 @@ from app.core.config.integrations import (
 from app.core.config.task_queue import TASK_STATUS_FAILED, TASK_STATUS_SUCCEEDED
 from app.domain.analytics.enqueue import enqueue_ingest_referrals
 from app.domain.analytics.ingest import ingest_referrals
-from app.models.analytics import AnalyticsTask, ReferralEvent
+from app.models.analytics import (
+    AnalyticsTask,
+    ReferralClassification,
+    ReferralEvent,
+)
 from app.models.integrations import (
     IntegrationConnection,
     IntegrationImportArtifact,
@@ -477,7 +482,8 @@ async def test_worker_dispatch_runs_registered_ingest_executor(
     assert task_id is not None
 
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
-    assert await worker.run_until_idle() == 2  # ingest + the chained classify
+    # ingest + the chained classify + the chained snapshot-refresh stub.
+    assert await worker.run_until_idle() == 3
 
     async with session_factory() as session:
         ingest_row = await session.get(AnalyticsTask, task_id)
@@ -485,9 +491,26 @@ async def test_worker_dispatch_runs_registered_ingest_executor(
         assert ingest_row.status == TASK_STATUS_SUCCEEDED
         assert ingest_row.attempt_count == 1
         assert await session.scalar(select(func.count(ReferralEvent.id))) == 1
-        # The chained classify task exists; it fails loud as not-yet-wired
-        # until A6 registers its executor.
+        # The chained classify task ran the real executor (A6) and wrote the
+        # event's classification.
         classify = await _classify_tasks(session)
         assert len(classify) == 1
-        assert classify[0].status == TASK_STATUS_FAILED
-        assert classify[0].error_code == ERROR_EXECUTOR_NOT_WIRED
+        assert classify[0].status == TASK_STATUS_SUCCEEDED
+        assert (
+            await session.scalar(select(func.count(ReferralClassification.id)))
+        ) == 1
+        # The chain continues: analytics_snapshot_refresh is enqueued; it
+        # fails loud as not-yet-wired until A8 registers its executor.
+        refresh = list(
+            (
+                await session.scalars(
+                    select(AnalyticsTask).where(
+                        AnalyticsTask.task_kind
+                        == ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH
+                    )
+                )
+            ).all()
+        )
+        assert len(refresh) == 1
+        assert refresh[0].status == TASK_STATUS_FAILED
+        assert refresh[0].error_code == ERROR_EXECUTOR_NOT_WIRED
