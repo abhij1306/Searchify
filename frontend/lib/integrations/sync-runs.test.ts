@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isActiveSyncRun, isSucceededSyncRun, TRAFFIC_SYNC_POLL_MS } from './sync';
+import { isActiveSyncRun, isSucceededSyncRun, SYNC_RUN_POLL_MS } from './sync-runs';
 
-describe('traffic sync polling idiom', () => {
+describe('sync-run polling idiom', () => {
   it('polls at the shared 3s cadence', () => {
-    expect(TRAFFIC_SYNC_POLL_MS).toBe(3_000);
+    expect(SYNC_RUN_POLL_MS).toBe(3_000);
   });
 
   it('treats queued/leased/running/retry_wait as non-terminal', () => {

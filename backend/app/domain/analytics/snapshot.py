@@ -94,20 +94,25 @@ from app.core.config.analytics import (
     CORRELATION_STATE_INSUFFICIENT_DATA,
     CORRELATION_STATE_OK,
 )
-from app.core.config.task_queue import TASK_TERMINAL_STATUSES
 
 # The dashboard-status audit tuple (completed | partially_completed) is
 # OWNED by the analysis projections service — imported, never re-derived
 # (invariant 2; the visibility/theme folds must measure the same audit
 # population the Visibility dashboard serves).
 from app.domain.analysis.service import _DASHBOARD_STATUSES
-from app.domain.analytics.tasks import TaskCancelledError
+from app.domain.analytics.tasks import payload_window, raise_if_task_terminal
 
 # Calendar bucketing (day | ISO-Monday week | 1st-of-month, first label
-# clamped to the window) is OWNED by the Traffic projection — the two
-# projections share the granularity vocabulary, so the bucket math has one
-# owner too (invariant 2).
-from app.domain.traffic.projection import bucket_labels, bucket_start
+# clamped to the window), the persisted series-point shape, and the
+# additive-measure count rule are OWNED by the Traffic projection — the
+# two projections share the granularity/series vocabulary, so those have
+# one owner too (invariant 2).
+from app.domain.traffic.projection import (
+    bucket_labels,
+    bucket_start,
+    metric_count,
+    series_point,
+)
 from app.models.analysis import MetricSnapshot, ResponseAnalysis
 from app.models.analytics import (
     AnalyticsSnapshot,
@@ -285,10 +290,6 @@ def correlation_summary(
     }
 
 
-def _series_point(label: date, value: int | float | None) -> dict[str, Any]:
-    return {"date": label.isoformat(), "value": value}
-
-
 def _weighted_mean(pairs: Sequence[tuple[float, int]]) -> float | None:
     """Completion-weighted mean of (value, weight); None when weightless."""
     total_weight = sum(weight for _value, weight in pairs)
@@ -346,14 +347,14 @@ def build_analytics_projection(
         # The label's natural bucket (the first label may be window-clamped).
         bucket = bucket_start(label, granularity)
         if not bucket_measured.get(bucket, False):
-            referral_volume.append(_series_point(label, None))
-            referral_share.append(_series_point(label, None))
+            referral_volume.append(series_point(label, None))
+            referral_share.append(series_point(label, None))
             continue
         ai_sessions = bucket_ai.get(bucket, 0)
         total_sessions = bucket_total.get(bucket, 0)
-        referral_volume.append(_series_point(label, ai_sessions))
+        referral_volume.append(series_point(label, ai_sessions))
         share = ai_sessions / total_sessions if total_sessions > 0 else None
-        referral_share.append(_series_point(label, share))
+        referral_share.append(series_point(label, share))
 
     sources = [
         {
@@ -383,7 +384,7 @@ def build_analytics_projection(
         {
             "logical_engine": engine,
             "series": [
-                _series_point(
+                series_point(
                     label,
                     (
                         round(mean, _SCORE_DECIMALS)
@@ -487,40 +488,15 @@ async def _raise_if_task_terminal(
 ) -> None:
     """Cooperative-cancel boundary check (invariant 9).
 
-    Mirrors the A6 idiom (``domain/analytics/tasks.py``): re-read the queue
-    row in a FRESH session (never the work session's possibly-stale identity
-    map) and stop if it reached a terminal status. The refresh writes
-    nothing before its single write transaction, so stopping here leaves no
-    partial projection behind. A row that does not resolve (unpersisted
-    direct-invocation fixture) has nothing to cancel against.
+    Thin label adapter over the single owner (``domain/analytics/tasks.py``)
+    so this executor's message names its own batch boundary and tests keep
+    a module-local patch point. The refresh writes nothing before its
+    single write transaction, so stopping here leaves no partial
+    projection behind.
     """
-    if task_id is None:  # unpersisted fixture row: nothing to cancel against
-        return
-    async with session_factory() as session:
-        row = await session.get(AnalyticsTask, task_id)
-        status = row.status if row is not None else None
-    if status is not None and status in TASK_TERMINAL_STATUSES:
-        raise TaskCancelledError(
-            f"analytics task {task_id} reached terminal status {status!r}; "
-            "stopping at the classification batch boundary"
-        )
-
-
-def _payload_window(task: AnalyticsTask) -> tuple[date, date]:
-    payload = task.payload or {}
-    raw_start = payload.get("window_start")
-    raw_end = payload.get("window_end")
-    if not raw_start or not raw_end:
-        raise ValueError(
-            "analytics_snapshot_refresh payload missing window_start/window_end"
-        )
-    window_start = date.fromisoformat(str(raw_start))
-    window_end = date.fromisoformat(str(raw_end))
-    if window_end < window_start:
-        raise ValueError(
-            "analytics_snapshot_refresh window_end before window_start"
-        )
-    return window_start, window_end
+    await raise_if_task_terminal(
+        session_factory, task_id, boundary="classification batch"
+    )
 
 
 def _window_bounds(
@@ -573,12 +549,6 @@ async def _classification_batch(
     return list((await session.execute(stmt)).tuples().all())
 
 
-def _sessions(metrics: dict | None) -> int:
-    """The row's session measure: a missing/non-numeric value counts as 0."""
-    value = (metrics or {}).get("sessions")
-    return int(value) if isinstance(value, (int, float)) else 0
-
-
 def _to_referral_input(
     classification: ReferralClassification,
     event: ReferralEvent,
@@ -589,7 +559,7 @@ def _to_referral_input(
         is_ai_referral=bool(classification.is_ai_referral),
         ai_source=classification.ai_source,
         occurred_date=event.occurred_at.date(),
-        sessions=_sessions(row.metrics if row is not None else None),
+        sessions=metric_count(row.metrics if row is not None else None, "sessions"),
         row_identity=(
             (
                 row.property_ref,
@@ -781,7 +751,9 @@ async def refresh_analytics_snapshot(
     """
     if task.project_id is None:
         raise ValueError("analytics_snapshot_refresh task missing project_id")
-    window_start, window_end = _payload_window(task)
+    window_start, window_end = payload_window(
+        task, kind="analytics_snapshot_refresh"
+    )
     async with session_factory() as session:
         referral_facts: list[ReferralFactInput] = []
         after_id: uuid.UUID | None = None

@@ -17,18 +17,19 @@ approved-host allow-list before a request is issued (SSRF policy).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from urllib.parse import urlsplit
 
 import httpx
 
+from app.connectors.integrations._http import (
+    IntegrationApiError,
+    assert_approved_url,
+    classify_status,
+    oauth_error_detail,
+)
 from app.core.config import settings
 from app.core.config.integrations import (
-    ERROR_GRANT_AUTH_FAILED,
     ERROR_PROVIDER_API,
-    ERROR_RATE_LIMITED,
-    ERROR_UNAPPROVED_ENDPOINT,
     GSC_API_BASE_URL,
-    INTEGRATION_APPROVED_ENDPOINT_HOSTS,
     INTEGRATION_OAUTH_REVOKE_URLS,
     INTEGRATION_OAUTH_TOKEN_URLS,
     INTEGRATION_TRANSPORT_GOOGLE,
@@ -37,30 +38,17 @@ from app.core.config.integrations import (
     integration_settings,
 )
 
-# Cap on provider-supplied error text surfaced in exceptions (defensive:
-# keeps messages short even if a provider returns a huge error body).
-_ERROR_DETAIL_MAX_LEN = 240
-
 # Cheap, read-only, scope-minimal probe path validating a Google grant's
 # access token (the one shared Google grant carries ``webmasters.readonly``
 # for both the GSC and the GA4 connection, so the site list validates the
 # grant behind either connection). The host is config-owned
-# (``GSC_API_BASE_URL``) and allow-listed. The Bing data-API probe host/path
-# literal is pinned from Microsoft docs at I12 (plan R3); until then a
-# Microsoft grant is probed via a non-persisting refresh round-trip (see the
-# domain service).
+# (``GSC_API_BASE_URL``) and allow-listed. The Microsoft-grant probe
+# (``GetSites``) lives with the Bing data-API client (I12).
 _GSC_SITES_PROBE_PATH = "/webmasters/v3/sites"
 
 
-class IntegrationOAuthError(RuntimeError):
+class IntegrationOAuthError(IntegrationApiError):
     """An OAuth transport call failed; carries a config-owned error token."""
-
-    def __init__(
-        self, message: str, *, error_code: str, retryable: bool = False
-    ) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-        self.retryable = retryable
 
 
 @dataclass(frozen=True)
@@ -101,39 +89,7 @@ def oauth_client_configured(transport: str) -> bool:
 
 def _assert_approved_url(url: str) -> None:
     """SSRF guard: integration clients only call allow-listed hosts (config)."""
-    host = (urlsplit(url).hostname or "").lower()
-    if host not in INTEGRATION_APPROVED_ENDPOINT_HOSTS:
-        raise IntegrationOAuthError(
-            f"OAuth endpoint host is not approved: {host or '<none>'}",
-            error_code=ERROR_UNAPPROVED_ENDPOINT,
-        )
-
-
-def _safe_error_detail(payload: object) -> str:
-    """Extract ``error`` + ``error_description`` from an OAuth error body.
-
-    Only these two known fields are read (never the full body) and both are
-    length-capped; non-dict payloads degrade to an empty string.
-    """
-    if not isinstance(payload, dict):
-        return ""
-    parts = []
-    error = str(payload.get("error") or "").strip()
-    if error:
-        parts.append(error[:_ERROR_DETAIL_MAX_LEN])
-    description = str(payload.get("error_description") or "").strip()
-    if description:
-        parts.append(description[:_ERROR_DETAIL_MAX_LEN])
-    return ": ".join(parts)
-
-
-def _classify_status(status_code: int) -> tuple[str, bool]:
-    """Map an HTTP status to a config-owned (error_code, retryable) pair."""
-    if status_code == 429:
-        return ERROR_RATE_LIMITED, True
-    if status_code in (401, 403):
-        return ERROR_GRANT_AUTH_FAILED, False
-    return ERROR_PROVIDER_API, status_code in (500, 502, 503, 504)
+    assert_approved_url(url, label="OAuth", error_type=IntegrationOAuthError)
 
 
 def _split_scopes(value: object) -> tuple[str, ...]:
@@ -195,9 +151,9 @@ class IntegrationOAuthClient:
                 retryable=True,
             ) from exc
         if response.status_code != 200:
-            error_code, retryable = _classify_status(response.status_code)
+            error_code, retryable = classify_status(response.status_code)
             try:
-                detail = _safe_error_detail(response.json())
+                detail = oauth_error_detail(response.json())
             except ValueError:
                 detail = ""
             suffix = f" ({detail})" if detail else ""
@@ -301,7 +257,7 @@ class IntegrationOAuthClient:
                 retryable=True,
             ) from exc
         if response.status_code != 200:
-            error_code, retryable = _classify_status(response.status_code)
+            error_code, retryable = classify_status(response.status_code)
             raise IntegrationOAuthError(
                 f"OAuth revoke returned HTTP {response.status_code}",
                 error_code=error_code,
@@ -328,7 +284,7 @@ class IntegrationOAuthClient:
                 retryable=True,
             ) from exc
         if response.status_code != 200:
-            error_code, retryable = _classify_status(response.status_code)
+            error_code, retryable = classify_status(response.status_code)
             raise IntegrationOAuthError(
                 f"grant probe returned HTTP {response.status_code}",
                 error_code=error_code,

@@ -18,10 +18,9 @@ import {
   type IntegrationSyncRun,
 } from '@/lib/api/integrations';
 import { queryKeys } from '@/lib/api/query-keys';
+import { formatShortDate, formatUtcTimestamp } from '@/lib/format';
+import { isActiveSyncRun, SYNC_RUN_POLL_MS } from '@/lib/integrations/sync-runs';
 import { assignLocation } from '@/lib/navigate';
-
-/** Poll cadence for an in-flight sync run (mirrors ACTIVE_RUN_POLL_MS). */
-export const SYNC_RUN_POLL_MS = 3_000;
 
 /** OAuth grant family — gsc/ga4 share ONE Google grant; bing rides a Microsoft grant. */
 export type GrantFamily = 'google' | 'microsoft';
@@ -97,43 +96,10 @@ const SYNC_RUN_BADGE: Record<SyncRunStatus, RunStatusValue> = {
   cancelled: 'cancelled',
 };
 
-/** Non-terminal queue statuses — an active run keeps polling + disables Sync now. */
-function isActiveSyncStatus(status: SyncRunStatus): boolean {
-  return (
-    status === 'queued' || status === 'leased' || status === 'running' || status === 'retry_wait'
-  );
-}
-
 /** Scope chips show the short scope name (`…/auth/webmasters.readonly` → `webmasters.readonly`). */
 function scopeLabel(scope: string): string {
   const segment = scope.split('/').filter(Boolean).pop();
   return segment ?? scope;
-}
-
-/** Mono timestamp in the mockup format (`Jul 23, 2026 · 04:12 UTC`); explicit locale + UTC keep SSR/CSR identical. */
-function formatUtcTimestamp(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return timestamp;
-  const datePart = date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const timePart = date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'UTC',
-  });
-  return `${datePart} · ${timePart} UTC`;
-}
-
-/** `2026-07-16` → `Jul 16` (window labels on an active run). */
-function formatWindowDate(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 function errorMessage(error: unknown): string {
@@ -228,13 +194,13 @@ function ConnectionRow({
     refetchInterval: (query) => {
       const run = query.state.data;
       if (!run) return SYNC_RUN_POLL_MS;
-      return isActiveSyncStatus(run.status) ? SYNC_RUN_POLL_MS : false;
+      return isActiveSyncRun(run.status) ? SYNC_RUN_POLL_MS : false;
     },
   });
 
   const activeRun = syncRunQuery.data ?? null;
-  const runActive = activeRun !== null && isActiveSyncStatus(activeRun.status);
-  const runTerminal = activeRun !== null && !isActiveSyncStatus(activeRun.status);
+  const runActive = activeRun !== null && isActiveSyncRun(activeRun.status);
+  const runTerminal = activeRun !== null && !isActiveSyncRun(activeRun.status);
 
   // A finished run changes the connection's last_synced_at — refresh the list
   // (prefix-invalidation also covers the per-connection sync keys).
@@ -316,7 +282,7 @@ function ConnectionRow({
           </Badge>
           <span className="text-muted text-2xs font-mono whitespace-nowrap">
             {activeRun.status === 'running'
-              ? `${activeRun.row_count.toLocaleString('en-US')} rows · window ${formatWindowDate(activeRun.window_start)}–${formatWindowDate(activeRun.window_end)}`
+              ? `${activeRun.row_count.toLocaleString('en-US')} rows · window ${formatShortDate(activeRun.window_start)}–${formatShortDate(activeRun.window_end)}`
               : `Enqueued ${formatUtcTimestamp(activeRun.created_at)} · waiting for a worker`}
           </span>
         </div>

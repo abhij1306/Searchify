@@ -34,10 +34,9 @@ from app.domain.analytics.schemas import (
     AnalyticsSourceBreakdownRow,
     LlmAnalyticsResponse,
     LlmAnalyticsThemeRow,
-    MetricSeriesPoint,
+    metric_series_points,
 )
 from app.domain.site_health.normalization import (
-    CursorScopeError,
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
@@ -135,20 +134,6 @@ async def _load_snapshot(
     return await session.scalar(stmt.limit(1))
 
 
-def _series(raw: object) -> list[MetricSeriesPoint]:
-    """Normalize a persisted series fragment into strict DTO points."""
-    points: list[MetricSeriesPoint] = []
-    for entry in raw if isinstance(raw, list) else []:
-        if not isinstance(entry, dict):
-            continue
-        points.append(
-            MetricSeriesPoint(
-                date=str(entry.get("date") or ""), value=entry.get("value")
-            )
-        )
-    return points
-
-
 def _empty_analytics(
     *,
     project_id: uuid.UUID,
@@ -223,7 +208,7 @@ async def get_llm_analytics(
     engine_visibility = [
         AnalyticsEngineVisibility(
             logical_engine=str(row.get("logical_engine") or ""),
-            series=_series(row.get("series")),
+            series=metric_series_points(row.get("series")),
         )
         for row in metrics.get("engine_visibility") or []
         if isinstance(row, dict)
@@ -233,8 +218,8 @@ async def get_llm_analytics(
         window_start=snapshot.window_start.isoformat(),
         window_end=snapshot.window_end.isoformat(),
         granularity=snapshot.granularity,
-        referral_volume=_series(metrics.get("referral_volume")),
-        referral_share=_series(metrics.get("referral_share")),
+        referral_volume=metric_series_points(metrics.get("referral_volume")),
+        referral_share=metric_series_points(metrics.get("referral_share")),
         sources=sources,
         engine_visibility=engine_visibility,
         correlation=AnalyticsCorrelation(
@@ -274,9 +259,8 @@ def _decode_referrals_cursor(
             cursor, scope=_REFERRALS_CURSOR_SCOPE, filters=filters
         )
         return datetime.fromisoformat(occurred_raw), uuid.UUID(id_raw)
-    except CursorScopeError as exc:
-        raise AnalyticsCursorError(str(exc)) from exc
     except ValueError as exc:
+        # CursorScopeError is a ValueError subclass — one branch covers it.
         raise AnalyticsCursorError(str(exc)) from exc
 
 

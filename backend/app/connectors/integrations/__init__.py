@@ -6,4 +6,7 @@
 # (``gsc`` / ``ga4`` / ``bing``) page the provider stats endpoints behind
 # the sync worker through the config-owned dispatch registry
 # (``INTEGRATION_CLIENT_BUILDERS``); ``bing`` additionally owns the cheap
-# authenticated probe for Microsoft grants (``GetSites``).
+# authenticated probe for Microsoft grants (``GetSites``). ``_http`` is the
+# package-private single owner of the shared plumbing (SSRF guard, status
+# classification, error-detail capping, Retry-After parsing, pacing) and
+# the ``IntegrationApiError`` base the per-module error classes alias.

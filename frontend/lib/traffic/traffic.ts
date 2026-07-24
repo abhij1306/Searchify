@@ -14,6 +14,21 @@
  */
 import type { TrendPoint } from '@/components/ui/trend-chart';
 import type { SnapshotGranularity, TrafficDashboard } from '@/lib/api/traffic';
+import { formatCount, formatShortDate } from '@/lib/format';
+
+// The shared display-format vocabulary (granularity options, bucket-date /
+// window / timestamp formats, grouped counts, URL splitting) is OWNED by
+// `@/lib/format` (invariant 2) — re-exported here under the traffic-local
+// names so the screen + tables keep one domain import point.
+export {
+  bucketAdjective as bucketAdverb,
+  formatCount,
+  formatShortDate as formatSeriesLabel,
+  formatUtcTimestamp as formatSyncTimestamp,
+  formatWindowDate,
+  GRANULARITY_OPTIONS,
+  splitUrlParts,
+} from '@/lib/format';
 
 /** One dated point of a persisted metric series (nullable = chart gap). */
 export type TrafficSeriesPoint = TrafficDashboard['series']['impressions'][number];
@@ -21,24 +36,9 @@ export type TrafficSeriesPoint = TrafficDashboard['series']['impressions'][numbe
 /** The snapshot bucket granularity served by the traffic read API. */
 export type TrafficGranularity = SnapshotGranularity;
 
-export const GRANULARITY_OPTIONS: readonly { value: TrafficGranularity; label: string }[] = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-] as const;
-
-export function granularityLabel(value: TrafficGranularity): string {
-  return GRANULARITY_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
-
 /** The per-bucket noun used in delta copy ("vs. prior day"). */
-export function bucketNoun(granularity: TrafficGranularity): string {
+function bucketNoun(granularity: TrafficGranularity): string {
   return granularity;
-}
-
-/** Adverb form for card subtitles ("Google Search Console · daily"). */
-export function bucketAdverb(granularity: TrafficGranularity): string {
-  return granularity === 'day' ? 'daily' : granularity === 'week' ? 'weekly' : 'monthly';
 }
 
 /**
@@ -87,44 +87,6 @@ export function rangeToWindow(
   return { from: isoDate(from), to: isoDate(now) };
 }
 
-/** `2026-07-23` → `Jul 23` (series bucket labels; explicit UTC keeps SSR/CSR identical). */
-export function formatSeriesLabel(isoDay: string): string {
-  const date = new Date(`${isoDay}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return isoDay;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
-
-/** `2026-07-23` → `Jul 23, 2026` (window labels in notes). */
-export function formatWindowDate(isoDay: string): string {
-  const date = new Date(`${isoDay}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return isoDay;
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-/** Mono timestamp in the F5 idiom (`Jul 23, 2026 · 18:14 UTC`); explicit locale + UTC. */
-export function formatSyncTimestamp(timestamp: string): string {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return timestamp;
-  const datePart = date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const timePart = date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'UTC',
-  });
-  return `${datePart} · ${timePart} UTC`;
-}
-
 /**
  * Map a persisted series into `TrendChart` points. `percent: true` scales a
  * persisted FRACTION (the wire CTR, e.g. 0.0317) onto the chart's 0–100
@@ -136,7 +98,7 @@ export function toChartPoints(
   { percent = false }: { percent?: boolean } = {},
 ): TrendPoint[] {
   return series.map((point) => ({
-    label: formatSeriesLabel(point.date),
+    label: formatShortDate(point.date),
     value:
       point.value === null ? null : percent ? Math.round(point.value * 10000) / 100 : point.value,
   }));
@@ -178,11 +140,6 @@ export function formatCountTick(value: number): string {
 /** Five evenly spaced y-axis labels for a count domain (top → 0). */
 export function countAxisTicks(domainMax: number): string[] {
   return [1, 0.75, 0.5, 0.25, 0].map((ratio) => formatCountTick(domainMax * ratio));
-}
-
-/** Whole-number grouping for counts (`1,162,000`). */
-export function formatCount(value: number): string {
-  return value.toLocaleString('en-US');
 }
 
 /** Persisted CTR fraction → display percent (`0.0317` → `3.17%` at 2 digits). */
@@ -362,19 +319,4 @@ export function describeSort(sort: string): string {
 export function toggleSort(current: string, key: string): string {
   if (current === `-${key}`) return key;
   return `-${key}`;
-}
-
-/** Split a canonical URL into a muted host part + the remaining path for the mono url cell. */
-export function splitUrlParts(canonicalUrl: string): { host: string; rest: string } {
-  try {
-    const url = new URL(canonicalUrl);
-    return { host: url.host, rest: `${url.pathname}${url.search}` || '/' };
-  } catch {
-    // Scheme-less or non-URL value: split the leading host segment if present.
-    const match = /^([^/]+)(\/.*)?$/.exec(canonicalUrl);
-    if (match && match[1].includes('.')) {
-      return { host: match[1], rest: match[2] ?? '/' };
-    }
-    return { host: '', rest: canonicalUrl };
-  }
 }

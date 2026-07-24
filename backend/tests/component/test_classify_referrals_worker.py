@@ -266,7 +266,7 @@ async def test_classify_honors_cooperative_cancel_at_batch_boundary(
 
     # One event per batch so the boundary lands between events.
     monkeypatch.setattr(analytics_tasks, "_CLASSIFY_BATCH_SIZE", 1)
-    real_check = analytics_tasks._raise_if_task_terminal
+    real_check = analytics_tasks.raise_if_task_terminal
     checks = 0
 
     async def _cancel_on_second_check(
@@ -285,7 +285,7 @@ async def test_classify_honors_cooperative_cancel_at_batch_boundary(
         await real_check(factory, row_id)
 
     monkeypatch.setattr(
-        analytics_tasks, "_raise_if_task_terminal", _cancel_on_second_check
+        analytics_tasks, "raise_if_task_terminal", _cancel_on_second_check
     )
 
     with pytest.raises(TaskCancelledError):

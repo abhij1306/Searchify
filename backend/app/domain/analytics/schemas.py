@@ -22,6 +22,25 @@ class MetricSeriesPoint(BaseModel):
     value: float | None
 
 
+def metric_series_points(raw: object) -> list[MetricSeriesPoint]:
+    """Normalize a persisted series fragment into strict DTO points.
+
+    Single owner of the snapshot-JSONB -> DTO read shape shared by the
+    traffic + analytics read services (invariant 2): non-list fragments
+    and non-dict entries degrade to nothing rather than failing the read.
+    """
+    points: list[MetricSeriesPoint] = []
+    for entry in raw if isinstance(raw, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        points.append(
+            MetricSeriesPoint(
+                date=str(entry.get("date") or ""), value=entry.get("value")
+            )
+        )
+    return points
+
+
 class AnalyticsSourceBreakdownRow(BaseModel):
     """One per-``ai_source`` referral breakdown row (window-level)."""
 

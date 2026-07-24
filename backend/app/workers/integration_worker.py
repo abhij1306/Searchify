@@ -46,6 +46,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.connectors.integrations import oauth as integration_oauth
+from app.connectors.integrations._http import IntegrationApiError
 from app.connectors.integrations.bing import BingApiError
 from app.connectors.integrations.ga4 import Ga4ApiError
 from app.connectors.integrations.gsc import GscApiError
@@ -250,13 +251,8 @@ class IntegrationWorker:
     async def _begin_attempt(self, run_id: uuid.UUID) -> _RunContext | None:
         """Bump the attempt count + append sync_started (owner-gated)."""
         async with self._session_factory() as session:
-            run = await session.get(IntegrationSyncRun, run_id, with_for_update=True)
-            if (
-                run is None
-                or run.lease_owner != self.owner
-                or run.status != TASK_STATUS_RUNNING
-            ):
-                await session.commit()  # nothing staged; releases the lock
+            run = await self._claim_run_if_owned(session, run_id)
+            if run is None:
                 return None
             connection = await session.get(IntegrationConnection, run.connection_id)
             grant = (
@@ -284,23 +280,20 @@ class IntegrationWorker:
                 attempt_count=run.attempt_count,
                 max_attempts=run.max_attempts,
             )
-            session.add(
-                IntegrationEvent(
-                    workspace_id=ctx.workspace_id,
-                    connection_id=ctx.connection_id,
-                    grant_id=ctx.grant_id,
-                    event_type=EVENT_INTEGRATION_SYNC_STARTED,
-                    message=f"Sync started for {ctx.provider}",
-                    payload={
-                        "provider": ctx.provider,
-                        "sync_run_id": str(ctx.run_id),
-                        "sync_kind": ctx.sync_kind,
-                        "window_start": ctx.window_start.isoformat(),
-                        "window_end": ctx.window_end.isoformat(),
-                        "resync_seq": ctx.resync_seq,
-                        "attempt_count": ctx.attempt_count,
-                    },
-                )
+            self._append_event(
+                session,
+                ctx,
+                event_type=EVENT_INTEGRATION_SYNC_STARTED,
+                message=f"Sync started for {ctx.provider}",
+                payload={
+                    "provider": ctx.provider,
+                    "sync_run_id": str(ctx.run_id),
+                    "sync_kind": ctx.sync_kind,
+                    "window_start": ctx.window_start.isoformat(),
+                    "window_end": ctx.window_end.isoformat(),
+                    "resync_seq": ctx.resync_seq,
+                    "attempt_count": ctx.attempt_count,
+                },
             )
             await session.commit()
             return ctx
@@ -328,7 +321,9 @@ class IntegrationWorker:
         try:
             access_token = await self._fresh_access_token(ctx)
         except integration_oauth.IntegrationOAuthError as exc:
-            await self._handle_refresh_failure(ctx, exc)
+            await self._handle_classified_error(
+                ctx, exc, run_error_code=ERROR_TOKEN_REFRESH_FAILED
+            )
             return
 
         heartbeat = asyncio.create_task(self._heartbeat_loop(ctx.run_id))
@@ -346,7 +341,9 @@ class IntegrationWorker:
                     return
         except _PROVIDER_API_ERRORS as exc:
             # Every provider client raises the same classified taxonomy.
-            await self._handle_provider_error(ctx, exc)
+            await self._handle_classified_error(
+                ctx, exc, retry_after_seconds=exc.retry_after_seconds
+            )
             return
         except _PayloadTooLargeError as exc:
             await self._queue.fail(
@@ -439,9 +436,25 @@ class IntegrationWorker:
             await session.commit()
             return bundle.access_token
 
-    async def _handle_refresh_failure(
-        self, ctx: _RunContext, exc: integration_oauth.IntegrationOAuthError
+    async def _handle_classified_error(
+        self,
+        ctx: _RunContext,
+        exc: IntegrationApiError,
+        *,
+        run_error_code: str | None = None,
+        retry_after_seconds: float | None = None,
     ) -> None:
+        """Terminal accounting for one classified connector error.
+
+        Token-refresh failures and provider data-API failures share the
+        taxonomy: an auth failure moves the grant to needs_reauth and
+        fails the run; a retryable failure burns one attempt with backoff
+        (or fails terminal at the cap); anything else fails the run. The
+        run's error token is ``run_error_code`` when given (the refresh
+        path wraps the transport cause in ERROR_TOKEN_REFRESH_FAILED),
+        else the exception's own config-owned token.
+        """
+        error_code = run_error_code or exc.error_code
         if exc.error_code == ERROR_GRANT_AUTH_FAILED:
             await self._mark_grant_needs_reauth(ctx)
             await self._queue.fail(
@@ -456,8 +469,10 @@ class IntegrationWorker:
                 await self._queue.retry(
                     task_id=ctx.run_id,
                     owner=self.owner,
-                    delay_seconds=integration_settings.retry_delay(ctx.attempt_count),
-                    error_code=ERROR_TOKEN_REFRESH_FAILED,
+                    delay_seconds=integration_settings.retry_delay(
+                        ctx.attempt_count, retry_after_seconds
+                    ),
+                    error_code=error_code,
                     error_detail=str(exc),
                 )
             else:
@@ -471,7 +486,7 @@ class IntegrationWorker:
         await self._queue.fail(
             task_id=ctx.run_id,
             owner=self.owner,
-            error_code=ERROR_TOKEN_REFRESH_FAILED,
+            error_code=error_code,
             error_detail=str(exc),
         )
 
@@ -485,22 +500,19 @@ class IntegrationWorker:
                 await session.commit()
                 return
             grant.status = GRANT_STATUS_NEEDS_REAUTH
-            session.add(
-                IntegrationEvent(
-                    workspace_id=ctx.workspace_id,
-                    connection_id=ctx.connection_id,
-                    grant_id=ctx.grant_id,
-                    event_type=EVENT_INTEGRATION_REAUTH_REQUIRED,
-                    message=(
-                        "Grant token rejected by provider; re-authentication required"
-                    ),
-                    payload={
-                        "provider": ctx.provider,
-                        "transport": ctx.transport,
-                        "sync_run_id": str(ctx.run_id),
-                        "error_code": ERROR_GRANT_AUTH_FAILED,
-                    },
-                )
+            self._append_event(
+                session,
+                ctx,
+                event_type=EVENT_INTEGRATION_REAUTH_REQUIRED,
+                message=(
+                    "Grant token rejected by provider; re-authentication required"
+                ),
+                payload={
+                    "provider": ctx.provider,
+                    "transport": ctx.transport,
+                    "sync_run_id": str(ctx.run_id),
+                    "error_code": ERROR_GRANT_AUTH_FAILED,
+                },
             )
             await session.commit()
 
@@ -586,6 +598,46 @@ class IntegrationWorker:
                 and run.status == TASK_STATUS_RUNNING
             )
 
+    async def _claim_run_if_owned(
+        self, session: AsyncSession, run_id: uuid.UUID
+    ) -> IntegrationSyncRun | None:
+        """Lock + return the run only while THIS owner still runs it.
+
+        A missing row, a lost lease, or a cancelled run yields ``None``
+        after the lock is released with nothing staged — a lost lease
+        writes NOTHING (single-writer, invariant 3).
+        """
+        run = await session.get(IntegrationSyncRun, run_id, with_for_update=True)
+        if (
+            run is None
+            or run.lease_owner != self.owner
+            or run.status != TASK_STATUS_RUNNING
+        ):
+            await session.commit()  # nothing staged; releases the lock
+            return None
+        return run
+
+    def _append_event(
+        self,
+        session: AsyncSession,
+        ctx: _RunContext,
+        *,
+        event_type: str,
+        message: str,
+        payload: dict,
+    ) -> None:
+        """Stage one integration event on the run's connection + grant."""
+        session.add(
+            IntegrationEvent(
+                workspace_id=ctx.workspace_id,
+                connection_id=ctx.connection_id,
+                grant_id=ctx.grant_id,
+                event_type=event_type,
+                message=message,
+                payload=payload,
+            )
+        )
+
     async def _write_artifact(
         self,
         ctx: _RunContext,
@@ -605,17 +657,10 @@ class IntegrationWorker:
         payload_hash = hashlib.sha256(encoded).hexdigest()
         now = _utcnow()
         async with self._session_factory() as session:
-            run = await session.get(
-                IntegrationSyncRun, ctx.run_id, with_for_update=True
-            )
-            if (
-                run is None
-                or run.lease_owner != self.owner
-                or run.status != TASK_STATUS_RUNNING
-            ):
+            run = await self._claim_run_if_owned(session, ctx.run_id)
+            if run is None:
                 # Lost lease / cancelled between the fetch and this write:
-                # discard the page — a lost lease writes NOTHING.
-                await session.commit()  # nothing staged; releases the lock
+                # discard the page.
                 return False
             session.add(
                 IntegrationImportArtifact(
@@ -647,63 +692,19 @@ class IntegrationWorker:
 
     # --- Terminal accounting -------------------------------------------------
 
-    async def _handle_provider_error(
-        self, ctx: _RunContext, exc: GscApiError | Ga4ApiError | BingApiError
-    ) -> None:
-        if exc.error_code == ERROR_GRANT_AUTH_FAILED:
-            await self._mark_grant_needs_reauth(ctx)
-            await self._queue.fail(
-                task_id=ctx.run_id,
-                owner=self.owner,
-                error_code=exc.error_code,
-                error_detail=str(exc),
-            )
-            return
-        if exc.retryable:
-            if ctx.attempt_count < ctx.max_attempts:
-                await self._queue.retry(
-                    task_id=ctx.run_id,
-                    owner=self.owner,
-                    delay_seconds=integration_settings.retry_delay(
-                        ctx.attempt_count, exc.retry_after_seconds
-                    ),
-                    error_code=exc.error_code,
-                    error_detail=str(exc),
-                )
-            else:
-                await self._queue.fail(
-                    task_id=ctx.run_id,
-                    owner=self.owner,
-                    error_code=INTEGRATION_QUEUE_SPEC.max_attempts_error,
-                    error_detail=str(exc),
-                )
-            return
-        await self._queue.fail(
-            task_id=ctx.run_id,
-            owner=self.owner,
-            error_code=exc.error_code,
-            error_detail=str(exc),
-        )
-
-    async def _finalize_success(self, ctx: _RunContext) -> bool:
+    async def _finalize_success(self, ctx: _RunContext) -> None:
         """Derive + C5 projections + events + terminal status in ONE transaction.
 
         Idempotent under retry: derivation inserts ``ON CONFLICT DO NOTHING``
         and the projection enqueues dedupe on deterministic idempotency keys,
         so a crash before this commit replays to the same terminal state.
+        A lost lease / cancelled run finalizes NOTHING (owner gate).
         """
         now = _utcnow()
         async with self._session_factory() as session:
-            run = await session.get(
-                IntegrationSyncRun, ctx.run_id, with_for_update=True
-            )
-            if (
-                run is None
-                or run.lease_owner != self.owner
-                or run.status != TASK_STATUS_RUNNING
-            ):
-                await session.commit()  # nothing staged; releases the lock
-                return False
+            run = await self._claim_run_if_owned(session, ctx.run_id)
+            if run is None:
+                return
             artifacts = list(
                 (
                     await session.scalars(
@@ -723,7 +724,7 @@ class IntegrationWorker:
                 # Defensive: the composite FK cascade removes a connection's
                 # runs, so reaching here means corrupted state.
                 await session.commit()
-                return False
+                return
             try:
                 derived = await derive_run(
                     session, run=run, connection=connection, artifacts=artifacts
@@ -737,7 +738,7 @@ class IntegrationWorker:
                 run.lease_owner = None
                 run.lease_expires_at = None
                 await session.commit()
-                return True
+                return
             # C5: post-sync projections are the FINAL derivation step.
             await enqueue_post_sync_projections(
                 session,
@@ -745,26 +746,23 @@ class IntegrationWorker:
                 import_artifact_ids=derived.artifact_ids,
             )
             connection.last_synced_at = now
-            session.add(
-                IntegrationEvent(
-                    workspace_id=ctx.workspace_id,
-                    connection_id=ctx.connection_id,
-                    grant_id=ctx.grant_id,
-                    event_type=EVENT_INTEGRATION_SYNC_FINISHED,
-                    message=f"Sync finished for {ctx.provider}",
-                    payload={
-                        "provider": ctx.provider,
-                        "sync_run_id": str(ctx.run_id),
-                        "sync_kind": ctx.sync_kind,
-                        "window_start": ctx.window_start.isoformat(),
-                        "window_end": ctx.window_end.isoformat(),
-                        "resync_seq": ctx.resync_seq,
-                        "project_id": str(derived.project_id),
-                        "artifact_ids": [str(a) for a in derived.artifact_ids],
-                        "row_count": sum(a.row_count for a in artifacts),
-                        "metric_row_count": derived.metric_row_count,
-                    },
-                )
+            self._append_event(
+                session,
+                ctx,
+                event_type=EVENT_INTEGRATION_SYNC_FINISHED,
+                message=f"Sync finished for {ctx.provider}",
+                payload={
+                    "provider": ctx.provider,
+                    "sync_run_id": str(ctx.run_id),
+                    "sync_kind": ctx.sync_kind,
+                    "window_start": ctx.window_start.isoformat(),
+                    "window_end": ctx.window_end.isoformat(),
+                    "resync_seq": ctx.resync_seq,
+                    "project_id": str(derived.project_id),
+                    "artifact_ids": [str(a) for a in derived.artifact_ids],
+                    "row_count": sum(a.row_count for a in artifacts),
+                    "metric_row_count": derived.metric_row_count,
+                },
             )
             run.status = TASK_STATUS_SUCCEEDED
             run.completed_at = now
@@ -773,7 +771,6 @@ class IntegrationWorker:
             run.lease_owner = None
             run.lease_expires_at = None
             await session.commit()
-            return True
 
     async def _heartbeat_loop(
         self, run_id: uuid.UUID

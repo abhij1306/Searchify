@@ -46,54 +46,38 @@ returns the caller's verified-site list — the analogue of the GSC
 
 from __future__ import annotations
 
-import asyncio
 import re
-import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from urllib.parse import urlsplit
 
 import httpx
 
+from app.connectors.integrations._http import (
+    IntegrationApiError,
+    RequestPacer,
+    assert_approved_url,
+    classify_status,
+    flat_error_detail,
+    parse_retry_after,
+)
 from app.core.config.integrations import (
     BING_API_BASE_URL,
     BING_API_JSON_ROOT,
     BING_SITES_PROBE_METHOD,
-    ERROR_GRANT_AUTH_FAILED,
     ERROR_PROVIDER_API,
-    ERROR_RATE_LIMITED,
-    ERROR_UNAPPROVED_ENDPOINT,
-    INTEGRATION_APPROVED_ENDPOINT_HOSTS,
     INTEGRATION_DATASET_TEMPLATES,
     INTEGRATION_PROVIDER_BING,
     IntegrationDatasetTemplate,
     integration_settings,
 )
 
-# Cap on provider-supplied error text surfaced in exceptions (defensive:
-# keeps messages short even if the provider returns a huge error body).
-_ERROR_DETAIL_MAX_LEN = 240
-
 # Bing's JSON-serialized date form: ``/Date(<epoch-ms><+/-hhmm>)/``.
 _BING_DATE_RE = re.compile(r"^/Date\((\d+)([+-]\d{4})?\)/$")
 
 
-class BingApiError(RuntimeError):
+class BingApiError(IntegrationApiError):
     """A Bing API call failed; carries a config-owned error token."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_code: str,
-        retryable: bool = False,
-        retry_after_seconds: float | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-        self.retryable = retryable
-        self.retry_after_seconds = retry_after_seconds
 
 
 @dataclass(frozen=True)
@@ -127,51 +111,6 @@ def _bing_template_for_dimensions(
         f"no Bing dataset template for dimensions {tuple(dimensions)!r}",
         error_code=ERROR_PROVIDER_API,
     )
-
-
-def _assert_approved_url(url: str) -> None:
-    """SSRF guard: integration clients only call allow-listed hosts (config)."""
-    host = (urlsplit(url).hostname or "").lower()
-    if host not in INTEGRATION_APPROVED_ENDPOINT_HOSTS:
-        raise BingApiError(
-            f"Bing endpoint host is not approved: {host or '<none>'}",
-            error_code=ERROR_UNAPPROVED_ENDPOINT,
-        )
-
-
-def _classify_status(status_code: int) -> tuple[str, bool]:
-    """Map an HTTP status to a config-owned (error_code, retryable) pair."""
-    if status_code == 429:
-        return ERROR_RATE_LIMITED, True
-    if status_code in (401, 403):
-        return ERROR_GRANT_AUTH_FAILED, False
-    return ERROR_PROVIDER_API, status_code in (500, 502, 503, 504)
-
-
-def _safe_error_detail(payload: object) -> str:
-    """Extract a length-capped detail from a Bing error body.
-
-    Only known message fields are read (never the full body) and the
-    result is length-capped; non-dict payloads degrade to an empty string.
-    """
-    if not isinstance(payload, dict):
-        return ""
-    for key in ("Message", "message", "error"):
-        text = str(payload.get(key) or "").strip()
-        if text:
-            return text[:_ERROR_DETAIL_MAX_LEN]
-    return ""
-
-
-def _parse_retry_after(response: httpx.Response) -> float | None:
-    raw = response.headers.get("Retry-After")
-    if raw is None:
-        return None
-    try:
-        seconds = float(raw.strip())
-    except ValueError:
-        return None
-    return seconds if seconds >= 0 else None
 
 
 def _parse_bing_date(raw: object) -> str | None:
@@ -238,17 +177,7 @@ class BingClient:
         self, *, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
         self._transport = transport
-        self._last_request_at: float | None = None
-
-    async def _pace(self) -> None:
-        """Enforce the provider's requests/minute budget between requests."""
-        min_interval = 60.0 / integration_settings.bing_requests_per_minute
-        now = time.monotonic()
-        if self._last_request_at is not None:
-            delay = min_interval - (now - self._last_request_at)
-            if delay > 0:
-                await asyncio.sleep(delay)
-        self._last_request_at = time.monotonic()
+        self._pacer = RequestPacer()
 
     async def _get(
         self, url: str, *, access_token: str, params: dict[str, str], action: str
@@ -259,8 +188,10 @@ class BingClient:
         6); raised errors carry only the HTTP status and the provider's
         capped detail.
         """
-        _assert_approved_url(url)
-        await self._pace()
+        assert_approved_url(url, label="Bing", error_type=BingApiError)
+        await self._pacer.wait(
+            integration_settings.requests_per_minute(INTEGRATION_PROVIDER_BING)
+        )
         try:
             async with httpx.AsyncClient(
                 transport=self._transport,
@@ -278,9 +209,11 @@ class BingClient:
                 retryable=True,
             ) from exc
         if response.status_code != 200:
-            error_code, retryable = _classify_status(response.status_code)
+            error_code, retryable = classify_status(response.status_code)
             try:
-                detail = _safe_error_detail(response.json())
+                detail = flat_error_detail(
+                    response.json(), ("Message", "message", "error")
+                )
             except ValueError:
                 detail = ""
             suffix = f" ({detail})" if detail else ""
@@ -288,7 +221,7 @@ class BingClient:
                 f"Bing {action} returned HTTP {response.status_code}{suffix}",
                 error_code=error_code,
                 retryable=retryable,
-                retry_after_seconds=_parse_retry_after(response),
+                retry_after_seconds=parse_retry_after(response),
             )
         try:
             payload = response.json()

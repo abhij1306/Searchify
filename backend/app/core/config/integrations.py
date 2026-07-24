@@ -378,10 +378,11 @@ class IntegrationSettings(BaseSettings):
     retry_base_delay_seconds: float = Field(default=30.0, gt=0)
     retry_max_delay_seconds: float = Field(default=900.0, gt=0)
 
-    # --- OAuth state nonce lifetime + token refresh ----------------------------
-    state_ttl_seconds: int = Field(default=600, gt=0)
+    # --- Token refresh -----------------------------------------------------------
     # An access token expiring within this skew counts as near-expiry and is
     # refreshed (serialized per grant, spec section 2) before provider I/O.
+    # (The OAuth state-nonce TTL lives with the OAuth transport settings in
+    # ``config/oauth.py`` — ``oauth_settings.state_ttl_seconds``.)
     token_refresh_skew_seconds: float = Field(default=300.0, ge=0)
 
     # --- Import payload cap ------------------------------------------------------

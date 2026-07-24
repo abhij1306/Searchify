@@ -65,7 +65,10 @@ from app.core.config.traffic import (
 from app.domain.analytics.classification import classify_referral_signals
 from app.domain.site_health.normalization import canonical_identity
 
-_SERIES_NAMES: tuple[str, ...] = (
+# The six persisted series names of the headline projection — this module
+# writes exactly these into ``TrafficSnapshot.metrics["series"]`` and the
+# read service (``domain/traffic/service.py``) imports the one owner.
+TRAFFIC_SERIES_NAMES: tuple[str, ...] = (
     "impressions",
     "clicks",
     "ctr",
@@ -254,7 +257,7 @@ def _row_sort_key(row: TrafficMetricRowInput) -> tuple[object, ...]:
     return (row.date, row.dataset, row.dimension_key, str(row.id))
 
 
-def _count(metrics: Mapping[str, Any] | None, key: str) -> int:
+def metric_count(metrics: Mapping[str, Any] | None, key: str) -> int:
     """An additive measure: a missing/non-numeric key counts as 0."""
     value = (metrics or {}).get(key)
     return int(value) if isinstance(value, (int, float)) else 0
@@ -280,9 +283,9 @@ class _GscAccum:
 
     def add(self, row: TrafficMetricRowInput) -> None:
         self.has_rows = True
-        impressions = _count(row.metrics, "impressions")
+        impressions = metric_count(row.metrics, "impressions")
         self.impressions += impressions
-        self.clicks += _count(row.metrics, "clicks")
+        self.clicks += metric_count(row.metrics, "clicks")
         position = _number(row.metrics, "position")
         if position is not None:
             self.position_weighted_sum += position * impressions
@@ -323,8 +326,8 @@ class _Ga4Accum:
 
     def add(self, row: TrafficMetricRowInput) -> None:
         self.has_rows = True
-        self.sessions += _count(row.metrics, "sessions")
-        self.conversions += _count(row.metrics, "conversions")
+        self.sessions += metric_count(row.metrics, "sessions")
+        self.conversions += metric_count(row.metrics, "conversions")
         self.row_ids.add(str(row.id))
         self.artifact_ids.add(str(row.source_artifact_id))
 
@@ -369,7 +372,8 @@ def _page_accum(
     return accum
 
 
-def _series_point(label: date, value: int | float | None) -> dict[str, Any]:
+def series_point(label: date, value: int | float | None) -> dict[str, Any]:
+    """One persisted series fragment point (shared with analytics snapshot)."""
     return {"date": label.isoformat(), "value": value}
 
 
@@ -447,23 +451,23 @@ def build_traffic_projection(
 
     labels = bucket_labels(window_start, window_end, granularity)
     series: dict[str, list[dict[str, Any]]] = {
-        name: [] for name in _SERIES_NAMES
+        name: [] for name in TRAFFIC_SERIES_NAMES
     }
     for start, label in zip(starts, labels, strict=True):
         gsc = bucket_gsc[start]
         ga4 = bucket_ga4[start]
         series["impressions"].append(
-            _series_point(label, gsc.impressions if gsc.has_rows else None)
+            series_point(label, gsc.impressions if gsc.has_rows else None)
         )
         series["clicks"].append(
-            _series_point(label, gsc.clicks if gsc.has_rows else None)
+            series_point(label, gsc.clicks if gsc.has_rows else None)
         )
-        series["ctr"].append(_series_point(label, gsc.ctr()))
-        series["position"].append(_series_point(label, gsc.position()))
+        series["ctr"].append(series_point(label, gsc.ctr()))
+        series["position"].append(series_point(label, gsc.position()))
         ga4_measures = ga4.measures()
-        series["sessions"].append(_series_point(label, ga4_measures["sessions"]))
+        series["sessions"].append(series_point(label, ga4_measures["sessions"]))
         series["conversions"].append(
-            _series_point(label, ga4_measures["conversions"])
+            series_point(label, ga4_measures["conversions"])
         )
 
     totals = totals_gsc.measures() | totals_ga4.measures()

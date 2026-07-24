@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import uuid
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time
 from typing import Any
@@ -31,8 +30,7 @@ from app.core.config.analytics import REFERRAL_SANITIZE_VERSION
 from app.core.config.integrations import (
     DATASET_GA4_REFERRER_DAILY,
     DATASET_GA4_SOURCE_MEDIUM_DAILY,
-    DIMENSION_KEY_SEPARATOR,
-    INTEGRATION_DATASET_TEMPLATES,
+    unpack_dimension_key,
 )
 from app.core.config.traffic import TRAFFIC_GA4_REFERRAL_DATASETS
 from app.domain.analytics.enqueue import enqueue_classify_referrals
@@ -41,6 +39,7 @@ from app.domain.analytics.sanitize import (
     sanitize_raw_payload,
     sanitize_referral,
 )
+from app.domain.analytics.tasks import payload_artifact_id
 from app.models.analytics import AnalyticsTask, ReferralEvent
 from app.models.integrations import IntegrationImportArtifact, IntegrationMetricRow
 
@@ -69,21 +68,15 @@ def _signals_for_row(row: IntegrationMetricRow) -> ReferralSignals | None:
     """Map one metric row's packed ``dimension_key`` into referral signals.
 
     The key packs the dataset template's declared dimension values in order
-    (contract C1). Splitting from the RIGHT peels the always-trailing
-    ``date`` dimension (its value also lives on ``row.date``) without
-    breaking on a ``" | "`` inside a free-form leading value such as a
-    ``fullReferrer`` URL. A row whose key does not unpack into the
-    template's declared arity is un-mappable and skipped (never guessed).
+    (contract C1); unpacking is OWNED by the config module
+    (``unpack_dimension_key`` — never reimplemented here, invariant 2). A
+    row whose key does not unpack into the template's declared arity is
+    un-mappable and skipped (never guessed).
     """
-    template = INTEGRATION_DATASET_TEMPLATES.get(row.dataset)
-    if template is None:
+    values = unpack_dimension_key(row.dataset, row.dimension_key)
+    if values is None:
         return None
-    parts = row.dimension_key.rsplit(
-        DIMENSION_KEY_SEPARATOR, len(template.dimensions) - 1
-    )
-    if len(parts) != len(template.dimensions):
-        return None
-    *dimension_values, _date_value = parts
+    *dimension_values, _date_value = values
     if row.dataset == DATASET_GA4_REFERRER_DAILY:
         # Dimensions: (fullReferrer, date) — the full referring URL.
         (full_referrer,) = dimension_values
@@ -243,13 +236,6 @@ async def _latest_referral_rows(
     return list((await session.scalars(stmt)).all())
 
 
-def _payload_artifact_id(task: AnalyticsTask) -> uuid.UUID:
-    raw = (task.payload or {}).get("import_artifact_id")
-    if not raw:
-        raise ValueError("ingest_referrals payload missing import_artifact_id")
-    return uuid.UUID(str(raw))
-
-
 async def ingest_referrals(
     session_factory: async_sessionmaker[AsyncSession], task: AnalyticsTask
 ) -> None:
@@ -263,7 +249,7 @@ async def ingest_referrals(
     """
     if task.project_id is None:
         raise ValueError("ingest_referrals task missing project_id")
-    artifact_id = _payload_artifact_id(task)
+    artifact_id = payload_artifact_id(task, kind="ingest_referrals")
     async with session_factory() as session:
         artifact = await session.get(IntegrationImportArtifact, artifact_id)
         # Never project rows for an artifact outside the claimed task's

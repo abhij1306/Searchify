@@ -26,7 +26,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -69,16 +69,23 @@ class TaskCancelledError(RuntimeError):
     """
 
 
-async def _raise_if_task_terminal(
-    session_factory: async_sessionmaker[AsyncSession], task_id: uuid.UUID | None
+async def raise_if_task_terminal(
+    session_factory: async_sessionmaker[AsyncSession],
+    task_id: uuid.UUID | None,
+    *,
+    boundary: str = "batch",
 ) -> None:
     """Cooperative-cancel boundary check (invariant 9).
 
-    Mirrors the worker's dispatch-boundary check (``_execute``): re-read the
-    queue row in a FRESH session (never the work session's possibly-stale
-    identity map) and stop if it reached a terminal status. A row that does
-    not resolve (unpersisted direct-invocation fixture) has nothing to cancel
-    against and the run continues.
+    Single owner of the batch-boundary idiom every analytics/traffic
+    executor uses (the sibling executor modules keep a thin label adapter
+    under their own module-private name so their patch point + message
+    boundary stay local). Mirrors the worker's dispatch-boundary check
+    (``_execute``): re-read the queue row in a FRESH session (never the
+    work session's possibly-stale identity map) and stop if it reached a
+    terminal status. A row that does not resolve (unpersisted
+    direct-invocation fixture) has nothing to cancel against and the run
+    continues.
     """
     if task_id is None:  # unpersisted fixture row: nothing to cancel against
         return
@@ -88,14 +95,34 @@ async def _raise_if_task_terminal(
     if status is not None and status in TASK_TERMINAL_STATUSES:
         raise TaskCancelledError(
             f"analytics task {task_id} reached terminal status {status!r}; "
-            "stopping at the batch boundary"
+            f"stopping at the {boundary} boundary"
         )
 
 
-def _payload_artifact_id(task: AnalyticsTask) -> uuid.UUID:
+def payload_window(task: AnalyticsTask, *, kind: str) -> tuple[date, date]:
+    """Parse + validate a refresh task's ``window_start``/``window_end``.
+
+    ``kind`` is the task-kind token used in the error messages (the owning
+    executor's name); every windowed executor parses the same payload
+    shape, so the parse lives here exactly once.
+    """
+    payload = task.payload or {}
+    raw_start = payload.get("window_start")
+    raw_end = payload.get("window_end")
+    if not raw_start or not raw_end:
+        raise ValueError(f"{kind} payload missing window_start/window_end")
+    window_start = date.fromisoformat(str(raw_start))
+    window_end = date.fromisoformat(str(raw_end))
+    if window_end < window_start:
+        raise ValueError(f"{kind} window_end before window_start")
+    return window_start, window_end
+
+
+def payload_artifact_id(task: AnalyticsTask, *, kind: str) -> uuid.UUID:
+    """Parse a task payload's ``import_artifact_id`` (fail loud when absent)."""
     raw = (task.payload or {}).get("import_artifact_id")
     if not raw:
-        raise ValueError("classify_referrals payload missing import_artifact_id")
+        raise ValueError(f"{kind} payload missing import_artifact_id")
     return uuid.UUID(str(raw))
 
 
@@ -176,7 +203,7 @@ async def run_classify_referrals(
     """
     if task.project_id is None:
         raise ValueError("classify_referrals task missing project_id")
-    artifact_id = _payload_artifact_id(task)
+    artifact_id = payload_artifact_id(task, kind="classify_referrals")
     async with session_factory() as session:
         artifact = await session.get(IntegrationImportArtifact, artifact_id)
         # Never classify events for an artifact outside the claimed task's
@@ -193,7 +220,7 @@ async def run_classify_referrals(
         window_start, window_end = sync_run.window_start, sync_run.window_end
 
         while True:
-            await _raise_if_task_terminal(session_factory, task.id)
+            await raise_if_task_terminal(session_factory, task.id)
             events = await _unclassified_events(
                 session,
                 workspace_id=task.workspace_id,
@@ -279,7 +306,7 @@ async def run_referral_retention_sweep(
     cutoff = datetime.now(UTC) - timedelta(days=REFERRAL_RETENTION_DAYS)
     async with session_factory() as session:
         while True:
-            await _raise_if_task_terminal(session_factory, task.id)
+            await raise_if_task_terminal(session_factory, task.id)
             deleted = await _delete_expired_batch(
                 session,
                 workspace_id=task.workspace_id,

@@ -29,7 +29,7 @@ import {
   type TrafficSyncEnqueueResponse,
 } from '@/lib/api/traffic';
 import { useProjectContext } from '@/lib/project/project-context';
-import { isActiveSyncRun, isSucceededSyncRun, TRAFFIC_SYNC_POLL_MS } from '@/lib/traffic/sync';
+import { isActiveSyncRun, isSucceededSyncRun, SYNC_RUN_POLL_MS } from '@/lib/integrations/sync-runs';
 import {
   bucketAdverb,
   countAxisTicks,
@@ -305,7 +305,7 @@ export function TrafficScreen() {
   });
 
   // Poll every enqueued run until it reaches a terminal queue status (the F5
-  // `refetchInterval` idiom at TRAFFIC_SYNC_POLL_MS). `useQueries` keeps the
+  // `refetchInterval` idiom at SYNC_RUN_POLL_MS). `useQueries` keeps the
   // hook count fixed across the variable run fan-out, and the terminal
   // statuses are read straight from the polled query data — never mirrored
   // into state — so the completion transition only touches the query cache.
@@ -316,8 +316,8 @@ export function TrafficScreen() {
         integrationsApi.getSync(run.connection_id, run.sync_run_id, { signal }),
       refetchInterval: (query: { state: { data?: IntegrationSyncRun } }) => {
         const polled = query.state.data;
-        if (!polled) return TRAFFIC_SYNC_POLL_MS;
-        return isActiveSyncRun(polled.status) ? TRAFFIC_SYNC_POLL_MS : false;
+        if (!polled) return SYNC_RUN_POLL_MS;
+        return isActiveSyncRun(polled.status) ? SYNC_RUN_POLL_MS : false;
       },
     })),
   });

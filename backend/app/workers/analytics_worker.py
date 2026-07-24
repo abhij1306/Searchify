@@ -16,13 +16,10 @@
 # persisted rows (invariant 7), so this worker takes no transport; the test
 # seam is the executor mapping override instead.
 #
-# DISPATCH TABLE: kinds without a landed executor map to a stub that raises
-# ``ExecutorNotWiredError`` (stamped as terminal ``executor_not_wired``,
-# never retried). A5 wired ``ingest_referrals``; A6 wired
-# ``classify_referrals`` + ``referral_retention_sweep``; A7 wired
-# ``traffic_snapshot_refresh``; A8 wired ``analytics_snapshot_refresh`` —
-# every declared kind now routes to a real executor, and the stub remains
-# only as the fail-loud path for a kind outside the table (a config bug).
+# DISPATCH TABLE: every declared kind routes to its real executor
+# (``EXECUTORS`` below). A claimed kind outside the table is a config bug
+# and fails loud: ``ExecutorNotWiredError`` is stamped as terminal
+# ``executor_not_wired``, never retried.
 from __future__ import annotations
 
 import asyncio
@@ -71,10 +68,10 @@ def _utcnow() -> datetime:
 
 
 class ExecutorNotWiredError(RuntimeError):
-    """A claimed task kind has no registered executor yet (A5/A6/A7/A8)."""
+    """A claimed task kind has no registered executor (a config bug)."""
 
 
-# Executor contract (A5+): one async callable per task kind. It receives the
+# Executor contract: one async callable per task kind. It receives the
 # session factory + the claimed queue row and performs the kind's projection
 # work (DB only — NO network I/O, invariant 7). The worker owns the queue
 # lifecycle around it (mark_running / heartbeat / finalize).
@@ -83,21 +80,7 @@ type AnalyticsExecutor = Callable[
 ]
 
 
-async def _executor_not_wired(
-    session_factory: async_sessionmaker[AsyncSession], task: AnalyticsTask
-) -> None:
-    # TODO(A6/A7/A8): those tasks register the real executor for this kind
-    # in ``EXECUTORS`` below; until then every claimed row fails loud.
-    raise ExecutorNotWiredError(
-        f"analytics task kind {task.task_kind!r} has no registered executor"
-    )
-
-
 # Kind dispatch table (invariant 2: one owner of kind -> executor routing).
-# Each executor-landing task substitutes its real executor for the stub on
-# its own line: A5 wired ingest_referrals; A6 wired classify_referrals +
-# referral_retention_sweep; A7 wired traffic_snapshot_refresh; A8 wired
-# analytics_snapshot_refresh (the last stub).
 EXECUTORS: dict[str, AnalyticsExecutor] = {
     ANALYTICS_TASK_KIND_INGEST_REFERRALS: ingest_referrals,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS: run_classify_referrals,
@@ -194,10 +177,12 @@ class AnalyticsWorker:
         try:
             if executor is None:
                 # A kind outside the dispatch table is a config bug — fail
-                # loud exactly like a not-yet-wired kind.
-                await _executor_not_wired(self._session_factory, claimed)
-            else:
-                await executor(self._session_factory, claimed)
+                # loud (terminal, without burning the retry budget).
+                raise ExecutorNotWiredError(
+                    f"analytics task kind {claimed.task_kind!r} has no "
+                    "registered executor"
+                )
+            await executor(self._session_factory, claimed)
         except Exception as exc:
             error = exc
         finally:

@@ -19,11 +19,11 @@ import {
   llmAnalyticsThemeListSchema,
   strictValidate,
   type aiSourceSchema,
-  type snapshotGranularitySchema,
 } from './schemas';
 import { definedQuery, withQuery } from './shared';
-
-type SnapshotGranularity = z.infer<typeof snapshotGranularitySchema>;
+// The snapshot-granularity vocabulary is OWNED by the traffic domain module
+// (the first surface to serve snapshot windows) — imported, never re-derived.
+import type { SnapshotGranularity } from './traffic';
 
 export type AiSource = z.infer<typeof aiSourceSchema>;
 export type LlmAnalytics = z.infer<typeof llmAnalyticsSchema>;

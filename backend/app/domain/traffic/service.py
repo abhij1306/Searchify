@@ -49,7 +49,6 @@ from app.core.config.integrations import (
     GRANT_STATUS_CONNECTED,
     MAPPING_STATUS_ACTIVE,
 )
-from app.core.config.task_queue import TASK_TERMINAL_STATUSES
 from app.core.config.traffic import (
     TRAFFIC_CONSUMED_DATASETS,
     TRAFFIC_DEFAULT_GRANULARITY,
@@ -63,14 +62,14 @@ from app.core.config.traffic import (
     TRAFFIC_SYNC_PROVIDERS,
     TRAFFIC_TABLE_PAGE_SIZE,
 )
-from app.domain.analytics.schemas import MetricSeriesPoint
-from app.domain.analytics.tasks import TaskCancelledError
+from app.domain.analytics.schemas import metric_series_points
+from app.domain.analytics.tasks import payload_window, raise_if_task_terminal
 from app.domain.site_health.normalization import (
-    CursorScopeError,
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
 from app.domain.traffic.projection import (
+    TRAFFIC_SERIES_NAMES,
     SnapshotProjection,
     TrafficMetricRowInput,
     build_traffic_projection,
@@ -106,38 +105,15 @@ async def _raise_if_task_terminal(
 ) -> None:
     """Cooperative-cancel boundary check (invariant 9).
 
-    Mirrors the A6 idiom (``domain/analytics/tasks.py``): re-read the queue
-    row in a FRESH session (never the work session's possibly-stale identity
-    map) and stop if it reached a terminal status. The refresh writes
-    nothing before its single write transaction, so stopping here leaves no
-    partial projection behind. A row that does not resolve (unpersisted
-    direct-invocation fixture) has nothing to cancel against.
+    Thin label adapter over the single owner (``domain/analytics/tasks.py``)
+    so this executor's message names its own batch boundary and tests keep
+    a module-local patch point. The refresh writes nothing before its
+    single write transaction, so stopping here leaves no partial
+    projection behind.
     """
-    if task_id is None:  # unpersisted fixture row: nothing to cancel against
-        return
-    async with session_factory() as session:
-        row = await session.get(AnalyticsTask, task_id)
-        status = row.status if row is not None else None
-    if status is not None and status in TASK_TERMINAL_STATUSES:
-        raise TaskCancelledError(
-            f"analytics task {task_id} reached terminal status {status!r}; "
-            "stopping at the metric-row batch boundary"
-        )
-
-
-def _payload_window(task: AnalyticsTask) -> tuple[date, date]:
-    payload = task.payload or {}
-    raw_start = payload.get("window_start")
-    raw_end = payload.get("window_end")
-    if not raw_start or not raw_end:
-        raise ValueError(
-            "traffic_snapshot_refresh payload missing window_start/window_end"
-        )
-    window_start = date.fromisoformat(str(raw_start))
-    window_end = date.fromisoformat(str(raw_end))
-    if window_end < window_start:
-        raise ValueError("traffic_snapshot_refresh window_end before window_start")
-    return window_start, window_end
+    await raise_if_task_terminal(
+        session_factory, task_id, boundary="metric-row batch"
+    )
 
 
 async def _metric_row_batch(
@@ -350,7 +326,7 @@ async def refresh_traffic_snapshot(
     """
     if task.project_id is None:
         raise ValueError("traffic_snapshot_refresh task missing project_id")
-    window_start, window_end = _payload_window(task)
+    window_start, window_end = payload_window(task, kind="traffic_snapshot_refresh")
     async with session_factory() as session:
         inputs: list[TrafficMetricRowInput] = []
         after_id: uuid.UUID | None = None
@@ -423,18 +399,6 @@ class TrafficCursorError(ValueError):
 # the endpoint + the active filters — site-health convention, contract C4).
 _PAGES_CURSOR_SCOPE = "traffic-pages"
 _QUERIES_CURSOR_SCOPE = "traffic-queries"
-
-# The six persisted series names of the headline projection (projection.py
-# writes exactly these into ``TrafficSnapshot.metrics["series"]``).
-_SERIES_NAMES: tuple[str, ...] = (
-    "impressions",
-    "clicks",
-    "ctr",
-    "position",
-    "sessions",
-    "conversions",
-)
-
 
 def _validate_window(from_date: date | None, to_date: date | None) -> None:
     """The from/to contract: both-or-neither, ordered, within the max span."""
@@ -535,20 +499,6 @@ def _totals(raw: object) -> TrafficTotals:
     )
 
 
-def _series(raw: object) -> list[MetricSeriesPoint]:
-    """Normalize a persisted series fragment into strict DTO points."""
-    points: list[MetricSeriesPoint] = []
-    for entry in raw if isinstance(raw, list) else []:
-        if not isinstance(entry, dict):
-            continue
-        points.append(
-            MetricSeriesPoint(
-                date=str(entry.get("date") or ""), value=entry.get("value")
-            )
-        )
-    return points
-
-
 def _empty_dashboard(
     *,
     project_id: uuid.UUID,
@@ -625,7 +575,10 @@ async def get_traffic_dashboard(
         granularity=snapshot.granularity,
         totals=_totals(metrics.get("totals")),
         series=TrafficSeries(
-            **{name: _series(series_raw.get(name)) for name in _SERIES_NAMES}
+            **{
+                name: metric_series_points(series_raw.get(name))
+                for name in TRAFFIC_SERIES_NAMES
+            }
         ),
         formula_version=snapshot.formula_version,
         normalization_version=snapshot.normalization_version,
@@ -662,9 +615,8 @@ def _decode_table_cursor(
             cursor, scope=scope, filters=filters
         )
         return (None if value_raw == "" else float(value_raw)), uuid.UUID(id_raw)
-    except CursorScopeError as exc:
-        raise TrafficCursorError(str(exc)) from exc
     except ValueError as exc:
+        # CursorScopeError is a ValueError subclass — one branch covers it.
         raise TrafficCursorError(str(exc)) from exc
 
 
@@ -762,6 +714,65 @@ def _query_row(stat: TrafficQueryStat) -> TrafficQueryRow:
     )
 
 
+async def _stat_table(
+    session: AsyncSession,
+    *,
+    model: type[TrafficPageStat] | type[TrafficQueryStat],
+    scope: str,
+    sort_whitelist: frozenset[str],
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    from_date: date | None,
+    to_date: date | None,
+    sort: str | None,
+    cursor: str | None,
+) -> tuple[list[Any], str | None]:
+    """The shared keyset-table read behind the pages/queries endpoints.
+
+    Validates the window, parses the whitelist-guarded sort, decodes the
+    fingerprint-bound cursor, loads the default-granularity snapshot (the
+    per-page/per-query folds are granularity-independent, so its stat rows
+    serve every table request — the A9 themes precedent), and returns its
+    persisted rows + continuation cursor. An absent snapshot yields an
+    empty page. Each endpoint owns only its model/scope/whitelist and the
+    row mapping below.
+    """
+    _validate_window(from_date, to_date)
+    sort_key, descending = _parse_sort(sort, whitelist=sort_whitelist)
+    normalized_sort = f"-{sort_key}" if descending else sort_key
+    filters = _table_filters(
+        project_id=project_id,
+        from_date=from_date,
+        to_date=to_date,
+        sort=normalized_sort,
+    )
+    keyset: tuple[float | None, uuid.UUID] | None = None
+    if cursor:
+        keyset = _decode_table_cursor(cursor, scope=scope, filters=filters)
+    snapshot = await _load_snapshot(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        from_date=from_date,
+        to_date=to_date,
+        granularity=TRAFFIC_DEFAULT_GRANULARITY,
+    )
+    if snapshot is None:
+        return [], None
+    return await _stat_page_rows(
+        session,
+        model=model,
+        scope=scope,
+        filters=filters,
+        snapshot_id=snapshot.id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        sort_key=sort_key,
+        descending=descending,
+        keyset=keyset,
+    )
+
+
 async def get_traffic_pages(
     session: AsyncSession,
     *,
@@ -775,48 +786,22 @@ async def get_traffic_pages(
     """Page the persisted per-page stat rows (keyset, contract C4).
 
     A pure read of the persisted ``TrafficPageStat`` rows of the snapshot
-    matching the window (invariant 7): the per-page fold is
-    granularity-independent, so the default-granularity snapshot's stat
-    rows serve every table request (the A9 themes precedent). The opaque
-    cursor is fingerprint-bound to this endpoint + the active filters, so a
-    replay against a different window/sort is rejected (400) instead of
-    silently skipping rows. An absent snapshot yields an empty page.
+    matching the window (invariant 7). The opaque cursor is
+    fingerprint-bound to this endpoint + the active filters, so a replay
+    against a different window/sort is rejected (400) instead of silently
+    skipping rows. An absent snapshot yields an empty page.
     """
-    _validate_window(from_date, to_date)
-    sort_key, descending = _parse_sort(sort, whitelist=TRAFFIC_PAGE_SORT_WHITELIST)
-    normalized_sort = f"-{sort_key}" if descending else sort_key
-    filters = _table_filters(
-        project_id=project_id,
-        from_date=from_date,
-        to_date=to_date,
-        sort=normalized_sort,
-    )
-    keyset: tuple[float | None, uuid.UUID] | None = None
-    if cursor:
-        keyset = _decode_table_cursor(
-            cursor, scope=_PAGES_CURSOR_SCOPE, filters=filters
-        )
-    snapshot = await _load_snapshot(
-        session,
-        workspace_id=workspace_id,
-        project_id=project_id,
-        from_date=from_date,
-        to_date=to_date,
-        granularity=TRAFFIC_DEFAULT_GRANULARITY,
-    )
-    if snapshot is None:
-        return TrafficPagesPage(items=[], next_cursor=None)
-    rows, next_cursor = await _stat_page_rows(
+    rows, next_cursor = await _stat_table(
         session,
         model=TrafficPageStat,
         scope=_PAGES_CURSOR_SCOPE,
-        filters=filters,
-        snapshot_id=snapshot.id,
+        sort_whitelist=TRAFFIC_PAGE_SORT_WHITELIST,
         workspace_id=workspace_id,
         project_id=project_id,
-        sort_key=sort_key,
-        descending=descending,
-        keyset=keyset,
+        from_date=from_date,
+        to_date=to_date,
+        sort=sort,
+        cursor=cursor,
     )
     return TrafficPagesPage(
         items=[_page_row(row) for row in rows], next_cursor=next_cursor
@@ -838,41 +823,17 @@ async def get_traffic_queries(
     Same contract as :func:`get_traffic_pages` over ``TrafficQueryStat``
     (GSC-only measures; the key is the normalized query string).
     """
-    _validate_window(from_date, to_date)
-    sort_key, descending = _parse_sort(sort, whitelist=TRAFFIC_QUERY_SORT_WHITELIST)
-    normalized_sort = f"-{sort_key}" if descending else sort_key
-    filters = _table_filters(
-        project_id=project_id,
-        from_date=from_date,
-        to_date=to_date,
-        sort=normalized_sort,
-    )
-    keyset: tuple[float | None, uuid.UUID] | None = None
-    if cursor:
-        keyset = _decode_table_cursor(
-            cursor, scope=_QUERIES_CURSOR_SCOPE, filters=filters
-        )
-    snapshot = await _load_snapshot(
-        session,
-        workspace_id=workspace_id,
-        project_id=project_id,
-        from_date=from_date,
-        to_date=to_date,
-        granularity=TRAFFIC_DEFAULT_GRANULARITY,
-    )
-    if snapshot is None:
-        return TrafficQueriesPage(items=[], next_cursor=None)
-    rows, next_cursor = await _stat_page_rows(
+    rows, next_cursor = await _stat_table(
         session,
         model=TrafficQueryStat,
         scope=_QUERIES_CURSOR_SCOPE,
-        filters=filters,
-        snapshot_id=snapshot.id,
+        sort_whitelist=TRAFFIC_QUERY_SORT_WHITELIST,
         workspace_id=workspace_id,
         project_id=project_id,
-        sort_key=sort_key,
-        descending=descending,
-        keyset=keyset,
+        from_date=from_date,
+        to_date=to_date,
+        sort=sort,
+        cursor=cursor,
     )
     return TrafficQueriesPage(
         items=[_query_row(row) for row in rows], next_cursor=next_cursor

@@ -164,7 +164,7 @@ async def test_sweep_honors_cooperative_cancel_at_batch_boundary(
     assert task is not None
 
     monkeypatch.setattr(analytics_tasks, "_RETENTION_DELETE_BATCH_SIZE", 1)
-    real_check = analytics_tasks._raise_if_task_terminal
+    real_check = analytics_tasks.raise_if_task_terminal
     checks = 0
 
     async def _cancel_on_second_check(
@@ -181,7 +181,7 @@ async def test_sweep_honors_cooperative_cancel_at_batch_boundary(
         await real_check(factory, row_id)
 
     monkeypatch.setattr(
-        analytics_tasks, "_raise_if_task_terminal", _cancel_on_second_check
+        analytics_tasks, "raise_if_task_terminal", _cancel_on_second_check
     )
 
     with pytest.raises(TaskCancelledError):

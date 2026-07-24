@@ -17,7 +17,17 @@ import type {
   LlmAnalytics,
 } from '@/lib/api/analytics';
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
+import { formatShortDate } from '@/lib/format';
 import { bucketAdjective, type AnalyticsGranularity } from './options';
+
+// The bucket-date / grouped-count / URL-split formatters are OWNED by
+// `@/lib/format` (shared with the traffic surface, invariant 2) —
+// re-exported here under the analytics-local names.
+export {
+  formatShortDate as formatBucketDate,
+  formatCount as formatInt,
+  splitUrlParts as splitLandingUrl,
+} from '@/lib/format';
 
 // Mirrors backend `app/core/config/analytics.py` CORRELATION_MIN_SAMPLE — the
 // minimum aligned bucket count before a Pearson coefficient is reported.
@@ -101,13 +111,6 @@ export function latestValue(points: readonly SeriesPoint[]): number | null {
     if (value !== null) return value;
   }
   return null;
-}
-
-const numberFormat = new Intl.NumberFormat('en-US');
-
-/** Grouped integer display ("1,847"). */
-export function formatInt(value: number): string {
-  return numberFormat.format(value);
 }
 
 /** A persisted 0–1 fraction as a percent string ("62%"); em-dash for null. */
@@ -263,16 +266,6 @@ export function formatOccurredAt(timestamp: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-/** Split a landing URL into a muted host + foreground path for the URL cell. */
-export function splitLandingUrl(url: string): { host: string; rest: string } {
-  try {
-    const parsed = new URL(url);
-    return { host: parsed.host, rest: `${parsed.pathname}${parsed.search}` };
-  } catch {
-    return { host: '', rest: url };
-  }
 }
 
 /** The whole-screen empty state: no referral, source, or visibility evidence. */

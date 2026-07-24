@@ -12,6 +12,7 @@
 import type { z } from 'zod';
 
 import type { snapshotGranularitySchema } from '@/lib/api/schemas';
+import { bucketAdjective } from '@/lib/format';
 
 export {
   RANGE_OPTIONS,
@@ -20,19 +21,12 @@ export {
   type TrendRange as AnalyticsRange,
 } from '@/lib/visibility/trends';
 
+// The granularity options + adjective form are OWNED by `@/lib/format`
+// (shared with the traffic surface, invariant 2) — re-exported here.
+export { bucketAdjective, GRANULARITY_OPTIONS } from '@/lib/format';
+
 /** Snapshot bucket granularity — mirrors the backend contract vocabulary. */
 export type AnalyticsGranularity = z.infer<typeof snapshotGranularitySchema>;
-
-export const GRANULARITY_OPTIONS: readonly { value: AnalyticsGranularity; label: string }[] = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-] as const;
-
-/** Adjective form used inside copy ("n = 12 weekly buckets"). */
-export function bucketAdjective(granularity: AnalyticsGranularity): string {
-  return granularity === 'day' ? 'daily' : granularity === 'week' ? 'weekly' : 'monthly';
-}
 
 /** Capitalized adjective for sentence-start copy ("Weekly visibility score…"). */
 export function bucketAdjectiveTitle(granularity: AnalyticsGranularity): string {

@@ -130,6 +130,41 @@ class IntegrationDispatcher:
             )
         return enqueued
 
+    async def _try_enqueue(
+        self,
+        *,
+        workspace_id: uuid.UUID,
+        connection_id: uuid.UUID,
+        label: str,
+        window_start: date | None = None,
+        window_end: date | None = None,
+    ) -> int:
+        """One scheduled ``enqueue_sync_run`` attempt: 1 enqueued, 0 skipped.
+
+        An ``ActiveWindowConflictError`` is the dedup contract — an active
+        run already covers the window, so the tick skips it; a validation
+        failure is logged and skipped.
+        """
+        async with self._session_factory() as session:
+            try:
+                await enqueue_sync_run(
+                    session,
+                    workspace_id=workspace_id,
+                    connection_id=connection_id,
+                    sync_kind=SYNC_KIND_SCHEDULED,
+                    window_start=window_start,
+                    window_end=window_end,
+                )
+                return 1
+            except ActiveWindowConflictError:
+                return 0
+            except (
+                IntegrationConnectionNotFoundError,
+                SyncWindowInvalidError,
+            ) as exc:
+                logger.warning("%s skipped: %s", label, exc)
+                return 0
+
     async def _enqueue_for_connection(
         self,
         *,
@@ -139,24 +174,13 @@ class IntegrationDispatcher:
     ) -> int:
         """Trailing-window run + late-data revision re-sync for one connection.
 
-        Both go through ``enqueue_sync_run`` (the one enqueue entry point);
-        an ``ActiveWindowConflictError`` is the dedup contract — an active
-        run already covers the window, so the tick skips it.
+        Both go through ``enqueue_sync_run`` (the one enqueue entry point).
         """
-        enqueued = 0
-        async with self._session_factory() as session:
-            try:
-                await enqueue_sync_run(
-                    session,
-                    workspace_id=workspace_id,
-                    connection_id=connection_id,
-                    sync_kind=SYNC_KIND_SCHEDULED,
-                )
-                enqueued += 1
-            except ActiveWindowConflictError:
-                pass
-            except (IntegrationConnectionNotFoundError, SyncWindowInvalidError) as exc:
-                logger.warning("scheduled sync enqueue skipped: %s", exc)
+        enqueued = await self._try_enqueue(
+            workspace_id=workspace_id,
+            connection_id=connection_id,
+            label="scheduled sync enqueue",
+        )
         # Late-data revision (spec §4): re-enqueue the trailing
         # ``sync_late_data_revision_days`` window (ends yesterday, the latest
         # complete UTC day — the same rule as the default trailing window).
@@ -166,21 +190,13 @@ class IntegrationDispatcher:
         late_start = late_end - timedelta(
             days=integration_settings.sync_late_data_revision_days - 1
         )
-        async with self._session_factory() as session:
-            try:
-                await enqueue_sync_run(
-                    session,
-                    workspace_id=workspace_id,
-                    connection_id=connection_id,
-                    sync_kind=SYNC_KIND_SCHEDULED,
-                    window_start=late_start,
-                    window_end=late_end,
-                )
-                enqueued += 1
-            except ActiveWindowConflictError:
-                pass
-            except (IntegrationConnectionNotFoundError, SyncWindowInvalidError) as exc:
-                logger.warning("late-data revision enqueue skipped: %s", exc)
+        enqueued += await self._try_enqueue(
+            workspace_id=workspace_id,
+            connection_id=connection_id,
+            label="late-data revision enqueue",
+            window_start=late_start,
+            window_end=late_end,
+        )
         return enqueued
 
     # --- pending_revocation retries -----------------------------------------
