@@ -28,6 +28,11 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analysis.product_service import (
+    analyze_task_products,
+    build_product_scoring_config,
+    finalize_audit_product_analysis,
+)
 from app.analysis.service import (
     analyze_task,
     build_scoring_config,
@@ -726,6 +731,13 @@ class AuditWorker:
             if analysis is not None:
                 task.score = analysis.score
 
+            # Sibling deterministic PRODUCT pass (Agentic Commerce): scores
+            # the frozen catalog against the same persisted answer and writes
+            # ProductResponseAnalysis/ProductMention rows (no-op on an empty
+            # frozen catalog). Never touches the brand-level rows above.
+            product_config = build_product_scoring_config(audit.configuration)
+            await analyze_task_products(session, task=task, config=product_config)
+
             # One ProviderAttempt per actual call (retries + final success).
             self._record_attempts(
                 session,
@@ -963,6 +975,10 @@ class AuditWorker:
                 if audit is not None:
                     await session.rollback()
                 return
+            # Product finalize first (same session/commit): upserts the
+            # per-product ProductMetricSnapshot rows from the persisted
+            # product analyses; the brand finalize below stays untouched.
+            await finalize_audit_product_analysis(session, audit=audit)
             await finalize_audit_analysis(session, audit=audit)
             await session.commit()
 

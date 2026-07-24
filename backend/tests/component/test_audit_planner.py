@@ -295,3 +295,98 @@ async def test_create_audit_rejects_unknown_or_disabled_prompt_ids(
         )
         assert audit.requested_count == 2
         assert len(enabled) == 2
+
+
+@pytest.mark.asyncio
+async def test_create_audit_freezes_product_catalog(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The catalog is frozen into ``configuration`` at creation (invariant 9).
+
+    The audit carries the frozen ``products``/``competitor_products`` identity
+    next to ``scoring_identity``; a later catalog edit does not alter the
+    already-created audit.
+    """
+    from decimal import Decimal
+
+    from app.models.brand import Competitor
+    from app.models.product import CompetitorProduct, Product
+
+    async with session_factory() as session:
+        seed = await seed_audit_fixtures(session, prompt_count=1)
+    async with session_factory() as session:
+        competitor = await session.scalar(
+            select(Competitor).where(Competitor.project_id == seed.project_id)
+        )
+        assert competitor is not None
+        session.add(
+            Product(
+                project_id=seed.project_id,
+                sku="VC-EB500-GR",
+                name="VoltCity Commuter 500",
+                aliases=["VoltCity 500"],
+                variants=[{"name": "Graphite", "sku": "VC-EB500-GR", "price": 2499.0}],
+                price=Decimal("2499.00"),
+                currency="USD",
+                url="https://acme.com/p/vc500",
+            )
+        )
+        session.add(
+            CompetitorProduct(
+                project_id=seed.project_id,
+                competitor_id=competitor.id,
+                name="Globex CityCommuter 450",
+                price=Decimal("2399.00"),
+                currency="USD",
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        audit = await _create(session, seed, seed_value="7", reps=1)
+        configuration = audit.configuration
+        assert [p["sku"] for p in configuration["products"]] == ["VC-EB500-GR"]
+        frozen = configuration["products"][0]
+        assert frozen["name"] == "VoltCity Commuter 500"
+        assert frozen["aliases"] == ["VoltCity 500"]
+        assert frozen["price"] == 2499.0
+        assert frozen["currency"] == "USD"
+        assert frozen["id"]
+        competitor_products = configuration["competitor_products"]
+        assert len(competitor_products) == 1
+        assert competitor_products[0]["name"] == "Globex CityCommuter 450"
+        assert competitor_products[0]["competitor_name"] == "Globex"
+        # The brand scoring identity is untouched by the catalog freeze.
+        assert configuration["brand_name"] == "Acme Corp"
+
+    # Later catalog edits never alter the frozen audit (deterministic
+    # re-scoring, invariant 9).
+    async with session_factory() as session:
+        product = await session.scalar(
+            select(Product).where(Product.project_id == seed.project_id)
+        )
+        assert product is not None
+        product.price = Decimal("1999.00")
+        product.name = "Renamed After Freeze"
+        await session.commit()
+    async with session_factory() as session:
+        from app.domain.audits.planner import get_audit
+
+        audit = await get_audit(
+            session, workspace_id=seed.workspace_id, audit_id=audit.id
+        )
+        frozen = audit.configuration["products"][0]
+        assert frozen["price"] == 2499.0
+        assert frozen["name"] == "VoltCity Commuter 500"
+
+
+@pytest.mark.asyncio
+async def test_create_audit_empty_catalog_freezes_empty_lists(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        seed = await seed_audit_fixtures(session, prompt_count=1)
+    async with session_factory() as session:
+        audit = await _create(session, seed, seed_value="7", reps=1)
+        assert audit.configuration["products"] == []
+        assert audit.configuration["competitor_products"] == []

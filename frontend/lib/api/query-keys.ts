@@ -9,6 +9,7 @@
  *   - integrations.ts — integrations (connections, sync runs)
  *   - traffic.ts      — traffic (dashboard, pages, queries)
  *   - analytics.ts    — LLM analytics (headline, referrals, themes)
+ *   - products.ts     — products (agentic commerce catalog + visibility)
  *
  * This facade re-assembles them under the historical `queryKeys` shape so the
  * 20+ existing importers keep the single `@/lib/api/query-keys` entry point.
@@ -24,6 +25,7 @@ import {
   workspaceKeys,
 } from './query-keys/core';
 import { integrationKeys } from './query-keys/integrations';
+import { productKeys } from './query-keys/products';
 import { runKeys, visibilityKeys } from './query-keys/runs';
 import { siteHealthKeys } from './query-keys/site-health';
 import { trafficKeys } from './query-keys/traffic';
@@ -42,4 +44,5 @@ export const queryKeys = {
   integrations: integrationKeys,
   traffic: trafficKeys,
   analytics: analyticsKeys,
+  products: productKeys,
 } as const;
