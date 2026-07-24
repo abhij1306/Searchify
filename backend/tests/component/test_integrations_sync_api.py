@@ -272,9 +272,7 @@ async def test_completed_window_resyncs_with_bumped_seq(
     assert second.status_code == 202
     assert second.json()["sync_run_id"] != first.json()["sync_run_id"]
 
-    detail = await client.get(
-        f"{_BASE}/{gsc.id}/syncs/{second.json()['sync_run_id']}"
-    )
+    detail = await client.get(f"{_BASE}/{gsc.id}/syncs/{second.json()['sync_run_id']}")
     assert detail.json()["resync_seq"] == 1
     # The completed run is retained with its own identity (invariant 3).
     old = await client.get(f"{_BASE}/{gsc.id}/syncs/{first.json()['sync_run_id']}")
@@ -344,9 +342,7 @@ async def test_get_sync_detail_404s(client: httpx.AsyncClient, db_session) -> No
     # A run is only addressable through its OWN connection.
     other_connection = await client.get(f"{_BASE}/{ga4.id}/syncs/{sync_run_id}")
     assert other_connection.status_code == 404
-    unknown_connection = await client.get(
-        f"{_BASE}/{uuid.uuid4()}/syncs/{sync_run_id}"
-    )
+    unknown_connection = await client.get(f"{_BASE}/{uuid.uuid4()}/syncs/{sync_run_id}")
     assert unknown_connection.status_code == 404
 
 

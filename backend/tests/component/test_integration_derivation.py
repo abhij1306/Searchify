@@ -87,9 +87,7 @@ def _gsc_transport() -> httpx.MockTransport:
         body = json.loads(request.content)
         dimensions = tuple(body.get("dimensions") or ())
         if "page" in dimensions:
-            return httpx.Response(
-                200, json=_fixture("gsc_search_analytics_page1.json")
-            )
+            return httpx.Response(200, json=_fixture("gsc_search_analytics_page1.json"))
         return httpx.Response(
             200, json=_fixture("gsc_search_analytics_query_page.json")
         )
@@ -170,9 +168,7 @@ async def _run_artifacts(
     return list(result)
 
 
-async def _run_metric_rows(
-    db_session, run_id: uuid.UUID
-) -> list[IntegrationMetricRow]:
+async def _run_metric_rows(db_session, run_id: uuid.UUID) -> list[IntegrationMetricRow]:
     artifact_ids = select(IntegrationImportArtifact.id).where(
         IntegrationImportArtifact.sync_run_id == run_id
     )
@@ -185,9 +181,7 @@ async def _run_metric_rows(
 
 
 @pytest.mark.asyncio
-async def test_derivation_provenance_on_every_row(
-    session_factory, db_session
-) -> None:
+async def test_derivation_provenance_on_every_row(session_factory, db_session) -> None:
     workspace_id, project_id, connection_id = await _seed_graph(db_session)
     run = await _enqueue_run(db_session, workspace_id, connection_id)
 
@@ -236,9 +230,7 @@ async def test_derivation_provenance_on_every_row(
     assert query_row.dimension_key == "searchify | 2026-07-20"
     assert query_row.date == date(2026, 7, 20)
     # Each row points at the artifact of ITS dataset (not just any artifact).
-    artifact_dataset = {
-        artifact.id: artifact.dataset for artifact in artifacts
-    }
+    artifact_dataset = {artifact.id: artifact.dataset for artifact in artifacts}
     for row in rows:
         assert artifact_dataset[row.source_artifact_id] == row.dataset
 
@@ -270,17 +262,13 @@ async def test_unmapped_property_fails_run(session_factory, db_session) -> None:
             )
         ).all()
     )
-    assert EVENT_INTEGRATION_SYNC_FINISHED not in [
-        event.event_type for event in events
-    ]
+    assert EVENT_INTEGRATION_SYNC_FINISHED not in [event.event_type for event in events]
     connection = await db_session.get(IntegrationConnection, connection_id)
     assert connection.last_synced_at is None
 
 
 @pytest.mark.asyncio
-async def test_resync_writes_new_rows_old_retained(
-    session_factory, db_session
-) -> None:
+async def test_resync_writes_new_rows_old_retained(session_factory, db_session) -> None:
     workspace_id, project_id, connection_id = await _seed_graph(db_session)
     run0 = await _enqueue_run(db_session, workspace_id, connection_id)
     await _run_worker(session_factory)
@@ -337,9 +325,7 @@ async def test_resync_writes_new_rows_old_retained(
 
 
 @pytest.mark.asyncio
-async def test_derivation_replay_is_a_dedup_noop(
-    session_factory, db_session
-) -> None:
+async def test_derivation_replay_is_a_dedup_noop(session_factory, db_session) -> None:
     workspace_id, _project_id, connection_id = await _seed_graph(db_session)
     run = await _enqueue_run(db_session, workspace_id, connection_id)
     await _run_worker(session_factory)

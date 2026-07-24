@@ -192,7 +192,14 @@ describe('trafficStats', () => {
   it('renders null ctr/position as placeholders (zero-impression window)', () => {
     const stats = trafficStats(
       dashboard({
-        totals: { impressions: 0, clicks: 0, ctr: null, position: null, sessions: 10, conversions: 1 },
+        totals: {
+          impressions: 0,
+          clicks: 0,
+          ctr: null,
+          position: null,
+          sessions: 10,
+          conversions: 1,
+        },
       }),
     );
     const byKey = Object.fromEntries(stats.map((s) => [s.key, s]));
@@ -230,7 +237,14 @@ describe('isEmptyDashboard', () => {
     const empty = dashboard({
       window_start: '',
       window_end: '',
-      totals: { impressions: 0, clicks: 0, ctr: null, position: null, sessions: null, conversions: null },
+      totals: {
+        impressions: 0,
+        clicks: 0,
+        ctr: null,
+        position: null,
+        sessions: null,
+        conversions: null,
+      },
       series: { impressions: [], clicks: [], ctr: [], position: [], sessions: [], conversions: [] },
     });
     expect(isEmptyDashboard(empty)).toBe(true);

@@ -170,12 +170,8 @@ async def test_analytics_queue_claims_by_task_kind(
     ingest = await queue.claim(
         owner="analytics-a", limit=10, kinds=[ANALYTICS_TASK_KIND_INGEST_REFERRALS]
     )
-    assert {t.id for t in ingest} == set(
-        seeded[ANALYTICS_TASK_KIND_INGEST_REFERRALS]
-    )
-    assert all(
-        t.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS for t in ingest
-    )
+    assert {t.id for t in ingest} == set(seeded[ANALYTICS_TASK_KIND_INGEST_REFERRALS])
+    assert all(t.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS for t in ingest)
     assert all(t.status == TASK_STATUS_LEASED for t in ingest)
 
     chain = await queue.claim(
@@ -290,14 +286,10 @@ async def test_analytics_queue_idempotency_key_unique(
     async with session_factory() as session:
         workspace_id, project_id = await _seed_workspace_project(session)
     async with session_factory() as session:
-        session.add(
-            _task(workspace_id, project_id, idempotency_key="shared-key")
-        )
+        session.add(_task(workspace_id, project_id, idempotency_key="shared-key"))
         await session.commit()
     async with session_factory() as session:
-        session.add(
-            _task(workspace_id, project_id, idempotency_key="shared-key")
-        )
+        session.add(_task(workspace_id, project_id, idempotency_key="shared-key"))
         with pytest.raises(IntegrityError):
             await session.commit()
 

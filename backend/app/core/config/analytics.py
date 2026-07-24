@@ -136,9 +136,7 @@ class AiReferralUtmRule:
 
     def __post_init__(self) -> None:
         if self.utm_source is None and self.utm_medium is None:
-            raise ValueError(
-                f"AiReferralUtmRule {self.rule_id!r} constrains nothing"
-            )
+            raise ValueError(f"AiReferralUtmRule {self.rule_id!r} constrains nothing")
 
 
 @dataclass(frozen=True)
@@ -161,13 +159,9 @@ class AiReferralUaRule:
 AI_REFERRAL_HOST_RULES: Final[tuple[AiReferralHostRule, ...]] = (
     AiReferralHostRule("host-chatgpt-com", "chatgpt.com", AI_SOURCE_CHATGPT),
     AiReferralHostRule("host-chat-openai-com", "chat.openai.com", AI_SOURCE_CHATGPT),
-    AiReferralHostRule(
-        "host-gemini-google-com", "gemini.google.com", AI_SOURCE_GEMINI
-    ),
+    AiReferralHostRule("host-gemini-google-com", "gemini.google.com", AI_SOURCE_GEMINI),
     AiReferralHostRule("host-claude-ai", "claude.ai", AI_SOURCE_CLAUDE),
-    AiReferralHostRule(
-        "host-perplexity-ai", "perplexity.ai", AI_SOURCE_PERPLEXITY
-    ),
+    AiReferralHostRule("host-perplexity-ai", "perplexity.ai", AI_SOURCE_PERPLEXITY),
     AiReferralHostRule(
         "host-copilot-microsoft-com", "copilot.microsoft.com", AI_SOURCE_COPILOT
     ),
@@ -183,26 +177,16 @@ AI_REFERRAL_UTM_RULES: Final[tuple[AiReferralUtmRule, ...]] = (
         AI_SOURCE_CHATGPT,
         utm_source="chat.openai.com",
     ),
-    AiReferralUtmRule(
-        "utm-source-chatgpt", AI_SOURCE_CHATGPT, utm_source="chatgpt"
-    ),
-    AiReferralUtmRule(
-        "utm-source-openai", AI_SOURCE_CHATGPT, utm_source="openai"
-    ),
+    AiReferralUtmRule("utm-source-chatgpt", AI_SOURCE_CHATGPT, utm_source="chatgpt"),
+    AiReferralUtmRule("utm-source-openai", AI_SOURCE_CHATGPT, utm_source="openai"),
     AiReferralUtmRule(
         "utm-source-gemini-google-com",
         AI_SOURCE_GEMINI,
         utm_source="gemini.google.com",
     ),
-    AiReferralUtmRule(
-        "utm-source-gemini", AI_SOURCE_GEMINI, utm_source="gemini"
-    ),
-    AiReferralUtmRule(
-        "utm-source-claude-ai", AI_SOURCE_CLAUDE, utm_source="claude.ai"
-    ),
-    AiReferralUtmRule(
-        "utm-source-claude", AI_SOURCE_CLAUDE, utm_source="claude"
-    ),
+    AiReferralUtmRule("utm-source-gemini", AI_SOURCE_GEMINI, utm_source="gemini"),
+    AiReferralUtmRule("utm-source-claude-ai", AI_SOURCE_CLAUDE, utm_source="claude.ai"),
+    AiReferralUtmRule("utm-source-claude", AI_SOURCE_CLAUDE, utm_source="claude"),
     AiReferralUtmRule(
         "utm-source-perplexity-ai",
         AI_SOURCE_PERPLEXITY,
@@ -216,9 +200,7 @@ AI_REFERRAL_UTM_RULES: Final[tuple[AiReferralUtmRule, ...]] = (
         AI_SOURCE_COPILOT,
         utm_source="copilot.microsoft.com",
     ),
-    AiReferralUtmRule(
-        "utm-source-copilot", AI_SOURCE_COPILOT, utm_source="copilot"
-    ),
+    AiReferralUtmRule("utm-source-copilot", AI_SOURCE_COPILOT, utm_source="copilot"),
     AiReferralUtmRule(
         "utm-source-google-ai-overview",
         AI_SOURCE_GOOGLE_AI_OVERVIEW,
@@ -230,15 +212,11 @@ AI_REFERRAL_UTM_RULES: Final[tuple[AiReferralUtmRule, ...]] = (
 AI_REFERRAL_UA_RULES: Final[tuple[AiReferralUaRule, ...]] = (
     AiReferralUaRule("ua-chatgpt-user", AI_SOURCE_CHATGPT, "chatgpt-user"),
     AiReferralUaRule("ua-claude-user", AI_SOURCE_CLAUDE, "claude-user"),
-    AiReferralUaRule(
-        "ua-perplexity-user", AI_SOURCE_PERPLEXITY, "perplexity-user"
-    ),
+    AiReferralUaRule("ua-perplexity-user", AI_SOURCE_PERPLEXITY, "perplexity-user"),
 )
 
 # --- Snapshot projection knobs -------------------------------------------------
-ANALYTICS_SNAPSHOT_GRANULARITIES: Final[frozenset[str]] = (
-    TRAFFIC_SNAPSHOT_GRANULARITIES
-)
+ANALYTICS_SNAPSHOT_GRANULARITIES: Final[frozenset[str]] = TRAFFIC_SNAPSHOT_GRANULARITIES
 ANALYTICS_DEFAULT_GRANULARITY: Final = TRAFFIC_GRANULARITY_DAY
 ANALYTICS_MAX_WINDOW_DAYS: Final = 480
 # Minimum age before a persisted AnalyticsSnapshot is rebuilt (rebuild

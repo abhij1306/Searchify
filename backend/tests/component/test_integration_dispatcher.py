@@ -266,9 +266,7 @@ async def test_pending_revocation_remote_retry_failure_retains_tokens(
             )
         ).all()
     )
-    assert [event.event_type for event in events] == [
-        EVENT_INTEGRATION_REVOKE_FAILED
-    ]
+    assert [event.event_type for event in events] == [EVENT_INTEGRATION_REVOKE_FAILED]
 
 
 @pytest.mark.asyncio

@@ -51,10 +51,7 @@ function SortableColumnHead({
   const active = sortKey(sort) === columnKey;
   const descending = sortDirection(sort) === 'descending';
   return (
-    <TableHead
-      numeric
-      aria-sort={active ? (descending ? 'descending' : 'ascending') : undefined}
-    >
+    <TableHead numeric aria-sort={active ? (descending ? 'descending' : 'ascending') : undefined}>
       <button
         type="button"
         onClick={() => onSort(columnKey)}

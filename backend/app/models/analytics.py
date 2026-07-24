@@ -260,9 +260,7 @@ class ReferralClassification(Base):
     __tablename__ = "referral_classifications"
     __table_args__ = (
         # One classification per referral event.
-        UniqueConstraint(
-            "referral_event_id", name="uq_referral_classification_event"
-        ),
+        UniqueConstraint("referral_event_id", name="uq_referral_classification_event"),
         # Same-workspace event parent (composite FK, invariant 5); event
         # deletion (retention sweep / import-batch delete) removes its
         # classification.
@@ -308,9 +306,7 @@ class ReferralClassification(Base):
     rule_version: Mapped[str] = mapped_column(
         String(64), default=AI_REFERRAL_RULE_VERSION
     )
-    analyzer_version: Mapped[str] = mapped_column(
-        String(64), default=ANALYZER_VERSION
-    )
+    analyzer_version: Mapped[str] = mapped_column(String(64), default=ANALYZER_VERSION)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
@@ -363,14 +359,10 @@ class AnalyticsSnapshot(Base):
     metrics: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # Provenance (invariant 4): the ReferralClassification ids folded in and
     # the MetricSnapshot ids folded in (JSONB id arrays).
-    source_classification_ids: Mapped[list | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    source_classification_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     source_snapshot_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     # Version stamps (invariant 4) — reused from config/analysis.py.
-    analyzer_version: Mapped[str] = mapped_column(
-        String(64), default=ANALYZER_VERSION
-    )
+    analyzer_version: Mapped[str] = mapped_column(String(64), default=ANALYZER_VERSION)
     formula_version: Mapped[str] = mapped_column(
         String(64), default=SCORING_RULE_VERSION
     )

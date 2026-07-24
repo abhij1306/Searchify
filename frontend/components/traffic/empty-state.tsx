@@ -27,7 +27,9 @@ export function TrafficEmptyState({
         </IconChip>
         <div className="grid gap-1">
           <h2 className={displayHeadingLgClasses}>
-            {hasConnections ? 'Your first sync is on its way' : 'Connect search data to see traffic'}
+            {hasConnections
+              ? 'Your first sync is on its way'
+              : 'Connect search data to see traffic'}
           </h2>
           <p className="text-secondary max-w-md text-sm">
             {hasConnections

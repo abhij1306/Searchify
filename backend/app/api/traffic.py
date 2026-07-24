@@ -85,9 +85,7 @@ def _unprocessable(exc: TrafficQueryError) -> HTTPException:
 def _bad_cursor(exc: TrafficCursorError) -> HTTPException:
     # A cursor replayed against different filters (or tampered/malformed)
     # is a 400 — never a silent row skip (site-health convention, C4).
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-    )
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/{project_id}/traffic", response_model=TrafficDashboardResponse)

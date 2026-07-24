@@ -368,9 +368,7 @@ async def test_create_ga4_mapping_malformed_id_rejected_422(
 
 
 @pytest.mark.asyncio
-async def test_list_and_disable_mapping(
-    client: httpx.AsyncClient, db_session
-) -> None:
+async def test_list_and_disable_mapping(client: httpx.AsyncClient, db_session) -> None:
     _ws, gsc, _ga4, project = await _setup(client, db_session, "map-list@example.com")
     for property_ref in ("sc-domain:acme.com", "https://acme.com/docs"):
         created = await client.post(

@@ -139,9 +139,7 @@ def _coerce_count(raw: object) -> int | None:
     return value if value >= 0 else None
 
 
-def _normalize_row(
-    row: object, template: IntegrationDatasetTemplate
-) -> dict | None:
+def _normalize_row(row: object, template: IntegrationDatasetTemplate) -> dict | None:
     """Map one raw ``d``-array row into the GSC-shaped contract row.
 
     ``Query`` carries the leading dimension value (page URL or query
@@ -176,9 +174,7 @@ class BingClient:
     uses the real network.
     """
 
-    def __init__(
-        self, *, transport: httpx.AsyncBaseTransport | None = None
-    ) -> None:
+    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
         self._pacer = RequestPacer()
 

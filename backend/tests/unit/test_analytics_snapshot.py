@@ -146,15 +146,33 @@ def test_select_latest_deterministic_regardless_of_input_order() -> None:
 def test_referral_volume_share_and_sources_by_bucket() -> None:
     facts = [
         # Day 1: 5 AI (4 chatgpt + 1 gemini) out of 13 total.
-        _fact(date(2026, 7, 20), ai_source=AI_SOURCE_CHATGPT, sessions=4,
-              dimension_key="https://chatgpt.com/ | 20260720"),
-        _fact(date(2026, 7, 20), ai_source=AI_SOURCE_GEMINI, sessions=1,
-              dimension_key="https://gemini.google.com/ | 20260720"),
-        _fact(date(2026, 7, 20), is_ai=False, ai_source=AI_SOURCE_OTHER, sessions=8,
-              dimension_key="https://example.com/ | 20260720"),
+        _fact(
+            date(2026, 7, 20),
+            ai_source=AI_SOURCE_CHATGPT,
+            sessions=4,
+            dimension_key="https://chatgpt.com/ | 20260720",
+        ),
+        _fact(
+            date(2026, 7, 20),
+            ai_source=AI_SOURCE_GEMINI,
+            sessions=1,
+            dimension_key="https://gemini.google.com/ | 20260720",
+        ),
+        _fact(
+            date(2026, 7, 20),
+            is_ai=False,
+            ai_source=AI_SOURCE_OTHER,
+            sessions=8,
+            dimension_key="https://example.com/ | 20260720",
+        ),
         # Day 2: measured, but NO AI referrals -> measured zero, share 0.
-        _fact(date(2026, 7, 21), is_ai=False, ai_source=AI_SOURCE_OTHER, sessions=6,
-              dimension_key="https://example.com/ | 20260721"),
+        _fact(
+            date(2026, 7, 21),
+            is_ai=False,
+            ai_source=AI_SOURCE_OTHER,
+            sessions=6,
+            dimension_key="https://example.com/ | 20260721",
+        ),
         # Day 3: no rows at all -> gap (None), never a coerced zero.
     ]
     projection = _build(referral_facts=facts)
@@ -234,13 +252,25 @@ def test_empty_evidence_yields_gaps_and_zero_sample_correlation() -> None:
 def test_engine_visibility_folds_completion_weighted_means() -> None:
     facts = [
         # Day 1: two audits covering chatgpt; weighted by completions.
-        _visibility(date(2026, 7, 20), score=50.0, total_completed=2,
-                    engine_scores=(("chatgpt", 50.0),)),
-        _visibility(date(2026, 7, 20), score=80.0, total_completed=6,
-                    engine_scores=(("chatgpt", 70.0),)),
+        _visibility(
+            date(2026, 7, 20),
+            score=50.0,
+            total_completed=2,
+            engine_scores=(("chatgpt", 50.0),),
+        ),
+        _visibility(
+            date(2026, 7, 20),
+            score=80.0,
+            total_completed=6,
+            engine_scores=(("chatgpt", 70.0),),
+        ),
         # Day 2: one audit covering both engines.
-        _visibility(date(2026, 7, 21), score=25.0, total_completed=4,
-                    engine_scores=(("chatgpt", 25.0), ("gemini", 75.0))),
+        _visibility(
+            date(2026, 7, 21),
+            score=25.0,
+            total_completed=4,
+            engine_scores=(("chatgpt", 25.0), ("gemini", 75.0)),
+        ),
     ]
     projection = _build(visibility_facts=facts)
 
@@ -302,13 +332,15 @@ def test_projection_correlation_aligns_only_days_with_both_series() -> None:
     # 8 days of visibility, but only 7 days carry referral facts -> the
     # unmatched visibility day drops out and the sample is 7 (< 8).
     visibility = [
-        _visibility(date(2026, 7, 1) + timedelta(days=i),
-                    score=float(10 + i))
+        _visibility(date(2026, 7, 1) + timedelta(days=i), score=float(10 + i))
         for i in range(8)
     ]
     referrals = [
-        _fact(date(2026, 7, 1) + timedelta(days=i),
-              sessions=i + 1, dimension_key=f"a | 2026070{i + 1}")
+        _fact(
+            date(2026, 7, 1) + timedelta(days=i),
+            sessions=i + 1,
+            dimension_key=f"a | 2026070{i + 1}",
+        )
         for i in range(7)  # day 8 has NO referral measurement
     ]
     projection = _build(
@@ -323,9 +355,7 @@ def test_projection_correlation_aligns_only_days_with_both_series() -> None:
 
     # One more aligned day (strictly rising both axes) reaches the floor:
     # a perfect positive correlation.
-    referrals.append(
-        _fact(date(2026, 7, 8), sessions=8, dimension_key="a | 20260708")
-    )
+    referrals.append(_fact(date(2026, 7, 8), sessions=8, dimension_key="a | 20260708"))
     projection = _build(
         referral_facts=referrals,
         visibility_facts=visibility,
@@ -339,13 +369,15 @@ def test_projection_correlation_aligns_only_days_with_both_series() -> None:
 
 def test_correlation_is_day_aligned_even_for_weekly_snapshots() -> None:
     visibility = [
-        _visibility(date(2026, 7, 1) + timedelta(days=i),
-                    score=float(10 + i))
+        _visibility(date(2026, 7, 1) + timedelta(days=i), score=float(10 + i))
         for i in range(8)
     ]
     referrals = [
-        _fact(date(2026, 7, 1) + timedelta(days=i),
-              sessions=i + 1, dimension_key=f"a | 2026070{i + 1}")
+        _fact(
+            date(2026, 7, 1) + timedelta(days=i),
+            sessions=i + 1,
+            dimension_key=f"a | 2026070{i + 1}",
+        )
         for i in range(8)
     ]
     projection = _build(

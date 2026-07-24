@@ -314,7 +314,9 @@ export function SetupForm({
                   error={errors.name?.message}
                   hint="Defaults to the brand name when blank."
                 >
-                  {(props) => <Input {...props} {...register('name')} placeholder="Searchify — US" />}
+                  {(props) => (
+                    <Input {...props} {...register('name')} placeholder="Searchify — US" />
+                  )}
                 </Field>
               ) : null}
             </div>

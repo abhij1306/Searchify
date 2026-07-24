@@ -344,9 +344,7 @@ async def test_refresh_builds_snapshots_stats_join_and_provenance(
         page_stats = list(
             (
                 await session.scalars(
-                    select(TrafficPageStat).where(
-                        TrafficPageStat.snapshot_id == day.id
-                    )
+                    select(TrafficPageStat).where(TrafficPageStat.snapshot_id == day.id)
                 )
             ).all()
         )
@@ -369,9 +367,7 @@ async def test_refresh_builds_snapshots_stats_join_and_provenance(
         # Its google/organic landing row is excluded (not an AI referral).
         assert page_b.metrics["sessions"] is None
         assert page_b.metrics["conversions"] is None
-        assert page_b.source_metric_row_ids == [
-            str(ids["included_row_ids"][2])
-        ]
+        assert page_b.source_metric_row_ids == [str(ids["included_row_ids"][2])]
 
         # Query stats: normalized key, GSC-only measures.
         query_stats = list(
@@ -412,8 +408,7 @@ async def test_refresh_upsert_is_idempotent_across_reruns(
     async with session_factory() as session:
         first = await _snapshots_by_granularity(session)
         first_metrics = {
-            granularity: snapshot.metrics
-            for granularity, snapshot in first.items()
+            granularity: snapshot.metrics for granularity, snapshot in first.items()
         }
 
     # A second run of the same task recomputes from the same latest rows:
@@ -539,9 +534,7 @@ async def test_refresh_honors_cooperative_cancel_at_metric_row_boundary(
         # transaction: no partial projection is left behind.
         assert await session.scalar(select(func.count(TrafficSnapshot.id))) == 0
         assert await session.scalar(select(func.count(TrafficPageStat.id))) == 0
-        assert (
-            await session.scalar(select(func.count(TrafficQueryStat.id))) == 0
-        )
+        assert await session.scalar(select(func.count(TrafficQueryStat.id))) == 0
 
 
 @pytest.mark.asyncio

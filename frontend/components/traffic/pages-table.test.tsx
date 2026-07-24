@@ -88,9 +88,7 @@ describe('PagesTable', () => {
 
     // A new column sorts descending first.
     await ue.click(within(table).getByRole('button', { name: 'Impressions' }));
-    await waitFor(() =>
-      expect(seen.at(-1)?.searchParams.get('sort')).toBe('-impressions'),
-    );
+    await waitFor(() => expect(seen.at(-1)?.searchParams.get('sort')).toBe('-impressions'));
     const impressionsHead = within(table).getByRole('columnheader', { name: 'Impressions' });
     expect(impressionsHead).toHaveAttribute('aria-sort', 'descending');
     expect(within(table).getByText('Sorted by impressions, descending')).toBeInTheDocument();

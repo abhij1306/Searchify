@@ -506,9 +506,7 @@ async def test_workspace_delete_cascades_graph(
             IntegrationImportArtifact,
         ):
             remaining = (
-                await session.scalars(
-                    select(model).where(model.workspace_id == ws_id)
-                )
+                await session.scalars(select(model).where(model.workspace_id == ws_id))
             ).all()
             assert remaining == [], model.__tablename__
 

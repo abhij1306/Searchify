@@ -331,9 +331,7 @@ async def test_fixture_import_refresh_artifacts_derivation(
     ]
     tasks = list((await db_session.scalars(select(AnalyticsTask))).all())
     ingest_tasks = [
-        task
-        for task in tasks
-        if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
+        task for task in tasks if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
     ]
     refresh_tasks = [
         task

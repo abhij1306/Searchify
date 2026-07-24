@@ -58,9 +58,10 @@ describe('QueriesTable', () => {
     expect(within(table).getByText('12.8%')).toBeInTheDocument();
     expect(within(table).getByText('1.1')).toBeInTheDocument();
     expect(within(table).getByText('Sorted by clicks, descending')).toBeInTheDocument();
-    expect(
-      within(table).getByRole('columnheader', { name: 'Clicks' }),
-    ).toHaveAttribute('aria-sort', 'descending');
+    expect(within(table).getByRole('columnheader', { name: 'Clicks' })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
   });
 
   it('renders null position as the em-dash placeholder', async () => {
@@ -113,15 +114,11 @@ describe('QueriesTable', () => {
     await within(table).findByText('best trail running shoes 2026');
 
     await ue.click(within(table).getByRole('button', { name: 'Next' }));
-    expect(
-      await within(table).findByText('marathon training plan beginner'),
-    ).toBeInTheDocument();
+    expect(await within(table).findByText('marathon training plan beginner')).toBeInTheDocument();
     expect(within(table).queryByText('best trail running shoes 2026')).not.toBeInTheDocument();
 
     await ue.click(within(table).getByRole('button', { name: 'Previous' }));
-    expect(
-      await within(table).findByText('best trail running shoes 2026'),
-    ).toBeInTheDocument();
+    expect(await within(table).findByText('best trail running shoes 2026')).toBeInTheDocument();
   });
 
   it('renders the empty note when the window has no query stats', async () => {

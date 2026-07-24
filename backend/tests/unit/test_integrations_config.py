@@ -80,9 +80,7 @@ def test_status_and_kind_tokens() -> None:
     assert INTEGRATION_GRANT_STATUSES == frozenset(
         {"connected", "needs_reauth", "pending_revocation", "revoked", "error"}
     )
-    assert INTEGRATION_SYNC_KINDS == frozenset(
-        {"scheduled", "on_demand", "backfill"}
-    )
+    assert INTEGRATION_SYNC_KINDS == frozenset({"scheduled", "on_demand", "backfill"})
 
 
 def test_oauth_endpoints_per_transport_https_and_allow_listed() -> None:

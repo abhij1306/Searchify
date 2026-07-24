@@ -390,9 +390,7 @@ def test_query_rows_feed_query_stats_but_never_totals() -> None:
     )
     # Totals come from the page dataset only — no double counting.
     assert projection.metrics["totals"]["clicks"] == 10
-    assert [q.normalized_query for q in projection.queries] == [
-        "best crm tools"
-    ]
+    assert [q.normalized_query for q in projection.queries] == ["best crm tools"]
     assert projection.queries[0].metrics["clicks"] == 7
     # The query row IS provenance (it fed a query stat).
     assert str(rows[1].id) in projection.source_metric_row_ids
@@ -689,8 +687,5 @@ def test_unpack_dimension_key_right_peels_separator_inside_leading_value() -> No
 
 
 def test_unpack_dimension_key_rejects_wrong_arity_and_unknown_dataset() -> None:
-    assert (
-        unpack_dimension_key(DATASET_GSC_PAGE_DAILY, "https://example.com/a")
-        is None
-    )
+    assert unpack_dimension_key(DATASET_GSC_PAGE_DAILY, "https://example.com/a") is None
     assert unpack_dimension_key("bing_unknown_daily", "a | b") is None

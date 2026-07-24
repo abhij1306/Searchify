@@ -121,9 +121,7 @@ async def test_snapshot_unique_per_project_window_granularity(
     async with session_factory() as session:
         session.add(_snapshot(ws_id, project_id, granularity="week"))
         session.add(
-            _snapshot(
-                ws_id, project_id, window=(date(2026, 6, 1), date(2026, 6, 28))
-            )
+            _snapshot(ws_id, project_id, window=(date(2026, 6, 1), date(2026, 6, 28)))
         )
         await session.commit()
 

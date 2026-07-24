@@ -114,7 +114,10 @@ const NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10] as const;
  * all-zero series get a minimal domain.
  */
 export function countDomainMax(series: readonly TrafficSeriesPoint[]): number {
-  const max = series.reduce((acc, point) => (point.value !== null && point.value > acc ? point.value : acc), 0);
+  const max = series.reduce(
+    (acc, point) => (point.value !== null && point.value > acc ? point.value : acc),
+    0,
+  );
   if (max <= 0) return 10;
   const exponent = Math.floor(Math.log10(max));
   for (const e of [exponent - 1, exponent, exponent + 1]) {
@@ -159,7 +162,8 @@ export const NULL_PLACEHOLDER = '—';
 // Headline stat cards
 // ---------------------------------------------------------------------------
 
-export type TrafficStatKey = 'impressions' | 'clicks' | 'ctr' | 'position' | 'sessions' | 'conversions';
+export type TrafficStatKey =
+  'impressions' | 'clicks' | 'ctr' | 'position' | 'sessions' | 'conversions';
 
 export type TrafficStat = {
   key: TrafficStatKey;
@@ -175,7 +179,9 @@ export type TrafficStat = {
 };
 
 /** The last two AVAILABLE points of a series (nulls are unmeasured buckets). */
-function latestPair(series: readonly TrafficSeriesPoint[]): { latest: number; prior: number } | null {
+function latestPair(
+  series: readonly TrafficSeriesPoint[],
+): { latest: number; prior: number } | null {
   const available = series.filter((point) => point.value !== null);
   if (available.length < 2) return null;
   return {
@@ -254,10 +260,24 @@ export function trafficStats(dashboard: TrafficDashboard): TrafficStat[] {
     nullNote: string,
   ): TrafficStat => {
     if (value === null) {
-      return { key, label, value: NULL_PLACEHOLDER, delta: nullNote, tone: 'flat', placeholder: true };
+      return {
+        key,
+        label,
+        value: NULL_PLACEHOLDER,
+        delta: nullNote,
+        tone: 'flat',
+        placeholder: true,
+      };
     }
     const delta = countDelta(metricSeries, noun);
-    return { key, label, value: formatCount(value), delta: delta.text, tone: delta.tone, placeholder: false };
+    return {
+      key,
+      label,
+      value: formatCount(value),
+      delta: delta.text,
+      tone: delta.tone,
+      placeholder: false,
+    };
   };
 
   const ctr = totals.ctr;
@@ -269,13 +289,47 @@ export function trafficStats(dashboard: TrafficDashboard): TrafficStat[] {
     countStat('impressions', 'Impressions', totals.impressions, series.impressions, ''),
     countStat('clicks', 'Clicks', totals.clicks, series.clicks, ''),
     ctr === null
-      ? { key: 'ctr', label: 'CTR', value: NULL_PLACEHOLDER, delta: 'No impressions in window', tone: 'flat', placeholder: true }
-      : { key: 'ctr', label: 'CTR', value: formatCtr(ctr, 2), delta: ctrD.text, tone: ctrD.tone, placeholder: false },
+      ? {
+          key: 'ctr',
+          label: 'CTR',
+          value: NULL_PLACEHOLDER,
+          delta: 'No impressions in window',
+          tone: 'flat',
+          placeholder: true,
+        }
+      : {
+          key: 'ctr',
+          label: 'CTR',
+          value: formatCtr(ctr, 2),
+          delta: ctrD.text,
+          tone: ctrD.tone,
+          placeholder: false,
+        },
     position === null
-      ? { key: 'position', label: 'Avg position', value: NULL_PLACEHOLDER, delta: 'No impressions in window', tone: 'flat', placeholder: true }
-      : { key: 'position', label: 'Avg position', value: formatPosition(position), delta: positionD.text, tone: positionD.tone, placeholder: false },
+      ? {
+          key: 'position',
+          label: 'Avg position',
+          value: NULL_PLACEHOLDER,
+          delta: 'No impressions in window',
+          tone: 'flat',
+          placeholder: true,
+        }
+      : {
+          key: 'position',
+          label: 'Avg position',
+          value: formatPosition(position),
+          delta: positionD.text,
+          tone: positionD.tone,
+          placeholder: false,
+        },
     countStat('sessions', 'Sessions', totals.sessions, series.sessions, 'No GA4 data in window'),
-    countStat('conversions', 'Conversions', totals.conversions, series.conversions, 'No GA4 data in window'),
+    countStat(
+      'conversions',
+      'Conversions',
+      totals.conversions,
+      series.conversions,
+      'No GA4 data in window',
+    ),
   ];
 }
 

@@ -51,7 +51,11 @@ export type TrafficTableParams = {
 };
 
 export const trafficApi = {
-  getTraffic: async (projectId: string, params?: TrafficWindowParams, options?: ApiRequestOptions) => {
+  getTraffic: async (
+    projectId: string,
+    params?: TrafficWindowParams,
+    options?: ApiRequestOptions,
+  ) => {
     const path = withQuery(`/projects/${projectId}/traffic`, definedQuery(params));
     const res = await apiClient.get<TrafficDashboard>(path, options);
     return strictValidate(trafficDashboardSchema, res, 'traffic.getTraffic');

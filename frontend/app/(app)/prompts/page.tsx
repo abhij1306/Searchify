@@ -28,7 +28,7 @@ function PromptsScreen() {
   const modeParam = useSearchParams().get('mode');
   // Local override for the in-page toggle buttons; null = follow the URL.
   const [override, setOverride] = useState<boolean | null>(null);
-  const managing = override ?? (modeParam === 'manage');
+  const managing = override ?? modeParam === 'manage';
 
   // Exiting manage mode clears both the override and the URL param, so the
   // read view's `/prompts?mode=manage` links keep working (they would

@@ -127,9 +127,7 @@ class _ProviderFake:
             )
         if self._empty:
             return httpx.Response(200, json={"rowCount": 0})
-        dimensions = tuple(
-            entry.get("name") for entry in body.get("dimensions") or ()
-        )
+        dimensions = tuple(entry.get("name") for entry in body.get("dimensions") or ())
         offset = int(body.get("offset") or 0)
         if "sessionDefaultChannelGroup" in dimensions:
             if offset:
@@ -316,9 +314,13 @@ async def test_fixture_import_refresh_artifacts_derivation(
     ]
     # Every call hit the pinned runReport path for the connection's
     # property ref (SSRF allow-listed host).
-    assert fake.ga4_urls == [
-        f"https://analyticsdata.googleapis.com/v1beta/properties/{_PROPERTY_REF}:runReport"
-    ] * 5
+    assert (
+        fake.ga4_urls
+        == [
+            f"https://analyticsdata.googleapis.com/v1beta/properties/{_PROPERTY_REF}:runReport"
+        ]
+        * 5
+    )
 
     artifacts = await _artifacts(db_session, run.id)
     by_dataset: dict[str, list[IntegrationImportArtifact]] = {}
@@ -400,9 +402,7 @@ async def test_fixture_import_refresh_artifacts_derivation(
     ]
     tasks = list((await db_session.scalars(select(AnalyticsTask))).all())
     ingest_tasks = [
-        task
-        for task in tasks
-        if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
+        task for task in tasks if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
     ]
     refresh_tasks = [
         task

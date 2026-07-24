@@ -349,15 +349,11 @@ async def list_sync_runs(
     row_counts = _row_count_subquery()
     result = await session.execute(
         select(IntegrationSyncRun, func.coalesce(row_counts.c.row_count, 0))
-        .outerjoin(
-            row_counts, row_counts.c.sync_run_id == IntegrationSyncRun.id
-        )
+        .outerjoin(row_counts, row_counts.c.sync_run_id == IntegrationSyncRun.id)
         .where(IntegrationSyncRun.connection_id == connection.id)
         .order_by(IntegrationSyncRun.created_at.desc(), IntegrationSyncRun.id.desc())
     )
-    return [
-        _to_run_response(run, int(row_count)) for run, row_count in result.all()
-    ]
+    return [_to_run_response(run, int(row_count)) for run, row_count in result.all()]
 
 
 async def get_sync_run(
@@ -374,9 +370,7 @@ async def get_sync_run(
     row_counts = _row_count_subquery()
     result = await session.execute(
         select(IntegrationSyncRun, func.coalesce(row_counts.c.row_count, 0))
-        .outerjoin(
-            row_counts, row_counts.c.sync_run_id == IntegrationSyncRun.id
-        )
+        .outerjoin(row_counts, row_counts.c.sync_run_id == IntegrationSyncRun.id)
         .where(
             IntegrationSyncRun.connection_id == connection.id,
             IntegrationSyncRun.id == sync_run_id,

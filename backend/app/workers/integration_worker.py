@@ -410,8 +410,7 @@ class IntegrationWorker:
             now = _utcnow()
             skew = timedelta(seconds=integration_settings.token_refresh_skew_seconds)
             near_expiry = (
-                grant.token_expires_at is None
-                or grant.token_expires_at <= now + skew
+                grant.token_expires_at is None or grant.token_expires_at <= now + skew
             )
             if not near_expiry:
                 access_token = decrypt_secret(grant.access_token_encrypted)

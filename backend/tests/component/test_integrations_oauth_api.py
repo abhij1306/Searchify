@@ -187,9 +187,7 @@ async def test_google_connect_happy_path_shared_grant(
     assert _GOOGLE_CLIENT_SECRET not in location
 
     # The state row is persisted, unconsumed, and bound to the workspace/user.
-    state_row = (
-        await db_session.execute(select(IntegrationOAuthState))
-    ).scalar_one()
+    state_row = (await db_session.execute(select(IntegrationOAuthState))).scalar_one()
     assert state_row.consumed_at is None
     assert state_row.provider == "gsc"
 

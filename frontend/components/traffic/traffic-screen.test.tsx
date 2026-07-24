@@ -66,11 +66,7 @@ const dashboardPayload = {
     clicks: [point('2026-07-21', 1320), point('2026-07-22', 1401), point('2026-07-23', 1463)],
     ctr: [point('2026-07-22', 0.0297), point('2026-07-23', 0.0317)],
     position: [point('2026-07-22', 8.9), point('2026-07-23', 8.3)],
-    sessions: [
-      point('2026-07-21', 18200),
-      point('2026-07-22', null),
-      point('2026-07-23', 19404),
-    ],
+    sessions: [point('2026-07-21', 18200), point('2026-07-22', null), point('2026-07-23', 19404)],
     conversions: [point('2026-07-22', 612), point('2026-07-23', 640)],
   },
   formula_version: 'traffic-formula-1',
@@ -81,7 +77,14 @@ const dashboardPayload = {
 // echoed — the read endpoints never recompute.
 const emptyPayload = {
   ...dashboardPayload,
-  totals: { impressions: 0, clicks: 0, ctr: null, position: null, sessions: null, conversions: null },
+  totals: {
+    impressions: 0,
+    clicks: 0,
+    ctr: null,
+    position: null,
+    sessions: null,
+    conversions: null,
+  },
   series: { impressions: [], clicks: [], ctr: [], position: [], sessions: [], conversions: [] },
 };
 
@@ -199,17 +202,15 @@ describe('TrafficScreen — populated dashboard', () => {
 
     // Toolbar: the latest-window preset + day granularity selected, mono note.
     const toolbar = await screen.findByTestId('traffic-toolbar');
-    expect(
-      within(toolbar).getByRole('button', { name: 'Select date range' }),
-    ).toHaveTextContent('Latest synced window');
+    expect(within(toolbar).getByRole('button', { name: 'Select date range' })).toHaveTextContent(
+      'Latest synced window',
+    );
     const group = within(toolbar).getByRole('radiogroup', { name: 'Snapshot granularity' });
     expect(within(group).getByRole('radio', { name: 'Day' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
-    expect(
-      within(toolbar).getByText('Last synced Jul 23, 2026 · 18:14 UTC'),
-    ).toBeInTheDocument();
+    expect(within(toolbar).getByText('Last synced Jul 23, 2026 · 18:14 UTC')).toBeInTheDocument();
 
     // The default mode sends no window bounds — granularity only.
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
@@ -221,9 +222,7 @@ describe('TrafficScreen — populated dashboard', () => {
     // fraction renders as a percent, the position delta inverts its tone).
     const stats = await screen.findByTestId('traffic-stats');
     expect(within(stats).getByTestId('stat-impressions')).toHaveTextContent('1,162,000');
-    expect(within(stats).getByTestId('stat-impressions')).toHaveTextContent(
-      '+5.3% vs. prior day',
-    );
+    expect(within(stats).getByTestId('stat-impressions')).toHaveTextContent('+5.3% vs. prior day');
     expect(within(stats).getByTestId('stat-clicks')).toHaveTextContent('36,400');
     expect(within(stats).getByTestId('stat-ctr')).toHaveTextContent('3.17%');
     expect(within(stats).getByTestId('stat-ctr')).toHaveTextContent('+0.2 pts vs. prior day');
@@ -238,9 +237,7 @@ describe('TrafficScreen — populated dashboard', () => {
     expect(within(ctrCard).getByText('Click-through rate · 0–100% scale')).toBeInTheDocument();
     expect(within(ctrCard).getByText('100%')).toBeInTheDocument();
     const impressionsCard = screen.getByTestId('trend-chart-impressions');
-    expect(
-      within(impressionsCard).getByText('Google Search Console · daily'),
-    ).toBeInTheDocument();
+    expect(within(impressionsCard).getByText('Google Search Console · daily')).toBeInTheDocument();
     expect(within(impressionsCard).getByText('60K')).toBeInTheDocument();
     expect(screen.getByTestId('trend-chart-clicks')).toBeInTheDocument();
     expect(screen.getByTestId('trend-chart-average-position')).toBeInTheDocument();
@@ -333,9 +330,9 @@ describe('TrafficScreen — empty + bounded-miss states', () => {
     expect(screen.getByTestId('traffic-toolbar')).toBeInTheDocument();
     expect(screen.queryByTestId('traffic-stats')).not.toBeInTheDocument();
     await waitFor(() =>
-      expect(
-        seen.some((url) => url.searchParams.has('from') && url.searchParams.has('to')),
-      ).toBe(true),
+      expect(seen.some((url) => url.searchParams.has('from') && url.searchParams.has('to'))).toBe(
+        true,
+      ),
     );
   });
 });

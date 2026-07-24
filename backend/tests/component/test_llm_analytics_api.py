@@ -233,12 +233,8 @@ async def _seed_chain(
     session: AsyncSession, *, workspace_id: uuid.UUID, project_id: uuid.UUID
 ) -> None:
     """The full A8 fixture chain (referral side + audit side), committed."""
-    await _seed_referral_rows(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
-    await _seed_audit_rows(
-        session, workspace_id=workspace_id, project_id=project_id
-    )
+    await _seed_referral_rows(session, workspace_id=workspace_id, project_id=project_id)
+    await _seed_audit_rows(session, workspace_id=workspace_id, project_id=project_id)
     await session.commit()
 
 
@@ -320,9 +316,7 @@ async def test_empty_states_when_no_snapshot(client: httpx.AsyncClient) -> None:
     assert body["formula_version"] == SCORING_RULE_VERSION
 
     # An explicit window is echoed in the empty payload.
-    resp = await client.get(
-        base, params={"from": "2026-07-01", "to": "2026-07-07"}
-    )
+    resp = await client.get(base, params={"from": "2026-07-01", "to": "2026-07-07"})
     assert resp.status_code == 200
     assert resp.json()["window_start"] == "2026-07-01"
     assert resp.json()["window_end"] == "2026-07-07"
@@ -359,9 +353,7 @@ async def test_headline_serves_persisted_snapshot(
     )
     base = f"/api/v1/projects/{project_id}/llm-analytics"
 
-    resp = await client.get(
-        base, params={"from": "2026-07-20", "to": "2026-07-22"}
-    )
+    resp = await client.get(base, params={"from": "2026-07-20", "to": "2026-07-22"})
     assert resp.status_code == 200
     body = resp.json()
     assert set(body) == _HEADLINE_KEYS
@@ -424,9 +416,7 @@ async def test_headline_serves_persisted_snapshot(
     assert latest.status_code == 200
     assert latest.json()["window_start"] == "2026-07-20"
     assert latest.json()["window_end"] == "2026-07-22"
-    assert [
-        point["value"] for point in latest.json()["referral_volume"]
-    ] == [4, 1, 2]
+    assert [point["value"] for point in latest.json()["referral_volume"]] == [4, 1, 2]
 
     # The week granularity collapses to one bucket at the window start; the
     # day-aligned correlation is granularity-independent.
@@ -436,9 +426,7 @@ async def test_headline_serves_persisted_snapshot(
     )
     assert week.status_code == 200
     assert week.json()["granularity"] == "week"
-    assert week.json()["referral_volume"] == [
-        {"date": "2026-07-20", "value": 7}
-    ]
+    assert week.json()["referral_volume"] == [{"date": "2026-07-20", "value": 7}]
     assert week.json()["correlation"] == body["correlation"]
 
 
@@ -469,9 +457,7 @@ async def test_snapshot_without_visibility_serves_insufficient_data(
     )
     base = f"/api/v1/projects/{project_id}/llm-analytics"
 
-    resp = await client.get(
-        base, params={"from": "2026-07-20", "to": "2026-07-22"}
-    )
+    resp = await client.get(base, params={"from": "2026-07-20", "to": "2026-07-22"})
     assert resp.status_code == 200
     body = resp.json()
     assert set(body) == _HEADLINE_KEYS
@@ -640,16 +626,10 @@ async def test_referrals_keyset_paging_and_source_filter(
     assert body3["next_cursor"] is None
 
     # No overlap + strictly descending occurred_at across the traversal.
-    seen = [
-        item["id"]
-        for body in (body1, body2, body3)
-        for item in body["items"]
-    ]
+    seen = [item["id"] for body in (body1, body2, body3) for item in body["items"]]
     assert len(seen) == len(set(seen)) == 5
     occurred = [
-        item["occurred_at"]
-        for body in (body1, body2, body3)
-        for item in body["items"]
+        item["occurred_at"] for body in (body1, body2, body3) for item in body["items"]
     ]
     assert occurred == sorted(occurred, reverse=True)
 
@@ -691,9 +671,7 @@ async def test_referrals_keyset_paging_and_source_filter(
     assert fbody2["next_cursor"] is None
 
     # The from/to window filters on occurred_at (inclusive days).
-    windowed = await client.get(
-        url, params={"from": "2026-07-21", "to": "2026-07-22"}
-    )
+    windowed = await client.get(url, params={"from": "2026-07-21", "to": "2026-07-22"})
     assert windowed.status_code == 200
     assert [item["id"] for item in windowed.json()["items"]] == [
         str(ids["c_newest"]),
@@ -717,9 +695,7 @@ async def test_referrals_excludes_superseded_resync_revisions(
     project_id, workspace_id = await _create_project(client)
     ws_id, proj_id = uuid.UUID(workspace_id), uuid.UUID(project_id)
     async with session_factory() as session:
-        seed0 = await seed_ga4_import(
-            session, workspace_id=ws_id, project_id=proj_id
-        )
+        seed0 = await seed_ga4_import(session, workspace_id=ws_id, project_id=proj_id)
         stale_row = await seed_metric_row(
             session,
             seed=seed0,
@@ -837,9 +813,7 @@ async def test_referrals_cursor_replay_with_different_filters_400(
     assert dropped.status_code == 400
 
     # Replayed against the SAME filters still works (the cursor is valid).
-    ok = await client.get(
-        url, params={"source": AI_SOURCE_CHATGPT, "cursor": cursor}
-    )
+    ok = await client.get(url, params={"source": AI_SOURCE_CHATGPT, "cursor": cursor})
     assert ok.status_code == 200
 
 
@@ -863,17 +837,13 @@ async def test_query_validation_422(client: httpx.AsyncClient) -> None:
     base = f"/api/v1/projects/{project_id}/llm-analytics"
 
     # Unknown granularity.
-    assert (
-        await client.get(base, params={"granularity": "hourly"})
-    ).status_code == 422
+    assert (await client.get(base, params={"granularity": "hourly"})).status_code == 422
     # 'to' before 'from'.
     assert (
         await client.get(base, params={"from": "2026-07-22", "to": "2026-07-20"})
     ).status_code == 422
     # 'from' without 'to' (both-or-neither).
-    assert (
-        await client.get(base, params={"from": "2026-07-20"})
-    ).status_code == 422
+    assert (await client.get(base, params={"from": "2026-07-20"})).status_code == 422
     # Window span beyond ANALYTICS_MAX_WINDOW_DAYS.
     too_wide_from = WINDOW[1] - timedelta(days=ANALYTICS_MAX_WINDOW_DAYS)
     assert (

@@ -3,11 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { integrationsApi } from './integrations';
 import { queryKeys } from './query-keys';
-import {
-  integrationConnectionSchema,
-  integrationSyncRunSchema,
-  strictValidate,
-} from './schemas';
+import { integrationConnectionSchema, integrationSyncRunSchema, strictValidate } from './schemas';
 import { mswServer } from '@/test/msw-server';
 
 const WS = '11111111-1111-4111-8111-111111111111';

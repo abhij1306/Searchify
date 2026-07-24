@@ -52,10 +52,7 @@ function SortableColumnHead({
   const active = sortKey(sort) === columnKey;
   const descending = sortDirection(sort) === 'descending';
   return (
-    <TableHead
-      numeric
-      aria-sort={active ? (descending ? 'descending' : 'ascending') : undefined}
-    >
+    <TableHead numeric aria-sort={active ? (descending ? 'descending' : 'ascending') : undefined}>
       <button
         type="button"
         onClick={() => onSort(columnKey)}
@@ -152,14 +149,14 @@ export function PagesTable({
     <Card data-testid="pages-table">
       <CardHeader>
         <CardTitle>Top pages</CardTitle>
-        <CardDescription>
-          Canonical URLs by organic clicks · Google Search Console
-        </CardDescription>
+        <CardDescription>Canonical URLs by organic clicks · Google Search Console</CardDescription>
       </CardHeader>
 
       {pagesQuery.isError ? (
         <div className="p-[var(--card-padding)]">
-          <Alert tone="danger">Could not load page stats. Check your connection and try again.</Alert>
+          <Alert tone="danger">
+            Could not load page stats. Check your connection and try again.
+          </Alert>
         </div>
       ) : (
         <Table>

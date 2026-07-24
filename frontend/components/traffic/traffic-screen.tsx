@@ -29,7 +29,11 @@ import {
   type TrafficSyncEnqueueResponse,
 } from '@/lib/api/traffic';
 import { useProjectContext } from '@/lib/project/project-context';
-import { isActiveSyncRun, isSucceededSyncRun, SYNC_RUN_POLL_MS } from '@/lib/integrations/sync-runs';
+import {
+  isActiveSyncRun,
+  isSucceededSyncRun,
+  SYNC_RUN_POLL_MS,
+} from '@/lib/integrations/sync-runs';
 import {
   bucketAdverb,
   countAxisTicks,
@@ -162,11 +166,7 @@ function TrafficToolbar({
 function StatCard({ stat }: Readonly<{ stat: TrafficStat }>) {
   const valueClass = stat.placeholder ? 'text-muted' : 'text-foreground';
   const deltaClass =
-    stat.tone === 'up'
-      ? 'text-score-high'
-      : stat.tone === 'down'
-        ? 'text-score-low'
-        : 'text-muted';
+    stat.tone === 'up' ? 'text-score-high' : stat.tone === 'down' ? 'text-score-low' : 'text-muted';
   return (
     <Card data-testid={`stat-${stat.key}`}>
       <CardContent className="grid gap-1 p-4">
@@ -378,8 +378,8 @@ export function TrafficScreen() {
       <span className="flex items-center gap-2.5" data-testid="sync-status-banner">
         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
         <span>
-          Sync in progress — refreshing Google Search Console and GA4 data. Charts and tables
-          update when the sync completes.
+          Sync in progress — refreshing Google Search Console and GA4 data. Charts and tables update
+          when the sync completes.
         </span>
       </span>
     </Alert>
@@ -418,8 +418,8 @@ export function TrafficScreen() {
         {syncBanner}
         <Alert tone="info">
           No synced snapshot covers {formatWindowDate(windowBounds.from ?? '')} –{' '}
-          {formatWindowDate(windowBounds.to ?? '')} yet. Traffic serves persisted sync windows
-          only — switch to the latest synced window or run a sync.
+          {formatWindowDate(windowBounds.to ?? '')} yet. Traffic serves persisted sync windows only
+          — switch to the latest synced window or run a sync.
         </Alert>
       </div>
     );
@@ -433,7 +433,9 @@ export function TrafficScreen() {
       {toolbar}
       {syncBanner}
       {syncNotice ? <Alert tone="info">{syncNotice}</Alert> : null}
-      {syncMutation.isError ? <Alert tone="danger">{errorMessage(syncMutation.error)}</Alert> : null}
+      {syncMutation.isError ? (
+        <Alert tone="danger">{errorMessage(syncMutation.error)}</Alert>
+      ) : null}
       {syncOutcome === 'succeeded' ? (
         <Alert tone="success">Sync complete — charts and tables now render the new snapshot.</Alert>
       ) : null}

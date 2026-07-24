@@ -139,9 +139,7 @@ class AnalyticsWorker:
                 logger.exception("analytics worker loop iteration failed")
                 ran = 0
             if ran == 0:
-                await asyncio.sleep(
-                    max(0.05, analytics_settings.poll_interval_seconds)
-                )
+                await asyncio.sleep(max(0.05, analytics_settings.poll_interval_seconds))
 
     # --- One claimed row -----------------------------------------------------
 
@@ -155,9 +153,7 @@ class AnalyticsWorker:
                 if row is None or row.status in TASK_TERMINAL_STATUSES:
                     return
 
-            if not await self._queue.mark_running(
-                task_id=task_id, owner=self.owner
-            ):
+            if not await self._queue.mark_running(task_id=task_id, owner=self.owner):
                 # Lease lost before dispatch; another worker retries.
                 return
 

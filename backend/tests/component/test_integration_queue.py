@@ -119,8 +119,7 @@ async def test_claim_order_priority_availability_position(
     claimed = await queue.claim(owner="w1", limit=3)
     assert [row.id for row in claimed] == [high_old.id, high_new.id, low.id]
     assert all(
-        row.status == TASK_STATUS_LEASED and row.lease_owner == "w1"
-        for row in claimed
+        row.status == TASK_STATUS_LEASED and row.lease_owner == "w1" for row in claimed
     )
 
 
@@ -128,9 +127,7 @@ async def test_claim_order_priority_availability_position(
 async def test_no_double_claim_between_owners(session_factory, db_session) -> None:
     _workspace_id, connection = await _seed_connection(db_session)
     first = _run_row(connection)
-    second = _run_row(
-        connection, window=(date(2026, 7, 17), date(2026, 7, 19))
-    )
+    second = _run_row(connection, window=(date(2026, 7, 17), date(2026, 7, 19)))
     db_session.add_all([first, second])
     await db_session.commit()
 

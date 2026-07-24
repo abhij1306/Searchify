@@ -437,8 +437,7 @@ class IntegrationSettings(BaseSettings):
             )
         if self.sync_late_data_revision_days > self.sync_backfill_max_days:
             raise ValueError(
-                "sync_late_data_revision_days must not exceed "
-                "sync_backfill_max_days"
+                "sync_late_data_revision_days must not exceed sync_backfill_max_days"
             )
         if self.retry_max_delay_seconds < self.retry_base_delay_seconds:
             raise ValueError(
@@ -551,9 +550,7 @@ def unpack_dimension_key(dataset: str, dimension_key: str) -> tuple[str, ...] | 
     template = INTEGRATION_DATASET_TEMPLATES.get(dataset)
     if template is None:
         return None
-    parts = dimension_key.rsplit(
-        DIMENSION_KEY_SEPARATOR, len(template.dimensions) - 1
-    )
+    parts = dimension_key.rsplit(DIMENSION_KEY_SEPARATOR, len(template.dimensions) - 1)
     if len(parts) != len(template.dimensions):
         return None
     return tuple(parts)

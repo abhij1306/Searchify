@@ -132,9 +132,7 @@ def _coerce_metric_value(raw: object) -> int | float | None:
         return None
 
 
-def _normalize_row(
-    row: object, template: IntegrationDatasetTemplate
-) -> dict | None:
+def _normalize_row(row: object, template: IntegrationDatasetTemplate) -> dict | None:
     """Map one raw ``runReport`` row into the GSC-shaped contract row.
 
     Positional ``dimensionValues``/``metricValues`` are mapped by the
@@ -177,9 +175,7 @@ class Ga4Client:
     uses the real network.
     """
 
-    def __init__(
-        self, *, transport: httpx.AsyncBaseTransport | None = None
-    ) -> None:
+    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
         self._pacer = RequestPacer()
 
@@ -285,13 +281,9 @@ class Ga4Client:
         payload: dict = {"rows": list(rows)}
         if "rowCount" in report:
             payload["rowCount"] = report["rowCount"]
-        return Ga4ReportPage(
-            payload=payload, rows=rows, raw_row_count=len(raw_rows)
-        )
+        return Ga4ReportPage(payload=payload, rows=rows, raw_row_count=len(raw_rows))
 
 
-def build_ga4_client(
-    *, transport: httpx.AsyncBaseTransport | None = None
-) -> Ga4Client:
+def build_ga4_client(*, transport: httpx.AsyncBaseTransport | None = None) -> Ga4Client:
     """Build a GA4 client (``transport`` = test seam)."""
     return Ga4Client(transport=transport)

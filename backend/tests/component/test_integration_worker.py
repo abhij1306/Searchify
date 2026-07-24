@@ -275,9 +275,7 @@ def _worker(
     )
 
 
-async def _artifacts(
-    db_session, run_id: uuid.UUID
-) -> list[IntegrationImportArtifact]:
+async def _artifacts(db_session, run_id: uuid.UUID) -> list[IntegrationImportArtifact]:
     result = await db_session.scalars(
         select(IntegrationImportArtifact)
         .where(IntegrationImportArtifact.sync_run_id == run_id)
@@ -393,9 +391,7 @@ async def test_fixture_import_writes_immutable_artifacts(
 
     tasks = list((await db_session.scalars(select(AnalyticsTask))).all())
     ingest_tasks = [
-        task
-        for task in tasks
-        if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
+        task for task in tasks if task.task_kind == ANALYTICS_TASK_KIND_INGEST_REFERRALS
     ]
     refresh_tasks = [
         task

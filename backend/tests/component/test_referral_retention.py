@@ -125,18 +125,14 @@ async def test_sweep_deletes_expired_rows_in_batches_keeps_young(
     await run_referral_retention_sweep(session_factory, _sweep_task(workspace_id))
 
     async with session_factory() as session:
-        remaining_events = set(
-            (await session.scalars(select(ReferralEvent.id))).all()
-        )
+        remaining_events = set((await session.scalars(select(ReferralEvent.id))).all())
         # Every expired row (classified or not) is gone; young rows stay.
         assert remaining_events == {ids["young_a"], ids["young_b"]}
         # Classifications were deleted WITH their events; the young row's
         # classification survives.
         remaining_classifications = list(
             (
-                await session.scalars(
-                    select(ReferralClassification.referral_event_id)
-                )
+                await session.scalars(select(ReferralClassification.referral_event_id))
             ).all()
         )
         assert remaining_classifications == [ids["young_a"]]

@@ -153,9 +153,7 @@ async def start_connect(
     return f"{INTEGRATION_OAUTH_AUTHORIZE_URLS[transport]}?{urlencode(params)}"
 
 
-def _verify_state_claims(
-    state: str, provider: str, user: User
-) -> dict[str, str | int]:
+def _verify_state_claims(state: str, provider: str, user: User) -> dict[str, str | int]:
     """Verify signature/expiry/provider + the initiating-user binding."""
     try:
         # session_nonce=None: integration states bind via their persisted
@@ -548,9 +546,7 @@ async def delete_connection(
                 workspace_id=workspace_id,
                 grant_id=grant.id,
                 event_type=EVENT_INTEGRATION_DISCONNECTED,
-                message=(
-                    f"Connection {provider} disconnected; shared grant retained"
-                ),
+                message=(f"Connection {provider} disconnected; shared grant retained"),
                 payload={
                     "provider": provider,
                     "connection_id": str(connection_id),

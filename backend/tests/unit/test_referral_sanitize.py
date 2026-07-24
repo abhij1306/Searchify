@@ -86,9 +86,9 @@ def test_session_hash_is_deterministic_salted_and_truncated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(settings, "referral_hash_salt", "unit-test-salt")
-    expected = hmac.new(
-        b"unit-test-salt", b"session-42", hashlib.sha256
-    ).hexdigest()[:REFERRAL_SESSION_HASH_HEX_LENGTH]
+    expected = hmac.new(b"unit-test-salt", b"session-42", hashlib.sha256).hexdigest()[
+        :REFERRAL_SESSION_HASH_HEX_LENGTH
+    ]
     assert hash_session_id("session-42") == expected
     # Deterministic for the same (salt, raw id)...
     assert hash_session_id("session-42") == hash_session_id("session-42")

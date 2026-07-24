@@ -80,9 +80,7 @@ class GscClient:
     uses the real network.
     """
 
-    def __init__(
-        self, *, transport: httpx.AsyncBaseTransport | None = None
-    ) -> None:
+    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
         self._transport = transport
         self._pacer = RequestPacer()
 
@@ -168,13 +166,9 @@ class GscClient:
                 "GSC query returned malformed rows",
                 error_code=ERROR_PROVIDER_API,
             )
-        return GscQueryPage(
-            payload=payload, rows=tuple(rows), raw_row_count=len(rows)
-        )
+        return GscQueryPage(payload=payload, rows=tuple(rows), raw_row_count=len(rows))
 
 
-def build_gsc_client(
-    *, transport: httpx.AsyncBaseTransport | None = None
-) -> GscClient:
+def build_gsc_client(*, transport: httpx.AsyncBaseTransport | None = None) -> GscClient:
     """Build a GSC client (``transport`` = test seam)."""
     return GscClient(transport=transport)

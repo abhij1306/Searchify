@@ -48,9 +48,7 @@ from tests.component.analytics_helpers import (
 _GA4_DATE = "20260720"  # GA4 date dimension values arrive as YYYYMMDD.
 
 
-async def _tasks_by_kind(
-    session: AsyncSession, task_kind: str
-) -> list[AnalyticsTask]:
+async def _tasks_by_kind(session: AsyncSession, task_kind: str) -> list[AnalyticsTask]:
     return list(
         (
             await session.scalars(
@@ -112,9 +110,7 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
         assert len(events) == 2
 
         # Link 2: classify ran and wrote one classification per event.
-        classify = await _tasks_by_kind(
-            session, ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS
-        )
+        classify = await _tasks_by_kind(session, ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS)
         assert len(classify) == 1
         assert classify[0].status == TASK_STATUS_SUCCEEDED
         rows = list((await session.scalars(select(ReferralClassification))).all())
@@ -223,9 +219,7 @@ async def test_resync_of_projected_window_refires_refreshes(
 
     # Second sync of the SAME window at resync_seq=1 on the same connection.
     async with session_factory() as session:
-        connection = await session.get(
-            IntegrationConnection, seed0.connection_id
-        )
+        connection = await session.get(IntegrationConnection, seed0.connection_id)
         assert connection is not None
         seed1 = await seed_ga4_import(
             session,
@@ -263,9 +257,7 @@ async def test_resync_of_projected_window_refires_refreshes(
             session, ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH
         )
         assert len(traffic_refreshes) == 2
-        assert all(
-            row.status == TASK_STATUS_SUCCEEDED for row in traffic_refreshes
-        )
+        assert all(row.status == TASK_STATUS_SUCCEEDED for row in traffic_refreshes)
         # One refresh per data revision of the same window.
         assert {
             row.idempotency_key.rsplit(":", 1)[-1] for row in traffic_refreshes

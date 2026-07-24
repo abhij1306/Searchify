@@ -106,9 +106,7 @@ async def _seed_grant(
 class _FakeProvider:
     """MockTransport-backed fake provider with configurable outcomes."""
 
-    def __init__(
-        self, *, probe_status: int = 200, revoke_status: int = 200
-    ) -> None:
+    def __init__(self, *, probe_status: int = 200, revoke_status: int = 200) -> None:
         self.probe_status = probe_status
         self.revoke_status = revoke_status
         self.requests: list[httpx.Request] = []
@@ -264,9 +262,7 @@ async def test_probe_ok_microsoft_via_bing_get_sites(
     assert probe.headers["authorization"] == f"Bearer {_FAKE_ACCESS}"
     assert _fake_provider.token_calls() == []
     # The stored grant is untouched by the probe (no rotation persisted).
-    grant = (
-        await db_session.execute(select(IntegrationOAuthGrant))
-    ).scalar_one()
+    grant = (await db_session.execute(select(IntegrationOAuthGrant))).scalar_one()
     assert decrypt_secret(grant.refresh_token_encrypted) == _FAKE_REFRESH
     assert grant.status == "connected"
 

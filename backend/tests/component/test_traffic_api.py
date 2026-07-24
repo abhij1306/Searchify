@@ -404,9 +404,7 @@ async def test_empty_states_when_no_snapshot(client: httpx.AsyncClient) -> None:
     assert body["normalization_version"] == TRAFFIC_NORMALIZATION_VERSION
 
     # An explicit window is echoed in the empty payload.
-    resp = await client.get(
-        base, params={"from": "2026-07-01", "to": "2026-07-07"}
-    )
+    resp = await client.get(base, params={"from": "2026-07-01", "to": "2026-07-07"})
     assert resp.status_code == 200
     assert resp.json()["window_start"] == "2026-07-01"
     assert resp.json()["window_end"] == "2026-07-07"
@@ -437,9 +435,7 @@ async def test_headline_serves_persisted_snapshot(
     )
     base = f"/api/v1/projects/{project_id}/traffic"
 
-    resp = await client.get(
-        base, params={"from": "2026-07-20", "to": "2026-07-22"}
-    )
+    resp = await client.get(base, params={"from": "2026-07-20", "to": "2026-07-22"})
     assert resp.status_code == 200
     body = resp.json()
     assert set(body) == _DASHBOARD_KEYS
@@ -489,9 +485,11 @@ async def test_headline_serves_persisted_snapshot(
     assert latest.status_code == 200
     assert latest.json()["window_start"] == "2026-07-20"
     assert latest.json()["window_end"] == "2026-07-22"
-    assert [
-        p["value"] for p in latest.json()["series"]["impressions"]
-    ] == [150, 200, 10]
+    assert [p["value"] for p in latest.json()["series"]["impressions"]] == [
+        150,
+        200,
+        10,
+    ]
 
     # The week granularity collapses to one bucket at the window start.
     week = await client.get(
@@ -500,9 +498,7 @@ async def test_headline_serves_persisted_snapshot(
     )
     assert week.status_code == 200
     assert week.json()["granularity"] == "week"
-    assert week.json()["series"]["clicks"] == [
-        {"date": "2026-07-20", "value": 36}
-    ]
+    assert week.json()["series"]["clicks"] == [{"date": "2026-07-20", "value": 36}]
     assert week.json()["totals"]["sessions"] == 11
 
 
@@ -586,9 +582,7 @@ async def test_pages_sorting_paging_and_dto_mapping(
     body1 = page1.json()
     assert [row["canonical_url"] for row in body1["items"]] == [PAGE_A, PAGE_B]
     assert body1["next_cursor"] is not None
-    page2 = await client.get(
-        url, params={**window, "cursor": body1["next_cursor"]}
-    )
+    page2 = await client.get(url, params={**window, "cursor": body1["next_cursor"]})
     assert page2.status_code == 200
     body2 = page2.json()
     assert [row["canonical_url"] for row in body2["items"]] == [PAGE_C]
@@ -631,9 +625,7 @@ async def test_pages_cursor_replay_and_sort_validation(
     base = f"/api/v1/projects/{project_id}/traffic"
     window = {"from": "2026-07-20", "to": "2026-07-22"}
 
-    page1 = await client.get(
-        f"{base}/pages", params={**window, "sort": "-impressions"}
-    )
+    page1 = await client.get(f"{base}/pages", params={**window, "sort": "-impressions"})
     assert page1.status_code == 200
     cursor = page1.json()["next_cursor"]
     assert cursor is not None
@@ -739,9 +731,7 @@ async def test_queries_sorting_paging_and_dto_mapping(
         "best crm",
     ]
     assert body1["next_cursor"] is not None
-    page2 = await client.get(
-        url, params={**window, "cursor": body1["next_cursor"]}
-    )
+    page2 = await client.get(url, params={**window, "cursor": body1["next_cursor"]})
     body2 = page2.json()
     assert [row["normalized_query"] for row in body2["items"]] == ["pricing"]
     assert body2["next_cursor"] is None
@@ -763,17 +753,13 @@ async def test_query_validation_422(client: httpx.AsyncClient) -> None:
     base = f"/api/v1/projects/{project_id}/traffic"
 
     # Unknown granularity.
-    assert (
-        await client.get(base, params={"granularity": "hourly"})
-    ).status_code == 422
+    assert (await client.get(base, params={"granularity": "hourly"})).status_code == 422
     # 'to' before 'from'.
     assert (
         await client.get(base, params={"from": "2026-07-22", "to": "2026-07-20"})
     ).status_code == 422
     # 'from' without 'to' (both-or-neither).
-    assert (
-        await client.get(base, params={"from": "2026-07-20"})
-    ).status_code == 422
+    assert (await client.get(base, params={"from": "2026-07-20"})).status_code == 422
     # Window span beyond TRAFFIC_MAX_WINDOW_DAYS.
     too_wide_from = WINDOW[1] - timedelta(days=TRAFFIC_MAX_WINDOW_DAYS)
     assert (

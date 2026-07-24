@@ -264,8 +264,7 @@ async def test_refresh_builds_snapshots_metrics_and_provenance(
 
         # Per-engine visibility from the persisted MetricSnapshot rows.
         engines = {
-            row["logical_engine"]: row["series"]
-            for row in metrics["engine_visibility"]
+            row["logical_engine"]: row["series"] for row in metrics["engine_visibility"]
         }
         assert set(engines) == {"chatgpt", "gemini"}
         assert [p["value"] for p in engines["chatgpt"]] == [50.0, 25.0, None]
@@ -280,9 +279,7 @@ async def test_refresh_builds_snapshots_metrics_and_provenance(
         }
 
         # Theme rollup over the frozen (theme, intent) axes.
-        themes = {
-            (row["theme"], row["intent"]): row for row in metrics["themes"]
-        }
+        themes = {(row["theme"], row["intent"]): row for row in metrics["themes"]}
         pricing = themes[("pricing", "comparison")]
         assert pricing["total_completed"] == 2
         assert pricing["brand_mention_rate"] == pytest.approx(0.5)
@@ -342,9 +339,7 @@ async def test_refresh_upsert_is_idempotent_across_reruns(
     async with session_factory() as session:
         second = await _snapshots_by_granularity(session)
         assert set(second) == {"day", "week", "month"}
-        assert (
-            await session.scalar(select(func.count(AnalyticsSnapshot.id)))
-        ) == 3
+        assert (await session.scalar(select(func.count(AnalyticsSnapshot.id)))) == 3
         for granularity, snapshot in second.items():
             assert snapshot.id == first[granularity].id
             assert (snapshot.metrics, snapshot.source_classification_ids) == (

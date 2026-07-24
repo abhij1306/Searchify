@@ -548,9 +548,7 @@ async def test_sync_409_names_already_enqueued_connections(
 
     async def _partially_conflicting_enqueue(session, *, connection_id, **kwargs):
         if connection_id == ga4.id:
-            raise ActiveWindowConflictError(
-                "an active run already covers the window"
-            )
+            raise ActiveWindowConflictError("an active run already covers the window")
         return SimpleNamespace(
             id=uuid.uuid4(), connection_id=connection_id, status="queued"
         )

@@ -225,9 +225,7 @@ async def get_llm_analytics(
         sources=sources,
         engine_visibility=engine_visibility,
         correlation=AnalyticsCorrelation(
-            state=str(
-                correlation.get("state") or CORRELATION_STATE_INSUFFICIENT_DATA
-            ),
+            state=str(correlation.get("state") or CORRELATION_STATE_INSUFFICIENT_DATA),
             coefficient=correlation.get("coefficient"),
             sample_size=int(correlation.get("sample_size") or 0),
         ),

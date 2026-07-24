@@ -157,9 +157,7 @@ class IntegrationConnection(Base):
             "grant_id", "provider", name="uq_integration_connection_grant_provider"
         ),
         # Backs composite (workspace_id, connection_id) FKs on child tables.
-        UniqueConstraint(
-            "workspace_id", "id", name="uq_integration_connections_ws_id"
-        ),
+        UniqueConstraint("workspace_id", "id", name="uq_integration_connections_ws_id"),
         ForeignKeyConstraint(
             ["workspace_id", "grant_id"],
             ["integration_oauth_grants.workspace_id", _FK_GRANT],
@@ -255,9 +253,7 @@ class IntegrationSyncRun(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    connection_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), index=True
-    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), index=True)
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
@@ -340,12 +336,8 @@ class IntegrationImportArtifact(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    sync_run_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), index=True
-    )
-    connection_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), index=True
-    )
+    sync_run_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), index=True)
+    connection_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), index=True)
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
@@ -408,9 +400,7 @@ class IntegrationPropertyMapping(Base):
         ForeignKey(_FK_WORKSPACE, ondelete=_ON_DELETE_CASCADE),
         index=True,
     )
-    connection_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), index=True
-    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), index=True)
     provider: Mapped[str] = mapped_column(String(16))
     # Provider property id (GSC site URL / GA4 property id).
     property_ref: Mapped[str] = mapped_column(String(512))

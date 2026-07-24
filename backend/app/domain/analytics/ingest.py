@@ -285,9 +285,7 @@ async def ingest_referrals(
             stmt = (
                 pg_insert(ReferralEvent)
                 .values(values)
-                .on_conflict_do_nothing(
-                    index_elements=["import_id", "content_hash"]
-                )
+                .on_conflict_do_nothing(index_elements=["import_id", "content_hash"])
             )
             await session.execute(stmt)
 
