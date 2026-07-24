@@ -12,10 +12,14 @@ rather than guessing. Every write validates:
   (invariant 5); the connection lookup is workspace-scoped and the project
   lookup reuses the projects service, so cross-workspace references are
   404s, never data;
-- **owned-domain validation** (traffic.md §2) — the property must resolve,
+- **owned-domain validation** (traffic.md §2) — a DOMAIN-SHAPED property
+  (GSC ``sc-domain:``/URL-prefix properties, Bing site URLs) must resolve,
   as a bare host, to one of the project's ``OwnedDomain`` rows before any
   ingest may target it (non-matching ⇒ ``MappingPropertyNotOwnedError``,
-  API 422);
+  API 422). GA4 property refs are numeric property ids, never domains, so
+  the owned-domain rule can never match them: they are validated on id
+  SHAPE only (``is_ga4_property_ref``), with reachability probed by the
+  connection test;
 - **one active owner** — the partial unique index on
   ``(workspace_id, provider, property_ref) WHERE status = active``
   guarantees a single active owner across ALL connections; an
@@ -37,8 +41,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.analysis.normalization import normalize_domain
 from app.core.config.integrations import (
     GSC_DOMAIN_PROPERTY_PREFIX,
+    INTEGRATION_PROVIDER_GA4,
     MAPPING_STATUS_ACTIVE,
     MAPPING_STATUS_DISABLED,
+    is_ga4_property_ref,
 )
 from app.domain.integrations.schemas import IntegrationPropertyMappingResponse
 from app.domain.integrations.service import get_connection
@@ -132,7 +138,8 @@ async def create_mapping(
             connection (API: 404).
         ProjectNotFoundError: missing/cross-workspace project (API: 404).
         MappingProviderMismatchError: provider != connection's (API: 422).
-        MappingPropertyNotOwnedError: property not an owned domain (API: 422).
+        MappingPropertyNotOwnedError: domain-shaped property not an owned
+            domain, or a malformed GA4 property id (API: 422).
         MappingActiveOwnerConflictError: active-owner slot taken (API: 409).
     """
     connection = await get_connection(
@@ -148,14 +155,25 @@ async def create_mapping(
     project = await get_project(
         session, workspace_id=workspace_id, project_id=project_id
     )
-    host = property_ref_host(property_ref)
-    owned_hosts = {normalize_domain(owned.domain) for owned in project.owned_domains}
-    owned_hosts.discard("")
-    if not host or host not in owned_hosts:
-        raise MappingPropertyNotOwnedError(
-            f"property {property_ref!r} does not resolve to an owned domain "
-            f"of project {project_id}"
-        )
+    if provider == INTEGRATION_PROVIDER_GA4:
+        # GA4 property refs are numeric ids, never domains: the owned-domain
+        # rule cannot apply — validate the id shape only and rely on the
+        # connection test for reachability.
+        if not is_ga4_property_ref(property_ref):
+            raise MappingPropertyNotOwnedError(
+                f"GA4 property {property_ref!r} is not a numeric property id"
+            )
+    else:
+        host = property_ref_host(property_ref)
+        owned_hosts = {
+            normalize_domain(owned.domain) for owned in project.owned_domains
+        }
+        owned_hosts.discard("")
+        if not host or host not in owned_hosts:
+            raise MappingPropertyNotOwnedError(
+                f"property {property_ref!r} does not resolve to an owned domain "
+                f"of project {project_id}"
+            )
     mapping = IntegrationPropertyMapping(
         workspace_id=workspace_id,
         connection_id=connection.id,

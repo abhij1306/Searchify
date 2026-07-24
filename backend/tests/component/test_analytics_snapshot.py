@@ -193,6 +193,7 @@ async def _enqueue_and_fetch(
             project_id=project_id,
             window_start=WINDOW[0],
             window_end=WINDOW[1],
+            resync_seq=0,
         )
         await session.commit()
     assert task_id is not None
@@ -478,6 +479,7 @@ async def test_worker_routes_analytics_snapshot_refresh_kind(
             project_id=project_id,
             window_start=WINDOW[0],
             window_end=WINDOW[1],
+            resync_seq=0,
         )
         await session.commit()
     assert task_id is not None

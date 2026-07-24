@@ -99,7 +99,9 @@ DAYS = [W_FULL[0] + timedelta(days=i) for i in range(14)]
 VISIBILITY_DAYS = [date(2026, 7, 8) + timedelta(days=i) for i in range(10)]
 
 GSC_PROPERTY = "sc-domain:acme-running.example.com"
-GA4_PROPERTY = "https://acme-running.example.com/"
+# GA4 property refs are numeric property ids (the API validates the shape;
+# never domain-shaped).
+GA4_PROPERTY = "properties/123456789"
 BING_PROPERTY = "https://acme-running.example.com"
 
 GSC_PAGES = [
@@ -563,6 +565,7 @@ async def drive_chain(artifact_ids: list[str], project_id: str) -> dict:
             project_id=project.id,
             window_start=W_SHORT[0],
             window_end=W_SHORT[1],
+            resync_seq=0,
         )
         await enqueue_analytics_snapshot_refresh(
             session,
@@ -570,6 +573,7 @@ async def drive_chain(artifact_ids: list[str], project_id: str) -> dict:
             project_id=project.id,
             window_start=W_SHORT[0],
             window_end=W_SHORT[1],
+            resync_seq=0,
         )
         await session.commit()
     drained += await worker.run_until_idle()

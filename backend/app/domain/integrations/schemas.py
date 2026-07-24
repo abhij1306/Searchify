@@ -97,8 +97,10 @@ class IntegrationPropertyMappingCreate(BaseModel):
 
     ``provider`` must equal the referenced connection's provider (422);
     ``property_ref`` must resolve to one of the target project's owned
-    domains (422). Width caps mirror the DB columns so an overlong value
-    fails 422 here instead of a DataError at insert time.
+    domains (422) — GA4 property refs excepted: they are numeric property
+    ids validated on shape, never domains. Width caps mirror the DB columns
+    so an overlong value fails 422 here instead of a DataError at insert
+    time.
     """
 
     provider: str = Field(min_length=1, max_length=16)

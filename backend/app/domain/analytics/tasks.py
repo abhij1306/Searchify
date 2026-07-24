@@ -10,8 +10,8 @@
 # (or a concurrent duplicate attempt) is a dedup no-op, never a mutation
 # (invariant 3; single writer, invariant 4 version stamps). On completion it
 # enqueues ``analytics_snapshot_refresh`` for the artifact's sync-run window
-# (the chain's third link; the window is resolved artifact -> sync run, the
-# same resolution the C5 hook uses).
+# at the run's ``resync_seq`` (the chain's third link; the window + revision
+# are resolved artifact -> sync run, the same resolution the C5 hook uses).
 #
 # ``run_referral_retention_sweep`` hard-deletes referral data past
 # ``REFERRAL_RETENTION_DAYS`` (llm-analytics.md section 3): classifications
@@ -218,6 +218,7 @@ async def run_classify_referrals(
         # Bind to locals BEFORE any commit (post-commit attribute access on
         # an expired ORM object would re-load).
         window_start, window_end = sync_run.window_start, sync_run.window_end
+        resync_seq = sync_run.resync_seq
 
         while True:
             await raise_if_task_terminal(session_factory, task.id)
@@ -243,6 +244,7 @@ async def run_classify_referrals(
             project_id=task.project_id,
             window_start=window_start,
             window_end=window_end,
+            resync_seq=resync_seq,
         )
         await session.commit()
 

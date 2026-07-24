@@ -16,6 +16,7 @@
 # this file and never logged (invariant 6).
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
@@ -118,6 +119,17 @@ GSC_SEARCH_ANALYTICS_PATH: Final = (
 GSC_DOMAIN_PROPERTY_PREFIX: Final = "sc-domain:"
 GA4_API_BASE_URL: Final = "https://analyticsdata.googleapis.com"
 GA4_RUN_REPORT_PATH: Final = "/v1beta/properties/{property_ref}:runReport"
+# GA4 property refs are NUMERIC property ids, optionally carrying the
+# provider's ``properties/`` resource prefix (``123456789`` or
+# ``properties/123456789``) — never domain-shaped, so the owned-domain
+# mapping rule cannot apply to them (shape is validated on mapping writes;
+# the connection test probes reachability).
+GA4_PROPERTY_REF_PATTERN: Final = re.compile(r"^(?:properties/)?\d+$")
+
+
+def is_ga4_property_ref(property_ref: str) -> bool:
+    """True when ``property_ref`` is a well-formed GA4 numeric property id."""
+    return bool(GA4_PROPERTY_REF_PATTERN.match(property_ref.strip()))
 # Bing Webmaster API v1 literals, pinned from Microsoft docs at I12 (plan
 # R3): host ``ssl.bing.com``, JSON endpoint root
 # ``/webmaster/api.svc/json/`` (learn.microsoft.com

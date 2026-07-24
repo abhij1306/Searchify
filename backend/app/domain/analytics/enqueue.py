@@ -134,12 +134,16 @@ async def enqueue_traffic_snapshot_refresh(
     project_id: uuid.UUID,
     window_start: date,
     window_end: date,
+    resync_seq: int,
     priority: int = 0,
 ) -> uuid.UUID | None:
     """Enqueue a rebuild of the Traffic snapshot rows for one window (A7).
 
     The payload is window-level; the executor expands the configured
-    snapshot granularities (``TRAFFIC_SNAPSHOT_GRANULARITIES``).
+    snapshot granularities (``TRAFFIC_SNAPSHOT_GRANULARITIES``). The
+    idempotency key carries the triggering data revision (``resync_seq``)
+    so a re-sync of an already-projected window re-fires the refresh
+    while a same-revision duplicate still dedupes.
     """
     return await _enqueue_task(
         session,
@@ -155,6 +159,7 @@ async def enqueue_traffic_snapshot_refresh(
             project_id,
             window_start,
             window_end,
+            resync_seq,
         ),
         priority=priority,
     )
@@ -167,12 +172,16 @@ async def enqueue_analytics_snapshot_refresh(
     project_id: uuid.UUID,
     window_start: date,
     window_end: date,
+    resync_seq: int,
     priority: int = 0,
 ) -> uuid.UUID | None:
     """Enqueue a rebuild of the LLM-Analytics snapshot for one window (A8).
 
     The payload is window-level; the executor expands the configured
-    snapshot granularities (``ANALYTICS_SNAPSHOT_GRANULARITIES``).
+    snapshot granularities (``ANALYTICS_SNAPSHOT_GRANULARITIES``). The
+    idempotency key carries the triggering data revision (``resync_seq``)
+    so a re-sync of an already-projected window re-fires the refresh
+    while a same-revision duplicate still dedupes.
     """
     return await _enqueue_task(
         session,
@@ -188,6 +197,7 @@ async def enqueue_analytics_snapshot_refresh(
             project_id,
             window_start,
             window_end,
+            resync_seq,
         ),
         priority=priority,
     )
@@ -233,7 +243,10 @@ async def enqueue_post_sync_projections(
     Per import artifact: one ``ingest_referrals`` task (the chain's first
     link; the executors chain ``classify_referrals`` and
     ``analytics_snapshot_refresh`` on completion). Plus one
-    ``traffic_snapshot_refresh`` per distinct affected sync window (C5).
+    ``traffic_snapshot_refresh`` per distinct affected (sync window,
+    ``resync_seq``) revision (C5) — the refresh idempotency keys carry the
+    triggering run's data revision so a re-sync of an already-projected
+    window re-fires the refresh instead of deduping away.
 
     Artifact ids are resolved scoped to the project's workspace — an id that
     does not resolve there (unknown or cross-workspace) is skipped, never
@@ -255,6 +268,7 @@ async def enqueue_post_sync_projections(
                 IntegrationImportArtifact.id,
                 IntegrationSyncRun.window_start,
                 IntegrationSyncRun.window_end,
+                IntegrationSyncRun.resync_seq,
             )
             .join(
                 IntegrationSyncRun,
@@ -265,9 +279,13 @@ async def enqueue_post_sync_projections(
         )
     ).all()
     resolved_ids = {row.id for row in rows}
-    # One refresh per DISTINCT affected window, in first-seen order.
-    windows = list(
-        dict.fromkeys((row.window_start, row.window_end) for row in rows)
+    # One refresh per DISTINCT affected (window, data revision), in
+    # first-seen order (a hook call normally carries one run's artifacts —
+    # one window at one resync_seq).
+    revisions = list(
+        dict.fromkeys(
+            (row.window_start, row.window_end, row.resync_seq) for row in rows
+        )
     )
 
     enqueued: list[uuid.UUID] = []
@@ -282,13 +300,14 @@ async def enqueue_post_sync_projections(
         )
         if task_id is not None:
             enqueued.append(task_id)
-    for window_start, window_end in windows:
+    for window_start, window_end, resync_seq in revisions:
         task_id = await enqueue_traffic_snapshot_refresh(
             session,
             workspace_id=workspace_id,
             project_id=project_id,
             window_start=window_start,
             window_end=window_end,
+            resync_seq=resync_seq,
         )
         if task_id is not None:
             enqueued.append(task_id)

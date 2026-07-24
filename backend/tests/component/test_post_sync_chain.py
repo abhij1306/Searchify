@@ -36,6 +36,7 @@ from app.models.analytics import (
     ReferralClassification,
     ReferralEvent,
 )
+from app.models.integrations import IntegrationConnection
 from app.workers.analytics_worker import AnalyticsWorker
 from tests.component.analytics_helpers import (
     DEFAULT_WINDOW,
@@ -174,6 +175,116 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
                 session,
                 project_id=project_id,
                 import_artifact_ids=[seed.artifact_id],
+            )
+        ) == []
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_resync_of_projected_window_refires_refreshes(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A re-sync at a bumped ``resync_seq`` re-fires the window refreshes.
+
+    The refresh idempotency keys carry the triggering run's data revision:
+    a second sync of an ALREADY-projected window enqueues exactly one new
+    traffic refresh (and the chain's classify link one new analytics
+    refresh), while a same-revision duplicate still dedupes to nothing.
+    """
+    async with session_factory() as session:
+        workspace_id, project_id = await seed_workspace_project(session)
+    async with session_factory() as session:
+        seed0 = await seed_ga4_import(
+            session, workspace_id=workspace_id, project_id=project_id
+        )
+        await seed_metric_row(
+            session,
+            seed=seed0,
+            row_date=date(2026, 7, 20),
+            dimension_values=["https://chatgpt.com/c/abc", _GA4_DATE],
+            metrics={"sessions": 5},
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        assert (
+            len(
+                await enqueue_post_sync_projections(
+                    session,
+                    project_id=project_id,
+                    import_artifact_ids=[seed0.artifact_id],
+                )
+            )
+            == 2
+        )
+        await session.commit()
+    worker = AnalyticsWorker(session_factory=session_factory, owner="chain-test")
+    assert await worker.run_until_idle() == 4
+
+    # Second sync of the SAME window at resync_seq=1 on the same connection.
+    async with session_factory() as session:
+        connection = await session.get(
+            IntegrationConnection, seed0.connection_id
+        )
+        assert connection is not None
+        seed1 = await seed_ga4_import(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            resync_seq=1,
+            connection=connection,
+        )
+        await seed_metric_row(
+            session,
+            seed=seed1,
+            row_date=date(2026, 7, 20),
+            dimension_values=["https://chatgpt.com/c/abc", _GA4_DATE],
+            metrics={"sessions": 7},
+            resync_seq=1,
+        )
+        await session.commit()
+
+    # Exactly one NEW ingest + one NEW traffic refresh (keyed at seq 1).
+    async with session_factory() as session:
+        enqueued = await enqueue_post_sync_projections(
+            session,
+            project_id=project_id,
+            import_artifact_ids=[seed1.artifact_id],
+        )
+        await session.commit()
+    assert len(enqueued) == 2
+
+    # The second chain drains: ingest -> classify -> analytics refresh (seq
+    # 1) + the hook's traffic refresh (seq 1).
+    assert await worker.run_until_idle() == 4
+
+    async with session_factory() as session:
+        traffic_refreshes = await _tasks_by_kind(
+            session, ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH
+        )
+        assert len(traffic_refreshes) == 2
+        assert all(
+            row.status == TASK_STATUS_SUCCEEDED for row in traffic_refreshes
+        )
+        # One refresh per data revision of the same window.
+        assert {
+            row.idempotency_key.rsplit(":", 1)[-1] for row in traffic_refreshes
+        } == {"0", "1"}
+        analytics_refreshes = await _tasks_by_kind(
+            session, ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH
+        )
+        assert len(analytics_refreshes) == 2
+        assert {
+            row.idempotency_key.rsplit(":", 1)[-1] for row in analytics_refreshes
+        } == {"0", "1"}
+
+    # A same-revision duplicate hook call still dedupes to nothing.
+    async with session_factory() as session:
+        assert (
+            await enqueue_post_sync_projections(
+                session,
+                project_id=project_id,
+                import_artifact_ids=[seed1.artifact_id],
             )
         ) == []
         await session.commit()

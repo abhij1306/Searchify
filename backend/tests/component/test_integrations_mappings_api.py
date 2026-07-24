@@ -301,11 +301,63 @@ async def test_same_property_allowed_for_another_provider(
         f"{_BASE}/{ga4.id}/mappings",
         json={
             "provider": "ga4",
-            "property_ref": "https://acme.com/",
+            "property_ref": "properties/123456789",
             "project_id": str(project.id),
         },
     )
     assert ga4_mapping.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_ga4_mapping_numeric_property_ids(
+    client: httpx.AsyncClient, db_session
+) -> None:
+    """GA4 refs are numeric property ids: the owned-domain rule does not
+    apply (a numeric id can never resolve to an ``OwnedDomain`` host)."""
+    _ws, _gsc, ga4, project = await _setup(client, db_session, "map-ga4@example.com")
+
+    for property_ref in ("123456789", "properties/987654321"):
+        resp = await client.post(
+            f"{_BASE}/{ga4.id}/mappings",
+            json={
+                "provider": "ga4",
+                "property_ref": property_ref,
+                "project_id": str(project.id),
+            },
+        )
+        assert resp.status_code == 201, property_ref
+        body = resp.json()
+        _assert_mapping_contract_shape(body)
+        assert body["provider"] == "ga4"
+        assert body["property_ref"] == property_ref
+
+
+@pytest.mark.asyncio
+async def test_create_ga4_mapping_malformed_id_rejected_422(
+    client: httpx.AsyncClient, db_session
+) -> None:
+    """A domain-shaped or otherwise non-numeric GA4 ref is a 422."""
+    _ws, _gsc, ga4, project = await _setup(
+        client, db_session, "map-ga4-bad@example.com"
+    )
+
+    for property_ref in (
+        "https://acme.com/",  # domain-shaped is not a GA4 property id
+        "sc-domain:acme.com",
+        "properties/",  # the resource prefix without an id
+        "properties/acme",  # a non-numeric id
+    ):
+        resp = await client.post(
+            f"{_BASE}/{ga4.id}/mappings",
+            json={
+                "provider": "ga4",
+                "property_ref": property_ref,
+                "project_id": str(project.id),
+            },
+        )
+        assert resp.status_code == 422, property_ref
+        assert resp.json()["detail"] == "mapping_property_not_owned"
+    assert await db_session.scalar(select(IntegrationPropertyMapping)) is None
 
 
 @pytest.mark.asyncio
