@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
+from app.api.analytics import router as analytics_router
 from app.api.audits import router as audits_router
 from app.api.auth import router as auth_router
 from app.api.brand_suggestions import router as brand_suggestions_router
@@ -69,6 +70,7 @@ _ROUTERS = (
     site_health_router,
     content_router,
     integrations_router,
+    analytics_router,
 )
 
 

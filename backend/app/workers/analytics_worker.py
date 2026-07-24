@@ -20,8 +20,9 @@
 # ``ExecutorNotWiredError`` (stamped as terminal ``executor_not_wired``,
 # never retried). A5 wired ``ingest_referrals``; A6 wired
 # ``classify_referrals`` + ``referral_retention_sweep``; A7 wired
-# ``traffic_snapshot_refresh``; A8 (analytics_snapshot_refresh) replaces the
-# remaining stub when it lands.
+# ``traffic_snapshot_refresh``; A8 wired ``analytics_snapshot_refresh`` —
+# every declared kind now routes to a real executor, and the stub remains
+# only as the fail-loud path for a kind outside the table (a config bug).
 from __future__ import annotations
 
 import asyncio
@@ -53,6 +54,7 @@ from app.core.config.task_queue import (
 from app.core.database import SessionLocal
 from app.core.telemetry import configure_logging
 from app.domain.analytics.ingest import ingest_referrals
+from app.domain.analytics.snapshot import refresh_analytics_snapshot
 from app.domain.analytics.tasks import (
     run_classify_referrals,
     run_referral_retention_sweep,
@@ -94,13 +96,13 @@ async def _executor_not_wired(
 # Kind dispatch table (invariant 2: one owner of kind -> executor routing).
 # Each executor-landing task substitutes its real executor for the stub on
 # its own line: A5 wired ingest_referrals; A6 wired classify_referrals +
-# referral_retention_sweep; A7 wired traffic_snapshot_refresh; A8 wires the
-# rest.
+# referral_retention_sweep; A7 wired traffic_snapshot_refresh; A8 wired
+# analytics_snapshot_refresh (the last stub).
 EXECUTORS: dict[str, AnalyticsExecutor] = {
     ANALYTICS_TASK_KIND_INGEST_REFERRALS: ingest_referrals,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS: run_classify_referrals,
     ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH: refresh_traffic_snapshot,
-    ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH: _executor_not_wired,
+    ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH: refresh_analytics_snapshot,
     ANALYTICS_TASK_KIND_REFERRAL_RETENTION_SWEEP: run_referral_retention_sweep,
 }
 

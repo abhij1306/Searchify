@@ -250,6 +250,17 @@ ANALYTICS_SNAPSHOT_TTL_S: Final = 3600
 # (invariant 9; llm-analytics.md section 1).
 CORRELATION_MIN_SAMPLE: Final = 8
 
+# Correlation summary state vocabulary. Stamped into the persisted
+# ``AnalyticsSnapshot.metrics["correlation"]`` and served verbatim by the
+# read API — the frontend zod contract (C6) pins exactly these two states.
+CORRELATION_STATE_OK: Final = "ok"
+CORRELATION_STATE_INSUFFICIENT_DATA: Final = "insufficient_data"
+
+# Page size for the keyset-paged referrals drill-down (contract C4): every
+# page reads at most this many classified-referral rows (+1 lookahead row
+# for the ``next_cursor``), so a response is always bounded.
+ANALYTICS_REFERRALS_PAGE_SIZE: Final = 50
+
 # --- Referral sanitization contract (invariant 6 privacy) ---------------------
 # Persisted ``ReferralEvent.raw`` is an ALLOWLISTED, redacted payload — only
 # these keys survive the pre-write redaction pass; everything else (IPs,

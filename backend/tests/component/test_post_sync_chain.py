@@ -6,11 +6,9 @@ call after derivation in I9) over a freshly derived artifact, drain the
 analytics worker, and assert the full chain ran end to end — ingest
 projected the referral events, classify classified them, and both
 window-level refreshes were enqueued (``analytics_snapshot_refresh`` by the
-classify executor, ``traffic_snapshot_refresh`` by the hook itself). The
-``analytics_snapshot_refresh`` kind lands in A8, so its row terminal-fails
-``executor_not_wired`` here; ``traffic_snapshot_refresh`` is wired (A7) and
-succeeds. The chain LINKS (enqueue + routing) are what this test pins.
-Requires a real Postgres.
+classify executor, ``traffic_snapshot_refresh`` by the hook itself) and ran
+to SUCCESS (both kinds wired: A7 traffic, A8 analytics). The chain LINKS
+(enqueue + routing) are what this test pins. Requires a real Postgres.
 """
 
 from __future__ import annotations
@@ -30,9 +28,8 @@ from app.core.config.analytics import (
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS,
     ANALYTICS_TASK_KIND_INGEST_REFERRALS,
     ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH,
-    ERROR_EXECUTOR_NOT_WIRED,
 )
-from app.core.config.task_queue import TASK_STATUS_FAILED, TASK_STATUS_SUCCEEDED
+from app.core.config.task_queue import TASK_STATUS_SUCCEEDED
 from app.domain.analytics.enqueue import enqueue_post_sync_projections
 from app.models.analytics import (
     AnalyticsTask,
@@ -101,8 +98,7 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
 
     worker = AnalyticsWorker(session_factory=session_factory, owner="chain-test")
     # ingest -> classify -> analytics_snapshot_refresh + the hook's
-    # traffic_snapshot_refresh (analytics_snapshot_refresh fails not-wired
-    # until A8 — terminal, no retry burn; traffic_snapshot_refresh is wired).
+    # traffic_snapshot_refresh (both refresh kinds are wired — A7/A8).
     assert await worker.run_until_idle() == 4
 
     async with session_factory() as session:
@@ -150,9 +146,11 @@ async def test_post_sync_chain_runs_ingest_classify_and_enqueues_refreshes(
         }
         assert analytics_refresh[0].workspace_id == workspace_id
         assert analytics_refresh[0].project_id == project_id
-        # Not wired until A8: claimed, terminal-failed loud, never retried.
-        assert analytics_refresh[0].status == TASK_STATUS_FAILED
-        assert analytics_refresh[0].error_code == ERROR_EXECUTOR_NOT_WIRED
+        # Wired in A8: the executor ran and built the window's snapshots
+        # (the seeded rows are referral-dataset rows, so the referral side
+        # of the projection is non-empty; there is no audit history).
+        assert analytics_refresh[0].status == TASK_STATUS_SUCCEEDED
+        assert analytics_refresh[0].error_code == ""
 
         # The hook enqueued traffic_snapshot_refresh for the same window.
         traffic_refresh = await _tasks_by_kind(

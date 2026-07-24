@@ -16,14 +16,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config.analysis import ANALYZER_VERSION
+from app.core.config.analysis import ANALYZER_VERSION, SCORING_RULE_VERSION
 from app.core.config.analytics import (
     AI_REFERRAL_RULE_VERSION,
     AI_SOURCE_OTHER,
     REFERRAL_SANITIZE_VERSION,
 )
+from app.core.config.audits import AUDIT_STATUS_COMPLETED
 from app.core.config.integrations import (
     DATASET_GA4_REFERRER_DAILY,
     GRANT_STATUS_CONNECTED,
@@ -32,8 +34,16 @@ from app.core.config.integrations import (
     INTEGRATION_TRANSPORT_GOOGLE,
     pack_dimension_key,
 )
+from app.core.config.provider_catalog import ENGINE_GEMINI
 from app.core.config.task_queue import TASK_STATUS_SUCCEEDED
+from app.models.analysis import MetricSnapshot, ResponseAnalysis
 from app.models.analytics import ReferralClassification, ReferralEvent
+from app.models.audit import (
+    Audit,
+    AuditEngineSnapshot,
+    AuditPromptSnapshot,
+    AuditTask,
+)
 from app.models.integrations import (
     IntegrationConnection,
     IntegrationImportArtifact,
@@ -220,6 +230,7 @@ async def seed_referral_event(
     utm_medium: str = "",
     utm_campaign: str = "",
     user_agent: str = "",
+    source_metric_row_id: uuid.UUID | None = None,
 ) -> ReferralEvent:
     """Seed one ReferralEvent directly (bypassing the ingest projection).
 
@@ -227,12 +238,16 @@ async def seed_referral_event(
     exact ``occurred_at`` values without driving the metric-row ingest. The
     ``content_hash`` is a random unique token (dedupe is not under test
     here); ``sanitize_version`` is stamped like the real projection.
+    ``source_metric_row_id`` links the event to its derived metric row so
+    the snapshot builder (A8) can join the session measure + resync
+    identity exactly like the ingest projection writes it.
     """
     event = ReferralEvent(
         workspace_id=seed.workspace_id,
         project_id=seed.project_id,
         source=INTEGRATION_PROVIDER_GA4,
         import_id=seed.artifact_id,
+        source_metric_row_id=source_metric_row_id,
         occurred_at=occurred_at,
         landing_url=landing_url,
         referrer_host=referrer_host,
@@ -257,11 +272,15 @@ async def seed_referral_classification(
     event: ReferralEvent,
     is_ai_referral: bool = False,
     ai_source: str = AI_SOURCE_OTHER,
+    logical_engine: str | None = None,
+    matched_rule_id: str = "",
+    match_signal: str = "",
+    confidence: str = "",
 ) -> ReferralClassification:
-    """Seed one classification row directly (retention tests only).
+    """Seed one classification row directly (retention/snapshot/API tests).
 
     The classify executor is the single WRITER in production; tests seed the
-    row straight to set up delete-fixtures without running the chain.
+    row straight to set up fixtures without running the chain.
     """
     classification = ReferralClassification(
         workspace_id=event.workspace_id,
@@ -269,9 +288,139 @@ async def seed_referral_classification(
         referral_event_id=event.id,
         is_ai_referral=is_ai_referral,
         ai_source=ai_source,
+        logical_engine=logical_engine,
+        matched_rule_id=matched_rule_id,
+        match_signal=match_signal,
+        confidence=confidence,
         rule_version=AI_REFERRAL_RULE_VERSION,
         analyzer_version=ANALYZER_VERSION,
     )
     session.add(classification)
     await session.flush()
     return classification
+
+
+async def seed_visibility_snapshot(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    completed_at: datetime,
+    visibility_score: float,
+    total_completed: int = 3,
+    per_engine: dict[str, float] | None = None,
+    status: str = AUDIT_STATUS_COMPLETED,
+) -> MetricSnapshot:
+    """Seed one dashboard-status audit + its folded ``MetricSnapshot``.
+
+    For the A8/A9 visibility-series fixtures: ``per_engine`` maps
+    ``logical_engine -> brand_mention_rate`` and is stored in the aggregate
+    ``metrics["per_engine"]`` block exactly like the run-level finalize
+    writes it (the snapshot builder reads rates from there).
+    """
+    audit = Audit(
+        workspace_id=workspace_id,
+        project_id=project_id,
+        status=status,
+        completed_at=completed_at,
+    )
+    session.add(audit)
+    await session.flush()
+    snapshot = MetricSnapshot(
+        workspace_id=workspace_id,
+        audit_id=audit.id,
+        project_id=project_id,
+        analyzer_version=ANALYZER_VERSION,
+        scoring_rule_version=SCORING_RULE_VERSION,
+        total_completed=total_completed,
+        visibility_score=visibility_score,
+        metrics={
+            "brand_mention_rate": round(visibility_score / 100.0, 4),
+            "per_engine": {
+                engine: {"brand_mention_rate": rate}
+                for engine, rate in (per_engine or {}).items()
+            },
+        },
+        source_analysis_ids=[],
+        source_artifact_ids=[],
+    )
+    session.add(snapshot)
+    await session.flush()
+    return snapshot
+
+
+async def seed_theme_analysis(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    audit_id: uuid.UUID,
+    prompt_index: int,
+    theme: str,
+    intent: str,
+    logical_engine: str = ENGINE_GEMINI,
+    brand_mentioned: bool = False,
+    competitors_mentioned: list[str] | None = None,
+    repetition: int = 0,
+) -> ResponseAnalysis:
+    """Seed one per-execution analysis under its frozen prompt axes.
+
+    Builds the minimal chain the theme rollup joins over:
+    ``AuditPromptSnapshot`` (frozen theme/intent) -> ``AuditEngineSnapshot``
+    -> ``AuditTask`` -> ``ResponseAnalysis`` carrying
+    ``(audit_id, prompt_index)``. ``competitors_mentioned`` lands in the
+    persisted ``score`` dict exactly like the deterministic scorer writes it.
+    """
+    prompt_snapshot = AuditPromptSnapshot(
+        audit_id=audit_id,
+        prompt_index=prompt_index,
+        text=f"frozen prompt {prompt_index}",
+        theme=theme,
+        intent=intent,
+    )
+    session.add(prompt_snapshot)
+    await session.flush()
+    # One engine snapshot per (audit, engine) — reuse it across analyses.
+    engine_snapshot = await session.scalar(
+        select(AuditEngineSnapshot).where(
+            AuditEngineSnapshot.audit_id == audit_id,
+            AuditEngineSnapshot.logical_engine == logical_engine,
+        )
+    )
+    if engine_snapshot is None:
+        engine_snapshot = AuditEngineSnapshot(
+            audit_id=audit_id,
+            logical_engine=logical_engine,
+            transport_provider="google",
+            transport_model="gemini-flash-latest",
+        )
+        session.add(engine_snapshot)
+        await session.flush()
+    task = AuditTask(
+        audit_id=audit_id,
+        workspace_id=workspace_id,
+        prompt_snapshot_id=prompt_snapshot.id,
+        engine_snapshot_id=engine_snapshot.id,
+        prompt_index=prompt_index,
+        repetition=repetition,
+        logical_engine=logical_engine,
+        transport_provider="google",
+        transport_model="gemini-flash-latest",
+        idempotency_key=uuid.uuid4().hex,
+    )
+    session.add(task)
+    await session.flush()
+    analysis = ResponseAnalysis(
+        workspace_id=workspace_id,
+        audit_id=audit_id,
+        task_id=task.id,
+        analyzer_version=ANALYZER_VERSION,
+        scoring_rule_version=SCORING_RULE_VERSION,
+        logical_engine=logical_engine,
+        prompt_index=prompt_index,
+        repetition=repetition,
+        brand_mentioned=brand_mentioned,
+        score={"competitors_mentioned": list(competitors_mentioned or [])},
+    )
+    session.add(analysis)
+    await session.flush()
+    return analysis

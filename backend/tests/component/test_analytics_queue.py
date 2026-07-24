@@ -44,7 +44,6 @@ from app.core.config.task_queue import (
     TASK_STATUS_SUCCEEDED,
 )
 from app.domain.analytics.enqueue import (
-    enqueue_analytics_snapshot_refresh,
     enqueue_ingest_referrals,
     enqueue_post_sync_projections,
     enqueue_referral_retention_sweep,
@@ -493,18 +492,14 @@ async def test_analytics_worker_unwired_kind_fails_loud(
     async with session_factory() as session:
         workspace_id, project_id = await _seed_workspace_project(session)
     async with session_factory() as session:
-        task_id = await enqueue_analytics_snapshot_refresh(
-            session,
-            workspace_id=workspace_id,
-            project_id=project_id,
-            window_start=date(2026, 7, 20),
-            window_end=date(2026, 7, 22),
-        )
+        # Every declared kind is wired (A5/A6/A7/A8), so the fail-loud path
+        # is exercised with a kind OUTSIDE the dispatch table — a config
+        # bug the worker must stamp terminally, never retry.
+        row = _task(workspace_id, project_id, task_kind="mystery_kind")
+        session.add(row)
         await session.commit()
-    assert task_id is not None
+        task_id = row.id
 
-    # A kind whose executor has not landed yet (analytics_snapshot_refresh
-    # lands in A8) maps to the not-wired stub in the dispatch table.
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
     assert await worker.run_until_idle() == 1
 
