@@ -79,11 +79,7 @@ export function useProductVisibilityQueries(projectId: string | null, enabled = 
 
   const engineParam = engine === 'all' ? undefined : engine;
   const visibilityQuery = useQuery({
-    queryKey: queryKeys.products.visibility(
-      projectId ?? '',
-      activeRunId ?? undefined,
-      engineParam,
-    ),
+    queryKey: queryKeys.products.visibility(projectId ?? '', activeRunId ?? undefined, engineParam),
     queryFn: ({ signal }) =>
       productsApi.getProductVisibility(
         projectId!,

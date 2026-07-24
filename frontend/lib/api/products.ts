@@ -66,10 +66,7 @@ export type ProductEvidenceParams = {
 
 export const productsApi = {
   list: async (projectId: string, options?: ApiRequestOptions) => {
-    const res = await apiClient.get<Product[]>(
-      `/projects/${projectId}/products`,
-      options,
-    );
+    const res = await apiClient.get<Product[]>(`/projects/${projectId}/products`, options);
     return strictValidate(productListSchema, res, 'products.list');
   },
   create: async (projectId: string, input: ProductInput, options?: ApiRequestOptions) => {

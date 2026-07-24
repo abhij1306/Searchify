@@ -25,8 +25,7 @@ vi.mock('@/lib/project/project-context', () => ({
 }));
 
 vi.mock('@/lib/products/use-products-screen', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@/lib/products/use-products-screen')>();
+  const original = await importOriginal<typeof import('@/lib/products/use-products-screen')>();
   return {
     ...original,
     useProductVisibilityQueries: () => ({
@@ -59,10 +58,7 @@ describe('ProductsScreen tabs', () => {
   it('defaults to the Catalog tab and renders exactly one panel', () => {
     render(<ProductsScreen />);
 
-    expect(screen.getByRole('tab', { name: 'Catalog' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(screen.getByRole('tab', { name: 'Catalog' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Visibility' })).toHaveAttribute(
       'aria-selected',
       'false',

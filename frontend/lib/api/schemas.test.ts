@@ -513,9 +513,7 @@ describe('products contract (agentic commerce)', () => {
     expect(parsed.variants[0]?.price).toBe(2499.0);
     expect(parsed.completeness.missing).toEqual(['gtin']);
     // Strict: unknown keys are contract drift.
-    expect(() =>
-      strictValidate(productSchema, { ...product, slug: 'nope' }, 'product'),
-    ).toThrow();
+    expect(() => strictValidate(productSchema, { ...product, slug: 'nope' }, 'product')).toThrow();
     expect(() => strictValidate(productSchema, { ...product, id: 7 }, 'product')).toThrow();
   });
 

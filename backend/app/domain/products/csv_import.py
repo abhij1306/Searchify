@@ -96,9 +96,7 @@ def parse_product_csv(content: str) -> list[ProductInput]:
     url_i = _col(_URL_KEYS)
     aliases_i = _col(_ALIASES_KEYS)
     variant_i = _col(_VARIANT_KEYS)
-    attribute_cols = {
-        key: _col(aliases) for key, aliases in _ATTRIBUTE_KEYS.items()
-    }
+    attribute_cols = {key: _col(aliases) for key, aliases in _ATTRIBUTE_KEYS.items()}
 
     def _cell(row: list[str], index: int | None) -> str:
         if index is None or index >= len(row):

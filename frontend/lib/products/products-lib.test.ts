@@ -128,9 +128,7 @@ describe('parseProductCsv', () => {
   });
 
   it('flags rows without a sku as not importable and clears bad prices', () => {
-    const parsed = parseProductCsv(
-      'name,sku,price\nNoSku,,10\nBadPrice,SKU-2,not-a-price\n',
-    );
+    const parsed = parseProductCsv('name,sku,price\nNoSku,,10\nBadPrice,SKU-2,not-a-price\n');
     expect(parsed.rows[0]!.errors[0]).toMatch(/SKU is required/);
     expect(parsed.rows[1]!.warnings[0]).toMatch(/Unparseable price/);
     expect(parsed.rows[1]!.input.price).toBeNull();
@@ -147,7 +145,9 @@ describe('parseProductCsv', () => {
   it('folds spaced headers to underscores like the backend import', () => {
     // `Product SKU` / `Currency Code` are accepted by the server
     // (csv_import folds spaces to underscores); the browser preview must too.
-    const parsed = parseProductCsv('Product SKU,Product Name,Price Amount,Currency Code\nSKU-9,Volt,10,usd\n');
+    const parsed = parseProductCsv(
+      'Product SKU,Product Name,Price Amount,Currency Code\nSKU-9,Volt,10,usd\n',
+    );
     expect(parsed.errors).toEqual([]);
     expect(parsed.rows[0]!.input).toMatchObject({
       sku: 'SKU-9',
@@ -204,10 +204,11 @@ describe('formValuesToProductUpdate', () => {
   });
 
   it('writes the single form variant for a product without variants', () => {
-    const update = formValuesToProductUpdate(
-      { ...existing, variants: [] } as never,
-      { ...emptyProductForm, sku: 'SKU-1', variant: 'Graphite' },
-    );
+    const update = formValuesToProductUpdate({ ...existing, variants: [] } as never, {
+      ...emptyProductForm,
+      sku: 'SKU-1',
+      variant: 'Graphite',
+    });
     expect(update.variants).toEqual([{ name: 'Graphite' }]);
   });
 });

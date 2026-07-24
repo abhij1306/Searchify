@@ -120,16 +120,16 @@ async def get_product_visibility(
         )
 
     competitor_products: list[CompetitorProductVisibilityEntry] = []
-    for entry in config.competitor_products:
-        snapshot = by_entry.get(entry.id)
+    for competitor_entry in config.competitor_products:
+        snapshot = by_entry.get(competitor_entry.id)
         if snapshot is None:
             continue
-        metrics = sliced[entry.id]
+        metrics = sliced[competitor_entry.id]
         competitor_products.append(
             CompetitorProductVisibilityEntry(
                 competitor_product_id=snapshot.competitor_product_id,
-                competitor_name=entry.competitor,
-                name=entry.name,
+                competitor_name=competitor_entry.competitor,
+                name=competitor_entry.name,
                 mention_count=metrics["mention_count"],
                 sov_share=metrics["sov_share"],
                 avg_rank=metrics["avg_rank"],
@@ -261,9 +261,7 @@ async def get_product_evidence(
             rank_position=mention.rank_position,
             price_text=mention.price_text,
             price_value=(
-                float(mention.price_value)
-                if mention.price_value is not None
-                else None
+                float(mention.price_value) if mention.price_value is not None else None
             ),
             price_currency=mention.price_currency,
             price_matches_catalog=mention.price_matches_catalog,
@@ -296,9 +294,7 @@ async def load_product_visibility_export_bundle(
     )
 
 
-def product_visibility_csv(
-    audit: Audit, snapshots: list[ProductMetricSnapshot]
-) -> str:
+def product_visibility_csv(audit: Audit, snapshots: list[ProductMetricSnapshot]) -> str:
     """Render the per-entry product visibility rows as CSV (invariant 7).
 
     Renders PERSISTED ``ProductMetricSnapshot`` rows only — one overall row
@@ -308,17 +304,13 @@ def product_visibility_csv(
     config = build_product_scoring_config(audit.configuration)
     by_entry = {_snapshot_entry_id(snapshot): snapshot for snapshot in snapshots}
     ordered = [(entry.id, entry.name, entry.sku) for entry in config.products]
-    ordered += [
-        (entry.id, entry.name, "") for entry in config.competitor_products
-    ]
+    ordered += [(entry.id, entry.name, "") for entry in config.competitor_products]
 
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=_CSV_COLUMNS)
     writer.writeheader()
 
-    def _row(
-        *, name: str, sku: str, engine: str, aggregate: dict
-    ) -> dict[str, object]:
+    def _row(*, name: str, sku: str, engine: str, aggregate: dict) -> dict[str, object]:
         avg_rank = aggregate.get("avg_rank")
         price_accuracy = aggregate.get("price_accuracy_rate")
         return {

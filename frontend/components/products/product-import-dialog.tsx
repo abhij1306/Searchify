@@ -182,9 +182,7 @@ export function ProductImportDialog({
                         <TableCell>{String(attributes.gtin ?? '') || '—'}</TableCell>
                         <TableCell>
                           {invalid ? (
-                            <span className="text-danger-text text-xs">
-                              {row.errors.join(' ')}
-                            </span>
+                            <span className="text-danger-text text-xs">{row.errors.join(' ')}</span>
                           ) : row.warnings.length > 0 ? (
                             <span className="text-warning-text text-xs">
                               {row.warnings.join(' ')}

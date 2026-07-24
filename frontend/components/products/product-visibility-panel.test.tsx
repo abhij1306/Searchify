@@ -174,9 +174,7 @@ describe('ProductVisibilityPanel states', () => {
       `/products/${PRODUCT}`,
     );
     // The rank-distribution bar exposes bucket counts non-visually.
-    expect(
-      screen.getByRole('img', { name: /Top 1: 2, Top 2–3: 0/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Top 1: 2, Top 2–3: 0/ })).toBeInTheDocument();
   });
 
   it('defaults the run selector to Latest and builds the export URL for it', () => {

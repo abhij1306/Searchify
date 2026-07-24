@@ -80,9 +80,7 @@ class ProductUpdate(BaseModel):
     url: str | None = Field(default=None, max_length=2048)
     attributes: dict[str, Any] | None = None
 
-    _aliases_clean = field_validator("aliases", mode="before")(
-        _clean_optional_aliases
-    )
+    _aliases_clean = field_validator("aliases", mode="before")(_clean_optional_aliases)
     _currency_upper = field_validator("currency")(_clean_currency)
 
 
@@ -136,9 +134,7 @@ class CompetitorProductUpdate(BaseModel):
     currency: str | None = Field(default=None, max_length=3)
     url: str | None = Field(default=None, max_length=2048)
 
-    _aliases_clean = field_validator("aliases", mode="before")(
-        _clean_optional_aliases
-    )
+    _aliases_clean = field_validator("aliases", mode="before")(_clean_optional_aliases)
     _currency_upper = field_validator("currency")(_clean_currency)
 
 

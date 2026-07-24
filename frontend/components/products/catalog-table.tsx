@@ -76,9 +76,7 @@ export function CatalogTable({
                     {product.name}
                   </Link>
                   {product.variants[0]?.name ? (
-                    <span className="text-muted truncate text-xs">
-                      {product.variants[0].name}
-                    </span>
+                    <span className="text-muted truncate text-xs">{product.variants[0].name}</span>
                   ) : null}
                 </div>
               </TableCell>
@@ -98,11 +96,7 @@ export function CatalogTable({
               <TableCell className="text-right">
                 <Dropdown>
                   <DropdownTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Actions for ${product.name}`}
-                    >
+                    <Button variant="ghost" size="icon" aria-label={`Actions for ${product.name}`}>
                       <MoreHorizontal className="size-4" aria-hidden />
                     </Button>
                   </DropdownTrigger>

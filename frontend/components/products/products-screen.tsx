@@ -42,9 +42,7 @@ export function ProductsScreen() {
   }
 
   if (!projectId) {
-    return (
-      <Alert tone="info">Select or create a project to manage its product catalog.</Alert>
-    );
+    return <Alert tone="info">Select or create a project to manage its product catalog.</Alert>;
   }
 
   const panel =

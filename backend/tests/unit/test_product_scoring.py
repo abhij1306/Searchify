@@ -203,8 +203,11 @@ def test_price_matches_catalog_abs_floor_and_missing_catalog_price() -> None:
         ("- VoltCity 500\n- RideCore 450", "RideCore 450", 2),
         ("• VoltCity 500\n• RideCore 450", "VoltCity 500", 1),
         # Wrapped item: the continuation line belongs to item 2.
-        ("1. VoltCity 500\n2. RideCore 450 is a great\noption for commuters",
-         "commuters", 2),
+        (
+            "1. VoltCity 500\n2. RideCore 450 is a great\noption for commuters",
+            "commuters",
+            2,
+        ),
         # Prose mention outside any enumeration.
         ("The VoltCity 500 is widely recommended.", "VoltCity 500", None),
         # A restarted numbered list is a new block (rank restarts).
@@ -256,8 +259,7 @@ def test_multiple_products_get_distinct_ranks() -> None:
 def test_aggregate_product_run_sov_and_rates() -> None:
     config = _config()
     text_a = (
-        "1. VoltCity Commuter 500 — $2,499.00\n"
-        "2. RideCore CityCommuter 450 — $2,399"
+        "1. VoltCity Commuter 500 — $2,499.00\n2. RideCore CityCommuter 450 — $2,399"
     )
     text_b = "The RideCore CityCommuter 450 ($2,100 sale) beats the field."
     scores = [
@@ -293,9 +295,7 @@ def test_aggregate_product_run_sov_and_rates() -> None:
     assert empty["sov_share"] == 0.0
     assert empty["avg_rank"] is None
     assert empty["price_accuracy_rate"] is None
-    assert empty["rank_distribution"] == {
-        label: 0 for label in _BUCKET_LABELS
-    }
+    assert empty["rank_distribution"] == {label: 0 for label in _BUCKET_LABELS}
 
 
 def test_aggregate_product_run_all_empty() -> None:

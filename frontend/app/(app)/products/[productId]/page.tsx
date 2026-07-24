@@ -42,8 +42,7 @@ export default function ProductDetailPage() {
   }
 
   if (productQuery.isError || !productQuery.data) {
-    const notFound =
-      productQuery.error instanceof ApiError && productQuery.error.status === 404;
+    const notFound = productQuery.error instanceof ApiError && productQuery.error.status === 404;
     return (
       <Card>
         <CardContent className="grid justify-items-center gap-3 py-10 text-center">

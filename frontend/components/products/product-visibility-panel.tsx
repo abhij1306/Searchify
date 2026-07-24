@@ -25,10 +25,7 @@ import {
 import { displayHeadingLgClasses } from '@/components/ui/typography';
 import { ApiError } from '@/lib/api/errors';
 import { productsApi } from '@/lib/api/products';
-import type {
-  CompetitorProductVisibilityEntry,
-  ProductVisibilityEntry,
-} from '@/lib/api/types';
+import type { CompetitorProductVisibilityEntry, ProductVisibilityEntry } from '@/lib/api/types';
 import {
   RANK_BUCKET_LABELS,
   RANK_BUCKET_ORDER,
@@ -316,9 +313,7 @@ function RankingTableRow({ row, position }: Readonly<{ row: RankingRow; position
  * Each segment carries a `title` with its bucket label + count so the value
  * is never color-only.
  */
-function RankDistributionBar({
-  distribution,
-}: Readonly<{ distribution: Record<string, number> }>) {
+function RankDistributionBar({ distribution }: Readonly<{ distribution: Record<string, number> }>) {
   const total = RANK_BUCKET_ORDER.reduce((sum, key) => sum + (distribution[key] ?? 0), 0);
   if (total === 0) return <span className="text-subtle">—</span>;
   return (

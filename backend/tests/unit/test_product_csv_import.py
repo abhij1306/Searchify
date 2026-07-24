@@ -62,7 +62,7 @@ def test_parse_attribute_columns_fold_into_attributes() -> None:
 
 def test_parse_aliases_and_price_tolerances() -> None:
     csv_text = (
-        'sku,name,aliases,price\n'
+        "sku,name,aliases,price\n"
         'VC-500,VoltCity 500,"VoltCity|VC500|Commuter 500","$2,499.00"\n'
     )
     rows = parse_product_csv(csv_text)
@@ -71,13 +71,7 @@ def test_parse_aliases_and_price_tolerances() -> None:
 
 
 def test_parse_skips_blank_rows_bom_and_missing_sku() -> None:
-    csv_text = (
-        "\ufeffsku,name\n"
-        "\n"
-        "   \n"
-        ",No SKU row\n"
-        "VC-500,\n"
-    )
+    csv_text = "\ufeffsku,name\n\n   \n,No SKU row\nVC-500,\n"
     rows = parse_product_csv(csv_text)
     # Blank rows skipped; the sku-less row is skipped (sku is the identity);
     # a missing name falls back to the sku.

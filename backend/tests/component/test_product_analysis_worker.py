@@ -154,9 +154,7 @@ async def test_worker_writes_product_derived_rows_and_snapshots(
     _stub_adapter,
 ) -> None:
     async with session_factory() as session:
-        seed, product, competitor_product = await _seed_with_catalog(
-            session, prompts=2
-        )
+        seed, product, competitor_product = await _seed_with_catalog(session, prompts=2)
     audit = await _run_audit(session_factory, seed, reps=1)  # 2 tasks
 
     async with session_factory() as session:
@@ -180,10 +178,7 @@ async def test_worker_writes_product_derived_rows_and_snapshots(
         for analysis in analyses:
             assert analysis.artifact_id == artifact_by_task[analysis.task_id]
             assert analysis.product_analyzer_version == PRODUCT_ANALYZER_VERSION
-            assert (
-                analysis.product_scoring_rule_version
-                == PRODUCT_SCORING_RULE_VERSION
-            )
+            assert analysis.product_scoring_rule_version == PRODUCT_SCORING_RULE_VERSION
             assert analysis.logical_engine == ENGINE_GEMINI
             assert analysis.transport_provider == TRANSPORT_GOOGLE
             assert analysis.own_product_mention_count == 1
@@ -194,9 +189,7 @@ async def test_worker_writes_product_derived_rows_and_snapshots(
         mentions = list(
             (
                 await session.scalars(
-                    select(ProductMention).where(
-                        ProductMention.audit_id == audit.id
-                    )
+                    select(ProductMention).where(ProductMention.audit_id == audit.id)
                 )
             ).all()
         )

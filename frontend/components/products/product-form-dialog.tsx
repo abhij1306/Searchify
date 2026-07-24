@@ -58,7 +58,9 @@ export function ProductFormDialog({
   const submit = handleSubmit(async (values) => {
     // Edit mode merges over the existing row so attribute keys / variants the
     // form doesn't manage are preserved (see formValuesToProductUpdate).
-    await onSubmit(product ? formValuesToProductUpdate(product, values) : formValuesToProductInput(values));
+    await onSubmit(
+      product ? formValuesToProductUpdate(product, values) : formValuesToProductInput(values),
+    );
   });
 
   const handleOpenChange = (next: boolean) => {
@@ -133,12 +135,7 @@ export function ProductFormDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Price" error={errors.price?.message}>
             {(props) => (
-              <Input
-                {...props}
-                {...register('price')}
-                inputMode="decimal"
-                placeholder="2499.00"
-              />
+              <Input {...props} {...register('price')} inputMode="decimal" placeholder="2499.00" />
             )}
           </Field>
           <Field label="Currency" error={errors.currency?.message}>

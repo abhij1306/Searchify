@@ -118,9 +118,7 @@ async def analyze_task_products(
                 signals=signals,
                 product_id=None,
                 competitor_product_id=uuid.UUID(signals["competitor_product_id"]),
-                matched_name=competitor_names.get(
-                    signals["competitor_product_id"], ""
-                ),
+                matched_name=competitor_names.get(signals["competitor_product_id"], ""),
                 matched_sku="",
             )
         )

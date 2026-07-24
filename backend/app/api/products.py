@@ -98,9 +98,7 @@ def _unprocessable(detail: str) -> HTTPException:
 # --------------------------------------------------------------------------
 # Own catalog
 # --------------------------------------------------------------------------
-@router.get(
-    "/projects/{project_id}/products", response_model=list[ProductResponse]
-)
+@router.get("/projects/{project_id}/products", response_model=list[ProductResponse])
 async def list_products_endpoint(
     project_id: uuid.UUID, ctx: _WorkspaceDep, session: _SessionDep
 ) -> list[ProductResponse]:

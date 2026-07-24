@@ -251,15 +251,15 @@ def extract_price_mentions(
     # Earliest first, longest match wins ties; drop overlapping duplicates.
     matches.sort(key=lambda m: (m["offset"], -(m["_end"] - m["offset"])))
     accepted: list[dict[str, Any]] = []
-    for match in matches:
+    for candidate in matches:
         if any(
-            match["offset"] < kept["_end"] and kept["offset"] < match["_end"]
+            candidate["offset"] < kept["_end"] and kept["offset"] < candidate["_end"]
             for kept in accepted
         ):
             continue
-        accepted.append(match)
-    for match in accepted:
-        del match["_end"]
+        accepted.append(candidate)
+    for item in accepted:
+        del item["_end"]
     return accepted
 
 
@@ -338,9 +338,7 @@ def _rank_in_block(
             ordinal += 1
             item_start = start
         # An item's span runs to the next marker (or the block end).
-        next_start = (
-            block[index + 1][0] if index + 1 < len(block) else None
-        )
+        next_start = block[index + 1][0] if index + 1 < len(block) else None
         if item_start is not None and match_offset >= item_start:
             if next_start is None or match_offset < next_start:
                 return ordinal
@@ -518,9 +516,7 @@ def aggregate_product_run(
     """
     entries: list[tuple[str, str]] = [
         (entry.id, "products") for entry in config.products
-    ] + [
-        (entry.id, "competitor_products") for entry in config.competitor_products
-    ]
+    ] + [(entry.id, "competitor_products") for entry in config.competitor_products]
     id_key = {
         "products": "product_id",
         "competitor_products": "competitor_product_id",

@@ -191,9 +191,7 @@ class ProductResponseAnalysis(Base):
 
     # Flat headline signals (per-execution).
     own_product_mention_count: Mapped[int] = mapped_column(Integer, default=0)
-    competitor_product_mention_count: Mapped[int] = mapped_column(
-        Integer, default=0
-    )
+    competitor_product_mention_count: Mapped[int] = mapped_column(Integer, default=0)
     products_with_price_match: Mapped[int] = mapped_column(Integer, default=0)
 
     # Full deterministic product score dict (source of truth for aggregation).
@@ -267,9 +265,7 @@ class ProductMention(Base):
     price_value: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     price_currency: Mapped[str] = mapped_column(String(3), default="")
     # null = not verifiable (no catalog price / currency mismatch).
-    price_matches_catalog: Mapped[bool | None] = mapped_column(
-        Boolean, nullable=True
-    )
+    price_matches_catalog: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -338,9 +334,7 @@ class ProductMetricSnapshot(Base):
         nullable=True,
     )
     product_analyzer_version: Mapped[str] = mapped_column(String(32), default="")
-    product_scoring_rule_version: Mapped[str] = mapped_column(
-        String(32), default=""
-    )
+    product_scoring_rule_version: Mapped[str] = mapped_column(String(32), default="")
     mention_count: Mapped[int] = mapped_column(Integer, default=0)
     sov_share: Mapped[float] = mapped_column(default=0.0)
     avg_rank: Mapped[float | None] = mapped_column(nullable=True)

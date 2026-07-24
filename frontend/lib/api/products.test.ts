@@ -148,16 +148,12 @@ describe('productsApi', () => {
 
     const { productsApi } = await import('./products');
     await productsApi.importCsv(UUID2, new File(['sku,name\nAC-VB500,Acme'], 'products.csv'));
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      `/api/v1/projects/${UUID2}/products/import`,
-    );
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`/api/v1/projects/${UUID2}/products/import`);
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBeInstanceOf(FormData);
 
     const rows = [{ sku: 'AC-VB500', name: 'Acme VoltBike 500' }];
     await productsApi.importRows(UUID2, rows);
-    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
-      `/api/v1/projects/${UUID2}/products/import`,
-    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(`/api/v1/projects/${UUID2}/products/import`);
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({ products: rows });
   });
 

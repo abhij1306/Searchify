@@ -474,12 +474,9 @@ async def test_export_csv_download(
     # 2 entries x (overall + one engine row) = 4 data rows.
     rows = lines[1:]
     assert len(rows) == 4
+    assert any("Acme VoltBike 500" in row and row.endswith("all") for row in rows)
     assert any(
-        "Acme VoltBike 500" in row and row.endswith("all") for row in rows
-    )
-    assert any(
-        "Acme VoltBike 500" in row and row.endswith(ENGINE_GEMINI)
-        for row in rows
+        "Acme VoltBike 500" in row and row.endswith(ENGINE_GEMINI) for row in rows
     )
     assert any("Globex CityBike 450" in row for row in rows)
     assert all(str(audit.id) in row for row in rows)
@@ -510,7 +507,7 @@ async def test_export_csv_formula_neutralization_and_zero_accuracy(
         session.add(
             Product(
                 project_id=seed.project_id,
-                sku="=HYPERLINK(\"https://evil.example\",\"x\")",
+                sku='=HYPERLINK("https://evil.example","x")',
                 name="=cmd|'/c calc'!A1",
                 price=Decimal("10.00"),
                 currency="USD",

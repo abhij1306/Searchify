@@ -116,10 +116,7 @@ export type ProductVisibilitySummary = {
 export function summarizeProductVisibility(
   visibility: ProductVisibility,
 ): ProductVisibilitySummary {
-  const ownMentions = visibility.products.reduce(
-    (sum, entry) => sum + entry.mention_count,
-    0,
-  );
+  const ownMentions = visibility.products.reduce((sum, entry) => sum + entry.mention_count, 0);
   const totalMentions = visibility.total_mentions;
 
   let rankSum = 0;

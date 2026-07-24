@@ -38,7 +38,9 @@ def test_has_formula_trigger_allows_safe_text() -> None:
 
 
 def test_csv_cell_prefixes_formula_cells_with_quote() -> None:
-    assert csv_cell("=HYPERLINK(\"https://evil\",\"x\")") == "'=HYPERLINK(\"https://evil\",\"x\")"
+    assert (
+        csv_cell('=HYPERLINK("https://evil","x")') == '\'=HYPERLINK("https://evil","x")'
+    )
     assert csv_cell("\t=1+1") == "'\t=1+1"
     assert csv_cell("safe") == "safe"
     assert csv_cell(None) == ""

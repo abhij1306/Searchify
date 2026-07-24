@@ -95,11 +95,7 @@ export function ProductEvidenceTable({
             <div className="p-[var(--card-padding)]">
               <Alert tone="danger">
                 Could not load this product&apos;s evidence.{' '}
-                <button
-                  type="button"
-                  className="underline"
-                  onClick={() => evidenceQuery.refetch()}
-                >
+                <button type="button" className="underline" onClick={() => evidenceQuery.refetch()}>
                   Retry
                 </button>
               </Alert>

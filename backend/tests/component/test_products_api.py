@@ -257,9 +257,7 @@ async def test_cross_workspace_isolation(client: httpx.AsyncClient) -> None:
     assert (
         await client.patch(f"/api/v1/products/{product['id']}", json={"name": "x"})
     ).status_code == 404
-    assert (
-        await client.delete(f"/api/v1/products/{product['id']}")
-    ).status_code == 404
+    assert (await client.delete(f"/api/v1/products/{product['id']}")).status_code == 404
     assert (
         await client.post(
             f"/api/v1/projects/{project_a['id']}/products",
