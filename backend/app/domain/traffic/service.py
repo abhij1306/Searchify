@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Any
 
 from sqlalchemy import Float, and_, cast, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -111,9 +110,7 @@ async def _raise_if_task_terminal(
     single write transaction, so stopping here leaves no partial
     projection behind.
     """
-    await raise_if_task_terminal(
-        session_factory, task_id, boundary="metric-row batch"
-    )
+    await raise_if_task_terminal(session_factory, task_id, boundary="metric-row batch")
 
 
 async def _metric_row_batch(
@@ -136,9 +133,7 @@ async def _metric_row_batch(
         select(IntegrationMetricRow)
         .where(IntegrationMetricRow.workspace_id == workspace_id)
         .where(IntegrationMetricRow.project_id == project_id)
-        .where(
-            IntegrationMetricRow.dataset.in_(sorted(TRAFFIC_CONSUMED_DATASETS))
-        )
+        .where(IntegrationMetricRow.dataset.in_(sorted(TRAFFIC_CONSUMED_DATASETS)))
         .where(IntegrationMetricRow.date >= window_start)
         .where(IntegrationMetricRow.date <= window_end)
         .order_by(IntegrationMetricRow.id.asc())
@@ -288,9 +283,7 @@ async def _replace_query_stats(
 ) -> None:
     """Delete-then-insert the snapshot's query stat rows (same tx)."""
     await session.execute(
-        delete(TrafficQueryStat).where(
-            TrafficQueryStat.snapshot_id == snapshot_id
-        )
+        delete(TrafficQueryStat).where(TrafficQueryStat.snapshot_id == snapshot_id)
     )
     if not projection.queries:
         return
@@ -399,6 +392,7 @@ class TrafficCursorError(ValueError):
 # the endpoint + the active filters — site-health convention, contract C4).
 _PAGES_CURSOR_SCOPE = "traffic-pages"
 _QUERIES_CURSOR_SCOPE = "traffic-queries"
+
 
 def _validate_window(from_date: date | None, to_date: date | None) -> None:
     """The from/to contract: both-or-neither, ordered, within the max span."""
@@ -611,19 +605,20 @@ def _decode_table_cursor(
     ``float`` exactly as encoded.
     """
     try:
-        value_raw, id_raw = decode_keyset_cursor(
-            cursor, scope=scope, filters=filters
-        )
+        value_raw, id_raw = decode_keyset_cursor(cursor, scope=scope, filters=filters)
         return (None if value_raw == "" else float(value_raw)), uuid.UUID(id_raw)
     except ValueError as exc:
         # CursorScopeError is a ValueError subclass — one branch covers it.
         raise TrafficCursorError(str(exc)) from exc
 
 
-async def _stat_page_rows(
+# The two persisted stat models share the columns the keyset read touches
+# (metrics/workspace_id/project_id/snapshot_id/id), so the shared helpers below
+# stay generic in the model and return its CONCRETE row type rather than Base.
+async def _stat_page_rows[StatModel: (TrafficPageStat, TrafficQueryStat)](
     session: AsyncSession,
     *,
-    model: type[TrafficPageStat] | type[TrafficQueryStat],
+    model: type[StatModel],
     scope: str,
     filters: dict[str, object],
     snapshot_id: uuid.UUID,
@@ -632,7 +627,7 @@ async def _stat_page_rows(
     sort_key: str,
     descending: bool,
     keyset: tuple[float | None, uuid.UUID] | None,
-) -> tuple[list[Any], str | None]:
+) -> tuple[list[StatModel], str | None]:
     """One keyset page of a snapshot's persisted stat rows + the cursor.
 
     Ordering is ``(sort_metric [direction] NULLS LAST, id ASC)`` over the
@@ -714,10 +709,10 @@ def _query_row(stat: TrafficQueryStat) -> TrafficQueryRow:
     )
 
 
-async def _stat_table(
+async def _stat_table[StatModel: (TrafficPageStat, TrafficQueryStat)](
     session: AsyncSession,
     *,
-    model: type[TrafficPageStat] | type[TrafficQueryStat],
+    model: type[StatModel],
     scope: str,
     sort_whitelist: frozenset[str],
     workspace_id: uuid.UUID,
@@ -726,7 +721,7 @@ async def _stat_table(
     to_date: date | None,
     sort: str | None,
     cursor: str | None,
-) -> tuple[list[Any], str | None]:
+) -> tuple[list[StatModel], str | None]:
     """The shared keyset-table read behind the pages/queries endpoints.
 
     Validates the window, parses the whitelist-guarded sort, decodes the
@@ -868,8 +863,7 @@ async def list_traffic_sync_connections(
             and_(
                 IntegrationPropertyMapping.workspace_id
                 == IntegrationConnection.workspace_id,
-                IntegrationPropertyMapping.connection_id
-                == IntegrationConnection.id,
+                IntegrationPropertyMapping.connection_id == IntegrationConnection.id,
             ),
         )
         .join(

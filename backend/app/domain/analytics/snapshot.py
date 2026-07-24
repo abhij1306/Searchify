@@ -237,9 +237,7 @@ def select_latest_referral_facts(
     )
 
 
-def pearson_coefficient(
-    xs: Sequence[float], ys: Sequence[float]
-) -> float | None:
+def pearson_coefficient(xs: Sequence[float], ys: Sequence[float]) -> float | None:
     """Deterministic Pearson product-moment correlation coefficient.
 
     Returns ``None`` when the coefficient is undefined: empty input or a
@@ -278,9 +276,7 @@ def correlation_summary(
     }
     if sample_size < CORRELATION_MIN_SAMPLE:
         return insufficient
-    coefficient = pearson_coefficient(
-        [x for x, _y in pairs], [y for _x, y in pairs]
-    )
+    coefficient = pearson_coefficient([x for x, _y in pairs], [y for _x, y in pairs])
     if coefficient is None:
         return insufficient
     return {
@@ -356,7 +352,7 @@ def build_analytics_projection(
         share = ai_sessions / total_sessions if total_sessions > 0 else None
         referral_share.append(series_point(label, share))
 
-    sources = [
+    sources: list[dict[str, Any]] = [
         {
             "ai_source": ai_source,
             "sessions": sessions,
@@ -365,20 +361,25 @@ def build_analytics_projection(
         for ai_source, sessions in source_sessions.items()
         if sessions > 0
     ]
-    sources.sort(key=lambda row: (-row["sessions"], row["ai_source"]))
+    # Descending by sessions, then ai_source ascending as the stable tiebreak.
+    sources.sort(key=lambda row: (-int(row["sessions"]), str(row["ai_source"])))
 
     # --- Per-engine visibility series --------------------------------------
     engines = sorted(
-        {engine for fact in visibility_facts for engine, _s in fact.engine_scores}
+        {
+            engine
+            for visibility_fact in visibility_facts
+            for engine, _s in visibility_fact.engine_scores
+        }
     )
     bucket_engine: dict[tuple[date, str], list[tuple[float, int]]] = {}
-    for fact in visibility_facts:
-        if not (window_start <= fact.completed_date <= window_end):
+    for visibility_fact in visibility_facts:
+        if not (window_start <= visibility_fact.completed_date <= window_end):
             continue  # defensive: the executor's query already scopes this
-        bucket = bucket_start(fact.completed_date, granularity)
-        for engine, score in fact.engine_scores:
+        bucket = bucket_start(visibility_fact.completed_date, granularity)
+        for engine, score in visibility_fact.engine_scores:
             bucket_engine.setdefault((bucket, engine), []).append(
-                (score, fact.total_completed)
+                (score, visibility_fact.total_completed)
             )
     engine_visibility = [
         {
@@ -408,10 +409,10 @@ def build_analytics_projection(
 
     # --- Correlation (ALWAYS day-aligned, granularity-independent) --------
     day_visibility: dict[date, list[tuple[float, int]]] = {}
-    for fact in visibility_facts:
-        if window_start <= fact.completed_date <= window_end:
-            day_visibility.setdefault(fact.completed_date, []).append(
-                (fact.visibility_score, fact.total_completed)
+    for visibility_fact in visibility_facts:
+        if window_start <= visibility_fact.completed_date <= window_end:
+            day_visibility.setdefault(visibility_fact.completed_date, []).append(
+                (visibility_fact.visibility_score, visibility_fact.total_completed)
             )
     day_ai: dict[date, int] = {}
     for fact in latest:
@@ -429,8 +430,10 @@ def build_analytics_projection(
 
     # --- Theme rollup (window-level) ---------------------------------------
     theme_groups: dict[tuple[str, str], list[ThemeFactInput]] = {}
-    for fact in theme_facts:
-        theme_groups.setdefault((fact.theme, fact.intent), []).append(fact)
+    for theme_fact in theme_facts:
+        theme_groups.setdefault((theme_fact.theme, theme_fact.intent), []).append(
+            theme_fact
+        )
     themes: list[dict[str, Any]] = []
     for (theme, intent), group in sorted(theme_groups.items()):
         total_completed = len(group)
@@ -474,9 +477,7 @@ def build_analytics_projection(
         source_classification_ids=sorted(
             str(fact.classification_id) for fact in latest
         ),
-        source_snapshot_ids=sorted(
-            str(fact.snapshot_id) for fact in visibility_facts
-        ),
+        source_snapshot_ids=sorted(str(fact.snapshot_id) for fact in visibility_facts),
     )
 
 
@@ -499,9 +500,7 @@ async def _raise_if_task_terminal(
     )
 
 
-def _window_bounds(
-    window_start: date, window_end: date
-) -> tuple[datetime, datetime]:
+def _window_bounds(window_start: date, window_end: date) -> tuple[datetime, datetime]:
     """The inclusive-window UTC datetimes [start 00:00, end+1day 00:00)."""
     start_dt = datetime.combine(window_start, time.min, tzinfo=UTC)
     end_dt = datetime.combine(window_end + timedelta(days=1), time.min, tzinfo=UTC)
@@ -621,6 +620,8 @@ async def _visibility_facts(
     )
     facts: list[VisibilityFactInput] = []
     for snapshot, completed_at in (await session.execute(stmt)).tuples().all():
+        if completed_at is None:
+            continue  # defensive: the query already filters completed_at NOT NULL
         facts.append(
             VisibilityFactInput(
                 snapshot_id=snapshot.id,
@@ -751,9 +752,7 @@ async def refresh_analytics_snapshot(
     """
     if task.project_id is None:
         raise ValueError("analytics_snapshot_refresh task missing project_id")
-    window_start, window_end = payload_window(
-        task, kind="analytics_snapshot_refresh"
-    )
+    window_start, window_end = payload_window(task, kind="analytics_snapshot_refresh")
     async with session_factory() as session:
         referral_facts: list[ReferralFactInput] = []
         after_id: uuid.UUID | None = None

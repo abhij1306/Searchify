@@ -11,11 +11,7 @@
  */
 import type { DonutSegment } from '@/components/ui/donut';
 import type { TrendPoint } from '@/components/ui/trend-chart';
-import type {
-  AiSource,
-  AnalyticsCorrelation,
-  LlmAnalytics,
-} from '@/lib/api/analytics';
+import type { AiSource, AnalyticsCorrelation, LlmAnalytics } from '@/lib/api/analytics';
 import { ENGINE_ORDER } from '@/lib/providers/catalog';
 import { formatShortDate } from '@/lib/format';
 import { bucketAdjective, type AnalyticsGranularity } from './options';
@@ -233,12 +229,16 @@ export function correlationDisplay(
 export function formatOccurredAt(timestamp: string): string {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return timestamp;
+  // UTC-pinned like every other formatter (lib/format.ts): the API's
+  // occurred_at is a UTC instant, and rendering it in the viewer's local
+  // zone would day-shift the row away from the UTC day it is bucketed under.
   return date.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   });
 }
 

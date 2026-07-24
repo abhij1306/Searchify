@@ -181,16 +181,12 @@ def _bucket_starts(
             else:
                 current = current.replace(month=current.month + 1)
         else:
-            step = timedelta(
-                days=1 if granularity == TRAFFIC_GRANULARITY_DAY else 7
-            )
+            step = timedelta(days=1 if granularity == TRAFFIC_GRANULARITY_DAY else 7)
             current += step
     return starts
 
 
-def bucket_labels(
-    window_start: date, window_end: date, granularity: str
-) -> list[date]:
+def bucket_labels(window_start: date, window_end: date, granularity: str) -> list[date]:
     """The series labels: natural starts, the first clamped to the window.
 
     A window opening mid-week/mid-month labels its first (partial) bucket
@@ -244,10 +240,7 @@ def ga4_source_medium_ai_match(source: str, medium: str) -> bool:
     (inv. 2 — the one AI-referral taxonomy, owned by
     ``domain/analytics/classification.py``).
     """
-    return (
-        classify_referral_signals(utm_source=source, utm_medium=medium)
-        is not None
-    )
+    return classify_referral_signals(utm_source=source, utm_medium=medium) is not None
 
 
 # --- Aggregation ---------------------------------------------------------------
@@ -348,9 +341,7 @@ class _PageAccum:
     ga4: _Ga4Accum = field(default_factory=_Ga4Accum)
 
 
-def _page_accum(
-    pages: dict[str, _PageAccum], raw_page_value: str
-) -> _PageAccum | None:
+def _page_accum(pages: dict[str, _PageAccum], raw_page_value: str) -> _PageAccum | None:
     """The page's accumulator keyed by its canonical URL identity.
 
     The page dimension value is canonicalized with the ONE canonical-form
@@ -466,9 +457,7 @@ def build_traffic_projection(
         series["position"].append(series_point(label, gsc.position()))
         ga4_measures = ga4.measures()
         series["sessions"].append(series_point(label, ga4_measures["sessions"]))
-        series["conversions"].append(
-            series_point(label, ga4_measures["conversions"])
-        )
+        series["conversions"].append(series_point(label, ga4_measures["conversions"]))
 
     totals = totals_gsc.measures() | totals_ga4.measures()
 
@@ -477,12 +466,8 @@ def build_traffic_projection(
             canonical_url=canonical_url,
             url_hash=accum.url_hash,
             metrics=accum.gsc.measures() | accum.ga4.measures(),
-            source_metric_row_ids=sorted(
-                accum.gsc.row_ids | accum.ga4.row_ids
-            ),
-            source_artifact_ids=sorted(
-                accum.gsc.artifact_ids | accum.ga4.artifact_ids
-            ),
+            source_metric_row_ids=sorted(accum.gsc.row_ids | accum.ga4.row_ids),
+            source_artifact_ids=sorted(accum.gsc.artifact_ids | accum.ga4.artifact_ids),
         )
         for canonical_url, accum in sorted(pages.items())
     )
@@ -497,15 +482,13 @@ def build_traffic_projection(
     )
 
     snapshot_row_ids = set(totals_gsc.row_ids) | set(totals_ga4.row_ids)
-    snapshot_artifact_ids = set(totals_gsc.artifact_ids) | set(
-        totals_ga4.artifact_ids
-    )
-    for page in page_projections:
-        snapshot_row_ids.update(page.source_metric_row_ids)
-        snapshot_artifact_ids.update(page.source_artifact_ids)
-    for query in query_projections:
-        snapshot_row_ids.update(query.source_metric_row_ids)
-        snapshot_artifact_ids.update(query.source_artifact_ids)
+    snapshot_artifact_ids = set(totals_gsc.artifact_ids) | set(totals_ga4.artifact_ids)
+    for page_projection in page_projections:
+        snapshot_row_ids.update(page_projection.source_metric_row_ids)
+        snapshot_artifact_ids.update(page_projection.source_artifact_ids)
+    for query_projection in query_projections:
+        snapshot_row_ids.update(query_projection.source_metric_row_ids)
+        snapshot_artifact_ids.update(query_projection.source_artifact_ids)
 
     return SnapshotProjection(
         granularity=granularity,
