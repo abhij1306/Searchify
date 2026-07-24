@@ -1,9 +1,13 @@
 # Roadmap — Opportunities
 
-> **Status: roadmap / not yet coded.** This is a design spec for a future surface, written so
-> an engineer (or agent) can start building without re-deriving the architecture. It follows
-> the same conventions as the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP
-> LOCKED` task queue, immutable artifacts, and provenance on every derived row. Read
+> **Status: implemented (v1).** The deterministic core below is coded: the config-owned rule
+> catalog + priority formula, pure detectors over the persisted visibility/site evidence, the
+> supersede-not-mutate recompute service (inline-only, no queue), the workspace-scoped API
+> (`/projects/{id}/opportunities*`, `/opportunities/{id}`), and the CSV/MD exports. Two rules
+> stay **deferred** (disabled in config): `low_share_of_voice_theme` (needs per-topic SOV) and
+> `high_traffic_low_visibility` (needs the Traffic surface). It follows the same conventions as
+> the MVP: UUID PKs, workspace scoping, the Postgres `FOR UPDATE SKIP LOCKED` task queue,
+> immutable artifacts, and provenance on every derived row. Read
 > [`../../Agents.md`](../../Agents.md) and [`../invariants.md`](../invariants.md) first — every rule
 > there applies here too.
 

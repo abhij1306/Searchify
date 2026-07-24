@@ -30,7 +30,7 @@ full-product surface is marked below.
 | LLM Analytics / AI referrals | — | Roadmap |
 | Traffic | — | Roadmap |
 | Content (writer) | `domain/content` + `connectors/discovery_models` + `workers/content_worker.py` | **Implemented (basic v1)** — env-driven single output type (`website_page`), default-on Website-context tool, cancel; briefs/revisions/CMS stay roadmap ([`roadmap/content-writer.md`](roadmap/content-writer.md)) |
-| Opportunities | — | Roadmap |
+| Opportunities | `domain/opportunities` + `analysis/opportunities` | **Implemented (v1)** — 4 enabled rules (2 visibility + 2 site), inline-only recompute, supersede-not-mutate history; topic/traffic rules deferred ([`roadmap/opportunities.md`](roadmap/opportunities.md)) |
 | Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
 | Issues catalog | `site_health` | **Implemented** — grouped issues + per-URL detail |
 | Brand / Competitors / E-E-A-T rich profile | `domain/projects` | **Partial** — tenant-scoped `BrandProfile` manual CRUD, immutable default-agent drafts + explicit acceptance, and shared KB context are coded; competitor profiles, E-E-A-T, and `/brand` UI remain roadmap |
@@ -75,6 +75,7 @@ services.
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
 | `app/api/content.py` | `GET/POST /content/generations` (idempotent enqueue via `Idempotency-Key`), `GET /content/generations/{id}`, `POST /content/generations/{id}/regenerate` (new record, fresh context), `POST /content/generations/{id}/try-again` (new record, frozen context snapshot), `POST /content/generations/{id}/cancel` |
+| `app/api/opportunities.py` | `GET /projects/{id}/opportunities`, `GET /projects/{id}/opportunities/summary`, `POST /projects/{id}/opportunities/recompute`, `GET /projects/{id}/opportunities/export.csv`, `GET /projects/{id}/opportunities/export.md`, `GET /opportunities/{id}`, `PATCH /opportunities/{id}` (status only; a superseded row is a coded 409) |
 
 > The `brands/analyze`, `audits/estimate`,
 > `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the
@@ -127,11 +128,11 @@ deterministic ([architecture.md](architecture.md) §11). Metrics are a **project
 | `app/core/{database,security,telemetry}.py` | `Base`/engine/session; argon2/JWT/Fernet; structlog + correlation ids. |
 | `app/models/*` | SQLAlchemy persistence (UUID PKs, provenance columns). |
 | `app/schemas/*` | Pydantic request/response DTOs (secrets never present). |
-| `app/domain/{auth,workspaces,projects,prompts,providers,audits,content}/*` | Services + business rules per resource. |
+| `app/domain/{auth,workspaces,projects,prompts,providers,audits,content,opportunities}/*` | Services + business rules per resource. |
 | `app/connectors/answer_engines/*` | Answer-engine adapters + parsers (gemini, anthropic, openai — direct OpenAI Responses API). |
 | `app/connectors/discovery_models/*` | Discovery/generative model connectors for the content vertical (Mistral chat-completions at v1). Provider-agnostic contract; the API key is env-held (`SecretStr`), resolved only at call time — deliberately **not** BYOK: content generation is a platform capability, measurement keys stay per-workspace. |
 | `app/orchestration/{audit_state,task_queue,postgres_task_queue}.py` + `domain/audits/planner.py` | State machine, `TaskQueue` Protocol + Postgres impl (generic over queue specs — see §10), slot planning. |
-| `app/analysis/{normalization,scoring,exports}.py` | Deterministic scoring, aggregation, CSV/MD export. |
+| `app/analysis/{normalization,scoring,exports}.py` + `app/analysis/opportunities/*` | Deterministic scoring, aggregation, CSV/MD export; pure opportunity detectors + priority formula. |
 | `app/workers/audit_worker.py` | Separate process: claim → execute → persist → analyze → transition. |
 | `app/workers/content_worker.py` | Separate process for content generation: claim → build messages (prompt + optional deterministic Website-context projection) → call provider → atomic `finalize_attempt` (one locked transaction re-checking lease + cancel before writing the attempt + terminal state). |
 
@@ -157,6 +158,8 @@ project). No integer PKs, no `user_id` columns.
 | `models/audit.py` `AuditEvent` | Append-only lifecycle events (SSE source) | — |
 | `models/analysis.py` `ResponseAnalysis`, `BrandMention`, `CompetitorMention`, `Citation` | Deterministic per-execution analysis | each references its `RawResponseArtifact` + `analyzer_version` (invariant 4) |
 | `models/analysis.py` `MetricSnapshot` | Aggregate run metrics (projection) | `analyzer_version` + formula version |
+| `models/opportunity.py` `Opportunity` | Persisted opportunity row (rule, deterministic target key, evidence, priority score, human `status`); supersede-not-mutate history via `superseded_by_id`/`superseded_at` (partial unique live `(project, rule, target)` index) | `analyzer_version` + `rule_version` + `formula_version` + source id arrays (invariant 4) |
+| `models/opportunity.py` `OpportunitySnapshot` | Immutable per-recompute rollup (counts by type/severity/status, median priority, source ids) | unique `run_id` + version triple |
 | `models/content.py` `ContentGeneration` | Content request + queue row in one (AuditTask pattern): prompt, `output_type`, `website_context_*` (enabled/status/frozen snapshot), provider/model identity, output + usage, plus the full generic-queue column set (status/lease/attempts/idempotency) | `(workspace_id, idempotency_key)` unique + `request_fingerprint`; `generator_version`; `website_context_snapshot` frozen at enqueue |
 | `models/content.py` `ContentGenerationAttempt` | Append-only per-provider-call attempts | writer = claiming worker inside `finalize_attempt` (invariant 3) |
 
