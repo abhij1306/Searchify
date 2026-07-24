@@ -62,10 +62,14 @@ class GscQueryPage:
     artifact persists + hashes); ``rows`` is its ``rows`` list (absent on an
     empty result) with each entry the raw row dict
     (``keys``/``clicks``/``impressions``/``ctr``/``position``).
+    ``raw_row_count`` is the provider's row count for the page BEFORE any
+    client-side filtering (the worker's paging-termination measure); GSC
+    rows pass through unfiltered, so it equals ``len(rows)``.
     """
 
     payload: dict
     rows: tuple[dict, ...]
+    raw_row_count: int
 
 
 class GscClient:
@@ -164,7 +168,9 @@ class GscClient:
                 "GSC query returned malformed rows",
                 error_code=ERROR_PROVIDER_API,
             )
-        return GscQueryPage(payload=payload, rows=tuple(rows))
+        return GscQueryPage(
+            payload=payload, rows=tuple(rows), raw_row_count=len(rows)
+        )
 
 
 def build_gsc_client(

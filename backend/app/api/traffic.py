@@ -216,7 +216,10 @@ async def sync_traffic_endpoint(
     Returns 202 with the contract-C3 bare array — one
     ``{sync_run_id, connection_id, status}`` per queued run (empty when no
     active mapped connection feeds the project). A run still active for
-    the same window upstream is a 409.
+    the same window upstream is a 409; because each connection's enqueue
+    commits independently, the 409 detail names the connections that were
+    ALREADY enqueued before the conflict so the partial fan-out is never
+    invisible.
     """
     await _get_project_or_404(session, ctx.workspace_id, project_id)
     connections = await list_traffic_sync_connections(
@@ -234,7 +237,12 @@ async def sync_traffic_endpoint(
         except ActiveWindowConflictError as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+                detail={
+                    "error": ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+                    "enqueued_connection_ids": [
+                        str(row.connection_id) for row in enqueued
+                    ],
+                },
             ) from exc
         enqueued.append(
             IntegrationSyncEnqueueResponse(

@@ -104,10 +104,17 @@ class _PayloadTooLargeError(RuntimeError):
 
 
 class _ClientPage(Protocol):
-    """One fetched provider page (every provider client's return shape)."""
+    """One fetched provider page (every provider client's return shape).
+
+    ``raw_row_count`` is the provider's row count for the page BEFORE any
+    client-side normalization dropped malformed rows — the ONLY correct
+    paging-termination measure (a full raw page whose normalized ``rows``
+    came out short is NOT the last page).
+    """
 
     payload: dict
     rows: tuple[dict, ...]
+    raw_row_count: int
 
 
 class _DataClient(Protocol):
@@ -549,7 +556,9 @@ class IntegrationWorker:
             )
             if not wrote:
                 return False
-            if len(page.rows) < page_size:
+            # Terminate on the RAW provider count: a full page whose
+            # normalization dropped malformed rows is not the last page.
+            if page.raw_row_count < page_size:
                 return True
             start_row += page_size
 
@@ -560,8 +569,10 @@ class IntegrationWorker:
 
         A retry never refetches a persisted page (immutability + idempotent
         retries): the artifact pages already written for this run tell us
-        either that the dataset is complete (last page was partial) or the
-        next ``startRow`` to request.
+        either that the dataset is complete (last page's RAW provider row
+        count was partial) or the next ``startRow`` to request.
+        ``row_count`` is the raw per-page count for exactly this decision —
+        the same measure the live paging loop terminates on.
         """
         page_size = integration_settings.sync_page_size
         async with self._session_factory() as session:
@@ -683,7 +694,10 @@ class IntegrationWorker:
                     },
                     payload_hash=payload_hash,
                     fetched_at=now,
-                    row_count=len(page.rows),
+                    # The RAW provider count (pre-normalization): the resume
+                    # path's paging-termination measure — ``len(page.rows)``
+                    # would hide rows the client dropped as malformed.
+                    row_count=page.raw_row_count,
                     payload=page.payload,
                 )
             )

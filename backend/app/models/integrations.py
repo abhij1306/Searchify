@@ -361,6 +361,8 @@ class IntegrationImportArtifact(Base):
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
+    # RAW provider rows in this page (BEFORE client normalization dropped
+    # any malformed rows) — the resume path's paging-termination measure.
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

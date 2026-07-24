@@ -26,6 +26,7 @@ from app.core.config.analytics import (
     CONFIDENCE_EXACT,
     CORRELATION_STATE_INSUFFICIENT_DATA,
 )
+from app.domain.analytics.ingest import metric_row_not_superseded
 from app.domain.analytics.schemas import (
     AnalyticsCorrelation,
     AnalyticsEngineVisibility,
@@ -45,6 +46,7 @@ from app.models.analytics import (
     ReferralClassification,
     ReferralEvent,
 )
+from app.models.integrations import IntegrationMetricRow
 
 
 class AnalyticsQueryError(ValueError):
@@ -281,6 +283,11 @@ async def get_llm_analytics_referrals(
     ``(occurred_at desc, id desc)``; the opaque cursor is fingerprint-bound
     to this endpoint + the active filters, so a replay against a different
     source/window is rejected (400) instead of silently skipping rows.
+    Only events whose source metric row is at the LATEST ``resync_seq``
+    per row identity are listed — a re-sync ingests a second copy of each
+    logical referral, and the superseded revision is stale evidence (the
+    snapshot builder folds the same way; events with no metric-row link
+    pass — they are not re-sync duplicates).
     """
     _validate_source(source)
     _validate_window(from_date, to_date)
@@ -297,8 +304,13 @@ async def get_llm_analytics_referrals(
             ReferralEvent,
             ReferralEvent.id == ReferralClassification.referral_event_id,
         )
+        .outerjoin(
+            IntegrationMetricRow,
+            IntegrationMetricRow.id == ReferralEvent.source_metric_row_id,
+        )
         .where(ReferralClassification.workspace_id == workspace_id)
         .where(ReferralClassification.project_id == project_id)
+        .where(metric_row_not_superseded())
     )
     if source is not None:
         stmt = stmt.where(ReferralClassification.ai_source == source)

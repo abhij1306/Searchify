@@ -383,7 +383,11 @@ async def test_sync_active_window_conflict_is_409(
     # Same default window, run still active upstream -> 409.
     second = await client.post(url)
     assert second.status_code == 409
-    assert second.json()["detail"] == "sync_active_window_conflict"
+    detail = second.json()["detail"]
+    assert detail["error"] == "sync_active_window_conflict"
+    # The single connection conflicted on its own enqueue: nothing was
+    # fanned out before the conflict.
+    assert detail["enqueued_connection_ids"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -496,4 +500,68 @@ async def test_sync_maps_enqueue_conflict_to_409(
 
     resp = await client.post(f"/api/v1/projects/{project_id}/traffic/sync")
     assert resp.status_code == 409
-    assert resp.json()["detail"] == "sync_active_window_conflict"
+    detail = resp.json()["detail"]
+    assert detail["error"] == "sync_active_window_conflict"
+    assert detail["enqueued_connection_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_sync_409_names_already_enqueued_connections(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mid-fan-out conflict still reports the runs already committed.
+
+    Each connection's enqueue commits independently, so when the second
+    connection conflicts the first connection's run WILL run — the 409
+    detail must name it instead of hiding the partial fan-out.
+    """
+    from app.domain.integrations.sync import ActiveWindowConflictError
+
+    await _register(client, "traffic-sync-partial@example.com")
+    project_id, workspace_id = await _create_project(client)
+    async with session_factory() as session:
+        ws = uuid.UUID(workspace_id)
+        grant = await _seed_grant(session, workspace_id=ws)
+        gsc = await _seed_connection(
+            session, workspace_id=ws, grant=grant, provider=INTEGRATION_PROVIDER_GSC
+        )
+        ga4 = await _seed_connection(
+            session, workspace_id=ws, grant=grant, provider=INTEGRATION_PROVIDER_GA4
+        )
+        await _seed_mapping(
+            session,
+            workspace_id=ws,
+            connection=gsc,
+            property_ref="https://example.com/",
+            project_id=uuid.UUID(project_id),
+        )
+        await _seed_mapping(
+            session,
+            workspace_id=ws,
+            connection=ga4,
+            property_ref="properties/123456789",
+            project_id=uuid.UUID(project_id),
+        )
+        await session.commit()
+
+    async def _partially_conflicting_enqueue(session, *, connection_id, **kwargs):
+        if connection_id == ga4.id:
+            raise ActiveWindowConflictError(
+                "an active run already covers the window"
+            )
+        return SimpleNamespace(
+            id=uuid.uuid4(), connection_id=connection_id, status="queued"
+        )
+
+    monkeypatch.setattr(
+        "app.api.traffic.enqueue_sync_run", _partially_conflicting_enqueue
+    )
+
+    resp = await client.post(f"/api/v1/projects/{project_id}/traffic/sync")
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["error"] == "sync_active_window_conflict"
+    # The GSC run was enqueued (and committed) before the GA4 conflict.
+    assert detail["enqueued_connection_ids"] == [str(gsc.id)]

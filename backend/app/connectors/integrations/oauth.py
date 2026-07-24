@@ -99,9 +99,19 @@ def _split_scopes(value: object) -> tuple[str, ...]:
 
 
 def _coerce_expires_in(value: object) -> int | None:
-    try:
-        seconds = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    """Coerce a JSON ``expires_in`` (number or numeric string) to seconds.
+
+    A JSON payload yields int/float/str for this field; anything else (or
+    a negative value) means the provider sent no usable expiry — ``None``.
+    """
+    if isinstance(value, (int, float)):
+        seconds = int(value)
+    elif isinstance(value, str):
+        try:
+            seconds = int(value)
+        except ValueError:
+            return None
+    else:
         return None
     return seconds if seconds >= 0 else None
 

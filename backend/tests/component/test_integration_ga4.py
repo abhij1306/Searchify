@@ -97,15 +97,24 @@ def _fast_pacing_and_creds(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class _ProviderFake:
-    """The fake Google OAuth + GA4 Data API, routing by request host."""
+    """The fake Google OAuth + GA4 Data API, routing by request host.
 
-    def __init__(self, *, ga4_status: int = 200, empty: bool = False) -> None:
+    ``drop_row`` swaps the channel dataset's first page for a variant whose
+    second row is malformed (a non-numeric metric): the raw page is FULL
+    (2 rows) but normalization keeps only 1 — the paging-termination
+    regression fixture.
+    """
+
+    def __init__(
+        self, *, ga4_status: int = 200, empty: bool = False, drop_row: bool = False
+    ) -> None:
         self.token_calls: list[httpx.Request] = []
         self.ga4_auth: list[str] = []
         self.ga4_urls: list[str] = []
         self.ga4_requests: list[dict] = []
         self._ga4_status = ga4_status
         self._empty = empty
+        self._drop_row = drop_row
 
     def _ga4_response(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
@@ -123,9 +132,12 @@ class _ProviderFake:
         )
         offset = int(body.get("offset") or 0)
         if "sessionDefaultChannelGroup" in dimensions:
-            payload = _fixture(
-                "ga4_run_report_page2.json" if offset else "ga4_run_report_page1.json"
-            )
+            if offset:
+                payload = _fixture("ga4_run_report_page2.json")
+            elif self._drop_row:
+                payload = _fixture("ga4_run_report_page1_dropped_row.json")
+            else:
+                payload = _fixture("ga4_run_report_page1.json")
         elif "sessionSource" in dimensions and "landingPage" in dimensions:
             payload = _fixture("ga4_run_report_landing.json")
         elif "sessionSource" in dimensions:
@@ -396,6 +408,131 @@ async def test_fixture_import_refresh_artifacts_derivation(
         "window_start": _WINDOW[0].isoformat(),
         "window_end": _WINDOW[1].isoformat(),
     }
+
+
+@pytest.mark.asyncio
+async def test_full_raw_page_with_dropped_row_still_pages_on(
+    session_factory, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A FULL raw page whose normalization dropped a row is NOT the last.
+
+    Paging terminates on the provider's RAW row count, never the filtered
+    count: the channel dataset's first page carries 2 raw rows, one with a
+    non-numeric metric (dropped) — the worker must still request offset 2.
+    """
+    monkeypatch.setattr(integration_settings, "sync_page_size", 2)
+    workspace_id, _project_id, _grant_id, connection_id = await _seed_graph(db_session)
+    run = await enqueue_sync_run(
+        db_session,
+        workspace_id=workspace_id,
+        connection_id=connection_id,
+        window_start=_WINDOW[0],
+        window_end=_WINDOW[1],
+    )
+    fake = _ProviderFake(drop_row=True)
+
+    ran = await _worker(session_factory, fake.mock_transport()).run_until_idle()
+    assert ran == 1
+    await db_session.refresh(run)
+    assert run.status == TASK_STATUS_SUCCEEDED
+
+    channel_requests = [
+        body
+        for body in fake.ga4_requests
+        if any(
+            entry.get("name") == "sessionDefaultChannelGroup"
+            for entry in body["dimensions"]
+        )
+    ]
+    # Offset 2 WAS requested — the short normalized page (1 row) did not
+    # terminate paging early.
+    assert [body["offset"] for body in channel_requests] == [0, 2]
+
+    artifacts = await _artifacts(db_session, run.id)
+    channel = [
+        artifact
+        for artifact in artifacts
+        if artifact.dataset == DATASET_GA4_CHANNEL_DAILY
+    ]
+    # row_count is the RAW provider count (the resume path's measure)...
+    assert [a.row_count for a in channel] == [2, 1]
+    # ...while the persisted payload keeps only the rows that normalized.
+    assert [len(a.payload["rows"]) for a in channel] == [1, 1]
+
+
+@pytest.mark.asyncio
+async def test_retry_resumes_past_durable_page_with_dropped_row(
+    session_factory, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The resume path reads the same RAW count the live loop uses.
+
+    A durable first page with raw ``row_count == page_size`` but fewer
+    normalized payload rows (a dropped malformed row) resumes at the next
+    offset instead of being mistaken for a complete short page.
+    """
+    monkeypatch.setattr(integration_settings, "sync_page_size", 2)
+    workspace_id, _project_id, _grant_id, connection_id = await _seed_graph(db_session)
+    run = await enqueue_sync_run(
+        db_session,
+        workspace_id=workspace_id,
+        connection_id=connection_id,
+        window_start=_WINDOW[0],
+        window_end=_WINDOW[1],
+    )
+    # Simulate a crashed first attempt: channel page 0 is already durable
+    # with the raw count (2) vs one normalized payload row.
+    normalized_page1 = {
+        "rows": [
+            {
+                "keys": ["Organic Search", "20260720"],
+                "sessions": 41,
+                "engagedSessions": 30,
+                "conversions": 2,
+            }
+        ],
+        "rowCount": 3,
+    }
+    db_session.add(
+        IntegrationImportArtifact(
+            sync_run_id=run.id,
+            connection_id=connection_id,
+            workspace_id=workspace_id,
+            provider=INTEGRATION_PROVIDER_GA4,
+            dataset=DATASET_GA4_CHANNEL_DAILY,
+            query_snapshot={
+                "api_method": "runReport",
+                "dataset": DATASET_GA4_CHANNEL_DAILY,
+                "property_ref": _PROPERTY_REF,
+                "startDate": _WINDOW[0].isoformat(),
+                "endDate": _WINDOW[1].isoformat(),
+                "dimensions": ["sessionDefaultChannelGroup", "date"],
+                "metrics": ["sessions", "engagedSessions", "conversions"],
+                "rowLimit": 2,
+                "startRow": 0,
+            },
+            payload_hash=_canonical_hash(normalized_page1),
+            row_count=2,
+            payload=normalized_page1,
+        )
+    )
+    await db_session.commit()
+    fake = _ProviderFake(drop_row=True)
+
+    await _worker(session_factory, fake.mock_transport()).run_until_idle()
+
+    await db_session.refresh(run)
+    assert run.status == TASK_STATUS_SUCCEEDED
+    channel_requests = [
+        body
+        for body in fake.ga4_requests
+        if any(
+            entry.get("name") == "sessionDefaultChannelGroup"
+            for entry in body["dimensions"]
+        )
+    ]
+    # Page 0 was NOT refetched and the dataset was NOT declared complete:
+    # exactly one channel request, at the resumed offset.
+    assert [body["offset"] for body in channel_requests] == [2]
 
 
 @pytest.mark.asyncio

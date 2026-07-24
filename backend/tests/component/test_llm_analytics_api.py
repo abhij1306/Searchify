@@ -41,6 +41,7 @@ from app.core.config.analytics import (
 from app.domain.analytics import service as analytics_service
 from app.domain.analytics.snapshot import refresh_analytics_snapshot
 from app.models.analytics import AnalyticsTask
+from app.models.integrations import IntegrationConnection
 from tests.component.analytics_helpers import (
     DEFAULT_WINDOW,
     seed_ga4_import,
@@ -698,6 +699,108 @@ async def test_referrals_keyset_paging_and_source_filter(
         str(ids["c_newest"]),
         str(ids["c_mid"]),
     ]
+
+
+@pytest.mark.asyncio
+async def test_referrals_excludes_superseded_resync_revisions(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A re-sync's duplicate of a logical referral is listed ONCE.
+
+    The drill-down serves only events whose source metric row is at the
+    latest ``resync_seq`` per row identity (the snapshot builder folds the
+    same way); the superseded revision's event is stale evidence. Events
+    with NO metric-row link are not re-sync duplicates and still list.
+    """
+    await _register(client, "analytics-resync@example.com")
+    project_id, workspace_id = await _create_project(client)
+    ws_id, proj_id = uuid.UUID(workspace_id), uuid.UUID(project_id)
+    async with session_factory() as session:
+        seed0 = await seed_ga4_import(
+            session, workspace_id=ws_id, project_id=proj_id
+        )
+        stale_row = await seed_metric_row(
+            session,
+            seed=seed0,
+            row_date=date(2026, 7, 20),
+            dimension_values=["https://chatgpt.com/c/abc", "20260720"],
+            metrics={"sessions": 4},
+        )
+        stale_event = await seed_referral_event(
+            session,
+            seed=seed0,
+            occurred_at=_occurred(date(2026, 7, 20)),
+            referrer_url="https://chatgpt.com/c/abc",
+            source_metric_row_id=stale_row.id,
+        )
+        stale = await seed_referral_classification(
+            session,
+            event=stale_event,
+            is_ai_referral=True,
+            ai_source=AI_SOURCE_CHATGPT,
+            confidence=CONFIDENCE_EXACT,
+        )
+        # An unlinked event: not a re-sync duplicate — always listed.
+        unlinked_event = await seed_referral_event(
+            session,
+            seed=seed0,
+            occurred_at=_occurred(date(2026, 7, 21)),
+            referrer_url="https://gemini.google.com/app",
+            source_metric_row_id=None,
+        )
+        unlinked = await seed_referral_classification(
+            session,
+            event=unlinked_event,
+            is_ai_referral=True,
+            ai_source=AI_SOURCE_GEMINI,
+            confidence=CONFIDENCE_EXACT,
+        )
+        await session.commit()
+
+        # The re-sync: same connection, same window, resync_seq=1 — a second
+        # copy of the same logical referral row + event.
+        connection = await session.get(IntegrationConnection, seed0.connection_id)
+        assert connection is not None
+        seed1 = await seed_ga4_import(
+            session,
+            workspace_id=ws_id,
+            project_id=proj_id,
+            resync_seq=1,
+            connection=connection,
+        )
+        latest_row = await seed_metric_row(
+            session,
+            seed=seed1,
+            row_date=date(2026, 7, 20),
+            dimension_values=["https://chatgpt.com/c/abc", "20260720"],
+            metrics={"sessions": 9},
+            resync_seq=1,
+        )
+        latest_event = await seed_referral_event(
+            session,
+            seed=seed1,
+            occurred_at=_occurred(date(2026, 7, 20)),
+            referrer_url="https://chatgpt.com/c/abc",
+            source_metric_row_id=latest_row.id,
+        )
+        latest = await seed_referral_classification(
+            session,
+            event=latest_event,
+            is_ai_referral=True,
+            ai_source=AI_SOURCE_CHATGPT,
+            confidence=CONFIDENCE_EXACT,
+        )
+        await session.commit()
+
+    body = (
+        await client.get(f"/api/v1/projects/{project_id}/llm-analytics/referrals")
+    ).json()
+    ids = {item["id"] for item in body["items"]}
+    # The stale revision's copy is gone; the latest copy + the unlinked
+    # event remain — exactly once each.
+    assert ids == {str(latest.id), str(unlinked.id)}
+    assert str(stale.id) not in ids
 
 
 @pytest.mark.asyncio

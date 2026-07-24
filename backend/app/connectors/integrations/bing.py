@@ -87,10 +87,13 @@ class BingStatsPage:
     ``payload`` is the normalized stats document the immutable import
     artifact persists + hashes; ``rows`` is its ``rows`` list with each
     entry the normalized row dict (``keys`` + ``clicks``/``impressions``).
+    ``raw_row_count`` is the provider's row count BEFORE normalization
+    dropped any malformed rows — the worker's paging-termination measure.
     """
 
     payload: dict
     rows: tuple[dict, ...]
+    raw_row_count: int
 
 
 def _bing_template_for_dimensions(
@@ -261,7 +264,7 @@ class BingClient:
         template = _bing_template_for_dimensions(dimensions)
         if start_row > 0:
             # Unpaged single-shot API: there is no second page.
-            return BingStatsPage(payload={"rows": []}, rows=())
+            return BingStatsPage(payload={"rows": []}, rows=(), raw_row_count=0)
         url = f"{BING_API_BASE_URL}{BING_API_JSON_ROOT}{template.api_method}"
         payload = await self._get(
             url,
@@ -282,7 +285,9 @@ class BingClient:
         )
         # The persisted payload is the faithful normalized stats document
         # (the derivation contract).
-        return BingStatsPage(payload={"rows": list(rows)}, rows=rows)
+        return BingStatsPage(
+            payload={"rows": list(rows)}, rows=rows, raw_row_count=len(raw_rows)
+        )
 
     async def probe_access_token(self, *, access_token: str) -> None:
         """Cheap authenticated probe validating a Microsoft grant's token.

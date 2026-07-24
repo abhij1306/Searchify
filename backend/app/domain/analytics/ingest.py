@@ -21,7 +21,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import aliased
@@ -203,6 +203,32 @@ def _build_event_values(
     }
 
 
+def metric_row_not_superseded() -> ColumnElement[bool]:
+    """SQL WHERE fragment: no later-``resync_seq`` revision of the row exists.
+
+    The "latest revision per identity" rule as a reusable clause (ONE
+    owner, invariant 2 — the ingest projection and the referrals
+    drill-down both apply it). The identity is ``(project_id,
+    property_ref, provider, dataset, date, dimension_key)`` (the
+    ``uq_integration_metric_row_identity`` columns): a row superseded by
+    a later re-sync at a higher ``resync_seq`` is stale evidence and is
+    filtered out. On an OUTER join a NULL metric row passes (no row means
+    no newer revision).
+    """
+    newer_rows = aliased(IntegrationMetricRow)
+    return ~(
+        select(newer_rows.id)
+        .where(newer_rows.project_id == IntegrationMetricRow.project_id)
+        .where(newer_rows.property_ref == IntegrationMetricRow.property_ref)
+        .where(newer_rows.provider == IntegrationMetricRow.provider)
+        .where(newer_rows.dataset == IntegrationMetricRow.dataset)
+        .where(newer_rows.date == IntegrationMetricRow.date)
+        .where(newer_rows.dimension_key == IntegrationMetricRow.dimension_key)
+        .where(newer_rows.resync_seq > IntegrationMetricRow.resync_seq)
+        .exists()
+    )
+
+
 async def _latest_referral_rows(
     session: AsyncSession, artifact: IntegrationImportArtifact
 ) -> list[IntegrationMetricRow]:
@@ -214,23 +240,11 @@ async def _latest_referral_rows(
     by a later re-sync at a higher ``resync_seq`` is stale evidence and is
     never ingested, even if this artifact's queued task runs late.
     """
-    newer_rows = aliased(IntegrationMetricRow)
-    newer_exists = (
-        select(newer_rows.id)
-        .where(newer_rows.project_id == IntegrationMetricRow.project_id)
-        .where(newer_rows.property_ref == IntegrationMetricRow.property_ref)
-        .where(newer_rows.provider == IntegrationMetricRow.provider)
-        .where(newer_rows.dataset == IntegrationMetricRow.dataset)
-        .where(newer_rows.date == IntegrationMetricRow.date)
-        .where(newer_rows.dimension_key == IntegrationMetricRow.dimension_key)
-        .where(newer_rows.resync_seq > IntegrationMetricRow.resync_seq)
-        .exists()
-    )
     stmt = (
         select(IntegrationMetricRow)
         .where(IntegrationMetricRow.source_artifact_id == artifact.id)
         .where(IntegrationMetricRow.dataset.in_(sorted(TRAFFIC_GA4_REFERRAL_DATASETS)))
-        .where(~newer_exists)
+        .where(metric_row_not_superseded())
         .order_by(IntegrationMetricRow.date.asc(), IntegrationMetricRow.id.asc())
     )
     return list((await session.scalars(stmt)).all())

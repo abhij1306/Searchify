@@ -81,11 +81,15 @@ class Ga4ReportPage:
     ``payload`` is the normalized report document the immutable import
     artifact persists + hashes; ``rows`` is its ``rows`` list (absent on
     an empty result) with each entry the normalized row dict
-    (``keys`` + one entry per template metric).
+    (``keys`` + one entry per template metric). ``raw_row_count`` is the
+    provider's row count for the page BEFORE normalization dropped any
+    malformed rows — the worker's paging-termination measure (a full raw
+    page with dropped rows must not look like a short final page).
     """
 
     payload: dict
     rows: tuple[dict, ...]
+    raw_row_count: int
 
 
 def _ga4_template_for_dimensions(
@@ -193,9 +197,10 @@ class Ga4Client:
         The method name + signature mirror the GSC reference client — the
         worker pages every provider through this one seam; here it issues
         a GA4 ``runReport`` request. The caller owns paging: request pages
-        at ``start_row`` offsets of ``sync_page_size`` until a page
-        returns fewer rows than the page size. Raises ``Ga4ApiError`` on
-        any failure (classified, never carrying the token).
+        at ``start_row`` offsets of ``sync_page_size`` until a page's RAW
+        row count (``raw_row_count``, BEFORE normalization drops malformed
+        rows) comes back short of the page size. Raises ``Ga4ApiError``
+        on any failure (classified, never carrying the token).
         """
         template = _ga4_template_for_dimensions(dimensions)
         url = GA4_API_BASE_URL + GA4_RUN_REPORT_PATH.format(
@@ -276,7 +281,9 @@ class Ga4Client:
         payload: dict = {"rows": list(rows)}
         if "rowCount" in report:
             payload["rowCount"] = report["rowCount"]
-        return Ga4ReportPage(payload=payload, rows=rows)
+        return Ga4ReportPage(
+            payload=payload, rows=rows, raw_row_count=len(raw_rows)
+        )
 
 
 def build_ga4_client(
