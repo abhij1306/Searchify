@@ -35,7 +35,7 @@ export function ProductsScreen() {
   const projectId = activeProject?.id ?? null;
 
   const { activeTab, selectTab } = useProductsTab();
-  const visibilityQueries = useProductVisibilityQueries(projectId);
+  const visibilityQueries = useProductVisibilityQueries(projectId, activeTab === 'visibility');
 
   if (isProjectLoading) {
     return <ProductsScreenSkeleton />;

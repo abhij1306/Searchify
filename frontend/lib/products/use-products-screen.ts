@@ -56,14 +56,15 @@ export function useCatalogQueries(projectId: string | null) {
   return { productsQuery };
 }
 
-export function useProductVisibilityQueries(projectId: string | null) {
+export function useProductVisibilityQueries(projectId: string | null, enabled = true) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [engine, setEngine] = useState<ProductEngineFilter>('all');
 
   const auditsQuery = useQuery({
     queryKey: queryKeys.runs.list({ project_id: projectId ?? '' }),
     queryFn: ({ signal }) => runsApi.listAudits({ project_id: projectId! }, { signal }),
-    enabled: Boolean(projectId),
+    // Only fetch on the Visibility tab — the Catalog tab never reads these.
+    enabled: Boolean(projectId) && enabled,
   });
   const runOptions = useMemo(() => toRunOptions(auditsQuery.data ?? []), [auditsQuery.data]);
 
@@ -89,7 +90,7 @@ export function useProductVisibilityQueries(projectId: string | null) {
         { audit_id: activeRunId ?? undefined, engine: engineParam },
         { signal },
       ),
-    enabled: Boolean(projectId),
+    enabled: Boolean(projectId) && enabled,
   });
 
   return {

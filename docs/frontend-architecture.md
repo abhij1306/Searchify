@@ -35,6 +35,7 @@
 | `/prompt-research` | Prompt Research — manage prompts (manual + CSV import + AI generation; Topics rail, Active/Proposed/Archived review tabs) | **MVP** |
 | `/providers` | BYOK Provider Settings | **MVP** |
 | `/visibility` | Visibility workspace (four tabs: Overview, Trends, Mentions & Citations, Query Fanout) | **MVP** |
+| `/products`, `/products/[productId]` | Products workspace (agentic commerce): two tabs — Catalog (CRUD + CSV import + completeness badges) and Visibility (product SOV/mentions/rank/price-accuracy projection with engine filter); drill-down route page with mention evidence | **Implemented** — `components/products/products-screen.tsx` + `lib/api/products.ts` |
 | `/runs`, `/runs/[runId]`, `/runs/[runId]/executions/[executionId]` | Run/Executions explorer | **MVP** |
 | `/analytics` | LLM Analytics | **Implemented** — `components/analytics/analytics-screen.tsx` + `lib/api/analytics.ts` |
 | `/traffic` | Traffic | **Implemented** — `components/traffic/traffic-screen.tsx` + `lib/api/traffic.ts` |

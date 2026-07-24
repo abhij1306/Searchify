@@ -16,6 +16,7 @@ import {
   availabilityLabels,
   emptyProductForm,
   formValuesToProductInput,
+  formValuesToProductUpdate,
   productFormSchema,
   productToFormValues,
   type ProductFormValues,
@@ -55,7 +56,9 @@ export function ProductFormDialog({
   });
 
   const submit = handleSubmit(async (values) => {
-    await onSubmit(formValuesToProductInput(values));
+    // Edit mode merges over the existing row so attribute keys / variants the
+    // form doesn't manage are preserved (see formValuesToProductUpdate).
+    await onSubmit(product ? formValuesToProductUpdate(product, values) : formValuesToProductInput(values));
   });
 
   const handleOpenChange = (next: boolean) => {

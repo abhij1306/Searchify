@@ -18,6 +18,8 @@ audit (provider calls stubbed), covering the Task 4 acceptance:
 
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from decimal import Decimal
 
@@ -489,3 +491,59 @@ async def test_export_csv_download(
         headers=_headers(seed),
     )
     assert explicit.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_export_csv_formula_neutralization_and_zero_accuracy(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    _stub_adapter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A user-controlled product name that a spreadsheet would evaluate, plus
+    # an answer whose price contradicts the catalog (accuracy must render as
+    # 0.0, not a blank cell indistinguishable from "not verifiable").
+    seed, _product, _competitor_product = await _seed_workspace_with_catalog(
+        client, session_factory
+    )
+    async with session_factory() as session:
+        session.add(
+            Product(
+                project_id=seed.project_id,
+                sku="=HYPERLINK(\"https://evil.example\",\"x\")",
+                name="=cmd|'/c calc'!A1",
+                price=Decimal("10.00"),
+                currency="USD",
+            )
+        )
+        await session.commit()
+    monkeypatch.setitem(
+        globals(),
+        "_ANSWER",
+        "1. Acme VoltBike 500 — the best commuter pick at $1,999.00",
+    )
+    audit = await _run_audit(session_factory, seed)
+
+    resp = await client.get(
+        f"/api/v1/projects/{seed.project_id}/products/visibility/export.csv",
+        params={"audit_id": str(audit.id)},
+        headers=_headers(seed),
+    )
+    assert resp.status_code == 200
+
+    rows = list(csv.reader(io.StringIO(resp.text)))
+    header, data = rows[0], rows[1:]
+    product_col, sku_col = header.index("product"), header.index("sku")
+    accuracy_col = header.index("price_accuracy")
+
+    # Every formula-trigger cell is single-quote neutralized (OWASP pattern,
+    # shared app/analysis/csv_cells.py owner).
+    hostile = [row for row in data if "calc" in row[product_col]]
+    assert hostile, "expected the formula-named product row in the export"
+    assert all(row[product_col].startswith("'") for row in hostile)
+    assert all(row[sku_col].startswith("'") for row in hostile)
+
+    # The mismatched $1,999.00 vs catalog $2,499.00 renders as an explicit 0.0.
+    voltbike = [row for row in data if "VoltBike" in row[product_col]]
+    assert voltbike
+    assert all(float(row[accuracy_col]) == 0.0 for row in voltbike)

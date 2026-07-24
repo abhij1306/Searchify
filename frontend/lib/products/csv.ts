@@ -59,9 +59,17 @@ function splitAliases(value: string): string[] {
   return parts.map((part) => part.trim()).filter(Boolean);
 }
 
-/** Parse `$2,499.00` / `2499` into a number; null when unparseable. */
+// Currency markers the price column may carry (longest-first so `US$`/`AU$`/
+// `CA$` strip before `$`/`A$`/`C$`) — mirrors the backend `csv_import._parse_price`.
+const PRICE_CURRENCY_SYMBOLS = ['US$', 'AU$', 'CA$', 'A$', 'C$', '$', '€', '£'];
+
+/** Parse `$2,499.00` / `US$49.99` / `2499` into a number; null when unparseable. */
 function parsePrice(value: string): number | null {
-  const cleaned = value.replace(/[$€£,\s]/g, '');
+  let cleaned = value.replace(/,/g, '');
+  for (const symbol of PRICE_CURRENCY_SYMBOLS) {
+    cleaned = cleaned.split(symbol).join('');
+  }
+  cleaned = cleaned.replace(/\s/g, '');
   if (!cleaned) return null;
   const parsed = Number.parseFloat(cleaned);
   return Number.isFinite(parsed) ? parsed : null;
@@ -70,7 +78,9 @@ function parsePrice(value: string): number | null {
 type ColumnMap = Record<string, number>;
 
 function detectColumns(headerCells: string[]): ColumnMap | null {
-  const normalized = headerCells.map((cell) => cell.trim().toLowerCase());
+  // Mirrors the backend header fold (`csv_import`: lower + spaces to
+  // underscores) so a CSV the server would accept never fails browser preview.
+  const normalized = headerCells.map((cell) => cell.trim().toLowerCase().replace(/\s+/g, '_'));
   const find = (keys: Set<string>) => normalized.findIndex((cell) => keys.has(cell));
   const map: ColumnMap = {
     sku: find(SKU_KEYS),

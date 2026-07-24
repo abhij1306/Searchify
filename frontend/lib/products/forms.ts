@@ -83,10 +83,13 @@ export function productToFormValues(product: Product): ProductFormValues {
   };
 }
 
+// Attribute keys the form owns (and may therefore overwrite or clear).
+const FORM_ATTRIBUTE_KEYS = ['brand', 'category', 'gtin', 'availability', 'description'] as const;
+
 /** Map validated form values to the API input. */
 export function formValuesToProductInput(values: ProductFormValues): ProductInput {
   const attributes: Record<string, unknown> = {};
-  for (const key of ['brand', 'category', 'gtin', 'availability', 'description'] as const) {
+  for (const key of FORM_ATTRIBUTE_KEYS) {
     const value = values[key].trim();
     if (value) attributes[key] = value;
   }
@@ -105,4 +108,28 @@ export function formValuesToProductInput(values: ProductFormValues): ProductInpu
     url: values.url,
     attributes,
   };
+}
+
+/**
+ * Map validated form values to the API input for an EDIT of `product`.
+ *
+ * The form manages only a subset of the catalog row (one variant name and
+ * the FORM_ATTRIBUTE_KEYS bag). The backend replaces `attributes`/`variants`
+ * wholesale when they are sent, so an edit must merge: attribute keys and
+ * variants the form doesn't own (e.g. from a CSV import) are preserved,
+ * otherwise editing just the name would silently wipe them.
+ */
+export function formValuesToProductUpdate(
+  product: Product,
+  values: ProductFormValues,
+): ProductInput {
+  const input = formValuesToProductInput(values);
+  const attributes: Record<string, unknown> = { ...(product.attributes ?? {}) };
+  for (const key of FORM_ATTRIBUTE_KEYS) delete attributes[key];
+  Object.assign(attributes, input.attributes);
+  const existing = product.variants ?? [];
+  const variants = values.variant.trim()
+    ? [{ ...existing[0], name: values.variant.trim() }, ...existing.slice(1)]
+    : existing;
+  return { ...input, attributes, variants };
 }

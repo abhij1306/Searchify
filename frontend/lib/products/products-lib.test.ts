@@ -10,6 +10,7 @@ import {
   summarizeProductVisibility,
 } from './catalog';
 import { parseProductCsv, validProductRows } from './csv';
+import { emptyProductForm, formValuesToProductUpdate } from './forms';
 
 describe('normalizeProductsTab', () => {
   it('defaults to catalog and passes through known tabs', () => {
@@ -141,5 +142,72 @@ describe('parseProductCsv', () => {
     const parsed = parseProductCsv('sku,aliases\nSKU-1,Volt 500 | VC500\n');
     expect(parsed.rows[0]!.input.name).toBe('SKU-1');
     expect(parsed.rows[0]!.input.aliases).toEqual(['Volt 500', 'VC500']);
+  });
+
+  it('folds spaced headers to underscores like the backend import', () => {
+    // `Product SKU` / `Currency Code` are accepted by the server
+    // (csv_import folds spaces to underscores); the browser preview must too.
+    const parsed = parseProductCsv('Product SKU,Product Name,Price Amount,Currency Code\nSKU-9,Volt,10,usd\n');
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0]!.input).toMatchObject({
+      sku: 'SKU-9',
+      name: 'Volt',
+      price: 10,
+      currency: 'USD',
+    });
+  });
+
+  it('strips letter-prefixed currency symbols from prices (backend parity)', () => {
+    for (const raw of ['US$100', 'A$100', 'C$100', 'AU$100', 'CA$100', '€100', '£100']) {
+      const parsed = parseProductCsv(`sku,price\nSKU-1,"${raw}"\n`);
+      expect(parsed.rows[0]!.input.price).toBe(100);
+    }
+  });
+});
+
+describe('formValuesToProductUpdate', () => {
+  const existing = {
+    id: 'p1',
+    project_id: 'proj',
+    sku: 'SKU-1',
+    name: 'Volt',
+    aliases: ['V'],
+    variants: [
+      { name: 'Graphite', sku: 'SKU-1-G', price: 2499 },
+      { name: 'Silver', sku: 'SKU-1-S', price: 2599 },
+    ],
+    price: 2499,
+    currency: 'USD',
+    url: 'https://x.example/p',
+    attributes: { brand: 'Acme', mpn: 'MPN-1', condition: 'new' },
+    origin: 'imported',
+    completeness: { score: 1, present: 12, total: 12, missing: [] },
+    created_at: '2026-07-01T00:00:00Z',
+    updated_at: '2026-07-01T00:00:00Z',
+  } as const;
+
+  it('preserves form-unmanaged attribute keys and variants on edit', () => {
+    const update = formValuesToProductUpdate(existing as never, {
+      ...emptyProductForm,
+      name: 'Volt Renamed',
+      sku: 'SKU-1',
+      brand: 'Acme 2',
+    });
+    // Form-owned keys overwritten; unmanaged keys (mpn/condition) survive.
+    expect(update.attributes).toEqual({ brand: 'Acme 2', mpn: 'MPN-1', condition: 'new' });
+    // variants[0].name overwritten in place; every other variant preserved.
+    expect(update.variants).toEqual([
+      { name: 'Graphite', sku: 'SKU-1-G', price: 2499 },
+      { name: 'Silver', sku: 'SKU-1-S', price: 2599 },
+    ]);
+    expect(update.name).toBe('Volt Renamed');
+  });
+
+  it('writes the single form variant for a product without variants', () => {
+    const update = formValuesToProductUpdate(
+      { ...existing, variants: [] } as never,
+      { ...emptyProductForm, sku: 'SKU-1', variant: 'Graphite' },
+    );
+    expect(update.variants).toEqual([{ name: 'Graphite' }]);
   });
 });

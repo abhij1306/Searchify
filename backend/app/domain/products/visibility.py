@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analysis.csv_cells import csv_cell
 from app.analysis.product_service import build_product_scoring_config
 from app.core.config.audits import (
     AUDIT_STATUS_COMPLETED,
@@ -318,14 +319,19 @@ def product_visibility_csv(
     def _row(
         *, name: str, sku: str, engine: str, aggregate: dict
     ) -> dict[str, object]:
+        avg_rank = aggregate.get("avg_rank")
+        price_accuracy = aggregate.get("price_accuracy_rate")
         return {
             "audit_id": str(audit.id),
-            "product": name,
-            "sku": sku,
+            # User-controlled strings (CRUD / CSV import) — neutralize
+            # spreadsheet formula triggers on export (csv_cells owner).
+            "product": csv_cell(name),
+            "sku": csv_cell(sku),
             "mentions": aggregate.get("mention_count", 0),
             "sov": aggregate.get("sov_share", 0.0),
-            "avg_rank": aggregate.get("avg_rank") or "",
-            "price_accuracy": aggregate.get("price_accuracy_rate") or "",
+            # None (not verifiable) renders blank; 0.0 must survive as 0.0.
+            "avg_rank": "" if avg_rank is None else avg_rank,
+            "price_accuracy": "" if price_accuracy is None else price_accuracy,
             "engine": engine,
         }
 

@@ -126,7 +126,7 @@ export function ProductEvidenceTable({
                 </TableHeader>
                 <TableBody>
                   {(evidenceQuery.data?.items ?? []).map((item) => (
-                    <EvidenceRow key={item.mention_id} item={item} product={product} />
+                    <EvidenceRow key={item.mention_id} item={item} />
                   ))}
                 </TableBody>
               </Table>
@@ -146,10 +146,7 @@ export function ProductEvidenceTable({
   );
 }
 
-function EvidenceRow({
-  item,
-  product,
-}: Readonly<{ item: ProductEvidenceItem; product: Product }>) {
+function EvidenceRow({ item }: Readonly<{ item: ProductEvidenceItem }>) {
   return (
     <TableRow>
       <TableCell>
@@ -179,10 +176,12 @@ function EvidenceRow({
             Match
           </Badge>
         ) : (
-          <Badge
-            variant="status"
-            value="warning"
-          >{`catalog ${formatPrice(product.price, product.currency)}`}</Badge>
+          // Plain badge: the verdict was computed against the audit-time
+          // FROZEN catalog price, so quoting the live price here could
+          // contradict it after a post-audit price edit.
+          <Badge variant="status" value="warning">
+            Mismatch
+          </Badge>
         )}
       </TableCell>
       <TableCell numeric className="text-secondary">
