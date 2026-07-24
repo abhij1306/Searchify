@@ -1267,6 +1267,104 @@ export const contentGenerationDetailSchema = z
   .strict();
 
 // ---------------------------------------------------------------------------
+// Opportunities (deterministic priority catalog — backend owns the contract)
+// ---------------------------------------------------------------------------
+
+// Opportunity vocabulary (config-owned; per-subsystem severity enum — the
+// site-health `issueSeveritySchema` is NOT reused, they evolve independently).
+export const opportunityTypeSchema = z.enum(['visibility', 'site', 'traffic', 'topic']);
+export const opportunitySeveritySchema = z.enum([
+  'critical',
+  'high',
+  'medium',
+  'low',
+  'info',
+]);
+export const opportunityStatusSchema = z.enum([
+  'open',
+  'in_progress',
+  'dismissed',
+  'resolved',
+]);
+
+// One live opportunity row in the priority-sorted catalog.
+export const opportunitySchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    rule_id: z.string(),
+    opportunity_type: opportunityTypeSchema,
+    severity: opportunitySeveritySchema,
+    priority_score: z.number(),
+    title: z.string(),
+    target_key: z.string(),
+    target_prompt_id: uuid().nullable(),
+    target_url: z.string().nullable(),
+    target_theme: z.string().nullable(),
+    status: opportunityStatusSchema,
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+// Full evidence bundle + provenance for one opportunity. Superseded rows stay
+// readable (only the status PATCH is live-only, coded 409).
+export const opportunityDetailSchema = opportunitySchema.extend({
+  remediation: z.string(),
+  evidence: z.record(z.string(), z.unknown()),
+  source_analysis_ids: z.array(z.string()),
+  source_issue_ids: z.array(z.string()),
+  source_metric_ids: z.array(z.string()),
+  source_traffic_ids: z.array(z.string()),
+  analyzer_version: z.string(),
+  rule_version: z.string(),
+  formula_version: z.string(),
+  superseded_by_id: uuid().nullable(),
+  superseded_at: z.string().nullable(),
+});
+
+export const opportunitiesPageSchema = cursorPageSchema(opportunitySchema);
+
+// Latest recompute snapshot projection. `computed=false` (with empty counts +
+// null ids) before the first recompute — a 200, never a 404.
+export const opportunitySummarySchema = z
+  .object({
+    computed: z.boolean(),
+    run_id: uuid().nullable(),
+    audit_id: uuid().nullable(),
+    site_crawl_id: uuid().nullable(),
+    counts_by_type: z.record(z.string(), z.number().int()),
+    counts_by_severity: z.record(z.string(), z.number().int()),
+    counts_by_status: z.record(z.string(), z.number().int()),
+    total_count: z.number().int(),
+    median_priority: z.number().nullable(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    formula_version: z.string(),
+    computed_at: z.string().nullable(),
+  })
+  .strict();
+
+// The immutable snapshot written by one recompute run (POST response).
+export const recomputeResponseSchema = z
+  .object({
+    id: uuid(),
+    run_id: uuid(),
+    audit_id: uuid().nullable(),
+    site_crawl_id: uuid().nullable(),
+    counts_by_type: z.record(z.string(), z.number().int()),
+    counts_by_severity: z.record(z.string(), z.number().int()),
+    counts_by_status: z.record(z.string(), z.number().int()),
+    total_count: z.number().int(),
+    median_priority: z.number().nullable(),
+    analyzer_version: z.string(),
+    rule_version: z.string(),
+    formula_version: z.string(),
+    created_at: z.string(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
 // strictValidate — fail loud on any schema drift (drift policy §6)
 // ---------------------------------------------------------------------------
 

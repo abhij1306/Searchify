@@ -39,7 +39,7 @@
 | `/analytics` (AEO Insights beyond the Visibility workspace) | LLM Analytics | Roadmap |
 | `/traffic` | Traffic | Roadmap |
 | `/content` | Content writer (basic v1: prompt-box-first composer, Website-context toggle, sanitised Markdown result, cancel, history) | **Implemented** |
-| `/opportunities` | Opportunities | Roadmap |
+| `/opportunities` | Opportunities (snapshot strip + priority catalog + evidence drawer) | **Implemented (v1)** |
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
 | `/brand` (Profile beyond setup, Competitors, E-E-A-T) | Brand suite | Roadmap |
 | `/topics` | Dedicated Topics page (topic management already lives in the `/prompt-research` rail) | Roadmap |
@@ -76,6 +76,7 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
 | Visibility | `/visibility` + `lib/api/visibility.ts` | Four-tab workspace with a shared filter bar (§7) |
 | Runs / executions | `/runs/*` + `lib/api/runs.ts` | Launch, progress, cancel, evidence, export |
 | Content | `/content` + `lib/api/content.ts` + `lib/content/{use-content-generations.ts,markdown.tsx}` + `components/content/content-screen.tsx` | **Live** — enqueue (client-generated `Idempotency-Key`), conditional polling while non-terminal, cancel/regenerate/try-again, history list, and a sanitised Markdown renderer (react-markdown + remark-gfm, **no rehype-raw**, http/https/mailto URL allowlist, images dropped, hardened links) |
+| Opportunities | `/opportunities` + `lib/api/opportunities.ts` + `components/opportunities/{opportunities-screen,opportunities-catalog,evidence-drawer}.tsx` | Snapshot strip (API-owned counts + Recompute + exports), server-filtered priority catalog (keyset), status PATCH, evidence/provenance drawer (new 448px shell — not the HistoryDrawer) |
 | UI + token policy | `components/ui/*`, `app/globals.css` | CVA primitives, bridged tokens only (no raw hex) |
 
 ## 5. Live backend API usage
@@ -102,6 +103,10 @@ The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live
     `GET /audits/{id}/events` (SSE, optional)
   - Content → `GET/POST /content/generations`, `GET /content/generations/{id}`,
     `POST /content/generations/{id}/{regenerate|try-again|cancel}`
+  - Opportunities → `GET /projects/{id}/opportunities` (+ `type|severity|status|rule_id|
+    min_priority|limit|cursor`), `GET /projects/{id}/opportunities/summary`,
+    `POST /projects/{id}/opportunities/recompute`, `GET /opportunities/{id}`,
+    `PATCH /opportunities/{id}` (status only), `GET /projects/{id}/opportunities/export.{csv,md}`
 - **Workspace scoping**: the active workspace + project are carried in context; the backend
   enforces workspace auth on every query (invariant 5). No `user_id` anywhere.
 - **Cookie session**: JWT in a secure HttpOnly cookie; the client sends `credentials:'include'`.
@@ -184,6 +189,11 @@ reuses the cached dataset rather than refetching.
   `queries_available|count_only|no_search`) — the shared dataset for the two evidence tabs.
 - `transportProviderSchema = z.enum(['openai','anthropic','google'])` for the approved
   direct transports on both request and response DTOs.
+- `opportunitySchema` / `opportunityDetailSchema` / `opportunitiesPageSchema` /
+  `opportunitySummarySchema` / `recomputeResponseSchema` with the per-subsystem enums
+  `opportunityTypeSchema` (`visibility|site|traffic|topic`), `opportunitySeveritySchema`
+  (5 tokens), `opportunityStatusSchema` (`open|in_progress|dismissed|resolved`). The summary
+  is `computed=false` (empty counts, null ids) before the first recompute — a 200, not a 404.
 
 **Every `id` and `*_id` field is `z.string().uuid()`; no numeric ids; no `user_id`.** All
 responses pass through `strictValidate`.

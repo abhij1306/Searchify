@@ -74,6 +74,15 @@ import type {
   contentOutputTypeSchema,
   websiteContextStatusSchema,
   websiteContextSummarySchema,
+  // Opportunities
+  opportunitiesPageSchema,
+  opportunityDetailSchema,
+  opportunitySchema,
+  opportunitySeveritySchema,
+  opportunityStatusSchema,
+  opportunitySummarySchema,
+  opportunityTypeSchema,
+  recomputeResponseSchema,
 } from './schemas';
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
@@ -147,3 +156,13 @@ export type WebsiteContextStatus = z.infer<typeof websiteContextStatusSchema>;
 export type WebsiteContextSummary = z.infer<typeof websiteContextSummarySchema>;
 export type ContentGenerationListItem = z.infer<typeof contentGenerationListItemSchema>;
 export type ContentGenerationDetail = z.infer<typeof contentGenerationDetailSchema>;
+
+// --- Opportunities ---
+export type OpportunityType = z.infer<typeof opportunityTypeSchema>;
+export type OpportunitySeverity = z.infer<typeof opportunitySeveritySchema>;
+export type OpportunityStatus = z.infer<typeof opportunityStatusSchema>;
+export type Opportunity = z.infer<typeof opportunitySchema>;
+export type OpportunityDetail = z.infer<typeof opportunityDetailSchema>;
+export type OpportunitiesPage = z.infer<typeof opportunitiesPageSchema>;
+export type OpportunitySummary = z.infer<typeof opportunitySummarySchema>;
+export type RecomputeResponse = z.infer<typeof recomputeResponseSchema>;

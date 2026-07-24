@@ -6,6 +6,7 @@
  *   - core.ts        — auth, workspaces, projects, prompts, providers, content
  *   - runs.ts        — runs (audits + executions), visibility
  *   - site-health.ts — site health (crawls, inventory, monitored, issues)
+ *   - opportunities.ts — opportunities (catalog, detail, summary)
  *
  * This facade re-assembles them under the historical `queryKeys` shape so the
  * 20+ existing importers keep the single `@/lib/api/query-keys` entry point.
@@ -19,6 +20,7 @@ import {
   topicKeys,
   workspaceKeys,
 } from './query-keys/core';
+import { opportunityKeys } from './query-keys/opportunities';
 import { runKeys, visibilityKeys } from './query-keys/runs';
 import { siteHealthKeys } from './query-keys/site-health';
 
@@ -33,4 +35,5 @@ export const queryKeys = {
   visibility: visibilityKeys,
   siteHealth: siteHealthKeys,
   content: contentKeys,
+  opportunities: opportunityKeys,
 } as const;

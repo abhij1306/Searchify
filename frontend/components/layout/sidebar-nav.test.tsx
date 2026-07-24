@@ -42,7 +42,7 @@ describe('SidebarNav', () => {
   it('renders every item as a link — no disabled state or "soon" badge', () => {
     renderNav();
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(8);
+    expect(links).toHaveLength(9);
     for (const link of links) {
       expect(link).not.toHaveAttribute('aria-disabled');
     }
@@ -60,6 +60,7 @@ describe('SidebarNav', () => {
       'Content',
       'Site Health',
       'Issues',
+      'Opportunities',
       'Knowledge Base',
       'Setup',
     ]);
