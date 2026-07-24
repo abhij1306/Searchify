@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { IntegrationSettings } from '@/components/settings/integration-settings';
 import { ProviderSettings } from '@/components/settings/provider-settings';
 import { projectsApi } from '@/lib/api/projects';
 import { queryKeys } from '@/lib/api/query-keys';
@@ -59,6 +60,7 @@ function DetailRow({
 const SETTINGS_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'providers', label: 'Provider Settings' },
+  { id: 'integrations', label: 'Integrations' },
   { id: 'danger', label: 'Danger Zone' },
 ] as const;
 
@@ -68,9 +70,10 @@ const TAB_ID = (tab: SettingsTab) => `settings-tab-${tab}`;
 const PANEL_ID = (tab: SettingsTab) => `settings-panel-${tab}`;
 
 /**
- * SettingsScreen — tabbed settings (Account / Provider Settings / Danger Zone),
- * following the WAI-ARIA tabs idiom used by the Visibility workspace (roving
- * tabindex, Arrow/Home/End navigation, `aria-selected`, labelled panels).
+ * SettingsScreen — tabbed settings (Account / Provider Settings / Integrations
+ * / Danger Zone), following the WAI-ARIA tabs idiom used by the Visibility
+ * workspace (roving tabindex, Arrow/Home/End navigation, `aria-selected`,
+ * labelled panels).
  *
  * - **Account**: read-only session details from `GET /auth/me` via
  *   `useSessionUser` (no account-mutation endpoints exist) plus the
@@ -79,6 +82,10 @@ const PANEL_ID = (tab: SettingsTab) => `settings-panel-${tab}`;
  *   neither is a workspace membership role.
  * - **Provider Settings**: the BYOK provider configuration (formerly the
  *   standalone `/providers` page), rendered by `ProviderSettings`.
+ * - **Integrations**: first-party data connections (GSC/GA4 on one shared
+ *   Google OAuth grant, Bing on a Microsoft grant), rendered by
+ *   `IntegrationSettings`. `?tab=integrations` is the OAuth-callback landing
+ *   surface (contract C2).
  * - **Danger Zone**: deletes the active project (backend cascades to all child
  *   data) behind a confirmation dialog — the one mutation on this screen.
  */
@@ -286,6 +293,17 @@ export function SettingsScreen() {
         className="focus-ring outline-none"
       >
         <ProviderSettings />
+      </div>
+
+      <div
+        role="tabpanel"
+        id={PANEL_ID('integrations')}
+        aria-labelledby={TAB_ID('integrations')}
+        hidden={activeTab !== 'integrations'}
+        tabIndex={0}
+        className="focus-ring outline-none"
+      >
+        <IntegrationSettings />
       </div>
 
       <div
