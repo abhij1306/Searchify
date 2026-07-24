@@ -33,6 +33,13 @@ from app.core.config.site_health import (
 MIN_SUFFICIENT_WORDS = PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER].min_sufficient_words
 
 
+def test_other_profile_minimum_preserves_v1_parity():
+    # Pin the v1 contract: the ``other`` profile minimum must stay 100 words
+    # so unclassified pages score exactly as v1 did (spec §5.2). The alias
+    # above intentionally derives from config; this assertion does not.
+    assert PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER].min_sufficient_words == 100
+
+
 def _html_facts(**overrides):
     facts = {
         "has_html": True,

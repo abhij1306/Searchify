@@ -631,6 +631,19 @@ async def _issue_counts_by_site_url(
 # =========================================================================
 # Inventory (keyset (normalized_url, id) over SiteUrl)
 # =========================================================================
+def _page_type_matches(analysis: SitePageAnalysis | None, wanted: str | None) -> bool:
+    """The v2 P1 page_type filter predicate (inventory + pages share it).
+
+    An unfiltered request (``wanted is None``) matches everything; a filtered
+    one requires a classified analysis of exactly that type — URLs without
+    an analysis never match, and an unknown value simply matches nothing
+    (the same ignore-unknown convention as the other filters).
+    """
+    if wanted is None:
+        return True
+    return analysis is not None and analysis.page_type == wanted
+
+
 async def get_inventory(
     session: AsyncSession,
     *,
@@ -647,10 +660,9 @@ async def get_inventory(
 
     Filters by substring ``query`` (normalized/display url), a per-URL
     presentation ``status``, the ``monitored`` flag, and a ``page_type``
-    exact match against the latest analysis's classified type (v2 P1 — URLs
-    without an analysis never match; an unknown value matches nothing, the
-    same ignore-unknown convention as the other filters). The cursor is bound
-    to the endpoint + filter fingerprint so a filter change invalidates it.
+    exact match against the latest analysis's classified type (v2 P1 —
+    semantics in ``_page_type_matches``). The cursor is bound to the
+    endpoint + filter fingerprint so a filter change invalidates it.
     Nullable latest-analysis summaries are attached per row.
     """
     crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
@@ -728,9 +740,7 @@ async def get_inventory(
         )
         if status is not None and pres_status != status:
             continue
-        if page_type is not None and (
-            analysis is None or analysis.page_type != page_type
-        ):
+        if not _page_type_matches(analysis, page_type):
             continue
         items.append(
             {
@@ -904,12 +914,10 @@ async def get_pages(
     """Analyzed-page summaries for a crawl, ordered ``(normalized_url, id)``.
 
     Accepts an exact presentation ``status`` or the combined ``error_or_blocked``
-    filter, a ``monitored`` toggle, and a ``page_type`` filter (v2 P1 — exact
-    match against the latest analysis's classified type; URLs without an
-    analysis never match, and an unknown value simply matches nothing, the
-    same ignore-unknown convention as the other filters). Filters are part of
-    the cursor fingerprint. Rows are the crawl's project ``SiteUrl`` set,
-    projected with the latest analysis and derived presentation status.
+    filter, a ``monitored`` toggle, and a ``page_type`` filter (v2 P1 —
+    semantics in ``_page_type_matches``). Filters are part of the cursor
+    fingerprint. Rows are the crawl's project ``SiteUrl`` set, projected
+    with the latest analysis and derived presentation status.
     """
     crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     limit = _clamp_limit(limit)
@@ -1002,9 +1010,7 @@ async def get_pages(
         last_scanned = row
         if not _matches_page_status(pres_status, status):
             continue
-        if page_type is not None and (
-            analysis is None or analysis.page_type != page_type
-        ):
+        if not _page_type_matches(analysis, page_type):
             continue
         items.append(
             {

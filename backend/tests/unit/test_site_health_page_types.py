@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.analysis.site_health import page_types as page_types_module
 from app.analysis.site_health.page_types import classify
 from app.core.config import site_health as config
 from app.core.config.site_health import (
     CLASSIFIER_VERSION,
     PAGE_TYPE_CONFIDENCE_THRESHOLD,
+    PAGE_TYPE_PATH_PATTERNS,
+    PAGE_TYPE_PROFILES,
+    PAGE_TYPE_SCHEMA_TYPE_MAP,
     PAGE_TYPE_SIGNAL_CONTENT_HEURISTIC,
     PAGE_TYPE_SIGNAL_NONE,
     PAGE_TYPE_SIGNAL_PATH_PATTERN,
@@ -335,5 +337,30 @@ def test_malformed_inputs_never_raise() -> None:
 
 
 def test_classifier_version_stamped_from_config() -> None:
-    assessment = page_types_module.classify("https://example.com/", {})
+    assessment = classify("https://example.com/", {})
     assert assessment.classifier_version == CLASSIFIER_VERSION
+
+
+# --- Config table integrity (static frozen tables — a plain test, not an
+# import-time check) --------------------------------------------------------
+
+
+def test_page_type_config_tables_are_internally_consistent() -> None:
+    # Every taxonomy member has a profile with a sane thin-content minimum.
+    for page_type in PAGE_TYPES:
+        profile = PAGE_TYPE_PROFILES.get(page_type)
+        assert profile is not None, f"missing PAGE_TYPE_PROFILES entry: {page_type}"
+        assert profile.min_sufficient_words >= 0
+    # Path patterns and the schema map only reference taxonomy members.
+    for page_type, _pattern in PAGE_TYPE_PATH_PATTERNS:
+        assert page_type in PAGE_TYPES, f"path pattern type unknown: {page_type}"
+    for page_type in PAGE_TYPE_SCHEMA_TYPE_MAP.values():
+        assert page_type in PAGE_TYPES, f"schema map type unknown: {page_type}"
+    # Every signal name the classifier records has a weight.
+    for signal in (
+        config.PAGE_TYPE_SIGNAL_ROOT_PATH,
+        config.PAGE_TYPE_SIGNAL_PATH_PATTERN,
+        config.PAGE_TYPE_SIGNAL_CONTENT_HEURISTIC,
+        config.PAGE_TYPE_SIGNAL_STRUCTURED_DATA,
+    ):
+        assert signal in PAGE_TYPE_SIGNAL_WEIGHTS

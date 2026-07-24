@@ -6,21 +6,17 @@
  * dashboard per-type breakdown reads it from here (no duplicated maps).
  * No transport, no React.
  */
+import { pageTypeSchema } from '@/lib/api/schemas';
 import type { PageType, PageTypeScoreSummary } from '@/lib/api/types';
 import { titleCaseStatus } from '@/lib/utils';
 
-/** Every page type in stable display order (filter control + breakdown table). */
-export const PAGE_TYPES: readonly PageType[] = [
-  'homepage',
-  'article',
-  'product',
-  'category',
-  'pricing',
-  'docs',
-  'faq',
-  'about_contact',
-  'other',
-];
+/**
+ * Every page type in stable display order (filter control + breakdown
+ * table). Derived from the API-contract zod enum (the same derivation as
+ * `lib/prompts/forms.ts` `intentValues`) so the vocabulary has exactly one
+ * frontend owner.
+ */
+export const PAGE_TYPES: readonly PageType[] = pageTypeSchema.options;
 
 /** Humanized label per page type — the one shared mapping. */
 export const PAGE_TYPE_LABELS: Record<PageType, string> = {

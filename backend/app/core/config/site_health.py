@@ -608,6 +608,10 @@ PAGE_TYPE_DATE_PATTERN: Final = (
 # URL/content type wins and the schema-suggested type is recorded in the
 # evidence instead, so the schema's claim about the page can never decide
 # the page's type (which would make type-expected-schema rules circular).
+# NOTE: the sh-extractor-1 parser only records the 7
+# STRUCTURED_DATA_REQUIRED_PROPERTIES types into facts["structured_data"]["types"],
+# so BlogPosting / NewsArticle / TechArticle below cannot fire until the P2
+# extractor bump widens recognition — they are forward-looking, not dormant bugs.
 PAGE_TYPE_SCHEMA_TYPE_MAP: Final[dict[str, str]] = {
     "Article": PAGE_TYPE_ARTICLE,
     "BlogPosting": PAGE_TYPE_ARTICLE,
@@ -644,17 +648,17 @@ PAGE_TYPE_APPLICABILITY_PREFIX: Final = "page_type:"
 class PageTypeProfile:
     """Per-page-type rule-tuning profile (frozen, config-owned).
 
-    ``applicability_tokens`` are the ``applicability_key`` tokens this page
-    type answers to (unknown tokens stay fail-closed in the evaluator).
-    ``min_sufficient_words`` is the per-type thin-content minimum read by
-    ``aeo.sufficient_text`` (the v1 global ``MIN_SUFFICIENT_WORDS`` analysis
-    constant moved here in v2 — invariant 1). ``rule_weight_overrides`` maps
-    ``rule_id -> weight`` resolved at evaluation time; sparse by design.
+    The profile key doubles as the rule ``applicability_key`` token this
+    page type answers to (``page_type:<type>`` — unknown tokens stay
+    fail-closed in the evaluator). ``min_sufficient_words`` is the per-type
+    thin-content minimum read by ``aeo.sufficient_text`` (the v1 global
+    ``MIN_SUFFICIENT_WORDS`` analysis constant moved here in v2 — invariant
+    1). ``rule_weight_overrides`` maps ``rule_id -> weight`` resolved at
+    evaluation time; sparse by design.
     """
 
     __slots__ = (
         "page_type",
-        "applicability_tokens",
         "min_sufficient_words",
         "rule_weight_overrides",
     )
@@ -663,28 +667,12 @@ class PageTypeProfile:
         self,
         *,
         page_type: str,
-        applicability_tokens: tuple[str, ...],
         min_sufficient_words: int,
         rule_weight_overrides: dict[str, float] | None = None,
     ) -> None:
         self.page_type = page_type
-        self.applicability_tokens = applicability_tokens
         self.min_sufficient_words = min_sufficient_words
         self.rule_weight_overrides = dict(rule_weight_overrides or {})
-
-
-def _page_type_profile(
-    page_type: str,
-    *,
-    min_sufficient_words: int,
-    rule_weight_overrides: dict[str, float] | None = None,
-) -> PageTypeProfile:
-    return PageTypeProfile(
-        page_type=page_type,
-        applicability_tokens=(f"{PAGE_TYPE_APPLICABILITY_PREFIX}{page_type}",),
-        min_sufficient_words=min_sufficient_words,
-        rule_weight_overrides=rule_weight_overrides,
-    )
 
 
 # Per-type profiles (spec §5.2). The ``other`` minimum preserves the v1
@@ -692,48 +680,34 @@ def _page_type_profile(
 # classified pages get type-appropriate thin-content minimums. Weight
 # overrides start sparse (the mechanism is exercised at evaluation time).
 PAGE_TYPE_PROFILES: Final[dict[str, PageTypeProfile]] = {
-    PAGE_TYPE_HOMEPAGE: _page_type_profile(
-        PAGE_TYPE_HOMEPAGE,
-        # Homepages are naturally link-heavy/thin; a lower minimum and a
-        # reduced sufficient-text weight keep them from reading as thin.
+    # Homepages are naturally link-heavy/thin; a lower minimum and a
+    # reduced sufficient-text weight keep them from reading as thin.
+    PAGE_TYPE_HOMEPAGE: PageTypeProfile(
+        page_type=PAGE_TYPE_HOMEPAGE,
         min_sufficient_words=40,
         rule_weight_overrides={"aeo.sufficient_text": 1.0},
     ),
-    PAGE_TYPE_ARTICLE: _page_type_profile(
-        PAGE_TYPE_ARTICLE, min_sufficient_words=300
+    PAGE_TYPE_ARTICLE: PageTypeProfile(
+        page_type=PAGE_TYPE_ARTICLE, min_sufficient_words=300
     ),
-    PAGE_TYPE_PRODUCT: _page_type_profile(
-        PAGE_TYPE_PRODUCT, min_sufficient_words=80
+    PAGE_TYPE_PRODUCT: PageTypeProfile(
+        page_type=PAGE_TYPE_PRODUCT, min_sufficient_words=80
     ),
-    PAGE_TYPE_CATEGORY: _page_type_profile(
-        PAGE_TYPE_CATEGORY, min_sufficient_words=60
+    PAGE_TYPE_CATEGORY: PageTypeProfile(
+        page_type=PAGE_TYPE_CATEGORY, min_sufficient_words=60
     ),
-    PAGE_TYPE_PRICING: _page_type_profile(
-        PAGE_TYPE_PRICING, min_sufficient_words=80
+    PAGE_TYPE_PRICING: PageTypeProfile(
+        page_type=PAGE_TYPE_PRICING, min_sufficient_words=80
     ),
-    PAGE_TYPE_DOCS: _page_type_profile(PAGE_TYPE_DOCS, min_sufficient_words=150),
-    PAGE_TYPE_FAQ: _page_type_profile(PAGE_TYPE_FAQ, min_sufficient_words=120),
-    PAGE_TYPE_ABOUT_CONTACT: _page_type_profile(
-        PAGE_TYPE_ABOUT_CONTACT, min_sufficient_words=60
+    PAGE_TYPE_DOCS: PageTypeProfile(page_type=PAGE_TYPE_DOCS, min_sufficient_words=150),
+    PAGE_TYPE_FAQ: PageTypeProfile(page_type=PAGE_TYPE_FAQ, min_sufficient_words=120),
+    PAGE_TYPE_ABOUT_CONTACT: PageTypeProfile(
+        page_type=PAGE_TYPE_ABOUT_CONTACT, min_sufficient_words=60
     ),
-    PAGE_TYPE_OTHER: _page_type_profile(PAGE_TYPE_OTHER, min_sufficient_words=100),
+    PAGE_TYPE_OTHER: PageTypeProfile(
+        page_type=PAGE_TYPE_OTHER, min_sufficient_words=100
+    ),
 }
-
-def _check_page_type_config() -> None:
-    """Fail fast at import on a malformed page-type table (never later)."""
-    for page_type in PAGE_TYPES:
-        profile = PAGE_TYPE_PROFILES.get(page_type)
-        assert profile is not None, f"missing PAGE_TYPE_PROFILES entry: {page_type}"
-        assert profile.min_sufficient_words >= 0
-        for token in profile.applicability_tokens:
-            assert token.startswith(PAGE_TYPE_APPLICABILITY_PREFIX)
-    for page_type, _pattern in PAGE_TYPE_PATH_PATTERNS:
-        assert page_type in PAGE_TYPES, f"path pattern type unknown: {page_type}"
-    for _schema_type, page_type in PAGE_TYPE_SCHEMA_TYPE_MAP.items():
-        assert page_type in PAGE_TYPES, f"schema map type unknown: {page_type}"
-
-
-_check_page_type_config()
 
 # =========================================================================
 # Deterministic scoring weights (config-owned)

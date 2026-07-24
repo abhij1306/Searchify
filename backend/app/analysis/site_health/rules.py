@@ -184,11 +184,15 @@ def _is_applicable(rule: SiteHealthRule, facts: dict) -> bool:
     if key == "has_html":
         return bool(facts.get("has_html"))
     if key.startswith(PAGE_TYPE_APPLICABILITY_PREFIX):
-        # page_type:<type> tokens resolve against facts["page_type"] via the
-        # config profile's token set. An absent/unknown page type (or a token
-        # the profile does not carry) is inapplicable (fail-closed).
+        # page_type:<type> tokens resolve against facts["page_type"]: the
+        # token must name exactly the page's (known) type. An absent/unknown
+        # page type — or a token naming any other type — is inapplicable
+        # (fail-closed).
         profile = _profile_for(facts)
-        return profile is not None and key in profile.applicability_tokens
+        return (
+            profile is not None
+            and key == f"{PAGE_TYPE_APPLICABILITY_PREFIX}{profile.page_type}"
+        )
     # Unknown applicability key: treat as inapplicable (fail-closed).
     return False
 
