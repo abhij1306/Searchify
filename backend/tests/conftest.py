@@ -10,7 +10,6 @@ for the session, and drops it on teardown — nothing persists between runs.
 from __future__ import annotations
 
 import asyncio
-import itertools
 import re
 import sys
 import uuid
@@ -24,7 +23,12 @@ import pytest_asyncio
 from httpx import ASGITransport
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(_BACKEND_ROOT) not in sys.path:
@@ -34,8 +38,18 @@ from app.core.config import settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
 from app.main import app  # noqa: E402
 
-_COUNTER = itertools.count()
 _TEST_RUN_ID = uuid.uuid4().hex[:12]
+_TEST_SCHEMA = f"test_{re.sub(r'[^a-zA-Z0-9_]', '_', _TEST_RUN_ID)}"
+
+# Every table, schema-qualified, for the between-test TRUNCATE. Raw SQL bypasses
+# the engine's ``schema_translate_map`` (which only rewrites SQLAlchemy
+# constructs), so the schema is spelled out here. Order is irrelevant because a
+# single CASCADE truncate handles all tables at once — so this deliberately uses
+# unordered ``.tables`` rather than ``.sorted_tables``, which emits a warning
+# about the FK cycles between the audit-task / artifact tables.
+_TRUNCATE_TARGETS = ", ".join(
+    f'"{_TEST_SCHEMA}"."{table.name}"' for table in Base.metadata.tables.values()
+)
 
 
 @pytest.fixture(autouse=True)
@@ -100,32 +114,54 @@ def test_database_url() -> Iterator[str]:
         asyncio.run(_admin_execute(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)'))
 
 
-@pytest_asyncio.fixture
-async def session_factory(
-    test_database_url: str,
-) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    """Create an isolated Postgres schema per test and yield a session factory.
+@pytest_asyncio.fixture(scope="session")
+async def _schema_engine(test_database_url: str) -> AsyncIterator[AsyncEngine]:
+    """Build the test schema ONCE per session and yield a scoped engine.
 
-    The schema is dropped on teardown so tests never leak state into each other.
+    Creating ``Base.metadata`` per test is prohibitively slow: the models carry
+    67 tables and 184 indexes, so a per-test ``create_all`` costs ~250 DDL
+    round-trips *per test* (~1s of setup each, minutes of CI wall-clock across
+    the suite). The schema is immutable during a run, so it is built once and
+    every test reuses it; isolation comes from truncating rows between tests
+    (see ``session_factory``), which is orders of magnitude cheaper than DDL.
+
+    The engine — and therefore its connection pool — is session-scoped for the
+    same reason: a per-test engine reconnects to Postgres on every test.
     """
-    suffix = re.sub(r"[^a-zA-Z0-9_]", "_", f"{_TEST_RUN_ID}_{next(_COUNTER)}")
-    schema_name = f"test_{suffix}"
-    quoted = f'"{schema_name}"'
+    quoted = f'"{_TEST_SCHEMA}"'
     engine = create_async_engine(test_database_url, future=True, echo=False)
-    scoped_engine = engine.execution_options(schema_translate_map={None: schema_name})
+    scoped_engine = engine.execution_options(schema_translate_map={None: _TEST_SCHEMA})
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {quoted}"))
     async with scoped_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    try:
+        yield scoped_engine
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def session_factory(
+    _schema_engine: AsyncEngine,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Yield a session factory bound to the shared per-session test schema.
+
+    Every table is truncated on teardown so tests never leak state into each
+    other — the same isolation the old per-test schema gave, without paying to
+    rebuild the schema each time. ``TRUNCATE ... CASCADE`` in one statement
+    also sidesteps the FK cycles between ``audit_tasks`` /
+    ``raw_response_artifacts`` / ``site_crawl_tasks`` / ``site_fetch_artifacts``
+    that make those tables unorderable for a delete-in-dependency-order pass.
+    """
     factory = async_sessionmaker(
-        scoped_engine, expire_on_commit=False, class_=AsyncSession
+        _schema_engine, expire_on_commit=False, class_=AsyncSession
     )
     try:
         yield factory
     finally:
-        async with engine.begin() as conn:
-            await conn.execute(text(f"DROP SCHEMA IF EXISTS {quoted} CASCADE"))
-        await engine.dispose()
+        async with _schema_engine.begin() as conn:
+            await conn.execute(text(f"TRUNCATE TABLE {_TRUNCATE_TARGETS} CASCADE"))
 
 
 @pytest_asyncio.fixture

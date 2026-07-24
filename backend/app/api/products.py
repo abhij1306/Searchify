@@ -24,6 +24,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceContext, get_db, require_active_workspace
@@ -199,8 +200,16 @@ async def _resolve_import_rows(
 
     content_type = request.headers.get("content-type", "")
     if "application/json" in content_type:
-        body = await request.json()
-        return ProductImport.model_validate(body).products
+        # Malformed JSON / schema violations are client errors: surface them as
+        # 422 like the CSV path, never as an unhandled 500.
+        try:
+            body = await request.json()
+        except ValueError as exc:
+            raise _unprocessable("Request body is not valid JSON") from exc
+        try:
+            return ProductImport.model_validate(body).products
+        except ValidationError as exc:
+            raise _unprocessable(f"Invalid product import payload: {exc}") from exc
 
     # Raw CSV posted as text/csv (no multipart wrapper).
     raw_body = (await request.body()).decode("utf-8-sig", errors="replace")

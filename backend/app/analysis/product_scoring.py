@@ -320,8 +320,14 @@ def _rank_in_block(
 ) -> int | None:
     """1-based ordinal of the block item whose span contains the offset."""
     if family == "table":
-        # Skip header + separator rows; data rows enumerate from 1.
-        data_rows = [row for row in block if not _is_table_separator(row[1])][1:]
+        # Skip separator rows, and the header row ONLY when a separator marks
+        # one. A headerless or single-row pipe table has no header to drop —
+        # stripping its first row unconditionally would leave nothing to rank
+        # and report a genuine mention as unranked.
+        has_header = any(_is_table_separator(line) for _, line in block)
+        data_rows = [row for row in block if not _is_table_separator(row[1])]
+        if has_header:
+            data_rows = data_rows[1:]
         for ordinal, (start, line) in enumerate(data_rows, start=1):
             end = start + len(line)
             if start <= match_offset < end:

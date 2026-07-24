@@ -78,7 +78,7 @@ services.
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
 | `app/api/content.py` | `GET/POST /content/generations` (idempotent enqueue via `Idempotency-Key`), `GET /content/generations/{id}`, `POST /content/generations/{id}/regenerate` (new record, fresh context), `POST /content/generations/{id}/try-again` (new record, frozen context snapshot), `POST /content/generations/{id}/cancel` |
-| `app/api/products.py` | `GET/POST /projects/{id}/products`, `GET/PATCH/DELETE /products/{id}`, `POST /projects/{id}/products/import` (CSV), `GET/POST /projects/{id}/competitor-products`, `PATCH/DELETE /competitor-products/{id}`, `GET /projects/{id}/products/visibility?audit_id=&engine=`, `GET /products/{id}/visibility/evidence`, `GET /projects/{id}/products/visibility/export.csv` |
+| `app/api/products.py` | `GET/POST /projects/{id}/products`, `GET/PATCH/DELETE /products/{id}`, `POST /projects/{id}/products/import` (CSV upload **or** `{ products: [...] }` JSON rows), `GET/POST /projects/{id}/competitor-products`, `PATCH/DELETE /competitor-products/{id}`, `GET /projects/{id}/products/visibility?audit_id=&engine=`, `GET /products/{id}/visibility/evidence?audit_id=&engine=&limit=`, `GET /projects/{id}/products/visibility/export.csv` |
 
 > The `brands/analyze`, `audits/estimate`,
 > `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the

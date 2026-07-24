@@ -176,6 +176,28 @@ async def test_product_import_headerless_csv_rejected(
 
 
 @pytest.mark.asyncio
+async def test_product_import_malformed_json_is_422_not_500(
+    client: httpx.AsyncClient,
+) -> None:
+    """Bad JSON import payloads are client errors, never unhandled 500s."""
+    await _register(client, "prod-import-json-422@example.com")
+    project = await _project(client)
+    url = f"/api/v1/projects/{project['id']}/products/import"
+
+    # Undecodable JSON body.
+    broken = await client.post(
+        url, content="{not json", headers={"content-type": "application/json"}
+    )
+    assert broken.status_code == 422
+
+    # Well-formed JSON that violates the ProductImport schema.
+    invalid = await client.post(
+        url, json={"products": [{"name": "Missing the required sku"}]}
+    )
+    assert invalid.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_competitor_product_crud(client: httpx.AsyncClient) -> None:
     await _register(client, "comp-prod@example.com")
     project = await _project(client)

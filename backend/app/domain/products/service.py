@@ -174,10 +174,11 @@ async def import_products(
     """CSV bulk-create: persist already-parsed product rows as ``imported``.
 
     Rows with an empty sku are skipped (the parser already drops them; the
-    JSON path re-checks). Duplicates — same sku as an existing product or a
-    repeat within the upload — are dropped via ``ON CONFLICT DO NOTHING`` on
-    the per-project sku constraint, never a request failure. Returns the full
-    refreshed catalog so the caller projects the whole table back.
+    JSON path re-checks). Duplicates are dropped keeping the FIRST occurrence,
+    never a request failure: a repeat within the upload is filtered before the
+    insert, and a clash with an existing product is dropped by ``ON CONFLICT DO
+    NOTHING`` on the per-project sku constraint. Returns the full refreshed
+    catalog so the caller projects the whole table back.
     """
     await _project_in_workspace(
         session, workspace_id=workspace_id, project_id=project_id
@@ -186,28 +187,39 @@ async def import_products(
         raise ProductImportError(
             f"Import accepts at most {PRODUCT_IMPORT_MAX_ROWS} rows"
         )
+    # One multi-VALUES INSERT rather than a statement per row: the cap is 500
+    # rows, so a per-row execute costs up to 500 round-trips per import.
+    values = []
+    seen_skus: set[str] = set()
     for row in rows:
         sku = str(row.sku or "").strip()
-        if not sku:
+        # Within-batch duplicates must be dropped here: ON CONFLICT DO NOTHING
+        # cannot resolve two conflicting rows in the SAME statement (Postgres
+        # raises "cannot affect row a second time").
+        if not sku or sku in seen_skus:
             continue
-        stmt = (
+        seen_skus.add(sku)
+        values.append(
+            {
+                "id": uuid.uuid4(),
+                "project_id": project_id,
+                "sku": sku,
+                "name": str(row.name or "").strip() or sku,
+                "aliases": list(row.aliases or []),
+                "variants": [v.model_dump() for v in (row.variants or [])],
+                "price": row.price,
+                "currency": str(row.currency or "").strip().upper(),
+                "url": str(row.url or "").strip(),
+                "attributes": dict(row.attributes or {}),
+                "origin": PRODUCT_ORIGIN_IMPORTED,
+            }
+        )
+    if values:
+        await session.execute(
             pg_insert(Product)
-            .values(
-                id=uuid.uuid4(),
-                project_id=project_id,
-                sku=sku,
-                name=str(row.name or "").strip() or sku,
-                aliases=list(row.aliases or []),
-                variants=[v.model_dump() for v in (row.variants or [])],
-                price=row.price,
-                currency=str(row.currency or "").strip().upper(),
-                url=str(row.url or "").strip(),
-                attributes=dict(row.attributes or {}),
-                origin=PRODUCT_ORIGIN_IMPORTED,
-            )
+            .values(values)
             .on_conflict_do_nothing(constraint="uq_product_project_sku")
         )
-        await session.execute(stmt)
     await session.commit()
     return await list_products(
         session, workspace_id=workspace_id, project_id=project_id

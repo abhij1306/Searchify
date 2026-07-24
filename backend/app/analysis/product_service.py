@@ -31,10 +31,61 @@ from app.core.config.products import (
 )
 from app.models.audit import Audit, AuditTask
 from app.models.product import (
+    CompetitorProduct,
+    Product,
     ProductMention,
     ProductMetricSnapshot,
     ProductResponseAnalysis,
 )
+
+
+async def _live_entry_ids(
+    session: AsyncSession, config: ProductScoringConfig
+) -> tuple[set[str], set[str]]:
+    """Frozen catalog ids that STILL exist as live rows.
+
+    The frozen catalog in ``Audit.configuration`` is immutable (invariant 9),
+    so an id in it may point at a product deleted after the audit was created.
+    Writing such an id into a FK column raises a foreign-key violation that
+    rolls back the whole task-persistence transaction, so the FK is nulled for
+    missing rows — the snapshotted identity (``matched_name``/``matched_sku``,
+    ``metrics["entry_id"]``) keeps the evidence attributable either way.
+    """
+
+    def _as_uuids(raw_ids: list[str]) -> list[uuid.UUID]:
+        parsed = []
+        for raw in raw_ids:
+            try:
+                parsed.append(uuid.UUID(raw))
+            except ValueError:
+                continue
+        return parsed
+
+    product_ids = _as_uuids([entry.id for entry in config.products])
+    competitor_ids = _as_uuids([entry.id for entry in config.competitor_products])
+    live_products: set[str] = set()
+    live_competitors: set[str] = set()
+    if product_ids:
+        live_products = {
+            str(row)
+            for row in (
+                await session.scalars(
+                    select(Product.id).where(Product.id.in_(product_ids))
+                )
+            ).all()
+        }
+    if competitor_ids:
+        live_competitors = {
+            str(row)
+            for row in (
+                await session.scalars(
+                    select(CompetitorProduct.id).where(
+                        CompetitorProduct.id.in_(competitor_ids)
+                    )
+                )
+            ).all()
+        }
+    return live_products, live_competitors
 
 
 def build_product_scoring_config(configuration: dict | None) -> ProductScoringConfig:
@@ -91,34 +142,43 @@ async def analyze_task_products(
     session.add(analysis)
     await session.flush()  # assign analysis.id for child rows
 
+    # Only reference catalog rows that still exist — a delete after audit
+    # creation must not fail the insert (the frozen identity is snapshotted
+    # onto the row regardless).
+    live_products, live_competitors = await _live_entry_ids(session, config)
+
     entry_names = {entry.id: entry.name for entry in config.products}
     entry_skus = {entry.id: entry.sku for entry in config.products}
     for signals in score["products"]:
         if not signals.get("mentioned"):
             continue
+        entry_id = str(signals["product_id"])
         session.add(
             _mention_row(
                 task=task,
                 analysis=analysis,
                 signals=signals,
-                product_id=uuid.UUID(signals["product_id"]),
+                product_id=uuid.UUID(entry_id) if entry_id in live_products else None,
                 competitor_product_id=None,
-                matched_name=entry_names.get(signals["product_id"], ""),
-                matched_sku=entry_skus.get(signals["product_id"], ""),
+                matched_name=entry_names.get(entry_id, ""),
+                matched_sku=entry_skus.get(entry_id, ""),
             )
         )
     competitor_names = {entry.id: entry.name for entry in config.competitor_products}
     for signals in score["competitor_products"]:
         if not signals.get("mentioned"):
             continue
+        entry_id = str(signals["competitor_product_id"])
         session.add(
             _mention_row(
                 task=task,
                 analysis=analysis,
                 signals=signals,
                 product_id=None,
-                competitor_product_id=uuid.UUID(signals["competitor_product_id"]),
-                matched_name=competitor_names.get(signals["competitor_product_id"], ""),
+                competitor_product_id=(
+                    uuid.UUID(entry_id) if entry_id in live_competitors else None
+                ),
+                matched_name=competitor_names.get(entry_id, ""),
                 matched_sku="",
             )
         )
@@ -218,10 +278,19 @@ async def finalize_audit_product_analysis(
             )
         ).all()
     )
+    # Key on the frozen entry id, falling back to the live FKs. A catalog
+    # delete SET NULLs both FK columns, so keying on them alone would fail to
+    # match the existing row on a re-finalize and insert a duplicate snapshot.
     by_entry = {
-        str(snapshot.product_id or snapshot.competitor_product_id): snapshot
+        str(
+            (snapshot.metrics or {}).get("entry_id")
+            or snapshot.product_id
+            or snapshot.competitor_product_id
+        ): snapshot
         for snapshot in existing_snapshots
     }
+
+    live_products, live_competitors = await _live_entry_ids(session, config)
 
     snapshots: list[ProductMetricSnapshot] = []
     for entry_id, aggregate in aggregates.items():
@@ -241,32 +310,57 @@ async def finalize_audit_product_analysis(
                 project_id=audit.project_id,
             )
             session.add(snapshot)
-        snapshot.product_id = uuid.UUID(entry_id) if is_product else None
-        snapshot.competitor_product_id = None if is_product else uuid.UUID(entry_id)
-        snapshot.product_analyzer_version = PRODUCT_ANALYZER_VERSION
-        snapshot.product_scoring_rule_version = PRODUCT_SCORING_RULE_VERSION
-        snapshot.mention_count = int(aggregate["mention_count"])
-        snapshot.sov_share = float(aggregate["sov_share"])
-        snapshot.avg_rank = aggregate["avg_rank"]
-        snapshot.rank_distribution = aggregate["rank_distribution"]
-        snapshot.price_mention_count = int(aggregate["price_mention_count"])
-        snapshot.price_accuracy_rate = aggregate["price_accuracy_rate"]
-        snapshot.metrics = {
-            # Frozen entry id: survives the SET NULL a catalog delete triggers
-            # on the live FKs, so projections can still key the snapshot.
-            "entry_id": entry_id,
-            **aggregate,
-            "per_engine": {
-                engine: engine_aggregates.get(entry_id)
-                for engine, engine_aggregates in per_engine.items()
-            },
-        }
-        snapshot.source_analysis_ids = [str(a.id) for a in evidence]
-        snapshot.source_artifact_ids = [
-            str(a.artifact_id) for a in evidence if a.artifact_id is not None
-        ]
+        _apply_snapshot_fields(
+            snapshot,
+            entry_id=entry_id,
+            aggregate=aggregate,
+            is_product=is_product,
+            is_live=entry_id in (live_products if is_product else live_competitors),
+            evidence=evidence,
+            per_engine=per_engine,
+        )
         snapshots.append(snapshot)
     return snapshots
+
+
+def _apply_snapshot_fields(
+    snapshot: ProductMetricSnapshot,
+    *,
+    entry_id: str,
+    aggregate: dict,
+    is_product: bool,
+    is_live: bool,
+    evidence: list[ProductResponseAnalysis],
+    per_engine: dict[str, dict[str, dict]],
+) -> None:
+    """Write the aggregate onto a (new or existing) snapshot row."""
+    # Same live-row guard as the mention rows: never write a FK pointing at a
+    # catalog entry deleted after the audit was created.
+    live_id = uuid.UUID(entry_id) if is_live else None
+    snapshot.product_id = live_id if is_product else None
+    snapshot.competitor_product_id = None if is_product else live_id
+    snapshot.product_analyzer_version = PRODUCT_ANALYZER_VERSION
+    snapshot.product_scoring_rule_version = PRODUCT_SCORING_RULE_VERSION
+    snapshot.mention_count = int(aggregate["mention_count"])
+    snapshot.sov_share = float(aggregate["sov_share"])
+    snapshot.avg_rank = aggregate["avg_rank"]
+    snapshot.rank_distribution = aggregate["rank_distribution"]
+    snapshot.price_mention_count = int(aggregate["price_mention_count"])
+    snapshot.price_accuracy_rate = aggregate["price_accuracy_rate"]
+    snapshot.metrics = {
+        # Frozen entry id: survives the SET NULL a catalog delete triggers on
+        # the live FKs, so projections can still key the snapshot.
+        "entry_id": entry_id,
+        **aggregate,
+        "per_engine": {
+            engine: engine_aggregates.get(entry_id)
+            for engine, engine_aggregates in per_engine.items()
+        },
+    }
+    snapshot.source_analysis_ids = [str(a.id) for a in evidence]
+    snapshot.source_artifact_ids = [
+        str(a.artifact_id) for a in evidence if a.artifact_id is not None
+    ]
 
 
 def _mentions_entry(score: dict, entry_id: str, is_product: bool) -> bool:

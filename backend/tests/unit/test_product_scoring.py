@@ -229,6 +229,12 @@ def test_price_matches_catalog_abs_floor_and_missing_catalog_price() -> None:
             "VoltCity 500",
             1,
         ),
+        # Headerless table (no separator row): nothing to skip, so the first
+        # row IS rank 1 rather than being dropped as a header.
+        ("| VoltCity 500 |\n| RideCore 450 |", "VoltCity 500", 1),
+        ("| VoltCity 500 |\n| RideCore 450 |", "RideCore 450", 2),
+        # Single-row table: still a ranked mention, not None.
+        ("| VoltCity 500 | $2,499 |", "VoltCity 500", 1),
     ],
 )
 def test_detect_product_rank(text: str, needle: str, expected: int | None) -> None:

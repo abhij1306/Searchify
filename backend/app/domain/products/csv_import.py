@@ -86,7 +86,10 @@ def parse_product_csv(content: str) -> list[ProductInput]:
 
     sku_i = _col(_SKU_KEYS)
     name_i = _col(_NAME_KEYS)
-    if sku_i is None and name_i is None:
+    # BOTH columns are required: `sku` is the (project_id, sku) import identity,
+    # so a file without it has every row skipped below and would otherwise
+    # "succeed" while importing nothing.
+    if sku_i is None or name_i is None:
         raise ProductCsvError(
             "Product CSV must include a header row with at least 'sku' and "
             "'name' columns"

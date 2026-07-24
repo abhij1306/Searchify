@@ -85,6 +85,15 @@ def test_parse_headerless_rejected() -> None:
         parse_product_csv("VC-500,VoltCity 500,2499.00\n")
 
 
+def test_parse_rejects_header_missing_either_required_column() -> None:
+    # Both 'sku' and 'name' are required. A sku-less file would otherwise skip
+    # every row (sku is the import identity) and silently import nothing.
+    with pytest.raises(ProductCsvError):
+        parse_product_csv("name,price\nVoltCity 500,2499.00\n")
+    with pytest.raises(ProductCsvError):
+        parse_product_csv("sku,price\nVC-500,2499.00\n")
+
+
 def test_parse_empty_returns_empty() -> None:
     assert parse_product_csv("") == []
     assert parse_product_csv("   \n  ") == []
