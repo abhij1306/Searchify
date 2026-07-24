@@ -28,13 +28,11 @@ from app.core.config.analytics import (
     AI_SOURCE_OTHER,
     ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS,
-    ERROR_EXECUTOR_NOT_WIRED,
 )
 from app.core.config.provider_catalog import ENGINE_CHATGPT, ENGINE_GEMINI
 from app.core.config.site_health import ANALYZER_VERSION as SH_ANALYZER_VERSION
 from app.core.config.task_queue import (
     TASK_STATUS_CANCELLED,
-    TASK_STATUS_FAILED,
     TASK_STATUS_SUCCEEDED,
 )
 from app.domain.analytics import tasks as analytics_tasks
@@ -350,7 +348,7 @@ async def test_worker_dispatch_runs_registered_classify_executor(
     assert task_id is not None
 
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
-    # classify + the chained analytics_snapshot_refresh (stub until A8).
+    # classify + the chained analytics_snapshot_refresh.
     assert await worker.run_until_idle() == 2
 
     async with session_factory() as session:
@@ -361,9 +359,7 @@ async def test_worker_dispatch_runs_registered_classify_executor(
         assert (
             await session.scalar(select(func.count(ReferralClassification.id)))
         ) == 4
-        # The chain's third link exists; it fails loud as not-yet-wired
-        # until A8 registers its executor.
+        # The chain's third link runs its real executor (A8) and succeeds.
         refreshes = await _snapshot_refresh_tasks(session)
         assert len(refreshes) == 1
-        assert refreshes[0].status == TASK_STATUS_FAILED
-        assert refreshes[0].error_code == ERROR_EXECUTOR_NOT_WIRED
+        assert refreshes[0].status == TASK_STATUS_SUCCEEDED

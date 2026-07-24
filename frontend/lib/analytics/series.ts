@@ -39,39 +39,13 @@ export const REFERRALS_PAGE_SIZE = 50;
 
 type SeriesPoint = { date: string; value: number | null };
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-/**
- * Short x-axis label for a `YYYY-MM-DD` bucket date ("Apr 27"). Parsed
- * field-wise (not via `Date`) so UTC bucket dates never shift a day across
- * timezones; unparseable drift passes through untouched.
- */
-export function formatBucketDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day || month < 1 || month > 12 || day > 31) return value;
-  return `${MONTHS[month - 1]} ${day}`;
-}
-
 /**
  * Whole-number series (referral-volume counts, 0–100 engine scores) → chart
  * points. A `null` bucket stays a gap — never coerced to zero.
  */
 export function toCountChartPoints(points: readonly SeriesPoint[]): TrendPoint[] {
   return points.map((point) => ({
-    label: formatBucketDate(point.date),
+    label: formatShortDate(point.date),
     value: point.value === null ? null : Math.round(point.value),
   }));
 }
@@ -82,7 +56,7 @@ export function toCountChartPoints(points: readonly SeriesPoint[]): TrendPoint[]
  */
 export function toPercentChartPoints(points: readonly SeriesPoint[]): TrendPoint[] {
   return points.map((point) => ({
-    label: formatBucketDate(point.date),
+    label: formatShortDate(point.date),
     value: point.value === null ? null : Math.round(point.value * 1000) / 10,
   }));
 }

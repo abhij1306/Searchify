@@ -23,7 +23,6 @@ from app.core.config.analytics import (
     ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
     ANALYTICS_TASK_KIND_CLASSIFY_REFERRALS,
     ANALYTICS_TASK_KIND_INGEST_REFERRALS,
-    ERROR_EXECUTOR_NOT_WIRED,
     REFERRAL_RAW_ALLOWLIST,
     REFERRAL_SANITIZE_VERSION,
 )
@@ -33,7 +32,7 @@ from app.core.config.integrations import (
     DATASET_GA4_SOURCE_MEDIUM_DAILY,
     INTEGRATION_PROVIDER_GA4,
 )
-from app.core.config.task_queue import TASK_STATUS_FAILED, TASK_STATUS_SUCCEEDED
+from app.core.config.task_queue import TASK_STATUS_SUCCEEDED
 from app.domain.analytics.enqueue import enqueue_ingest_referrals
 from app.domain.analytics.ingest import ingest_referrals
 from app.models.analytics import (
@@ -482,7 +481,7 @@ async def test_worker_dispatch_runs_registered_ingest_executor(
     assert task_id is not None
 
     worker = AnalyticsWorker(session_factory=session_factory, owner="analytics-test")
-    # ingest + the chained classify + the chained snapshot-refresh stub.
+    # ingest + the chained classify + the chained snapshot refresh.
     assert await worker.run_until_idle() == 3
 
     async with session_factory() as session:
@@ -512,5 +511,4 @@ async def test_worker_dispatch_runs_registered_ingest_executor(
             ).all()
         )
         assert len(refresh) == 1
-        assert refresh[0].status == TASK_STATUS_FAILED
-        assert refresh[0].error_code == ERROR_EXECUTOR_NOT_WIRED
+        assert refresh[0].status == TASK_STATUS_SUCCEEDED
