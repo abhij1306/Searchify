@@ -74,6 +74,16 @@ import type {
   contentOutputTypeSchema,
   websiteContextStatusSchema,
   websiteContextSummarySchema,
+  // Products (agentic commerce)
+  competitorProductSchema,
+  competitorProductVisibilityEntrySchema,
+  productCompletenessSchema,
+  productEvidenceItemSchema,
+  productEvidenceResponseSchema,
+  productSchema,
+  productVariantSchema,
+  productVisibilityEntrySchema,
+  productVisibilitySchema,
 } from './schemas';
 
 export type SessionUser = z.infer<typeof sessionUserSchema>;
@@ -147,3 +157,16 @@ export type WebsiteContextStatus = z.infer<typeof websiteContextStatusSchema>;
 export type WebsiteContextSummary = z.infer<typeof websiteContextSummarySchema>;
 export type ContentGenerationListItem = z.infer<typeof contentGenerationListItemSchema>;
 export type ContentGenerationDetail = z.infer<typeof contentGenerationDetailSchema>;
+
+// --- Products (agentic commerce) ---
+export type ProductVariant = z.infer<typeof productVariantSchema>;
+export type ProductCompleteness = z.infer<typeof productCompletenessSchema>;
+export type Product = z.infer<typeof productSchema>;
+export type CompetitorProduct = z.infer<typeof competitorProductSchema>;
+export type ProductVisibilityEntry = z.infer<typeof productVisibilityEntrySchema>;
+export type CompetitorProductVisibilityEntry = z.infer<
+  typeof competitorProductVisibilityEntrySchema
+>;
+export type ProductVisibility = z.infer<typeof productVisibilitySchema>;
+export type ProductEvidenceItem = z.infer<typeof productEvidenceItemSchema>;
+export type ProductEvidenceResponse = z.infer<typeof productEvidenceResponseSchema>;

@@ -5,8 +5,12 @@ import {
   auditSchema,
   authResponseSchema,
   citationSchema,
+  competitorProductSchema,
   executionEvidenceSchema,
   executionSchema,
+  productEvidenceResponseSchema,
+  productSchema,
+  productVisibilitySchema,
   projectSchema,
   providerCatalogSchema,
   providerConnectionSchema,
@@ -482,5 +486,143 @@ describe('visibility evidence contract', () => {
       'evidence',
     );
     expect(parsed.items[0]?.search_events[0]?.query).toBe('');
+  });
+});
+
+describe('products contract (agentic commerce)', () => {
+  const product = {
+    id: UUID,
+    project_id: UUID2,
+    sku: 'AC-VB500',
+    name: 'Acme VoltBike 500',
+    aliases: ['VoltBike'],
+    variants: [{ name: 'Graphite / Standard', sku: 'AC-VB500-GR', price: 2499.0 }],
+    price: 2499.0,
+    currency: 'USD',
+    url: 'https://acme.com/p/voltbike',
+    attributes: { brand: 'Acme' },
+    origin: 'manual',
+    completeness: { score: 0.75, present: 9, total: 12, missing: ['gtin'] },
+    created_at: '2026-07-15T00:00:00Z',
+    updated_at: '2026-07-15T00:00:00Z',
+  };
+
+  it('validates a product with uuid ids, variants, and a completeness badge', () => {
+    const parsed = strictValidate(productSchema, product, 'product');
+    expect(parsed.sku).toBe('AC-VB500');
+    expect(parsed.variants[0]?.price).toBe(2499.0);
+    expect(parsed.completeness.missing).toEqual(['gtin']);
+    // Strict: unknown keys are contract drift.
+    expect(() => strictValidate(productSchema, { ...product, slug: 'nope' }, 'product')).toThrow();
+    expect(() => strictValidate(productSchema, { ...product, id: 7 }, 'product')).toThrow();
+  });
+
+  it('accepts a nullable price and rejects a negative-id competitor product', () => {
+    expect(strictValidate(productSchema, { ...product, price: null }, 'product').price).toBeNull();
+    const competitorProduct = {
+      id: UUID,
+      project_id: UUID2,
+      competitor_id: UUID,
+      name: 'Globex CityBike 450',
+      aliases: [],
+      price: null,
+      currency: '',
+      url: '',
+      created_at: '2026-07-15T00:00:00Z',
+      updated_at: '2026-07-15T00:00:00Z',
+    };
+    expect(
+      strictValidate(competitorProductSchema, competitorProduct, 'competitorProduct').price,
+    ).toBeNull();
+    expect(() =>
+      strictValidate(competitorProductSchema, { ...competitorProduct, competitor_id: 3 }, 'cp'),
+    ).toThrow();
+  });
+
+  it('validates the visibility projection with nullable ids and rates', () => {
+    const projection = {
+      project_id: UUID2,
+      audit_id: UUID,
+      audit_status: 'completed',
+      product_analyzer_version: 'product-analysis-1',
+      product_scoring_rule_version: 'product-scoring-v1',
+      total_mentions: 4,
+      total_analyses: 2,
+      products: [
+        {
+          product_id: UUID,
+          sku: 'AC-VB500',
+          name: 'Acme VoltBike 500',
+          mention_count: 2,
+          sov_share: 0.5,
+          avg_rank: 1.0,
+          rank_distribution: { top_1: 2, top_2_3: 0, top_4_5: 0, rank_6_plus: 0, unranked: 0 },
+          price_mention_count: 2,
+          price_accuracy_rate: 1.0,
+        },
+      ],
+      competitor_products: [
+        {
+          // null id: the aggregate survives the catalog row's delete.
+          competitor_product_id: null,
+          competitor_name: 'Globex',
+          name: 'Globex CityBike 450',
+          mention_count: 2,
+          sov_share: 0.5,
+          avg_rank: null,
+          rank_distribution: { top_1: 0, top_2_3: 2, top_4_5: 0, rank_6_plus: 0, unranked: 0 },
+          price_mention_count: 0,
+          price_accuracy_rate: null,
+        },
+      ],
+      created_at: '2026-07-15T00:00:00Z',
+    };
+    const parsed = strictValidate(productVisibilitySchema, projection, 'productVisibility');
+    expect(parsed.competitor_products[0]?.competitor_product_id).toBeNull();
+    expect(parsed.competitor_products[0]?.price_accuracy_rate).toBeNull();
+    expect(() =>
+      strictValidate(
+        productVisibilitySchema,
+        { ...projection, audit_status: 'bogus' },
+        'productVisibility',
+      ),
+    ).toThrow();
+  });
+
+  it('validates the evidence envelope (items + truncated, nullable fields)', () => {
+    const item = {
+      mention_id: UUID,
+      audit_id: UUID,
+      task_id: UUID2,
+      artifact_id: null,
+      logical_engine: 'gemini',
+      transport_model: 'gemini-2.5-pro',
+      prompt_text: 'best option 0',
+      prompt_index: 0,
+      repetition: 0,
+      matched_name: 'Acme VoltBike 500',
+      matched_sku: 'AC-VB500',
+      first_offset: null,
+      rank_position: 1,
+      price_text: '$2,499.00',
+      price_value: 2499.0,
+      price_currency: 'USD',
+      price_matches_catalog: null,
+      created_at: '2026-07-15T00:00:00Z',
+    };
+    const parsed = strictValidate(
+      productEvidenceResponseSchema,
+      { items: [item], truncated: true },
+      'productEvidence',
+    );
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.items[0]?.price_matches_catalog).toBeNull();
+    expect(() =>
+      strictValidate(
+        productEvidenceResponseSchema,
+        { items: [{ ...item, task_id: 'not-a-uuid' }], truncated: false },
+        'productEvidence',
+      ),
+    ).toThrow();
   });
 });

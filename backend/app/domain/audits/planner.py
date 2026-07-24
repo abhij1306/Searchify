@@ -49,6 +49,7 @@ from app.core.config.provider_catalog import (
     is_route_approved,
 )
 from app.domain.audits.state_events import apply_transition, record_event
+from app.domain.products.shim import project_product_identity
 from app.domain.projects.shim import project_scoring_identity
 from app.models.audit import (
     Audit,
@@ -57,6 +58,7 @@ from app.models.audit import (
     AuditTask,
 )
 from app.models.brand import Brand
+from app.models.product import CompetitorProduct
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet
 from app.models.provider import ProviderConnection, ProviderRoute
@@ -111,6 +113,10 @@ async def _load_project(
             selectinload(Project.competitors),
             selectinload(Project.owned_domains),
             selectinload(Project.unintended_domains),
+            selectinload(Project.products),
+            selectinload(Project.competitor_products).selectinload(
+                CompetitorProduct.competitor
+            ),
         )
         .where(
             Project.id == project_id,
@@ -297,6 +303,10 @@ async def create_audit(
     scoring_identity = project_scoring_identity(project)
     configuration = {
         **scoring_identity,
+        # Frozen product catalog (Agentic Commerce): the deterministic
+        # product analyzer scores against this copy, so later catalog edits
+        # never alter the audit (invariant 9).
+        **project_product_identity(project),
         "benchmark_mode": mode,
         "engines": engine_list,
         "repetitions": reps,

@@ -78,6 +78,7 @@ services.
 | `app/api/audits.py` | `POST /audits`, `GET /audits`, `GET /audits/{id}`, `POST /audits/{id}/cancel`, `GET /audits/{id}/events` (SSE), `GET /audits/{id}/executions` |
 | `app/api/audits.py` (cont.) | `GET /audits/{id}/metrics`, `GET /executions/{id}`, `GET /audits/{id}/export.csv`, `GET /audits/{id}/export.md` |
 | `app/api/content.py` | `GET/POST /content/generations` (idempotent enqueue via `Idempotency-Key`), `GET /content/generations/{id}`, `POST /content/generations/{id}/regenerate` (new record, fresh context), `POST /content/generations/{id}/try-again` (new record, frozen context snapshot), `POST /content/generations/{id}/cancel` |
+| `app/api/products.py` | `GET/POST /projects/{id}/products`, `GET/PATCH/DELETE /products/{id}`, `POST /projects/{id}/products/import` (CSV upload **or** `{ products: [...] }` JSON rows), `GET/POST /projects/{id}/competitor-products`, `PATCH/DELETE /competitor-products/{id}`, `GET /projects/{id}/products/visibility?audit_id=&engine=`, `GET /products/{id}/visibility/evidence?audit_id=&engine=&limit=`, `GET /projects/{id}/products/visibility/export.csv` |
 
 > The `brands/analyze`, `audits/estimate`,
 > `audits/{id}/reports`, `reports/{id}/download` endpoints from [architecture.md](architecture.md) §14 are **roadmap** — the
@@ -160,6 +161,9 @@ project). No integer PKs, no `user_id` columns.
 | `models/audit.py` `AuditEvent` | Append-only lifecycle events (SSE source) | — |
 | `models/analysis.py` `ResponseAnalysis`, `BrandMention`, `CompetitorMention`, `Citation` | Deterministic per-execution analysis | each references its `RawResponseArtifact` + `analyzer_version` (invariant 4) |
 | `models/analysis.py` `MetricSnapshot` | Aggregate run metrics (projection) | `analyzer_version` + formula version |
+| `models/product.py` `Product`, `CompetitorProduct` | Product catalog (agentic commerce): own SKUs (aliases/variants/price/attributes) + competitor products for share-of-voice | unique `(project_id, sku)` / `(competitor_id, name)` |
+| `models/product.py` `ProductResponseAnalysis`, `ProductMention` | Deterministic per-execution PRODUCT analysis (sibling of the brand-level pass, same persisted artifact) | `RawResponseArtifact` + `product_analyzer_version` + `product_scoring_rule_version` (invariant 4) |
+| `models/product.py` `ProductMetricSnapshot` | Per-(audit, catalog-entry) aggregate product metrics (projection) | analyzer/rule versions + frozen `entry_id` in `metrics` |
 | `models/content.py` `ContentGeneration` | Content request + queue row in one (AuditTask pattern): prompt, `output_type`, `website_context_*` (enabled/status/frozen snapshot), provider/model identity, output + usage, plus the full generic-queue column set (status/lease/attempts/idempotency) | `(workspace_id, idempotency_key)` unique + `request_fingerprint`; `generator_version`; `website_context_snapshot` frozen at enqueue |
 | `models/content.py` `ContentGenerationAttempt` | Append-only per-provider-call attempts | writer = claiming worker inside `finalize_attempt` (invariant 3) |
 
@@ -318,7 +322,10 @@ discovery_models, web_evidence, object_storage}`, `orchestration/*`, `analysis/*
 providers, audits}`, `connectors/answer_engines`, `orchestration/*`, `analysis/*`, and
 `workers/audit_worker.py` are coded; since then `site_health` (crawler + issues) and the
 **content vertical** (`domain/content`, `connectors/discovery_models`, `api/content.py`,
-`workers/content_worker.py` — basic v1) have shipped; the rest are documented placeholders.
+`workers/content_worker.py` — basic v1), and the **products vertical** (`domain/products`,
+`models/product.py`, `analysis/product_scoring.py` + `analysis/product_service.py`,
+`api/products.py` — agentic commerce catalog + deterministic product-visibility
+projections, a sibling analyzer pass in `workers/audit_worker.py`) have shipped; the rest are documented placeholders.
 
 ## 14. Known Issues / Drift
 

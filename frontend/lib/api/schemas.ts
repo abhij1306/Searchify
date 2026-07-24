@@ -1580,6 +1580,143 @@ export const llmAnalyticsThemeRowSchema = z
 export const llmAnalyticsThemeListSchema = z.array(llmAnalyticsThemeRowSchema);
 
 // ---------------------------------------------------------------------------
+// Products (agentic commerce) — catalog + visibility projections
+// ---------------------------------------------------------------------------
+
+export const productVariantSchema = z
+  .object({
+    name: z.string(),
+    sku: z.string(),
+    price: z.number().nullable(),
+  })
+  .strict();
+
+// Computed data-quality badge: present/total against the backend config
+// matrix (never persisted — computed on read).
+export const productCompletenessSchema = z
+  .object({
+    score: z.number(),
+    present: z.number().int(),
+    total: z.number().int(),
+    missing: z.array(z.string()),
+  })
+  .strict();
+
+export const productSchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    sku: z.string(),
+    name: z.string(),
+    aliases: z.array(z.string()),
+    variants: z.array(productVariantSchema),
+    price: z.number().nullable(),
+    currency: z.string(),
+    url: z.string(),
+    attributes: z.record(z.string(), z.unknown()),
+    origin: z.string(),
+    completeness: productCompletenessSchema,
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+export const competitorProductSchema = z
+  .object({
+    id: uuid(),
+    project_id: uuid(),
+    competitor_id: uuid(),
+    name: z.string(),
+    aliases: z.array(z.string()),
+    price: z.number().nullable(),
+    currency: z.string(),
+    url: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+export const productVisibilityEntrySchema = z
+  .object({
+    // Nullable: the aggregate survives the catalog row's delete (SET NULL).
+    product_id: uuid().nullable(),
+    sku: z.string(),
+    name: z.string(),
+    mention_count: z.number().int(),
+    sov_share: z.number(),
+    avg_rank: z.number().nullable(),
+    rank_distribution: z.record(z.string(), z.number().int()),
+    price_mention_count: z.number().int(),
+    // null = no verifiable price mentions (never a fabricated 0).
+    price_accuracy_rate: z.number().nullable(),
+  })
+  .strict();
+
+export const competitorProductVisibilityEntrySchema = z
+  .object({
+    competitor_product_id: uuid().nullable(),
+    competitor_name: z.string(),
+    name: z.string(),
+    mention_count: z.number().int(),
+    sov_share: z.number(),
+    avg_rank: z.number().nullable(),
+    rank_distribution: z.record(z.string(), z.number().int()),
+    price_mention_count: z.number().int(),
+    price_accuracy_rate: z.number().nullable(),
+  })
+  .strict();
+
+// Selected-audit product dashboard projection (persisted rows only). Identity
+// (sku/name/competitor_name) comes from the audit's frozen configuration.
+export const productVisibilitySchema = z
+  .object({
+    project_id: uuid(),
+    audit_id: uuid(),
+    audit_status: auditStatusSchema,
+    product_analyzer_version: z.string(),
+    product_scoring_rule_version: z.string(),
+    total_mentions: z.number().int(),
+    total_analyses: z.number().int(),
+    products: z.array(productVisibilityEntrySchema),
+    competitor_products: z.array(competitorProductVisibilityEntrySchema),
+    created_at: z.string(),
+  })
+  .strict();
+
+export const productEvidenceItemSchema = z
+  .object({
+    mention_id: uuid(),
+    audit_id: uuid(),
+    // Execution id — links to `/runs/[runId]/executions/[executionId]`.
+    task_id: uuid(),
+    artifact_id: uuid().nullable(),
+    logical_engine: z.string(),
+    transport_model: z.string(),
+    // Frozen prompt text (AuditPromptSnapshot) — survives prompt edits.
+    prompt_text: z.string(),
+    prompt_index: z.number().int(),
+    repetition: z.number().int(),
+    matched_name: z.string(),
+    matched_sku: z.string(),
+    first_offset: z.number().int().nullable(),
+    rank_position: z.number().int().nullable(),
+    price_text: z.string(),
+    price_value: z.number().nullable(),
+    price_currency: z.string(),
+    // null = not verifiable (no catalog price / currency mismatch).
+    price_matches_catalog: z.boolean().nullable(),
+    created_at: z.string(),
+  })
+  .strict();
+
+export const productEvidenceResponseSchema = z
+  .object({
+    items: z.array(productEvidenceItemSchema),
+    truncated: z.boolean(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
 // strictValidate — fail loud on any schema drift (drift policy §6)
 // ---------------------------------------------------------------------------
 

@@ -8,6 +8,7 @@
  */
 import { authApi } from './auth';
 import { contentApi } from './content';
+import { productsApi } from './products';
 import { projectsApi } from './projects';
 import { promptsApi } from './prompts';
 import { providersApi } from './providers';
@@ -19,6 +20,7 @@ import { visibilityApi } from './visibility';
 export const api = {
   ...authApi,
   ...contentApi,
+  ...productsApi,
   ...projectsApi,
   ...promptsApi,
   ...providersApi,
@@ -37,6 +39,7 @@ export {
   CONTENT_LIST_POLL_MS,
   CONTENT_DETAIL_POLL_MS,
 } from './content';
+export { productsApi } from './products';
 export { projectsApi } from './projects';
 export { promptsApi } from './prompts';
 export { topicsApi } from './topics';

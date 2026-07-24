@@ -49,6 +49,13 @@ from app.models.integrations import (
     IntegrationPropertyMapping,
     IntegrationSyncRun,
 )
+from app.models.product import (
+    CompetitorProduct,
+    Product,
+    ProductMention,
+    ProductMetricSnapshot,
+    ProductResponseAnalysis,
+)
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
@@ -95,6 +102,7 @@ __all__ = [
     "Citation",
     "Competitor",
     "CompetitorMention",
+    "CompetitorProduct",
     "ContentGeneration",
     "ContentGenerationAttempt",
     "DiscoveryModelConfig",
@@ -108,6 +116,10 @@ __all__ = [
     "IntegrationSyncRun",
     "MetricSnapshot",
     "OwnedDomain",
+    "Product",
+    "ProductMention",
+    "ProductMetricSnapshot",
+    "ProductResponseAnalysis",
     "Project",
     "Prompt",
     "PromptSet",

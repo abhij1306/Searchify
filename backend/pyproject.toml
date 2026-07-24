@@ -52,6 +52,14 @@ select = ["E", "F", "I", "UP", "B", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# The test schema and its engine/connection pool are built once per session
+# (see tests/conftest.py). Fixtures AND tests therefore have to share ONE event
+# loop for the whole run: with the default function-scoped loop the pool binds
+# to the first loop it sees, and every later test fails with "attached to a
+# different loop". Both knobs are required — setting only the fixture scope
+# leaves tests on their own loops.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 
 [tool.mypy]
 python_version = "3.12"

@@ -4,7 +4,7 @@ import { ICONS } from '@/lib/icons';
 
 /**
  * Sidebar navigation model (F5, simplified): two groups — Analyze / Optimize —
- * with ten live items, all navigable. Icons come from the canonical map
+ * with eleven live items, all navigable. Icons come from the canonical map
  * (`@/lib/icons`) so nav glyphs stay consistent with the rest of the app.
  * This is data-only so the sidebar component stays presentational and the nav
  * is unit-testable.
@@ -29,6 +29,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Traffic', href: '/traffic', icon: ICONS.traffic },
       // Single prompts surface: read view by default, manage mode in-page.
       { label: 'Prompts', href: '/prompts', icon: ICONS.prompts },
+      // Agentic commerce: product catalog + product visibility in one surface.
+      { label: 'Products', href: '/products', icon: ICONS.products },
       { label: 'Runs', href: '/runs', icon: ICONS.runs },
     ],
   },
