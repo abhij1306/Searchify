@@ -38,10 +38,11 @@ from app.domain.site_health.normalization import (
     filter_fingerprint,
 )
 from app.domain.site_health.service import (
+    _score_summary,
     display_label_for,
     presentation_status_for,
 )
-from app.models.site_health import SiteCrawlTask, SitePageAnalysis
+from app.models.site_health import SiteCrawl, SiteCrawlTask, SitePageAnalysis
 
 # --------------------------------------------------------------------------
 # Keyset cursors
@@ -223,3 +224,75 @@ def test_unmonitored_with_nothing_is_not_selected() -> None:
         analysis=None, monitored=False, latest_analyze_task=None
     )
     assert st == "not_selected"
+
+
+# --------------------------------------------------------------------------
+# score_summary projection (v2 P1 by_page_type breakdown)
+# --------------------------------------------------------------------------
+
+
+def _crawl_with_summary(summary: dict | None) -> SimpleNamespace:
+    return SimpleNamespace(score_summary=summary, scoring_version="sh-scoring-2")
+
+
+def test_score_summary_projects_by_page_type() -> None:
+    crawl = _crawl_with_summary(
+        {
+            "overall_score": 75.0,
+            "technical_score": 80.0,
+            "aeo_score": 70.0,
+            "selected_count": 4,
+            "analyzed_count": 3,
+            "issue_count": 2,
+            "scoring_version": "sh-scoring-2",
+            "by_page_type": {
+                "article": {
+                    "analyzed_count": 2,
+                    "technical_score": 85.0,
+                    "aeo_score": 70.0,
+                    "overall_score": 77.5,
+                },
+                "product": {
+                    "analyzed_count": 1,
+                    "technical_score": None,
+                    "aeo_score": 70.0,
+                    "overall_score": 70.0,
+                },
+            },
+        }
+    )
+    projected = _score_summary(cast(SiteCrawl, crawl))
+    assert projected is not None
+    by_page_type = projected["by_page_type"]
+    assert set(by_page_type) == {"article", "product"}
+    assert by_page_type["article"] == {
+        "analyzed_count": 2,
+        "technical_score": 85.0,
+        "aeo_score": 70.0,
+        "overall_score": 77.5,
+    }
+    # A None mean is projected as None, never fabricated as zero.
+    assert by_page_type["product"]["technical_score"] is None
+
+
+def test_score_summary_without_breakdown_projects_empty_map() -> None:
+    # Pre-P1 summaries carry no by_page_type key: the strict DTO shape gets
+    # an empty map rather than a missing key.
+    crawl = _crawl_with_summary(
+        {
+            "overall_score": 50.0,
+            "technical_score": 50.0,
+            "aeo_score": 50.0,
+            "selected_count": 1,
+            "analyzed_count": 1,
+            "issue_count": 0,
+        }
+    )
+    projected = _score_summary(cast(SiteCrawl, crawl))
+    assert projected is not None
+    assert projected["by_page_type"] == {}
+    assert projected["scoring_version"] == "sh-scoring-2"
+
+
+def test_score_summary_none_when_absent() -> None:
+    assert _score_summary(cast(SiteCrawl, _crawl_with_summary(None))) is None

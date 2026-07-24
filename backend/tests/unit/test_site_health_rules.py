@@ -1,14 +1,16 @@
-"""Unit tests for the Site Health rule evaluator (Task 5).
+"""Unit tests for the Site Health rule evaluator (Task 5 + v2 P1).
 
 Verifies each rule maps to the right check and each outcome (pass / fail /
-not_applicable / error) is produced with exact evidence + provenance. Pure,
-offline.
+not_applicable / error) is produced with exact evidence + provenance, plus
+the v2 P1 page-type behavior: ``page_type:<type>`` applicability tokens,
+per-type thin-content minimums (the v1 ``MIN_SUFFICIENT_WORDS`` analysis
+constant moved into the config-owned ``PAGE_TYPE_PROFILES``), and
+per-(rule_id, page_type) weight overrides. Pure, offline.
 """
 
 from __future__ import annotations
 
 from app.analysis.site_health.rules import (
-    MIN_SUFFICIENT_WORDS,
     evaluate_all,
     evaluate_rule,
     rule_for,
@@ -16,6 +18,8 @@ from app.analysis.site_health.rules import (
 from app.core.config.site_health import (
     DIMENSION_AEO,
     DIMENSION_TECHNICAL,
+    PAGE_TYPE_OTHER,
+    PAGE_TYPE_PROFILES,
     RULE_OUTCOME_ERROR,
     RULE_OUTCOME_FAIL,
     RULE_OUTCOME_NOT_APPLICABLE,
@@ -23,6 +27,17 @@ from app.core.config.site_health import (
     SITE_HEALTH_RULES,
     SiteHealthRule,
 )
+
+# The v1 global thin-content minimum now lives in the config-owned ``other``
+# profile (identical value, so unclassified pages score exactly as before).
+MIN_SUFFICIENT_WORDS = PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER].min_sufficient_words
+
+
+def test_other_profile_minimum_preserves_v1_parity():
+    # Pin the v1 contract: the ``other`` profile minimum must stay 100 words
+    # so unclassified pages score exactly as v1 did (spec §5.2). The alias
+    # above intentionally derives from config; this assertion does not.
+    assert PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER].min_sufficient_words == 100
 
 
 def _html_facts(**overrides):
@@ -207,3 +222,110 @@ def test_unknown_applicability_key_is_not_applicable():
     )
     ev = evaluate_rule(phantom, _html_facts())
     assert ev.outcome == RULE_OUTCOME_NOT_APPLICABLE
+
+
+# --- v2 P1: page-type applicability / minimums / weight overrides ---------
+
+
+def _page_type_rule(rule_id: str, page_type: str, weight: float = 1.0):
+    """A catalog-shaped rule scoped to one page type via the token syntax."""
+    return SiteHealthRule(
+        rule_id=rule_id,
+        rule_version="v1",
+        dimension=DIMENSION_TECHNICAL,
+        category="content",
+        severity="low",
+        weight=weight,
+        applicability_key=f"page_type:{page_type}",
+        description="",
+        remediation="",
+    )
+
+
+def test_page_type_token_applicable_on_matching_type():
+    rule = _page_type_rule("technical.title_present", "article")
+    ev = evaluate_rule(rule, _html_facts(page_type="article"))
+    # Applicable -> the real check runs (title present -> pass).
+    assert ev.outcome == RULE_OUTCOME_PASS
+
+
+def test_page_type_token_not_applicable_on_other_type():
+    rule = _page_type_rule("technical.title_present", "article")
+    ev = evaluate_rule(rule, _html_facts(page_type="product"))
+    assert ev.outcome == RULE_OUTCOME_NOT_APPLICABLE
+
+
+def test_page_type_token_not_applicable_without_page_type_fact():
+    # No facts["page_type"] (e.g. pre-classification) -> fail-closed.
+    rule = _page_type_rule("technical.title_present", "article")
+    ev = evaluate_rule(rule, _html_facts())
+    assert ev.outcome == RULE_OUTCOME_NOT_APPLICABLE
+
+
+def test_page_type_token_unknown_type_in_facts_fail_closed():
+    # A page_type outside the config taxonomy has no profile -> fail-closed.
+    rule = _page_type_rule("technical.title_present", "article")
+    ev = evaluate_rule(rule, _html_facts(page_type="not_a_real_type"))
+    assert ev.outcome == RULE_OUTCOME_NOT_APPLICABLE
+
+
+def test_page_type_token_for_unconfigured_type_fail_closed():
+    # The token itself names a type with no profile entry -> fail-closed.
+    rule = _page_type_rule("technical.title_present", "not_a_real_type")
+    ev = evaluate_rule(rule, _html_facts(page_type="article"))
+    assert ev.outcome == RULE_OUTCOME_NOT_APPLICABLE
+
+
+def test_sufficient_text_uses_per_type_minimum():
+    article_min = PAGE_TYPE_PROFILES["article"].min_sufficient_words
+    other_min = PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER].min_sufficient_words
+    assert article_min > other_min  # the config actually differentiates
+    # Between the two minimums: an article fails while `other` passes.
+    facts_article = _html_facts(
+        page_type="article", body={"word_count": other_min}
+    )
+    ev = _outcome(facts_article, "aeo.sufficient_text")
+    assert ev.outcome == RULE_OUTCOME_FAIL
+    assert ev.evidence["minimum"] == article_min
+    assert ev.evidence["page_type"] == "article"
+    facts_other = _html_facts(page_type="other", body={"word_count": other_min})
+    ev_other = _outcome(facts_other, "aeo.sufficient_text")
+    assert ev_other.outcome == RULE_OUTCOME_PASS
+    assert ev_other.evidence["minimum"] == other_min
+
+
+def test_sufficient_text_without_page_type_falls_back_to_other_minimum():
+    ev = _outcome(
+        _html_facts(body={"word_count": MIN_SUFFICIENT_WORDS}),
+        "aeo.sufficient_text",
+    )
+    assert ev.outcome == RULE_OUTCOME_PASS
+    assert ev.evidence["minimum"] == MIN_SUFFICIENT_WORDS
+    assert ev.evidence["page_type"] == "other"
+
+
+def test_sufficient_text_homepage_minimum_is_lower():
+    homepage_min = PAGE_TYPE_PROFILES["homepage"].min_sufficient_words
+    assert homepage_min < MIN_SUFFICIENT_WORDS
+    ev = _outcome(
+        _html_facts(page_type="homepage", body={"word_count": homepage_min}),
+        "aeo.sufficient_text",
+    )
+    assert ev.outcome == RULE_OUTCOME_PASS
+    assert ev.evidence["minimum"] == homepage_min
+
+
+def test_weight_override_applies_for_configured_page_type():
+    override = PAGE_TYPE_PROFILES["homepage"].rule_weight_overrides[
+        "aeo.sufficient_text"
+    ]
+    base_weight = rule_for("aeo.sufficient_text").weight
+    assert override != base_weight  # the sparse config override is real
+    ev = _outcome(_html_facts(page_type="homepage"), "aeo.sufficient_text")
+    assert ev.weight == override
+    # Every other page type keeps the catalog weight.
+    ev_other = _outcome(_html_facts(page_type="other"), "aeo.sufficient_text")
+    assert ev_other.weight == base_weight
+    # And a page with no page_type fact keeps the catalog weight.
+    ev_plain = _outcome(_html_facts(), "aeo.sufficient_text")
+    assert ev_plain.weight == base_weight

@@ -103,6 +103,7 @@ __all__ = [
     "get_pages",
     "get_page_detail",
     "get_issues",
+    "issue_group_page_types",
     "get_issue_detail",
     "get_issue_history",
     "get_dashboard",
@@ -183,6 +184,16 @@ def _score_summary(crawl: SiteCrawl) -> dict | None:
     summary = crawl.score_summary or None
     if not summary:
         return None
+    # v2 P1 per-page-type breakdown; absent on pre-P1 summaries (empty map).
+    by_page_type: dict[str, dict] = {}
+    for page_type, values in (summary.get("by_page_type") or {}).items():
+        values = values or {}
+        by_page_type[str(page_type)] = {
+            "analyzed_count": int(values.get("analyzed_count", 0) or 0),
+            "technical_score": values.get("technical_score"),
+            "aeo_score": values.get("aeo_score"),
+            "overall_score": values.get("overall_score"),
+        }
     return {
         "overall_score": summary.get("overall_score"),
         "technical_score": summary.get("technical_score"),
@@ -195,6 +206,7 @@ def _score_summary(crawl: SiteCrawl) -> dict | None:
         "scoring_version": str(
             summary.get("scoring_version") or crawl.scoring_version or SCORING_VERSION
         ),
+        "by_page_type": by_page_type,
     }
 
 
@@ -619,6 +631,19 @@ async def _issue_counts_by_site_url(
 # =========================================================================
 # Inventory (keyset (normalized_url, id) over SiteUrl)
 # =========================================================================
+def _page_type_matches(analysis: SitePageAnalysis | None, wanted: str | None) -> bool:
+    """The v2 P1 page_type filter predicate (inventory + pages share it).
+
+    An unfiltered request (``wanted is None``) matches everything; a filtered
+    one requires a classified analysis of exactly that type — URLs without
+    an analysis never match, and an unknown value simply matches nothing
+    (the same ignore-unknown convention as the other filters).
+    """
+    if wanted is None:
+        return True
+    return analysis is not None and analysis.page_type == wanted
+
+
 async def get_inventory(
     session: AsyncSession,
     *,
@@ -629,13 +654,16 @@ async def get_inventory(
     query: str | None = None,
     status: str | None = None,
     monitored: bool | None = None,
+    page_type: str | None = None,
 ) -> dict:
     """Keyset inventory for a crawl's project, ordered ``(normalized_url, id)``.
 
     Filters by substring ``query`` (normalized/display url), a per-URL
-    presentation ``status``, and the ``monitored`` flag. The cursor is bound to
-    the endpoint + filter fingerprint so a filter change invalidates it. Nullable
-    latest-analysis summaries are attached per row.
+    presentation ``status``, the ``monitored`` flag, and a ``page_type``
+    exact match against the latest analysis's classified type (v2 P1 —
+    semantics in ``_page_type_matches``). The cursor is bound to the
+    endpoint + filter fingerprint so a filter change invalidates it.
+    Nullable latest-analysis summaries are attached per row.
     """
     crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     limit = _clamp_limit(limit)
@@ -646,6 +674,7 @@ async def get_inventory(
         "query": (query or "").strip().lower() or None,
         "status": status or None,
         "monitored": (str(monitored) if monitored is not None else None),
+        "page_type": page_type or None,
     }
 
     # A Starter recrawl reads its explicitly frozen earlier full inventories
@@ -678,10 +707,11 @@ async def get_inventory(
             tuple_(SiteUrl.normalized_url, SiteUrl.id) > (cur_url, cur_id)
         )
 
-    # Over-fetch so a status filter (applied in Python from the derived
-    # presentation status) can still return a full page.
+    # Over-fetch so a status/page_type filter (applied in Python from the
+    # derived presentation status / latest analysis) can still return a full
+    # page.
     fetch = limit + 1
-    fetch_size = fetch if status is None else fetch * 4
+    fetch_size = fetch if (status is None and page_type is None) else fetch * 4
     stmt = stmt.order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc()).limit(
         fetch_size
     )
@@ -710,6 +740,8 @@ async def get_inventory(
         )
         if status is not None and pres_status != status:
             continue
+        if not _page_type_matches(analysis, page_type):
+            continue
         items.append(
             {
                 "site_url_id": row.id,
@@ -725,6 +757,7 @@ async def get_inventory(
                 "issue_count": (
                     issue_counts.get(row.id, 0) if analysis is not None else None
                 ),
+                "page_type": analysis.page_type if analysis is not None else None,
                 "technical_score": (
                     analysis.technical_score if analysis is not None else None
                 ),
@@ -752,11 +785,16 @@ async def get_inventory(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif status is not None and last_scanned is not None and len(rows) >= fetch_size:
-        # A sparse status filter can leave a partial (or even empty) page while
-        # more matching rows exist beyond the scanned window. We fetched a full
-        # window, so emit a cursor at the last SCANNED row (not the last matched
-        # one) to guarantee forward progress even when a window had no matches.
+    elif (
+        (status is not None or page_type is not None)
+        and last_scanned is not None
+        and len(rows) >= fetch_size
+    ):
+        # A sparse status/page_type filter can leave a partial (or even empty)
+        # page while more matching rows exist beyond the scanned window. We
+        # fetched a full window, so emit a cursor at the last SCANNED row (not
+        # the last matched one) to guarantee forward progress even when a
+        # window had no matches.
         next_cursor = encode_keyset_cursor(
             scope=scope,
             filters=filters,
@@ -871,12 +909,14 @@ async def get_pages(
     cursor: str | None,
     status: str | None = None,
     monitored: bool | None = None,
+    page_type: str | None = None,
 ) -> dict:
     """Analyzed-page summaries for a crawl, ordered ``(normalized_url, id)``.
 
     Accepts an exact presentation ``status`` or the combined ``error_or_blocked``
-    filter, plus a ``monitored`` toggle. Status + monitored are part of the
-    cursor fingerprint. Rows are the crawl's project ``SiteUrl`` set, projected
+    filter, a ``monitored`` toggle, and a ``page_type`` filter (v2 P1 —
+    semantics in ``_page_type_matches``). Filters are part of the cursor
+    fingerprint. Rows are the crawl's project ``SiteUrl`` set, projected
     with the latest analysis and derived presentation status.
     """
     crawl = await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
@@ -887,6 +927,7 @@ async def get_pages(
         "crawl_id": str(crawl_id),
         "status": status or None,
         "monitored": (str(monitored) if monitored is not None else None),
+        "page_type": page_type or None,
     }
 
     monitored_ids = await _monitored_site_url_ids(session, project_id=project_id)
@@ -911,7 +952,7 @@ async def get_pages(
         )
 
     fetch = limit + 1
-    fetch_size = fetch if status is None else fetch * 4
+    fetch_size = fetch if (status is None and page_type is None) else fetch * 4
     stmt = stmt.order_by(SiteUrl.normalized_url.asc(), SiteUrl.id.asc()).limit(
         fetch_size
     )
@@ -969,6 +1010,8 @@ async def get_pages(
         last_scanned = row
         if not _matches_page_status(pres_status, status):
             continue
+        if not _page_type_matches(analysis, page_type):
+            continue
         items.append(
             {
                 "site_url_id": row.id,
@@ -986,6 +1029,7 @@ async def get_pages(
                 "issue_count": (
                     issue_counts.get(row.id, 0) if analysis is not None else None
                 ),
+                "page_type": analysis.page_type if analysis is not None else None,
                 "technical_score": (
                     analysis.technical_score if analysis is not None else None
                 ),
@@ -1013,10 +1057,15 @@ async def get_pages(
                 str(last_kept["site_url_id"]),
             ],
         )
-    elif status is not None and last_scanned is not None and len(rows) >= fetch_size:
-        # Sparse status filter: a full window yielded a partial/empty page while
-        # more matching rows may exist. Advance the cursor to the last SCANNED
-        # row so traversal keeps making progress across empty windows.
+    elif (
+        (status is not None or page_type is not None)
+        and last_scanned is not None
+        and len(rows) >= fetch_size
+    ):
+        # Sparse status/page_type filter: a full window yielded a partial/empty
+        # page while more matching rows may exist. Advance the cursor to the
+        # last SCANNED row so traversal keeps making progress across empty
+        # windows.
         next_cursor = encode_keyset_cursor(
             scope=scope,
             filters=filters,
@@ -1238,6 +1287,7 @@ async def get_page_detail(
         "analysis_status": pres_status,
         "error_code": error_code,
         "field_cwv_available": False,
+        "page_type": analysis.page_type if analysis is not None else None,
         "technical_score": (analysis.technical_score if analysis is not None else None),
         "aeo_score": analysis.aeo_score if analysis is not None else None,
         "overall_score": (analysis.overall_score if analysis is not None else None),
@@ -1282,6 +1332,7 @@ def _issue_filter_clause(
     dimension: str | None,
     rule: str | None,
     site_url_id: uuid.UUID | None,
+    page_type: str | None = None,
 ):
     clauses = [SiteIssue.crawl_id == crawl_id]
     if severity:
@@ -1300,6 +1351,16 @@ def _issue_filter_clause(
         clauses.append(SiteIssue.rule_id == rule)
     if site_url_id is not None:
         clauses.append(SiteIssue.site_url_id == site_url_id)
+    if page_type:
+        # v2 P1: narrow to issues whose analysis classified as this page
+        # type (ignore-unknown: an unrecognized value simply matches nothing).
+        clauses.append(
+            SiteIssue.analysis_id.in_(
+                select(SitePageAnalysis.id).where(
+                    SitePageAnalysis.page_type == page_type
+                )
+            )
+        )
     if query:
         clauses.append(SiteIssue.rule_id.ilike(f"%{query.strip()}%"))
     return clauses
@@ -1456,13 +1517,15 @@ async def get_issues(
     dimension: str | None = None,
     rule: str | None = None,
     site_url_id: uuid.UUID | None = None,
+    page_type: str | None = None,
 ) -> dict:
     """Grouped issue catalog (``{items, next_cursor, summary}``) for mockup 710.
 
     Groups by ``(crawl_id, rule_id)`` after filters, keysets by
     ``(severity_rank, rule_id, canonical_id)`` and applies ``limit + 1`` so a
     rule group is never split across pages. ``id`` is the canonical (earliest)
-    issue UUID; ``title`` reads the CURRENT display label.
+    issue UUID; ``title`` reads the CURRENT display label. The ``page_type``
+    filter (v2 P1) narrows to issues whose analysis classified as that type.
     """
     await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
     limit = _clamp_limit(limit)
@@ -1475,6 +1538,7 @@ async def get_issues(
         "dimension": dimension or None,
         "rule": rule or None,
         "site_url_id": str(site_url_id) if site_url_id else None,
+        "page_type": page_type or None,
     }
     clauses = _issue_filter_clause(
         crawl_id=crawl_id,
@@ -1484,6 +1548,7 @@ async def get_issues(
         dimension=dimension,
         rule=rule,
         site_url_id=site_url_id,
+        page_type=page_type,
     )
     groups = await _load_issue_groups(session, crawl_id=crawl_id, clauses=clauses)
 
@@ -1543,9 +1608,9 @@ async def get_issues(
         for g in window
     ]
     # The summary powers the tiles + filter-chip counts, so it is computed
-    # WITHOUT the severity/dimension chip filters (but WITH search/rule/url
-    # narrowing): selecting the "High" chip must not zero out the other
-    # chips' counts or shrink the headline tiles.
+    # WITHOUT the severity/dimension chip filters (but WITH search/rule/url/
+    # page-type narrowing): selecting the "High" chip must not zero out the
+    # other chips' counts or shrink the headline tiles.
     summary_clauses = _issue_filter_clause(
         crawl_id=crawl_id,
         query=query,
@@ -1554,9 +1619,40 @@ async def get_issues(
         dimension=None,
         rule=rule,
         site_url_id=site_url_id,
+        page_type=page_type,
     )
     summary = await _issues_summary(session, clauses=summary_clauses)
     return {"items": items, "next_cursor": next_cursor, "summary": summary}
+
+
+async def issue_group_page_types(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    crawl_id: uuid.UUID,
+) -> dict[str, list[str]]:
+    """Map each grouped issue's ``rule_id`` to the sorted distinct page types
+    of its affected analyses (v2 P1 export column).
+
+    Read-only projection of persisted rows (invariant 7), workspace-scoped
+    like every read here (invariant 5). Used by the issues export only — the
+    grouped-issue JSON DTO deliberately stays unchanged (a group can span
+    page types, so it has no single type badge).
+    """
+    await _load_crawl(session, workspace_id=workspace_id, crawl_id=crawl_id)
+    rows = await session.execute(
+        select(
+            SiteIssue.rule_id,
+            func.array_agg(func.distinct(SitePageAnalysis.page_type)),
+        )
+        .join(SitePageAnalysis, SitePageAnalysis.id == SiteIssue.analysis_id)
+        .where(SiteIssue.crawl_id == crawl_id)
+        .group_by(SiteIssue.rule_id)
+    )
+    return {
+        rule_id: sorted(str(t) for t in (types or []) if t)
+        for rule_id, types in rows.all()
+    }
 
 
 async def get_issue_detail(
@@ -1653,12 +1749,32 @@ async def get_issue_detail(
             sort_values=[last[1], str(last[0])],
         )
 
+    # v2 P1: each affected URL's classified page type (latest issue analysis
+    # wins when a URL has several). Optional on the wire — the badge simply
+    # does not render for rows without a classification.
+    affected_ids = [row[0] for row in aff_rows]
+    page_type_by_url: dict[uuid.UUID, str] = {}
+    if affected_ids:
+        type_rows = await session.execute(
+            select(SiteIssue.site_url_id, SitePageAnalysis.page_type)
+            .join(SitePageAnalysis, SitePageAnalysis.id == SiteIssue.analysis_id)
+            .where(
+                SiteIssue.crawl_id == crawl_id,
+                SiteIssue.rule_id == canonical.rule_id,
+                SiteIssue.site_url_id.in_(affected_ids),
+            )
+            .order_by(SiteIssue.created_at.desc(), SiteIssue.id.desc())
+        )
+        for site_url_id_value, page_type_value in type_rows.all():
+            page_type_by_url.setdefault(site_url_id_value, page_type_value)
+
     affected_urls = [
         {
             "site_url_id": row[0],
             "normalized_url": row[1],
             "display_url": row[2] or row[1],
             "title": row[3] or None,
+            "page_type": page_type_by_url.get(row[0]),
         }
         for row in aff_rows
     ]

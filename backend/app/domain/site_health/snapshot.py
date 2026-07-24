@@ -32,6 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.site_health.scoring import (
     AnalysisScoreInput,
+    PageTypeScoreInput,
+    aggregate_by_page_type,
     aggregate_scores,
 )
 from app.core.config.site_health import (
@@ -90,6 +92,7 @@ async def persist_crawl_snapshot(
             SitePageAnalysis.technical_score.label("technical_score"),
             SitePageAnalysis.aeo_score.label("aeo_score"),
             SitePageAnalysis.overall_score.label("overall_score"),
+            SitePageAnalysis.page_type.label("page_type"),
             func.row_number()
             .over(
                 partition_by=SitePageAnalysis.site_url_id,
@@ -121,6 +124,7 @@ async def persist_crawl_snapshot(
                 ranked.c.technical_score,
                 ranked.c.aeo_score,
                 ranked.c.overall_score,
+                ranked.c.page_type,
             ).where(ranked.c.latest_rank == 1)
         )
     ).all()
@@ -133,6 +137,7 @@ async def persist_crawl_snapshot(
         return False
 
     inputs: list[AnalysisScoreInput] = []
+    page_type_inputs: list[PageTypeScoreInput] = []
     analysis_ids: list[uuid.UUID] = []
     artifact_ids: list[uuid.UUID] = []
     for row in rows:
@@ -147,7 +152,16 @@ async def persist_crawl_snapshot(
                 overall_score=row.overall_score,
             )
         )
+        page_type_inputs.append(
+            PageTypeScoreInput(
+                page_type=row.page_type,
+                technical_score=row.technical_score,
+                aeo_score=row.aeo_score,
+                overall_score=row.overall_score,
+            )
+        )
     aggregate = aggregate_scores(inputs)
+    by_page_type = aggregate_by_page_type(page_type_inputs)
 
     # Issue severity/category rollups for this crawl.
     severity_counts: dict[str, int] = {}
@@ -219,5 +233,8 @@ async def persist_crawl_snapshot(
         "selected_count": selected_url_count,
         "issue_count": issue_total,
         "scoring_version": aggregate.scoring_version,
+        # v2 P1: per-page-type breakdown (type -> analyzed count + mean
+        # technical/aeo/overall). Missing/errored URLs never appear here.
+        "by_page_type": by_page_type,
     }
     return True

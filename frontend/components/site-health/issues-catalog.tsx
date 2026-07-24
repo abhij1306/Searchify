@@ -13,6 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/typography';
 import { siteHealthQueries, type IssuesParams } from '@/lib/api/site-health';
 import type { IssueDimension, SiteIssue } from '@/lib/api/types';
+import { PageTypeBadge } from '@/components/site-health/page-type-badge';
+import { PageTypeSelect } from '@/components/site-health/page-type-select';
 import {
   dimensionLabel,
   issueTitle,
@@ -85,6 +87,7 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [pageType, setPageType] = useState('');
   const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   const cursor = cursorStack.at(-1);
@@ -92,10 +95,11 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
     () => ({
       ...filterParams(filter),
       query: query.trim() || undefined,
+      page_type: pageType || undefined,
       cursor,
       limit: ISSUE_LIMIT,
     }),
-    [filter, query, cursor],
+    [filter, query, pageType, cursor],
   );
 
   const issuesQuery = useQuery(siteHealthQueries.issues(crawlId, params));
@@ -111,6 +115,12 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
   };
   const selectFilter = (next: FilterKey) => {
     setFilter(next);
+    setCursorStack([]);
+  };
+  // Same server-backed reset behavior as the chips: a filter edit restarts
+  // from the first page (filter-bound cursors are rejected server-side).
+  const selectPageType = (next: string) => {
+    setPageType(next);
     setCursorStack([]);
   };
   const goNext = () => {
@@ -129,6 +139,7 @@ export function IssuesCatalog({ crawlId }: Readonly<{ crawlId: string }>) {
           aria-label="Search issues"
           className="max-w-xs"
         />
+        <PageTypeSelect value={pageType} onChange={selectPageType} />
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => (
             <button
@@ -272,8 +283,11 @@ function IssueCard({ issue, crawlId }: Readonly<{ issue: SiteIssue; crawlId: str
                       href={`/site-health/crawls/${crawlId}/pages/${url.site_url_id}`}
                       className="hover:text-accent flex flex-col gap-0.5"
                     >
-                      <span className="text-foreground text-sm font-medium">
-                        {url.title ?? url.display_url}
+                      <span className="flex items-center gap-2">
+                        <span className="text-foreground text-sm font-medium">
+                          {url.title ?? url.display_url}
+                        </span>
+                        <PageTypeBadge pageType={url.page_type} />
                       </span>
                       <span className="mono text-2xs text-muted">{url.display_url}</span>
                     </Link>

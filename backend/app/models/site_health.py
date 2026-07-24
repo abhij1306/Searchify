@@ -50,6 +50,7 @@ from app.core.config.site_health import (
     FREE_SAMPLE_URL_LIMIT,
     INITIAL_TASK_GENERATION,
     PAGE_ANALYSIS_STATUS_PENDING,
+    PAGE_TYPE_OTHER,
     SELECTION_SOURCE_USER,
     TASK_KIND_DISCOVER,
     site_health_settings,
@@ -771,6 +772,11 @@ class SitePageAnalysis(Base):
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     analyzer_version: Mapped[str] = mapped_column(String(32), default="")
     scoring_version: Mapped[str] = mapped_column(String(32), default="")
+    # v2 P1: the deterministic page-type classification + its version
+    # (invariant 4). ``other`` is the fail-safe default when no signal
+    # classifies the page.
+    page_type: Mapped[str] = mapped_column(String(24), default=PAGE_TYPE_OTHER)
+    classifier_version: Mapped[str] = mapped_column(String(32), default="")
     # Source provenance arrays (evaluation + artifact IDs).
     source_evaluation_ids: Mapped[list | None] = mapped_column(
         ARRAY(PGUUID(as_uuid=True)), nullable=True

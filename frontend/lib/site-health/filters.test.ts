@@ -20,15 +20,27 @@ import {
 
 describe('inventory filter serialization (cursor round-trip)', () => {
   it('round-trips a full filter set through URL query state', () => {
-    const filters: InventoryFilters = { query: 'blog', status: 'ok', monitored: 'monitored' };
+    const filters: InventoryFilters = {
+      query: 'blog',
+      status: 'ok',
+      monitored: 'monitored',
+      page_type: 'article',
+    };
     const params = serializeInventoryFilters(filters, 'CUR==');
     expect(params.get('query')).toBe('blog');
     expect(params.get('status')).toBe('ok');
     expect(params.get('monitored')).toBe('true');
+    expect(params.get('page_type')).toBe('article');
     expect(params.get('cursor')).toBe('CUR==');
     const parsed = parseInventoryFilters(params);
     expect(parsed).toEqual(filters);
     expect(parseCursor(params)).toBe('CUR==');
+  });
+
+  it('omits the empty page_type default', () => {
+    const params = serializeInventoryFilters(emptyInventoryFilters);
+    expect(params.get('page_type')).toBeNull();
+    expect(parseInventoryFilters(new URLSearchParams()).page_type).toBe('');
   });
 
   it('omits empty fields and the "all" monitored default', () => {
@@ -55,7 +67,7 @@ describe('inventory filter serialization (cursor round-trip)', () => {
 describe('toInventoryParams', () => {
   it('maps filters + cursor to request params (monitored tri-state)', () => {
     const params = toInventoryParams(
-      { query: ' foo ', status: 'ok', monitored: 'unmonitored' },
+      { query: ' foo ', status: 'ok', monitored: 'unmonitored', page_type: 'pricing' },
       'C1',
       200,
     );
@@ -65,24 +77,34 @@ describe('toInventoryParams', () => {
       query: 'foo',
       status: 'ok',
       monitored: false,
+      page_type: 'pricing',
     });
   });
 
-  it('drops empty query/status and "all" monitored to undefined', () => {
+  it('drops empty query/status/page_type and "all" monitored to undefined', () => {
     const params = toInventoryParams(emptyInventoryFilters);
     expect(params.query).toBeUndefined();
     expect(params.status).toBeUndefined();
     expect(params.monitored).toBeUndefined();
+    expect(params.page_type).toBeUndefined();
     expect(params.cursor).toBeUndefined();
   });
 });
 
 describe('changeInventoryFilters drops the cursor', () => {
   it('always resets cursor to null on a filter change', () => {
-    const current: InventoryFilters = { query: 'a', status: '', monitored: 'all' };
+    const current: InventoryFilters = { query: 'a', status: '', monitored: 'all', page_type: '' };
     const { filters, cursor } = changeInventoryFilters(current, { query: 'b' });
     expect(cursor).toBeNull();
     expect(filters.query).toBe('b');
+  });
+
+  it('resets the cursor when only the page type changes', () => {
+    const { filters, cursor } = changeInventoryFilters(emptyInventoryFilters, {
+      page_type: 'docs',
+    });
+    expect(cursor).toBeNull();
+    expect(filters.page_type).toBe('docs');
   });
 });
 
@@ -90,8 +112,8 @@ describe('inventoryFiltersEqual (cursor validity check)', () => {
   it('treats trimmed-equal queries as equal', () => {
     expect(
       inventoryFiltersEqual(
-        { query: 'foo', status: '', monitored: 'all' },
-        { query: '  foo  ', status: '', monitored: 'all' },
+        { query: 'foo', status: '', monitored: 'all', page_type: '' },
+        { query: '  foo  ', status: '', monitored: 'all', page_type: '' },
       ),
     ).toBe(true);
   });
@@ -99,8 +121,17 @@ describe('inventoryFiltersEqual (cursor validity check)', () => {
   it('detects a differing filter', () => {
     expect(
       inventoryFiltersEqual(
-        { query: 'foo', status: '', monitored: 'all' },
-        { query: 'foo', status: '', monitored: 'monitored' },
+        { query: 'foo', status: '', monitored: 'all', page_type: '' },
+        { query: 'foo', status: '', monitored: 'monitored', page_type: '' },
+      ),
+    ).toBe(false);
+  });
+
+  it('detects a differing page type', () => {
+    expect(
+      inventoryFiltersEqual(
+        { ...emptyInventoryFilters, page_type: 'article' },
+        { ...emptyInventoryFilters, page_type: 'docs' },
       ),
     ).toBe(false);
   });
@@ -114,8 +145,10 @@ describe('issue filter serialization', () => {
       dimension: 'aeo',
       rule_id: 'meta.title',
       site_url_id: 'u1',
+      page_type: 'product',
     };
     const params = serializeIssueFilters(filters, 'IC==');
+    expect(params.get('page_type')).toBe('product');
     expect(parseIssueFilters(params)).toEqual(filters);
     expect(parseCursor(params)).toBe('IC==');
   });
@@ -133,6 +166,7 @@ describe('issue filter serialization', () => {
       dimension: undefined,
       rule: undefined,
       site_url_id: undefined,
+      page_type: undefined,
     });
   });
 
@@ -142,11 +176,19 @@ describe('issue filter serialization', () => {
     expect('rule_id' in params).toBe(false);
   });
 
+  it('maps the page_type filter onto the wire param', () => {
+    const params = toIssueParams({ ...emptyIssueFilters, page_type: 'faq' });
+    expect(params.page_type).toBe('faq');
+  });
+
   it('changeIssueFilters drops the cursor and issueFiltersEqual compares', () => {
     const { cursor } = changeIssueFilters(emptyIssueFilters, { severity: 'high' });
     expect(cursor).toBeNull();
     expect(issueFiltersEqual(emptyIssueFilters, emptyIssueFilters)).toBe(true);
     expect(issueFiltersEqual(emptyIssueFilters, { ...emptyIssueFilters, severity: 'x' })).toBe(
+      false,
+    );
+    expect(issueFiltersEqual(emptyIssueFilters, { ...emptyIssueFilters, page_type: 'faq' })).toBe(
       false,
     );
   });

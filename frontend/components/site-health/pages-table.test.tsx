@@ -30,6 +30,8 @@ function page(overrides: Partial<PageSummary> = {}): PageSummary {
     aeo_score: 64,
     overall_score: 55,
     last_audited: '2026-07-16T00:00:00Z',
+    // Distinct from `title` so badge-text assertions stay unambiguous.
+    page_type: 'article',
     ...overrides,
   };
 }
@@ -40,6 +42,17 @@ describe('PagesTable', () => {
     expect(screen.getByText('Homepage')).toBeInTheDocument();
     expect(screen.getByText('46')).toBeInTheDocument();
     expect(screen.getByText('64')).toBeInTheDocument();
+  });
+
+  it('renders the page-type badge for a classified page', () => {
+    render(<PagesTable pages={[page()]} crawlId={CRAWL} />);
+    expect(screen.getByText('Article')).toBeInTheDocument();
+  });
+
+  it('renders the "—" placeholder for an unclassified page (null page_type)', () => {
+    render(<PagesTable pages={[page({ page_type: null })]} crawlId={CRAWL} />);
+    expect(screen.queryByText('Article')).not.toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('renders the "—" placeholder for a blocked page — never a fabricated zero', () => {
@@ -56,6 +69,7 @@ describe('PagesTable', () => {
             aeo_score: null,
             overall_score: null,
             last_audited: null,
+            page_type: null,
           }),
         ]}
       />,

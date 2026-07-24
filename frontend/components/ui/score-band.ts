@@ -24,3 +24,13 @@ export const scoreBandText: Record<ScoreBand, string> = {
   good: 'text-score-good',
   high: 'text-score-high',
 };
+
+/**
+ * Null-aware text class for a score cell: muted for a missing score (which
+ * renders the `—` placeholder), the band colour otherwise. Shared by every
+ * score table so the missing-score treatment never diverges.
+ */
+export function scoreTextClass(score: number | null): string {
+  if (score === null) return 'text-muted';
+  return scoreBandText[scoreBand(score)];
+}

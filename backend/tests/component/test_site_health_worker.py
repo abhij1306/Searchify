@@ -41,6 +41,8 @@ from app.core.config.site_health import (
     DISCOVERY_STATUS_FAILED,
     DISCOVERY_STATUS_RUNNING,
     DISCOVERY_STATUS_SAMPLE_COMPLETED,
+    PAGE_TYPE_PROFILES,
+    RULE_OUTCOME_FAIL,
     SELECTION_SOURCE_FREE_SAMPLE,
     TASK_KIND_ANALYZE,
     TASK_KIND_DISCOVER,
@@ -1249,6 +1251,73 @@ async def test_analyze_task_persists_analysis_evaluations_issues_scores(
         assert snapshot.analyzed_url_count == 1
         assert snapshot.overall_score is not None
         assert snapshot.issue_count == issue_count
+
+
+@pytest.mark.asyncio
+async def test_analyze_persists_page_type_classifier_and_v2_versions(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """v2 P1: the analyze task classifies the page, injects page_type into
+    the facts before rule evaluation, and stamps the P1 versions on the
+    persisted rows (sh-analyzer-2 / sh-scoring-2 / sh-classifier-1)."""
+    from app.core.config.site_health import (
+        ANALYZER_VERSION,
+        CLASSIFIER_VERSION,
+        SCORING_VERSION,
+    )
+
+    assert (ANALYZER_VERSION, SCORING_VERSION, CLASSIFIER_VERSION) == (
+        "sh-analyzer-2",
+        "sh-scoring-2",
+        "sh-classifier-1",
+    )
+
+    seed, _site_url_id, _task_id = await _seed_analyze_ready(
+        session_factory, root="https://example.com/blog/post-1"
+    )
+    pages = {"/blog/post-1": _rich_html()}
+    worker = _worker(session_factory, pages, owner="analyze-p1")
+    await worker.run_until_idle()
+
+    async with session_factory() as session:
+        analysis = (
+            await session.execute(
+                select(SitePageAnalysis).where(
+                    SitePageAnalysis.crawl_id == seed.crawl_id
+                )
+            )
+        ).scalar_one()
+        # The /blog/ path pattern classified the page as an article.
+        assert analysis.page_type == "article"
+        assert analysis.classifier_version == "sh-classifier-1"
+        assert analysis.analyzer_version == "sh-analyzer-2"
+        assert analysis.scoring_version == "sh-scoring-2"
+
+        # facts["page_type"] reached rule evaluation: the sufficient-text
+        # check read the per-type (article) minimum, not the v1 global.
+        sufficient = (
+            await session.execute(
+                select(SiteRuleEvaluation).where(
+                    SiteRuleEvaluation.analysis_id == analysis.id,
+                    SiteRuleEvaluation.rule_id == "aeo.sufficient_text",
+                )
+            )
+        ).scalar_one()
+        article_min = PAGE_TYPE_PROFILES["article"].min_sufficient_words
+        assert sufficient.evidence["page_type"] == "article"
+        assert sufficient.evidence["minimum"] == article_min
+        # The rich page (140 words) is thin FOR AN ARTICLE (>= 300 words).
+        assert sufficient.outcome == RULE_OUTCOME_FAIL
+
+        # The crawl rollup carries the per-page-type breakdown.
+        crawl = await session.get(SiteCrawl, seed.crawl_id)
+        assert crawl is not None
+        summary = crawl.score_summary or {}
+        assert summary.get("scoring_version") == "sh-scoring-2"
+        by_page_type = summary.get("by_page_type") or {}
+        assert set(by_page_type) == {"article"}
+        assert by_page_type["article"]["analyzed_count"] == 1
+        assert by_page_type["article"]["overall_score"] is not None
 
 
 @pytest.mark.asyncio

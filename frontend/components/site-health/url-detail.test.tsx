@@ -41,6 +41,7 @@ function detail(overrides: Partial<PageDetail> = {}): PageDetail {
     overall_score: 58,
     issue_count: 2,
     last_audited: '2026-07-16T00:00:00Z',
+    page_type: 'product',
     facts: {
       title: 'Best&Less Online',
       meta_description: null,
@@ -134,6 +135,9 @@ describe('UrlDetail', () => {
     expect(
       await screen.findByRole('heading', { name: 'Best&Less Online', level: 1 }),
     ).toBeInTheDocument();
+    // The header carries the v2 P1 page-type badge.
+    expect(screen.getByText('Page Type')).toBeInTheDocument();
+    expect(screen.getByText('Product')).toBeInTheDocument();
     // Delivery metric: TTFB rendered with ms suffix.
     expect(screen.getByText('840ms')).toBeInTheDocument();
     expect(screen.getByText('200')).toBeInTheDocument();

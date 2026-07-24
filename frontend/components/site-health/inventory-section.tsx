@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Label } from '@/components/ui/typography';
 import { InventorySelection } from '@/components/site-health/inventory-selection';
+import { PageTypeSelect } from '@/components/site-health/page-type-select';
 import { PagesTable } from '@/components/site-health/pages-table';
 import { siteHealthQueries, type PagesParams } from '@/lib/api/site-health';
 import type { SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
@@ -248,6 +249,9 @@ function ScoredInventory({
   cancelPending: boolean;
 }>) {
   const [tab, setTab] = useState<TabKey>('monitored');
+  // Shared page-type filter (v2 P1): one server-backed value that composes
+  // with whichever tab is active — never a client filter over the page window.
+  const [pageType, setPageType] = useState('');
   // Per-tab cursor stack so Prev/Next walk keyset pages without offsets.
   const pagers = {
     monitored: useCursorStack(),
@@ -258,9 +262,19 @@ function ScoredInventory({
 
   const activeTab = TABS.find((t) => t.key === tab)!;
 
+  // A filter edit restarts EVERY tab from its first page — cursors are
+  // filter-bound server-side, so a stale cursor under a new page type 400s.
+  const selectPageType = (next: string) => {
+    setPageType(next);
+    pagers.monitored.reset();
+    pagers.all.reset();
+    pagers.errors.reset();
+  };
+
   const pagesQuery = useQuery({
     ...siteHealthQueries.pages(crawl.id, {
       ...activeTab.params,
+      page_type: pageType || undefined,
       cursor: pager.cursor,
       limit: PAGE_LIMIT,
     }),
@@ -320,17 +334,19 @@ function ScoredInventory({
               </button>
             ))}
           </div>
-          {active ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mb-1 ml-auto"
-              onClick={onCancel}
-              disabled={cancelPending}
-            >
-              {cancelPending ? 'Cancelling…' : 'Cancel'}
-            </Button>
-          ) : null}
+          <div className="mb-1 ml-auto flex items-center gap-2">
+            <PageTypeSelect value={pageType} onChange={selectPageType} />
+            {active ? (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onCancel}
+                disabled={cancelPending}
+              >
+                {cancelPending ? 'Cancelling…' : 'Cancel'}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {body}

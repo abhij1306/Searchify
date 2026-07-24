@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { mswServer } from '@/test/msw-server';
@@ -99,6 +99,7 @@ function inventoryRow(id: string, url: string) {
     aeo_score: null,
     overall_score: null,
     last_audited: null,
+    page_type: null,
   };
 }
 
@@ -227,6 +228,9 @@ describe('SiteHealthScreen — terminal states on the canonical screen', () => {
       analyzed_count: 4,
       issue_count: 3,
       scoring_version: 's1',
+      by_page_type: {
+        article: { analyzed_count: 4, technical_score: 80, aeo_score: 62, overall_score: 71 },
+      },
     };
     mockRoutes();
     mswServer.use(
@@ -253,6 +257,11 @@ describe('SiteHealthScreen — terminal states on the canonical screen', () => {
     ).toBeInTheDocument();
     // The dashboard score value stays visible (partial results kept).
     expect(await screen.findByText('71 / 100')).toBeInTheDocument();
+    // The v2 P1 per-page-type breakdown renders from the same projection
+    // (scoped — the inventory page-type <select> also lists type labels).
+    const breakdown = screen.getByTestId('page-type-scores');
+    expect(breakdown).toBeInTheDocument();
+    expect(within(breakdown).getByText('Article')).toBeInTheDocument();
     // The header offers Re-crawl for a terminal-with-data dashboard.
     expect(screen.getByRole('button', { name: /Re-crawl now/ })).toBeInTheDocument();
     // Not the bare terminal notice.
@@ -281,6 +290,7 @@ describe('SiteHealthScreen — canonical single-screen flow (regression)', () =>
       analyzed_count: 1,
       issue_count: 3,
       scoring_version: 's1',
+      by_page_type: {},
     };
 
     // Mutable server state the handlers read on every request.

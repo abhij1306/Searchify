@@ -180,9 +180,13 @@ async def _seed_scenario(session: AsyncSession, *, email: str) -> Scenario:
         )
     )
 
-    # url_a + url_b get analyzed; url_b gets a failing rule -> issue.
+    # url_a + url_b get analyzed (classified article / product — v2 P1);
+    # url_b gets a failing rule -> issue.
     canonical_issue_id: uuid.UUID | None = None
-    for su, with_issue in ((url_a, False), (url_b, True)):
+    for su, with_issue, page_type in (
+        (url_a, False, "article"),
+        (url_b, True, "product"),
+    ):
         task = SiteCrawlTask(
             crawl_id=crawl.id,
             workspace_id=workspace.id,
@@ -241,6 +245,8 @@ async def _seed_scenario(session: AsyncSession, *, email: str) -> Scenario:
             overall_score=85.0,
             analyzer_version="v1",
             scoring_version="v1",
+            page_type=page_type,
+            classifier_version="sh-classifier-1",
         )
         session.add(analysis)
         await session.flush()
@@ -468,6 +474,116 @@ async def test_pages_and_issues_projection(
     assert any(
         au["site_url_id"] == str(scn.issue_url_id) for au in dbody["affected_urls"]
     )
+
+
+async def test_page_type_projection_filters_and_exports(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """v2 P1: page rows/detail carry page_type, the pages/inventory/issues
+    lists filter by it, and all three export views gain the column."""
+    await _register(client, "pagetype@example.com")
+    async with session_factory() as session:
+        scn = await _seed_scenario(session, email="pagetype@example.com")
+    headers = {"X-Workspace-Id": str(scn.workspace_id)}
+
+    # Page rows project the persisted page_type (None for the unanalyzed URL).
+    pages = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages", headers=headers
+    )
+    assert pages.status_code == 200
+    types = {row["site_url_id"]: row["page_type"] for row in pages.json()["items"]}
+    assert types[str(scn.monitored_url_id)] == "article"
+    assert types[str(scn.issue_url_id)] == "product"
+    assert None in types.values()  # the third, unanalyzed URL
+
+    # Pages page_type filter: exact match; unknown values match nothing.
+    filtered = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages?page_type=article",
+        headers=headers,
+    )
+    assert filtered.status_code == 200
+    f_items = filtered.json()["items"]
+    assert [row["site_url_id"] for row in f_items] == [str(scn.monitored_url_id)]
+    unknown = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages?page_type=not_a_type",
+        headers=headers,
+    )
+    assert unknown.status_code == 200
+    assert unknown.json()["items"] == []
+
+    # Inventory rows carry page_type and filter by it too.
+    inventory = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/inventory?page_type=product",
+        headers=headers,
+    )
+    assert inventory.status_code == 200
+    i_items = inventory.json()["items"]
+    assert [row["site_url_id"] for row in i_items] == [str(scn.issue_url_id)]
+    assert i_items[0]["page_type"] == "product"
+
+    # Per-URL detail carries page_type.
+    detail = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/pages/{scn.issue_url_id}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    assert detail.json()["page_type"] == "product"
+
+    # Issues filter by the affected analysis's page_type.
+    product_issues = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues?page_type=product",
+        headers=headers,
+    )
+    assert product_issues.status_code == 200
+    assert len(product_issues.json()["items"]) == 1
+    assert product_issues.json()["summary"]["issue_count"] == 1
+    article_issues = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues?page_type=article",
+        headers=headers,
+    )
+    assert article_issues.status_code == 200
+    assert article_issues.json()["items"] == []
+    assert article_issues.json()["summary"]["issue_count"] == 0
+
+    # Issue detail: affected URLs carry their analysis's page_type.
+    issue_detail = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/issues/{scn.canonical_issue_id}",
+        headers=headers,
+    )
+    assert issue_detail.status_code == 200
+    affected = issue_detail.json()["affected_urls"]
+    assert len(affected) == 1
+    assert affected[0]["page_type"] == "product"
+
+    # All three export views carry the page_type column.
+    pages_csv = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/export.csv?view=pages",
+        headers=headers,
+    )
+    assert pages_csv.status_code == 200
+    header = pages_csv.text.splitlines()[0].split(",")
+    assert "page_type" in header
+    assert "article" in pages_csv.text
+    assert "product" in pages_csv.text
+
+    issues_csv = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/export.csv?view=issues",
+        headers=headers,
+    )
+    assert issues_csv.status_code == 200
+    i_header = issues_csv.text.splitlines()[0].split(",")
+    assert "page_type" in i_header
+    # The single issue group affected a product page.
+    row = issues_csv.text.splitlines()[1].split(",")
+    assert row[i_header.index("page_type")] == "product"
+
+    inventory_md = await client.get(
+        f"/api/v1/site-crawls/{scn.crawl_id}/export.md?view=inventory",
+        headers=headers,
+    )
+    assert inventory_md.status_code == 200
+    assert "| page_type |" in inventory_md.text
 
 
 async def test_page_detail_and_history(

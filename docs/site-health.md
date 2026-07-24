@@ -77,6 +77,13 @@ All status/vocabulary constants are owned by
 - **Rule outcome**: `pass`, `fail`, `not_applicable`, `error`.
 - **Severity**: `critical`, `high`, `medium`, `low`, `info`.
 - **Dimension**: `technical`, `aeo`.
+- **Page type** (`PageSummary.page_type`, per-URL detail, exports): the
+  deterministic classifier's page-type taxonomy — `homepage`, `article`,
+  `product`, `category`, `pricing`, `docs`, `faq`, `about_contact`, `other`.
+  Assigned at analysis time (config-owned pattern tables +
+  `PAGE_TYPE_PROFILES`); always present, `other` when no signal clears the
+  confidence threshold. Classifier/classification rationale:
+  [`roadmap/site-health-v2-page-aware.md`](roadmap/site-health-v2-page-aware.md).
 - **Scores.** Technical / AEO / overall scores are `0–100` floats. A missing or
   failed score is **`null`** in the API and renders as an em dash (`—`) in the
   UI — never a fabricated `0`.
@@ -99,13 +106,13 @@ typed `400`, never a `500`.
 | `GET /site-crawls?project_id=&limit=&cursor=` | List crawls (created-at keyset). |
 | `GET /site-crawls/{crawl_id}` | Crawl summary/projection (redacted for Free). |
 | `POST /site-crawls/{crawl_id}/cancel` | Cancel a crawl → `cancelled`. |
-| `GET /site-crawls/{crawl_id}/inventory?limit=&cursor=&query=&status=&monitored=` | Admitted-URL inventory (selection source of truth). |
+| `GET /site-crawls/{crawl_id}/inventory?limit=&cursor=&query=&status=&monitored=&page_type=` | Admitted-URL inventory (selection source of truth). `page_type` filters by the classifier's page type (unknown values are ignored, matching the other filters). |
 | `GET /projects/{project_id}/monitored-urls` | Current monitored set + quota + `selection_version`. |
 | `PUT /projects/{project_id}/monitored-urls` | Full-set, versioned monitored-set replacement. `403` `starter_required` (Free) / `site_health_quota_exceeded`; `409` `stale_selection_version` (carries `current_selection_version`); `422` for unknown URL ids. |
-| `GET /site-crawls/{crawl_id}/pages?limit=&cursor=&query=&status=&monitored=` | Dashboard page rows (derived `analysis_status` + `error_code`, monitored flag, scores). |
+| `GET /site-crawls/{crawl_id}/pages?limit=&cursor=&query=&status=&monitored=&page_type=` | Dashboard page rows (derived `analysis_status` + `error_code`, monitored flag, `page_type`, scores). |
 | `GET /site-crawls/{crawl_id}/pages/{site_url_id}` | Per-URL detail (facts, delivery, evaluations, issues, link refs). |
 | `GET /site-crawls/{crawl_id}/pages/{site_url_id}/issue-history?limit=&cursor=` | Crawl-bounded issue history for a URL. |
-| `GET /site-crawls/{crawl_id}/issues?limit=&cursor=&query=&severity=&category=&dimension=&rule=&site_url_id=` | Grouped issues catalog + summary tiles. The grouped-issue wire filter is `rule` (not `rule_id`). |
+| `GET /site-crawls/{crawl_id}/issues?limit=&cursor=&query=&severity=&category=&dimension=&rule=&site_url_id=&page_type=` | Grouped issues catalog + summary tiles. The grouped-issue wire filter is `rule` (not `rule_id`). `page_type` filters to issues affecting pages of that type. |
 | `GET /site-crawls/{crawl_id}/issues/{canonical_id}` | Grouped-issue detail (a non-representative member id canonicalizes to the earliest `(created_at, id)`). |
 | `GET /projects/{project_id}/site-health?crawl_id=` | Dashboard projection (defaults to the latest completed crawl). |
 | `GET /site-crawls/{crawl_id}/events?stream=` | Event replay (`stream=false`, default → ordered JSON list) or SSE (`stream=true`). Free payloads are redacted. |
@@ -128,9 +135,11 @@ CSV (`export.csv`) and Markdown (`export.md`) render the **same
 workspace-scoped, already-projected rows** the JSON API returns, so an export can
 never leak more than the API. The `view` query parameter selects the projection:
 
-- `inventory` — admitted-URL inventory columns.
-- `pages` — dashboard page columns (status, error code, scores).
-- `issues` — grouped issues columns.
+- `inventory` — admitted-URL inventory columns (including `page_type` when the
+  row has a completed analysis).
+- `pages` — dashboard page columns (status, error code, `page_type`, scores).
+- `issues` — grouped issues columns (`page_type` is the comma-joined distinct
+  set of affected page types).
 
 Exports are **authenticated blob downloads** (`Content-Disposition: attachment`),
 so a selected non-default workspace's `X-Workspace-Id` header is carried (a plain
