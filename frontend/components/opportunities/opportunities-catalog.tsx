@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 
 import { Alert } from '@/components/ui/alert';
@@ -25,18 +25,16 @@ import {
 } from '@/components/ui/table';
 import {
   EvidenceDrawer,
+  OPPORTUNITY_STATUS_META,
   OpportunityStatusBadge,
   OpportunityTypeBadge,
 } from '@/components/opportunities/evidence-drawer';
-import {
-  opportunitiesMutations,
-  opportunitiesQueries,
-  type OpportunitiesParams,
-} from '@/lib/api/opportunities';
-import { queryKeys } from '@/lib/api/query-keys';
+import { useUpdateOpportunityStatus } from '@/components/opportunities/use-opportunity-status';
+import { opportunitiesQueries, type OpportunitiesParams } from '@/lib/api/opportunities';
 import type { Opportunity, OpportunityStatus } from '@/lib/api/types';
 import { severityBadgeValue, severityLabel } from '@/lib/site-health/issues';
 import { formatAudited } from '@/lib/site-health/status';
+import { useCursorStack } from '@/lib/site-health/use-cursor-stack';
 import { cn } from '@/lib/utils';
 
 const PAGE_LIMIT = 25;
@@ -68,21 +66,17 @@ const SEVERITY_FILTERS: ReadonlyArray<{ key: SeverityFilter; label: string }> = 
   { key: 'low', label: 'Low' },
 ];
 
+// Status labels come from the single source (evidence-drawer's meta record,
+// in display order) so chips, the row dropdown, and the drawer never drift.
+const STATUS_CHOICES: ReadonlyArray<{ value: OpportunityStatus; label: string }> = (
+  Object.keys(OPPORTUNITY_STATUS_META) as OpportunityStatus[]
+).map((value) => ({ value, label: OPPORTUNITY_STATUS_META[value].label }));
+
 // The server's no-status-param default IS the active triage queue
 // (open + in_progress), so the honest chip label is "Active".
 const STATUS_FILTERS: ReadonlyArray<{ key: StatusFilter; label: string }> = [
   { key: 'active', label: 'Active' },
-  { key: 'open', label: 'Open' },
-  { key: 'in_progress', label: 'In progress' },
-  { key: 'dismissed', label: 'Dismissed' },
-  { key: 'resolved', label: 'Resolved' },
-];
-
-const STATUS_CHOICES: ReadonlyArray<{ value: OpportunityStatus; label: string }> = [
-  { value: 'open', label: 'Open' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'dismissed', label: 'Dismissed' },
-  { value: 'resolved', label: 'Resolved' },
+  ...STATUS_CHOICES.map(({ value, label }) => ({ key: value, label })),
 ];
 
 function FilterChip({
@@ -132,23 +126,7 @@ function StatusControl({
   row,
   projectId,
 }: Readonly<{ row: Opportunity; projectId: string }>) {
-  const queryClient = useQueryClient();
-  const updateStatus = useMutation({
-    ...opportunitiesMutations.updateStatus(),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.list(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.summary(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.detail(row.id),
-        }),
-      ]);
-    },
-  });
+  const updateStatus = useUpdateOpportunityStatus(projectId, row.id);
   return (
     <Dropdown>
       <DropdownTrigger asChild>
@@ -183,31 +161,23 @@ export function OpportunitiesCatalog({ projectId }: Readonly<{ projectId: string
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const pager = useCursorStack();
 
-  const cursor = cursorStack.at(-1);
   const params: OpportunitiesParams = useMemo(
     () => ({
       type: typeFilter === 'all' ? undefined : typeFilter,
       severity: severityFilter === 'all' ? undefined : severityFilter,
       status: statusFilter === 'active' ? undefined : statusFilter,
-      cursor,
+      cursor: pager.cursor,
       limit: PAGE_LIMIT,
     }),
-    [typeFilter, severityFilter, statusFilter, cursor],
+    [typeFilter, severityFilter, statusFilter, pager.cursor],
   );
 
   const listQuery = useQuery(opportunitiesQueries.list(projectId, params));
   const rows = listQuery.data?.items ?? [];
   const nextCursor = listQuery.data?.next_cursor ?? null;
-  const canPrev = cursorStack.length > 0;
-
-  const resetPages = () => setCursorStack([]);
-  const goNext = () => {
-    if (nextCursor) setCursorStack((prev) => [...prev, nextCursor]);
-  };
-  const goPrev = () => setCursorStack((prev) => prev.slice(0, -1));
 
   return (
     <div className="grid gap-4">
@@ -220,7 +190,7 @@ export function OpportunitiesCatalog({ projectId }: Readonly<{ projectId: string
               selected={filter.key === typeFilter}
               onSelect={() => {
                 setTypeFilter(filter.key);
-                resetPages();
+                pager.reset();
               }}
             />
           ))}
@@ -233,7 +203,7 @@ export function OpportunitiesCatalog({ projectId }: Readonly<{ projectId: string
               selected={filter.key === severityFilter}
               onSelect={() => {
                 setSeverityFilter(filter.key);
-                resetPages();
+                pager.reset();
               }}
             />
           ))}
@@ -246,7 +216,7 @@ export function OpportunitiesCatalog({ projectId }: Readonly<{ projectId: string
               selected={filter.key === statusFilter}
               onSelect={() => {
                 setStatusFilter(filter.key);
-                resetPages();
+                pager.reset();
               }}
             />
           ))}
@@ -327,10 +297,10 @@ export function OpportunitiesCatalog({ projectId }: Readonly<{ projectId: string
       {rows.length > 0 ? (
         <div className="flex items-center justify-end gap-2">
           <CursorPager
-            canPrev={canPrev}
+            canPrev={pager.canPrev}
             canNext={Boolean(nextCursor)}
-            onPrev={goPrev}
-            onNext={goNext}
+            onPrev={pager.pop}
+            onNext={() => pager.push(nextCursor)}
           />
         </div>
       ) : null}

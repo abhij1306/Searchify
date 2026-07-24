@@ -100,12 +100,11 @@ export const opportunitiesApi = {
     projectId: string,
     format: 'csv' | 'md',
     filters?: Omit<OpportunitiesParams, 'cursor' | 'limit'>,
-  ) => {
-    const base = `${API_BASE_URL}/projects/${projectId}/opportunities/export.${format}`;
-    const query = definedQuery(filters);
-    const rendered = query.toString();
-    return rendered ? `${base}?${rendered}` : base;
-  },
+  ) =>
+    withQuery(
+      `${API_BASE_URL}/projects/${projectId}/opportunities/export.${format}`,
+      definedQuery(filters),
+    ),
 };
 
 /**

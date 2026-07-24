@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,6 +26,7 @@ from app.core.config.opportunities import (
     SITE_STRUCTURED_DATA_RULE_IDS,
     SITE_THIN_CONTENT_RULE_IDS,
     SITE_VALUE_FACTOR,
+    OpportunityRule,
 )
 
 # Catalog rule ids this module emits (validated by the catalog lookup itself).
@@ -148,18 +150,21 @@ def _group_by_prompt_index(
     return groups
 
 
-def detect_brand_absent_high_value_prompt(
+def _visibility_gap_hits(
     evidence: VisibilityEvidence,
+    *,
+    rule: OpportunityRule,
+    require_competitor: bool,
+    extras: Callable[[list[AnalysisEvidence], list[str]], dict[str, Any]],
 ) -> list[DetectorHit]:
-    """Fire per prompt with no owned citation and >=1 competitor present.
+    """Per-prompt hits for the "zero owned citations" visibility rules.
 
-    Groups the audit's analyses by ``prompt_index``; a prompt fires when NO
-    repetition carries an owned citation AND at least one competitor
-    citation-or-mention appears across the repetitions.
+    Both visibility rules share the firing condition (NO repetition of the
+    prompt carries an owned citation), the ``prompt_index`` grouping, the
+    deterministic target identity, and the scoring inputs; they differ only
+    in whether a competitor must be present (``require_competitor``) and in
+    the rule-specific evidence ``extras``.
     """
-    rule = OPPORTUNITY_RULES_BY_ID[RULE_BRAND_ABSENT]
-    if not rule.enabled:
-        return []
     snapshots = {s.prompt_index: s for s in evidence.prompt_snapshots}
     groups = _group_by_prompt_index(evidence.analyses)
     hits: list[DetectorHit] = []
@@ -170,7 +175,7 @@ def detect_brand_absent_high_value_prompt(
         competitor_names = sorted(
             {name for a in analyses for name in a.competitor_names if name}
         )
-        if not competitor_names:
+        if require_competitor and not competitor_names:
             continue
         snapshot = snapshots.get(prompt_index)
         target_key, prompt_id, theme = _prompt_target(
@@ -193,10 +198,7 @@ def detect_brand_absent_high_value_prompt(
                     "prompt_index": prompt_index,
                     "repetitions": len(analyses),
                     "owned_citation_count": 0,
-                    "competitor_names": competitor_names,
-                    "engines": sorted(
-                        {a.logical_engine for a in analyses if a.logical_engine}
-                    ),
+                    **extras(analyses, competitor_names),
                     "audit_id": str(evidence.audit_id),
                 },
                 source_analysis_ids=tuple(
@@ -213,6 +215,30 @@ def detect_brand_absent_high_value_prompt(
             )
         )
     return hits
+
+
+def detect_brand_absent_high_value_prompt(
+    evidence: VisibilityEvidence,
+) -> list[DetectorHit]:
+    """Fire per prompt with no owned citation and >=1 competitor present.
+
+    A prompt fires when NO repetition carries an owned citation AND at least
+    one competitor citation-or-mention appears across the repetitions.
+    """
+    rule = OPPORTUNITY_RULES_BY_ID[RULE_BRAND_ABSENT]
+    if not rule.enabled:
+        return []
+    return _visibility_gap_hits(
+        evidence,
+        rule=rule,
+        require_competitor=True,
+        extras=lambda analyses, competitor_names: {
+            "competitor_names": competitor_names,
+            "engines": sorted(
+                {a.logical_engine for a in analyses if a.logical_engine}
+            ),
+        },
+    )
 
 
 def detect_owned_page_not_cited(evidence: VisibilityEvidence) -> list[DetectorHit]:
@@ -224,54 +250,14 @@ def detect_owned_page_not_cited(evidence: VisibilityEvidence) -> list[DetectorHi
     rule = OPPORTUNITY_RULES_BY_ID[RULE_OWNED_PAGE_NOT_CITED]
     if not rule.enabled or not evidence.owned_domains:
         return []
-    snapshots = {s.prompt_index: s for s in evidence.prompt_snapshots}
-    groups = _group_by_prompt_index(evidence.analyses)
-    hits: list[DetectorHit] = []
-    for prompt_index in sorted(groups):
-        analyses = groups[prompt_index]
-        if any(a.owned_citation_count > 0 for a in analyses):
-            continue
-        competitor_names = sorted(
-            {name for a in analyses for name in a.competitor_names if name}
-        )
-        snapshot = snapshots.get(prompt_index)
-        target_key, prompt_id, theme = _prompt_target(
-            audit_id=evidence.audit_id,
-            snapshot=snapshot,
-            prompt_index=prompt_index,
-        )
-        intent = snapshot.intent if snapshot is not None else ""
-        hits.append(
-            DetectorHit(
-                rule_id=rule.rule_id,
-                target_key=target_key,
-                target_prompt_id=prompt_id,
-                target_url=None,
-                target_theme=theme,
-                evidence={
-                    "prompt_text": snapshot.text if snapshot is not None else "",
-                    "prompt_intent": intent,
-                    "prompt_theme": snapshot.theme if snapshot is not None else "",
-                    "prompt_index": prompt_index,
-                    "repetitions": len(analyses),
-                    "owned_citation_count": 0,
-                    "owned_domains": sorted(evidence.owned_domains),
-                    "audit_id": str(evidence.audit_id),
-                },
-                source_analysis_ids=tuple(
-                    str(a.analysis_id)
-                    for a in sorted(analyses, key=lambda a: str(a.analysis_id))
-                ),
-                source_issue_ids=(),
-                source_metric_ids=(),
-                value_factor=value_factor_for_intent(intent),
-                gap_factor=gap_factor_visibility(
-                    competitor_count=len(competitor_names),
-                    owned_citation_rate=0.0,
-                ),
-            )
-        )
-    return hits
+    return _visibility_gap_hits(
+        evidence,
+        rule=rule,
+        require_competitor=False,
+        extras=lambda _analyses, _competitor_names: {
+            "owned_domains": sorted(evidence.owned_domains),
+        },
+    )
 
 
 # =========================================================================

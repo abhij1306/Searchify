@@ -67,7 +67,6 @@ from app.core.config.site_health import (
 )
 from app.domain.prompts.locks import acquire_project_lock
 from app.domain.site_health.normalization import (
-    CursorScopeError,
     decode_keyset_cursor,
     encode_keyset_cursor,
 )
@@ -156,66 +155,42 @@ async def _require_project(
         raise OpportunityNotFoundError(_PROJECT_NOT_FOUND)
 
 
-async def _resolve_audit(
+async def _resolve_source[SourceT: Audit | SiteCrawl](
     session: AsyncSession,
+    model: type[SourceT],
     *,
     workspace_id: uuid.UUID,
     project_id: uuid.UUID,
-    audit_id: uuid.UUID | None,
-) -> Audit | None:
-    """Explicit audit (404 if foreign) else the latest dashboard-ready one."""
-    if audit_id is not None:
-        audit = await session.scalar(
-            select(Audit).where(
-                Audit.id == audit_id,
-                Audit.workspace_id == workspace_id,
-                Audit.project_id == project_id,
+    source_id: uuid.UUID | None,
+    ready_statuses: tuple[str, ...],
+    not_found_detail: str,
+) -> SourceT | None:
+    """Explicit source (404 if foreign) else the latest usable one.
+
+    Shared by the audit (dashboard-ready statuses) and the Site Health crawl
+    (terminal statuses) resolution: an explicit id must belong to the
+    workspace + project, and the default picks the most recent row in a
+    usable status (``completed_at`` first, ``created_at`` tie-break).
+    """
+    if source_id is not None:
+        source = await session.scalar(
+            select(model).where(
+                model.id == source_id,
+                model.workspace_id == workspace_id,
+                model.project_id == project_id,
             )
         )
-        if audit is None:
-            raise OpportunityNotFoundError(_AUDIT_NOT_FOUND)
-        return audit
+        if source is None:
+            raise OpportunityNotFoundError(not_found_detail)
+        return source
     return await session.scalar(
-        select(Audit)
+        select(model)
         .where(
-            Audit.workspace_id == workspace_id,
-            Audit.project_id == project_id,
-            Audit.status.in_(_DASHBOARD_READY_STATUSES),
+            model.workspace_id == workspace_id,
+            model.project_id == project_id,
+            model.status.in_(ready_statuses),
         )
-        .order_by(Audit.completed_at.desc().nullslast(), Audit.created_at.desc())
-        .limit(1)
-    )
-
-
-async def _resolve_crawl(
-    session: AsyncSession,
-    *,
-    workspace_id: uuid.UUID,
-    project_id: uuid.UUID,
-    site_crawl_id: uuid.UUID | None,
-) -> SiteCrawl | None:
-    """Explicit crawl (404 if foreign) else the latest terminal one."""
-    if site_crawl_id is not None:
-        crawl = await session.scalar(
-            select(SiteCrawl).where(
-                SiteCrawl.id == site_crawl_id,
-                SiteCrawl.workspace_id == workspace_id,
-                SiteCrawl.project_id == project_id,
-            )
-        )
-        if crawl is None:
-            raise OpportunityNotFoundError(_CRAWL_NOT_FOUND)
-        return crawl
-    return await session.scalar(
-        select(SiteCrawl)
-        .where(
-            SiteCrawl.workspace_id == workspace_id,
-            SiteCrawl.project_id == project_id,
-            SiteCrawl.status.in_(_EVIDENCE_CRAWL_STATUSES),
-        )
-        .order_by(
-            SiteCrawl.completed_at.desc().nullslast(), SiteCrawl.created_at.desc()
-        )
+        .order_by(model.completed_at.desc().nullslast(), model.created_at.desc())
         .limit(1)
     )
 
@@ -401,14 +376,23 @@ async def recompute(
     shared advisory lock; the second one recomputes on the latest state.
     """
     await _require_project(session, workspace_id=workspace_id, project_id=project_id)
-    audit = await _resolve_audit(
-        session, workspace_id=workspace_id, project_id=project_id, audit_id=audit_id
-    )
-    crawl = await _resolve_crawl(
+    audit = await _resolve_source(
         session,
+        Audit,
         workspace_id=workspace_id,
         project_id=project_id,
-        site_crawl_id=site_crawl_id,
+        source_id=audit_id,
+        ready_statuses=_DASHBOARD_READY_STATUSES,
+        not_found_detail=_AUDIT_NOT_FOUND,
+    )
+    crawl = await _resolve_source(
+        session,
+        SiteCrawl,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        source_id=site_crawl_id,
+        ready_statuses=_EVIDENCE_CRAWL_STATUSES,
+        not_found_detail=_CRAWL_NOT_FOUND,
     )
 
     hits: list[DetectorHit] = []
@@ -476,8 +460,9 @@ async def recompute(
     successor_ids: dict[uuid.UUID, uuid.UUID] = {}  # live row id -> new row id
     new_rows: list[Opportunity] = []
     for hit, score in scored:
-        # Write-path catalog validation (invariants 1 + 4).
-        rule = OPPORTUNITY_RULES_BY_ID[validate_rule_id(hit.rule_id)]
+        # The scoring pass above already resolved the catalog entry (an
+        # unknown rule_id raised there), so this lookup is guaranteed.
+        rule = OPPORTUNITY_RULES_BY_ID[hit.rule_id]
         live = live_by_target.get((hit.rule_id, hit.target_key))
         new_id = uuid.uuid4()
         new_rows.append(
@@ -551,15 +536,12 @@ def _build_snapshot(
     counts_by_severity = {name: 0 for name in sorted(OPPORTUNITY_SEVERITIES)}
     counts_by_status = {name: 0 for name in sorted(OPPORTUNITY_STATUSES)}
     for row in new_rows:
-        counts_by_type[row.opportunity_type] = (
-            counts_by_type.get(row.opportunity_type, 0) + 1
-        )
-        counts_by_severity[row.severity] = counts_by_severity.get(row.severity, 0) + 1
-        counts_by_status[row.status] = counts_by_status.get(row.status, 0) + 1
+        # Rows are written from the config vocabularies, so every key exists.
+        counts_by_type[row.opportunity_type] += 1
+        counts_by_severity[row.severity] += 1
+        counts_by_status[row.status] += 1
     scores = sorted(score for _hit, score in scored)
-    median = (
-        round(statistics.median(scores), 1) if scores else None
-    )
+    median = round(statistics.median(scores), 1) if scores else None
     source_analysis_ids = sorted(
         {sid for hit, _score in scored for sid in hit.source_analysis_ids}
     )
@@ -706,7 +688,7 @@ async def list_opportunities(
             )
             cursor_score = float(score_raw)
             cursor_id = uuid.UUID(id_raw)
-        except (CursorScopeError, ValueError) as exc:
+        except ValueError as exc:  # CursorScopeError is a ValueError
             raise InvalidCursorError(str(exc)) from exc
         clauses.append(
             or_(

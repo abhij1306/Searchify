@@ -11,10 +11,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.opportunities.exports import rows_to_csv, rows_to_markdown
@@ -186,7 +187,7 @@ async def update_status_endpoint(
 # =========================================================================
 # Exports (same projection + filters as the catalog, workspace-safe)
 # =========================================================================
-async def _export_rows(
+async def _export_response(
     session: AsyncSession,
     *,
     workspace_id: uuid.UUID,
@@ -196,17 +197,28 @@ async def _export_rows(
     status_filter: str | None,
     rule_id: str | None,
     min_priority: float | None,
-) -> list[dict]:
-    return await service.load_export_rows(
-        session,
-        workspace_id=workspace_id,
-        project_id=project_id,
-        opportunity_type=type_filter,
-        severity=severity,
-        status=status_filter,
-        rule_id=rule_id,
-        min_priority=min_priority,
-    )
+    render: Callable[[list[dict]], str],
+    media_type: str,
+    filename: str,
+) -> Response:
+    """The shared export pipeline: load the projection, render, attach."""
+    try:
+        rows = await service.load_export_rows(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            opportunity_type=type_filter,
+            severity=severity,
+            status=status_filter,
+            rule_id=rule_id,
+            min_priority=min_priority,
+        )
+    except OpportunityNotFoundError as exc:
+        raise _not_found(exc) from exc
+    except OpportunityValidationError as exc:
+        raise _validation(exc) from exc
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=render(rows), media_type=media_type, headers=headers)
 
 
 @router.get("/projects/{project_id}/opportunities/export.csv")
@@ -220,27 +232,19 @@ async def export_csv_endpoint(
     rule_id: Annotated[str | None, Query()] = None,
     min_priority: Annotated[float | None, Query()] = None,
 ) -> Response:
-    try:
-        rows = await _export_rows(
-            session,
-            workspace_id=ctx.workspace_id,
-            project_id=project_id,
-            type_filter=type_filter,
-            severity=severity,
-            status_filter=status_filter,
-            rule_id=rule_id,
-            min_priority=min_priority,
-        )
-    except OpportunityNotFoundError as exc:
-        raise _not_found(exc) from exc
-    except OpportunityValidationError as exc:
-        raise _validation(exc) from exc
-    headers = {
-        "Content-Disposition": (
-            f'attachment; filename="opportunities-{project_id}.csv"'
-        )
-    }
-    return Response(content=rows_to_csv(rows), media_type="text/csv", headers=headers)
+    return await _export_response(
+        session,
+        workspace_id=ctx.workspace_id,
+        project_id=project_id,
+        type_filter=type_filter,
+        severity=severity,
+        status_filter=status_filter,
+        rule_id=rule_id,
+        min_priority=min_priority,
+        render=rows_to_csv,
+        media_type="text/csv",
+        filename=f"opportunities-{project_id}.csv",
+    )
 
 
 @router.get("/projects/{project_id}/opportunities/export.md")
@@ -253,25 +257,17 @@ async def export_markdown_endpoint(
     status_filter: Annotated[str | None, Query(alias="status")] = None,
     rule_id: Annotated[str | None, Query()] = None,
     min_priority: Annotated[float | None, Query()] = None,
-) -> PlainTextResponse:
-    try:
-        rows = await _export_rows(
-            session,
-            workspace_id=ctx.workspace_id,
-            project_id=project_id,
-            type_filter=type_filter,
-            severity=severity,
-            status_filter=status_filter,
-            rule_id=rule_id,
-            min_priority=min_priority,
-        )
-    except OpportunityNotFoundError as exc:
-        raise _not_found(exc) from exc
-    except OpportunityValidationError as exc:
-        raise _validation(exc) from exc
-    headers = {
-        "Content-Disposition": f'attachment; filename="opportunities-{project_id}.md"'
-    }
-    return PlainTextResponse(
-        content=rows_to_markdown(rows), media_type="text/markdown", headers=headers
+) -> Response:
+    return await _export_response(
+        session,
+        workspace_id=ctx.workspace_id,
+        project_id=project_id,
+        type_filter=type_filter,
+        severity=severity,
+        status_filter=status_filter,
+        rule_id=rule_id,
+        min_priority=min_priority,
+        render=rows_to_markdown,
+        media_type="text/markdown",
+        filename=f"opportunities-{project_id}.md",
     )

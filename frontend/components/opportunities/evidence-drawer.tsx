@@ -1,7 +1,7 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 
 import { Alert } from '@/components/ui/alert';
@@ -10,8 +10,8 @@ import type { StatusValue } from '@/components/ui/badge-variants';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/typography';
-import { opportunitiesMutations, opportunitiesQueries } from '@/lib/api/opportunities';
-import { queryKeys } from '@/lib/api/query-keys';
+import { useUpdateOpportunityStatus } from '@/components/opportunities/use-opportunity-status';
+import { opportunitiesQueries } from '@/lib/api/opportunities';
 import type {
   OpportunityDetail,
   OpportunityStatus,
@@ -36,18 +36,20 @@ import { cn } from '@/lib/utils';
  * remediation, and a status-workflow footer (the one mutation).
  */
 
-const STATUS_LABEL: Record<OpportunityStatus, string> = {
-  open: 'Open',
-  in_progress: 'In progress',
-  dismissed: 'Dismissed',
-  resolved: 'Resolved',
-};
-
-const STATUS_BADGE: Record<OpportunityStatus, StatusValue | 'neutral'> = {
-  open: 'info',
-  in_progress: 'warning',
-  dismissed: 'neutral',
-  resolved: 'success',
+/**
+ * Workflow-status presentation meta — the SINGLE label + palette source for
+ * every status control on the surface (drawer badge/footer, catalog filter
+ * chips, catalog row dropdown). Insertion order is the display order.
+ * Mockup palette: open=info, in-progress=warning, resolved=success.
+ */
+export const OPPORTUNITY_STATUS_META: Record<
+  OpportunityStatus,
+  { label: string; badge: StatusValue | 'neutral' }
+> = {
+  open: { label: 'Open', badge: 'info' },
+  in_progress: { label: 'In progress', badge: 'warning' },
+  dismissed: { label: 'Dismissed', badge: 'neutral' },
+  resolved: { label: 'Resolved', badge: 'success' },
 };
 
 const TYPE_LABEL: Record<OpportunityType, string> = {
@@ -57,15 +59,15 @@ const TYPE_LABEL: Record<OpportunityType, string> = {
   topic: 'Topic',
 };
 
-/** Status badge (mockup palette: open=info, in-progress=warning, resolved=success). */
+/** Status badge driven by OPPORTUNITY_STATUS_META. */
 export function OpportunityStatusBadge({ status }: Readonly<{ status: OpportunityStatus }>) {
-  const value = STATUS_BADGE[status];
-  if (value === 'neutral') {
-    return <Badge>{STATUS_LABEL[status]}</Badge>;
+  const meta = OPPORTUNITY_STATUS_META[status];
+  if (meta.badge === 'neutral') {
+    return <Badge>{meta.label}</Badge>;
   }
   return (
-    <Badge variant="status" value={value}>
-      {STATUS_LABEL[status]}
+    <Badge variant="status" value={meta.badge}>
+      {meta.label}
     </Badge>
   );
 }
@@ -220,23 +222,7 @@ function StatusFooter({
   detail,
   projectId,
 }: Readonly<{ detail: OpportunityDetail; projectId: string }>) {
-  const queryClient = useQueryClient();
-  const updateStatus = useMutation({
-    ...opportunitiesMutations.updateStatus(),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.list(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.summary(projectId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.opportunities.detail(detail.id),
-        }),
-      ]);
-    },
-  });
+  const updateStatus = useUpdateOpportunityStatus(projectId, detail.id);
 
   const change = (status: OpportunityStatus) => {
     updateStatus.mutate({ opportunityId: detail.id, status });
@@ -333,11 +319,7 @@ export function EvidenceDrawer({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="bg-overlay-scrim fixed inset-0 z-[100]" />
-        <DialogPrimitive.Content
-          className={cn(
-            'border-border bg-elevated shadow-modal-value fixed top-0 right-0 z-[101] flex h-full w-[448px] max-w-full flex-col border-l focus:outline-none',
-          )}
-        >
+        <DialogPrimitive.Content className="border-border bg-elevated shadow-modal-value fixed top-0 right-0 z-[101] flex h-full w-[448px] max-w-full flex-col border-l focus:outline-none">
           <header className="border-border-subtle flex items-center justify-between gap-2 border-b px-4 py-3">
             <DialogPrimitive.Title className="text-foreground truncate text-base font-semibold">
               Opportunity detail
