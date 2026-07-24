@@ -4,11 +4,12 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
-# Supply-chain hardening: wait 7 days before installing freshly published
-# versions (malicious releases are usually caught and unpublished within
-# hours), and refuse packages whose trust signals (provenance, signatures)
-# weaken between updates.
-minimumReleaseAge: 10080
+# Supply-chain hardening: refuse packages whose trust signals (provenance,
+# signatures) weaken between updates.
+#
+# NOTE: `minimumReleaseAge` (a 7-day quarantine on freshly published versions)
+# was removed at the maintainer's request. Newly published versions are now
+# installed immediately, with no maturity window.
 trustPolicy: no-downgrade
 # Skip the downgrade check for releases older than ~1 year — they predate
 # widespread provenance publishing and trip the check for benign reasons.
@@ -25,3 +26,8 @@ trustPolicyExclude:
 # (CVE-2026-41305). pnpm 10+ reads overrides here, not from package.json.
 overrides:
   postcss: '>=8.5.10'
+  # Migrated from the `pnpm.overrides` field in package.json, which pnpm 11 no
+  # longer reads (it was being silently ignored). Keeps the React type packages
+  # pinned to a single version across the tree.
+  '@types/react': '19.2.17'
+  '@types/react-dom': '19.2.3'

@@ -67,7 +67,7 @@ export const setupFormSchema = z.object({
     .regex(/^[A-Za-z]{2}(-[A-Za-z]{2})?$/, 'Use a language code, e.g. en or en-US.'),
   benchmark_mode: z.enum(benchmarkModeValues),
   default_repetitions: z
-    .number({ invalid_type_error: 'Enter a number.' })
+    .number({ error: 'Enter a number.' })
     .int('Must be a whole number.')
     .min(1, 'At least 1 repetition.')
     .max(10, 'At most 10 repetitions.'),

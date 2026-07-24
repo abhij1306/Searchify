@@ -41,15 +41,33 @@ from app.main import app  # noqa: E402
 _TEST_RUN_ID = uuid.uuid4().hex[:12]
 _TEST_SCHEMA = f"test_{re.sub(r'[^a-zA-Z0-9_]', '_', _TEST_RUN_ID)}"
 
-# Every table, schema-qualified, for the between-test TRUNCATE. Raw SQL bypasses
-# the engine's ``schema_translate_map`` (which only rewrites SQLAlchemy
-# constructs), so the schema is spelled out here. Order is irrelevant because a
-# single CASCADE truncate handles all tables at once — so this deliberately uses
-# unordered ``.tables`` rather than ``.sorted_tables``, which emits a warning
-# about the FK cycles between the audit-task / artifact tables.
-_TRUNCATE_TARGETS = ", ".join(
-    f'"{_TEST_SCHEMA}"."{table.name}"' for table in Base.metadata.tables.values()
-)
+# Between-test cleanup only needs to touch tables that actually received rows.
+# Raw SQL bypasses the engine's ``schema_translate_map`` (which only rewrites
+# SQLAlchemy constructs), so the schema is spelled out in the statements below.
+# TRUNCATE takes an ACCESS EXCLUSIVE lock and rewrites each table's storage even
+# when it is already empty, so truncating all 67 tables after every test cost
+# ~2s per test (minutes across the suite) to clear the two or three a typical
+# test writes to. Postgres tracks per-relation liveness, so ask it which tables
+# are non-empty and truncate just those; a test that wrote nothing pays a single
+# cheap catalog query instead of 67 table rewrites.
+#
+# ``n_live_tup`` comes from the stats collector and is only eventually
+# consistent, so it is NOT trusted on its own — it can still read 0 for rows
+# written moments earlier. ``pg_class.reltuples`` is likewise an estimate
+# (``-1`` before the first ANALYZE). The union of both, plus a ``relpages``
+# check to catch freshly written tables neither counter has caught up with yet,
+# is deliberately over-inclusive: a table wrongly included is merely truncated
+# for nothing (correct, just slower), while one wrongly excluded would leak rows
+# into the next test. Correctness never depends on the estimates being exact.
+_NON_EMPTY_TABLES_SQL = """
+SELECT c.relname
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stat_all_tables s ON s.relid = c.oid
+WHERE n.nspname = :schema
+  AND c.relkind = 'r'
+  AND (c.reltuples <> 0 OR c.relpages > 0 OR COALESCE(s.n_live_tup, 0) > 0)
+"""
 
 
 @pytest.fixture(autouse=True)
@@ -147,12 +165,16 @@ async def session_factory(
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Yield a session factory bound to the shared per-session test schema.
 
-    Every table is truncated on teardown so tests never leak state into each
-    other — the same isolation the old per-test schema gave, without paying to
-    rebuild the schema each time. ``TRUNCATE ... CASCADE`` in one statement
-    also sidesteps the FK cycles between ``audit_tasks`` /
+    Tables written by the test are truncated on teardown so tests never leak
+    state into each other — the same isolation the old per-test schema gave,
+    without paying to rebuild the schema each time. ``TRUNCATE ... CASCADE`` in
+    one statement also sidesteps the FK cycles between ``audit_tasks`` /
     ``raw_response_artifacts`` / ``site_crawl_tasks`` / ``site_fetch_artifacts``
     that make those tables unorderable for a delete-in-dependency-order pass.
+
+    Only non-empty tables are truncated (see ``_NON_EMPTY_TABLES_SQL``); CASCADE
+    still pulls in any FK-referencing table, so rows are never left behind by
+    the narrower target list.
     """
     factory = async_sessionmaker(
         _schema_engine, expire_on_commit=False, class_=AsyncSession
@@ -161,7 +183,13 @@ async def session_factory(
         yield factory
     finally:
         async with _schema_engine.begin() as conn:
-            await conn.execute(text(f"TRUNCATE TABLE {_TRUNCATE_TARGETS} CASCADE"))
+            rows = await conn.execute(
+                text(_NON_EMPTY_TABLES_SQL), {"schema": _TEST_SCHEMA}
+            )
+            names = [row[0] for row in rows]
+            if names:
+                targets = ", ".join(f'"{_TEST_SCHEMA}"."{name}"' for name in names)
+                await conn.execute(text(f"TRUNCATE TABLE {targets} CASCADE"))
 
 
 @pytest_asyncio.fixture
