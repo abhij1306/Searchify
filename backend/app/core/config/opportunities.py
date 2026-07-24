@@ -271,6 +271,11 @@ GAP_COMPETITOR_WEIGHT: Final = 1.0
 GAP_COMPETITOR_CAP: Final = 3
 GAP_OWNED_CITATION_WEIGHT: Final = 1.0
 
+# Site-sourced rules carry no intent/gap modulation: their factors are the
+# neutral base (the severity weight already encodes their importance).
+SITE_VALUE_FACTOR: Final = 1.0
+SITE_GAP_FACTOR: Final = 1.0
+
 PRIORITY_SCALE: Final = 10.0
 PRIORITY_ROUNDING_DECIMALS: Final = 1
 # Write-time floor: hits below this score are never persisted. Set so a
