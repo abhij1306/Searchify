@@ -36,8 +36,8 @@
 | `/providers` | BYOK Provider Settings | **MVP** |
 | `/visibility` | Visibility workspace (four tabs: Overview, Trends, Mentions & Citations, Query Fanout) | **MVP** |
 | `/runs`, `/runs/[runId]`, `/runs/[runId]/executions/[executionId]` | Run/Executions explorer | **MVP** |
-| `/analytics` (AEO Insights beyond the Visibility workspace) | LLM Analytics | Roadmap |
-| `/traffic` | Traffic | Roadmap |
+| `/analytics` | LLM Analytics | **Implemented** — `components/analytics/analytics-screen.tsx` + `lib/api/analytics.ts` |
+| `/traffic` | Traffic | **Implemented** — `components/traffic/traffic-screen.tsx` + `lib/api/traffic.ts` |
 | `/content` | Content writer (basic v1: prompt-box-first composer, Website-context toggle, sanitised Markdown result, cancel, history) | **Implemented** |
 | `/opportunities` | Opportunities | Roadmap |
 | `/site-health`, `/site-health/crawls/[crawlId]/pages/[siteUrlId]`, `/issues` | Site Health + Issues | **Implemented** — see [`site-health.md`](site-health.md) |
@@ -45,9 +45,10 @@
 | `/topics` | Dedicated Topics page (topic management already lives in the `/prompt-research` rail) | Roadmap |
 | `/knowledge-base` | Curated Brand Knowledge — description, positioning, products/services, audience, and reviewed AI drafting | **MVP** |
 | `/writing` (Tone/Style, Memory) | Writing suite | Roadmap |
-| Settings → Integrations (GSC/GA4/Bing), Agent, MCP | Integrations / Agent | Roadmap |
+| Settings → Integrations (`?tab=integrations`, 4th settings tab; GSC/GA4/Bing connect, sync, property mapping) | Integrations | **Implemented** — `components/settings/integration-settings.tsx` + `lib/api/integrations.ts` |
+| Settings → Agent, MCP | Agent / MCP | Roadmap |
 
-The sidebar renders roadmap items **disabled ("soon")**; only MVP items are live.
+The sidebar renders only live items (no disabled/"soon" placeholders); Traffic and LLM Analytics are live in the Analyze group.
 
 ## 3. Current surface and roadmap table
 

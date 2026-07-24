@@ -21,8 +21,10 @@ if TYPE_CHECKING:
     # would create the config <-> models circular import ``model_ref`` exists
     # to avoid). The queue-row union below is the typed version of the shared
     # column contract documented on ``PostgresQueueSpec``.
+    from app.models.analytics import AnalyticsTask
     from app.models.audit import AuditTask
     from app.models.content import ContentGeneration
+    from app.models.integrations import IntegrationSyncRun
     from app.models.site_health import SiteCrawlTask
 
 # --- Queue-neutral task (queue row) statuses -----------------------------
@@ -54,7 +56,15 @@ ERROR_MAX_ATTEMPTS: Final = "max_attempts_exceeded"
 
 
 @dataclass(frozen=True)
-class PostgresQueueSpec[T: ("AuditTask", "SiteCrawlTask", "ContentGeneration")]:
+class PostgresQueueSpec[
+    T: (
+        "AuditTask",
+        "SiteCrawlTask",
+        "ContentGeneration",
+        "IntegrationSyncRun",
+        "AnalyticsTask",
+    )
+]:
     """The model/settings contract that parameterizes ``PostgresTaskQueue``.
 
     A spec supplies everything the otherwise identical

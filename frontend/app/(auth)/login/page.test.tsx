@@ -35,15 +35,9 @@ describe('LoginPage', () => {
   it('renders email as the only sign-in path (no OAuth buttons or divider)', () => {
     renderWithProviders(<LoginPage />);
 
-    expect(
-      screen.queryByRole('button', { name: /continue with google/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /continue with github/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /continue with apple/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with google/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with github/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue with apple/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/or continue with email/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });

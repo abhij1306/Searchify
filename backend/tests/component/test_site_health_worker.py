@@ -396,8 +396,14 @@ async def test_inventory_rows_present_before_crawl_terminalizes(
 @pytest.mark.asyncio
 async def test_free_sample_stops_at_ten_across_two_projects(
     session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Two Free crawls in the SAME workspace share the 10-URL sample budget."""
+    # Every URL below is on the one host, so the 0.5s politeness delay would
+    # serialize ~20 fetches into ~10s of pure sleeping. The budget accounting
+    # under test is delay-independent, so zero it (same treatment as the
+    # concurrency tests further down this file).
+    monkeypatch.setattr(site_health_settings, "per_host_delay_seconds", 0.0)
     root_a = "https://example.com/"
     async with session_factory() as session:
         seed_a = await seed_site_crawl(session, task_count=0, root_url=root_a)

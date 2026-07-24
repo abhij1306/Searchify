@@ -27,8 +27,8 @@ full-product surface is marked below.
 | Cross-run Visibility trend history | `analysis` | **Coded** — `GET /projects/{id}/visibility/trends` (Trends tab) |
 | Persisted execution evidence (mentions/citations + query fanout) | `analysis` | **Coded** — `GET /projects/{id}/visibility/evidence` |
 | Sentiment + average position | `analysis` | Roadmap (nullable; not computed) |
-| LLM Analytics / AI referrals | — | Roadmap |
-| Traffic | — | Roadmap |
+| LLM Analytics / AI referrals | `domain/analytics` + `models/analytics` + `workers/analytics_worker.py` | **Implemented** — deterministic referral classification/sanitization over integration metric rows (no LLM), `AnalyticsTask` queue chain (`ingest_referrals → classify_referrals → analytics_snapshot_refresh`, retention sweep), `GET /projects/{id}/llm-analytics(+referrals,+themes)` serving persisted `AnalyticsSnapshot` projections only |
+| Traffic | `domain/traffic` + `models/traffic` | **Implemented** — `TrafficSnapshot`/`TrafficPageStat`/`TrafficQueryStat` projections over integration metric rows (page join → `SiteUrl` via `canonical_identity`), `GET /projects/{id}/traffic(+pages,+queries)` persisted-snapshot reads + `POST …/traffic/sync` enqueue pass-through |
 | Content (writer) | `domain/content` + `connectors/discovery_models` + `workers/content_worker.py` | **Implemented (basic v1)** — env-driven single output type (`website_page`), default-on Website-context tool, cancel; briefs/revisions/CMS stay roadmap ([`roadmap/content-writer.md`](roadmap/content-writer.md)) |
 | Opportunities | — | Roadmap |
 | Site Health (HTTP/Screaming-Frog-style crawler, no browser) | `site_health` | **Implemented** — see [`site-health.md`](site-health.md) |
@@ -36,7 +36,7 @@ full-product surface is marked below.
 | Brand / Competitors / E-E-A-T rich profile | `domain/projects` | **Partial** — tenant-scoped `BrandProfile` manual CRUD, immutable default-agent drafts + explicit acceptance, and shared KB context are coded; competitor profiles, E-E-A-T, and `/brand` UI remain roadmap |
 | Topics | `domain/prompts` (`topics.py`) | **Coded** — first-class `Topic` table, per-project CRUD with active/proposed counts; generation groups prompts by topic |
 | Tone/Writing Style, Memory, broader Knowledge Base product surface | — | Roadmap |
-| GSC / GA4 / Bing integrations | — | Roadmap |
+| GSC / GA4 / Bing integrations | `domain/integrations` + `connectors/integrations` + `workers/integration_worker.py` + `workers/integration_dispatcher.py` | **Implemented** — OAuth grants with Fernet-encrypted tokens (one shared Google grant ⇒ GSC+GA4; Microsoft ⇒ Bing), sync runs on the SKIP LOCKED queue (`INTEGRATION_QUEUE_SPEC`), immutable per-page `IntegrationImportArtifact`s, derivation to `IntegrationMetricRow` with provenance + `resync_seq`, scheduled dispatcher (spec: [`roadmap/integrations.md`](roadmap/integrations.md)) |
 | Agent, MCP, Settings/white-labelling | — | Roadmap |
 | HTML/JSON report renderers, S3 artifacts, Redis queue | `reporting` / infra | Roadmap |
 | Direct OpenAI adapter (`openai.py` + `openai_parser.py`) | `connectors/answer_engines` | **Coded** — active transport |
@@ -52,10 +52,13 @@ full-product surface is marked below.
   `encrypt_secret`/`decrypt_secret` for BYOK.
 - **httpx** async client for provider calls.
 - **structlog** + correlation ids (optional Logfire).
-- **Deploy**: FastAPI web + workers on Railway, PostgreSQL on Railway, Next.js on Vercel. The
-  content worker is a **separate Railway service** (start command
-  `python -m app.workers.content_worker`) sharing the same env — including `MISTRAL_API_KEY`
-  and the `CONTENT_*` knobs — as the web + audit-worker services. No Redis, no S3 at MVP.
+- **Deploy**: FastAPI web + workers on Railway, PostgreSQL on Railway, Next.js on Vercel. Each
+  worker is a **separate Railway service** sharing the same env: `python -m
+  app.workers.audit_worker`, `app.workers.content_worker` (incl. `MISTRAL_API_KEY` and the
+  `CONTENT_*` knobs), `app.workers.integration_worker` + `app.workers.integration_dispatcher`
+  (integrations sync + cadence; need the `INTEGRATION_*` knobs, OAuth client secrets, and
+  `REFERRAL_HASH_SALT`), and `app.workers.analytics_worker` (referral/projection chain; no
+  network I/O). No Redis, no S3 at MVP.
 
 App factory (`app/main.py`) wires CORS, lifespan, explicit router includes under `/api/v1`,
 and `/health`.
@@ -241,9 +244,11 @@ release_expired()`. MVP impl = `PostgresTaskQueue`.
 
 **Generic queue extension (type-only).** `PostgresTaskQueue` is parameterized over a
 `QueueSpec` (`app/core/config/task_queue.py`) so the same claim/lease/heartbeat/sweeper
-machinery serves three task types — `audit_tasks`, the Site Health crawl queue, and
-`content_generations` (`CONTENT_QUEUE_SPEC` in `app/core/config/content.py`, claim order
-`priority desc → available_at asc → randomized_position asc`). The extension is type-only:
+machinery serves five task types — `audit_tasks`, the Site Health crawl queue,
+`content_generations` (`CONTENT_QUEUE_SPEC` in `app/core/config/content.py`),
+`integration_sync_runs` (`INTEGRATION_QUEUE_SPEC` in `app/core/config/integrations.py`), and
+`analytics_tasks` (`ANALYTICS_QUEUE_SPEC` in `app/core/config/analytics.py`) — all with claim
+order `priority desc → available_at asc → randomized_position asc`. The extension is type-only:
 `succeed()` and the queue semantics are unchanged. The content worker deliberately uses the
 queue only for claim/heartbeat/mark-running/cancel/release-expired; **terminal writes go
 through its own atomic `finalize_attempt`** — one locked transaction per provider call that

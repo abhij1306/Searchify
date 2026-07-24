@@ -14,6 +14,12 @@ from app.models.analysis import (
     MetricSnapshot,
     ResponseAnalysis,
 )
+from app.models.analytics import (
+    AnalyticsSnapshot,
+    AnalyticsTask,
+    ReferralClassification,
+    ReferralEvent,
+)
 from app.models.audit import (
     Audit,
     AuditEngineSnapshot,
@@ -33,6 +39,16 @@ from app.models.brand import (
     UnintendedDomain,
 )
 from app.models.content import ContentGeneration, ContentGenerationAttempt
+from app.models.integrations import (
+    IntegrationConnection,
+    IntegrationEvent,
+    IntegrationImportArtifact,
+    IntegrationMetricRow,
+    IntegrationOAuthGrant,
+    IntegrationOAuthState,
+    IntegrationPropertyMapping,
+    IntegrationSyncRun,
+)
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
@@ -58,10 +74,13 @@ from app.models.site_health import (
     SiteUrlObservation,
     WorkspaceSiteHealthEntitlement,
 )
+from app.models.traffic import TrafficPageStat, TrafficQueryStat, TrafficSnapshot
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
 __all__ = [
+    "AnalyticsSnapshot",
+    "AnalyticsTask",
     "Audit",
     "AuditEngineSnapshot",
     "AuditEvent",
@@ -79,6 +98,14 @@ __all__ = [
     "ContentGeneration",
     "ContentGenerationAttempt",
     "DiscoveryModelConfig",
+    "IntegrationConnection",
+    "IntegrationEvent",
+    "IntegrationImportArtifact",
+    "IntegrationMetricRow",
+    "IntegrationOAuthGrant",
+    "IntegrationOAuthState",
+    "IntegrationPropertyMapping",
+    "IntegrationSyncRun",
     "MetricSnapshot",
     "OwnedDomain",
     "Project",
@@ -89,6 +116,8 @@ __all__ = [
     "ProviderConnectionTest",
     "ProviderRoute",
     "RawResponseArtifact",
+    "ReferralClassification",
+    "ReferralEvent",
     "ResponseAnalysis",
     "MonitoredSiteUrl",
     "SiteCrawl",
@@ -106,6 +135,9 @@ __all__ = [
     "SiteUrlObservation",
     "WorkspaceSiteHealthEntitlement",
     "Topic",
+    "TrafficPageStat",
+    "TrafficQueryStat",
+    "TrafficSnapshot",
     "UnintendedDomain",
     "User",
     "Workspace",

@@ -31,12 +31,15 @@ const lineBudgets = [
 // Per-domain API owners under lib/api/. These now exist (F2), so the check is
 // enforced as a hard failure. ENFORCE_API_OWNERS=0 can soften it for debugging.
 const requiredApiOwners = [
+  'analytics.ts',
   'auth.ts',
   'content.ts',
+  'integrations.ts',
   'projects.ts',
   'prompts.ts',
   'providers.ts',
   'runs.ts',
+  'traffic.ts',
   'visibility.ts',
 ];
 const ENFORCE_API_OWNERS = process.env.ENFORCE_API_OWNERS !== '0';

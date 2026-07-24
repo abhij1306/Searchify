@@ -1,0 +1,25 @@
+{
+  "dimensionHeaders": [
+    {"name": "landingPage"},
+    {"name": "sessionSource"},
+    {"name": "sessionMedium"},
+    {"name": "date"}
+  ],
+  "metricHeaders": [
+    {"name": "sessions", "type": "TYPE_INTEGER"},
+    {"name": "engagedSessions", "type": "TYPE_INTEGER"},
+    {"name": "conversions", "type": "TYPE_INTEGER"}
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {"value": "/pricing"},
+        {"value": "google"},
+        {"value": "organic"},
+        {"value": "20260720"}
+      ],
+      "metricValues": [{"value": "21"}, {"value": "15"}, {"value": "1"}]
+    }
+  ],
+  "rowCount": 1
+}

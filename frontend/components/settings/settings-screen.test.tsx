@@ -58,6 +58,12 @@ vi.mock('@/components/settings/provider-settings', () => ({
   ProviderSettings: () => <div data-testid="provider-settings-panel">provider settings</div>,
 }));
 
+// The Integrations tab fetches connections and owns the OAuth-callback notice;
+// stub it the same way (its own suite is integration-settings.test.tsx).
+vi.mock('@/components/settings/integration-settings', () => ({
+  IntegrationSettings: () => <div data-testid="integration-settings-panel">integrations</div>,
+}));
+
 import { SettingsScreen } from './settings-screen';
 
 function renderScreen() {
@@ -75,13 +81,14 @@ describe('SettingsScreen', () => {
     search = '';
   });
 
-  it('renders the three settings tabs with Account selected by default', () => {
+  it('renders the four settings tabs with Account selected by default', () => {
     renderScreen();
     const tablist = screen.getByRole('tablist', { name: /settings sections/i });
     const tabs = within(tablist).getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Account',
       'Provider Settings',
+      'Integrations',
       'Danger Zone',
     ]);
     expect(within(tablist).getByRole('tab', { name: 'Account' })).toHaveAttribute(
@@ -140,6 +147,34 @@ describe('SettingsScreen', () => {
       'true',
     );
     expect(screen.getByTestId('provider-settings-panel')).toBeVisible();
+  });
+
+  it('opens the Integrations tab from a ?tab=integrations deep link (the C2 OAuth-callback landing)', () => {
+    search = 'tab=integrations';
+    renderScreen();
+    expect(screen.getByRole('tab', { name: 'Integrations' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByTestId('integration-settings-panel')).toBeVisible();
+    // The tab's aria-controls resolves to the mounted panel.
+    expect(screen.getByRole('tab', { name: 'Integrations' })).toHaveAttribute(
+      'aria-controls',
+      'settings-panel-integrations',
+    );
+  });
+
+  it('shows the integrations panel when the Integrations tab is clicked', async () => {
+    const ue = userEvent.setup();
+    renderScreen();
+
+    expect(screen.getByTestId('integration-settings-panel')).not.toBeVisible();
+    await ue.click(screen.getByRole('tab', { name: 'Integrations' }));
+    expect(screen.getByTestId('integration-settings-panel')).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Integrations' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   it('falls back to Account on an unknown ?tab value', () => {

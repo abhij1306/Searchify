@@ -1,0 +1,22 @@
+{
+  "dimensionHeaders": [
+    {"name": "sessionDefaultChannelGroup"},
+    {"name": "date"}
+  ],
+  "metricHeaders": [
+    {"name": "sessions", "type": "TYPE_INTEGER"},
+    {"name": "engagedSessions", "type": "TYPE_INTEGER"},
+    {"name": "conversions", "type": "TYPE_INTEGER"}
+  ],
+  "rows": [
+    {
+      "dimensionValues": [{"value": "Organic Search"}, {"value": "20260720"}],
+      "metricValues": [{"value": "41"}, {"value": "30"}, {"value": "2"}]
+    },
+    {
+      "dimensionValues": [{"value": "Referral"}, {"value": "20260720"}],
+      "metricValues": [{"value": "not-a-number"}, {"value": "9"}, {"value": "1"}]
+    }
+  ],
+  "rowCount": 3
+}

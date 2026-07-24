@@ -71,7 +71,13 @@ def decode_access_token(token: str) -> dict[str, str | int]:
     return dict(decoded.claims)
 
 
-def create_oauth_state(provider: str) -> tuple[str, str]:
+def create_oauth_state(
+    provider: str,
+    *,
+    workspace_id: str | None = None,
+    user_id: str | None = None,
+    jti: str | None = None,
+) -> tuple[str, str]:
     """Mint a signed, short-lived OAuth state token bound to a session nonce.
 
     Returns ``(state_token, session_nonce)`` — the caller must persist
@@ -81,16 +87,29 @@ def create_oauth_state(provider: str) -> tuple[str, str]:
 
     The token is single-use by convention: the caller must clear the cookie
     after a successful decode so replayed callbacks are rejected.
+
+    The optional ``workspace_id`` / ``user_id`` / ``jti`` claims extend the
+    token for the integrations connect flow (docs/roadmap/integrations.md
+    section 2): they bind the state to the initiating workspace + member and
+    carry the id of the persisted, atomically-consumed state row. They are
+    omitted entirely when not passed, so auth sign-in callers produce
+    byte-identical tokens.
     """
     session_nonce = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(seconds=oauth_settings.state_ttl_seconds)
-    payload = {
+    payload: dict[str, str | datetime] = {
         "sub": "oauth-state",
         "provider": provider,
         "nonce": secrets.token_urlsafe(16),
         "session_nonce": session_nonce,
         "exp": expires_at,
     }
+    if workspace_id is not None:
+        payload["workspace_id"] = workspace_id
+    if user_id is not None:
+        payload["user_id"] = user_id
+    if jti is not None:
+        payload["jti"] = jti
     state_token = jwt.encode(
         {"alg": settings.jwt_algorithm},
         payload,
@@ -103,19 +122,22 @@ def create_oauth_state(provider: str) -> tuple[str, str]:
 def decode_oauth_state(
     token: str,
     provider: str,
-    session_nonce: str,
+    session_nonce: str | None = None,
 ) -> dict[str, str | int]:
     """Decode + validate an OAuth state token for ``provider``.
 
     ``session_nonce`` must match the value stored in the browser's HttpOnly
     cookie — this binds the callback to the browser session that initiated the
     flow.  The caller must delete the cookie after a successful decode so the
-    nonce cannot be replayed.
+    nonce cannot be replayed.  Pass ``session_nonce=None`` (the integrations
+    connect flow) to skip the cookie-nonce comparison: integration states bind
+    via their persisted ``workspace_id``/``user_id``/``jti`` claims plus the
+    authenticated user at the callback instead.
 
     Raises ``TokenDecodeError`` on an invalid/expired token, provider
     mismatch, or session-nonce mismatch.
     """
-    if not session_nonce:
+    if session_nonce is not None and not session_nonce:
         raise TokenDecodeError("Missing OAuth session nonce")
     try:
         decoded = jwt.decode(
@@ -129,7 +151,9 @@ def decode_oauth_state(
     claims = dict(decoded.claims)
     if claims.get("sub") != "oauth-state" or claims.get("provider") != provider:
         raise TokenDecodeError("OAuth state provider mismatch")
-    if not secrets.compare_digest(claims.get("session_nonce", ""), session_nonce):
+    if session_nonce is not None and not secrets.compare_digest(
+        claims.get("session_nonce", ""), session_nonce
+    ):
         raise TokenDecodeError("OAuth session nonce mismatch")
     return claims
 

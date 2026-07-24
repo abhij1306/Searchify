@@ -8,11 +8,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
+from app.api.analytics import router as analytics_router
 from app.api.audits import router as audits_router
 from app.api.auth import router as auth_router
 from app.api.brand_suggestions import router as brand_suggestions_router
 from app.api.content import router as content_router
 from app.api.executions import router as executions_router
+from app.api.integrations import router as integrations_router
 from app.api.oauth import router as oauth_router
 from app.api.projects import router as projects_router
 from app.api.prompts import router as prompts_router
@@ -21,6 +23,7 @@ from app.api.provider_connections import (
 )
 from app.api.provider_connections import router as provider_connections_router
 from app.api.site_health import router as site_health_router
+from app.api.traffic import router as traffic_router
 from app.api.workspaces import router as workspaces_router
 from app.core.config import get_frontend_origins, settings
 from app.core.database import dispose_engine
@@ -67,6 +70,9 @@ _ROUTERS = (
     executions_router,
     site_health_router,
     content_router,
+    integrations_router,
+    analytics_router,
+    traffic_router,
 )
 
 

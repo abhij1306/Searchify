@@ -262,11 +262,7 @@ describe('PromptsPage (Your Prompts)', () => {
 
     // Manage mode swaps in the prompt library workspace.
     expect(
-      await screen.findByRole(
-        'button',
-        { name: /Generate prompts & topics/ },
-        { timeout: 5000 },
-      ),
+      await screen.findByRole('button', { name: /Generate prompts & topics/ }, { timeout: 5000 }),
     ).toBeInTheDocument();
 
     // Exiting returns to the read view without a navigation.

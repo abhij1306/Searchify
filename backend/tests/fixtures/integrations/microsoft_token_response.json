@@ -1,0 +1,7 @@
+{
+  "access_token": "eyJ0eXAiOi.fake-microsoft-access-token-not-a-real-credential",
+  "refresh_token": "0.A fake-microsoft-refresh-token-not-a-real-credential",
+  "expires_in": 3600,
+  "scope": "offline_access https://webmaster.bing.com/api/webmaster.manage",
+  "token_type": "Bearer"
+}

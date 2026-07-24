@@ -71,6 +71,45 @@ class Settings(BaseSettings):
         default="replace-with-32-byte-minimum-secret",
         validation_alias=AliasChoices("ENCRYPTION_KEY", "encryption_key"),
     )
+    # HMAC key for the opaque ``session_id_hash`` stamped on sanitized
+    # referral events (LLM Analytics, invariant 6). Env-injected deployment
+    # secret — resolved only inside the referral sanitization pass, never
+    # logged and never placed in a DTO.
+    referral_hash_salt: str = Field(
+        default="replace-with-64-byte-random-secret",
+        validation_alias=AliasChoices("REFERRAL_HASH_SALT", "referral_hash_salt"),
+    )
+
+    # --- Integrations OAuth client credentials (GSC/GA4/Bing connect) ---
+    # Env-injected deployment secrets for the integrations OAuth transports
+    # (Google covers GSC+GA4 on one shared grant; Microsoft covers Bing).
+    # Resolved only inside the OAuth exchange/refresh paths; never logged and
+    # never placed in a DTO (invariant 6). Empty = provider not configured.
+    integration_google_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_GOOGLE_CLIENT_ID", "integration_google_client_id"
+        ),
+    )
+    integration_google_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_GOOGLE_CLIENT_SECRET", "integration_google_client_secret"
+        ),
+    )
+    integration_microsoft_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_MICROSOFT_CLIENT_ID", "integration_microsoft_client_id"
+        ),
+    )
+    integration_microsoft_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "INTEGRATION_MICROSOFT_CLIENT_SECRET",
+            "integration_microsoft_client_secret",
+        ),
+    )
 
     # --- Database ---
     database_url: str = Field(
@@ -148,6 +187,8 @@ def _check_secret_defaults() -> None:
         issues.append("jwt_secret_key is set to a default value")
     if settings.encryption_key in _INSECURE_DEFAULTS:
         issues.append("encryption_key is set to a default value")
+    if settings.referral_hash_salt in _INSECURE_DEFAULTS:
+        issues.append("referral_hash_salt is set to a default value")
     if not issues:
         return
     msg = (

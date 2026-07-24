@@ -1,0 +1,12 @@
+{
+  "rows": [
+    {
+      "keys": ["searchify", "2026-07-20"],
+      "clicks": 7,
+      "impressions": 95,
+      "ctr": 0.0737,
+      "position": 2.4
+    }
+  ],
+  "responseAggregationType": "byProperty"
+}

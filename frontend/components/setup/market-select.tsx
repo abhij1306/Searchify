@@ -56,7 +56,8 @@ export function MarketSelect({
   const filtered = needle
     ? options.filter(
         (option) =>
-          option.label.toLowerCase().includes(needle) || option.value.toLowerCase().includes(needle),
+          option.label.toLowerCase().includes(needle) ||
+          option.value.toLowerCase().includes(needle),
       )
     : options;
   const showList = open && filtered.length > 0;

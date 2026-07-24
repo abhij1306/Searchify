@@ -1,0 +1,31 @@
+{
+  "d": [
+    {
+      "__type": "QueryStats:#Microsoft.Bing.Webmaster.Api",
+      "AvgClickPosition": 4.2,
+      "AvgImpressionPosition": 5.1,
+      "Clicks": 12,
+      "Date": "/Date(1784530800000-0700)/",
+      "Impressions": 340,
+      "Query": "https://example.com/"
+    },
+    {
+      "__type": "QueryStats:#Microsoft.Bing.Webmaster.Api",
+      "AvgClickPosition": 6.1,
+      "AvgImpressionPosition": 7.4,
+      "Clicks": 5,
+      "Date": "/Date(1784617200000-0700)/",
+      "Impressions": 120,
+      "Query": "https://example.com/pricing"
+    },
+    {
+      "__type": "QueryStats:#Microsoft.Bing.Webmaster.Api",
+      "AvgClickPosition": 3.3,
+      "AvgImpressionPosition": 4.0,
+      "Clicks": 44,
+      "Date": "/Date(1781506800000-0700)/",
+      "Impressions": 910,
+      "Query": "https://example.com/old-post"
+    }
+  ]
+}
