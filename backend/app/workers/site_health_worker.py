@@ -41,6 +41,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analysis.site_health.page_types import classify
 from app.analysis.site_health.parser import extract_page_facts
 from app.analysis.site_health.rules import RuleEvaluation, evaluate_all
 from app.analysis.site_health.scoring import (
@@ -1442,6 +1443,17 @@ class SiteHealthWorker:
         site_url_id = await self._resolve_analysis_site_url_id(
             session, crawl=crawl, task=task
         )
+        # v2 P1: classify the page type and inject it into the facts dict
+        # BEFORE rule evaluation, so page_type applicability tokens, per-type
+        # thin-content minimums, and weight overrides resolve against it
+        # (spec §5.1 pipeline slot; evaluate_all keeps its pure (facts)
+        # signature). The type + classifier version persist on the analysis
+        # row for provenance (invariant 4).
+        assessment = classify(
+            str((facts.get("delivery") or {}).get("final_url") or ""), facts
+        )
+        facts["page_type"] = assessment.page_type
+        facts["page_type_evidence"] = assessment.to_evidence()
         evaluations: list[RuleEvaluation] = evaluate_all(facts)
         scores = score_analysis(evaluations)
         # Refresh the lightweight identity/observation state from the analyze
@@ -1481,6 +1493,8 @@ class SiteHealthWorker:
             overall_score=scores.overall_score,
             analyzer_version=crawl.analyzer_version or ANALYZER_VERSION,
             scoring_version=crawl.scoring_version or SCORING_VERSION,
+            page_type=assessment.page_type,
+            classifier_version=assessment.classifier_version,
             source_artifact_ids=[artifact_id],
             finalized_at=_utcnow(),
         )

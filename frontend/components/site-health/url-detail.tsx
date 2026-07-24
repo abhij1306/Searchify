@@ -17,6 +17,7 @@ import { ApiError } from '@/lib/api/errors';
 import { queryKeys } from '@/lib/api/query-keys';
 import { siteHealthMutations, siteHealthQueries } from '@/lib/api/site-health';
 import type { DeliveryFacts, PageDetail, RerunPageResponse, SiteIssue } from '@/lib/api/types';
+import { PageTypeBadge } from '@/components/site-health/page-type-badge';
 import {
   dimensionLabel,
   issueTitle,
@@ -266,6 +267,10 @@ function HeaderCard({
             >
               {detail.display_url}
             </a>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Label className="font-mono tracking-[0.08em]">Page Type</Label>
+            <PageTypeBadge pageType={detail.page_type} />
           </span>
           <span className="flex items-center gap-1.5">
             <Label className="font-mono tracking-[0.08em]">Last Audit</Label>

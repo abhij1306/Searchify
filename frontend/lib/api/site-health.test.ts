@@ -74,6 +74,7 @@ const inventoryRow = {
   aeo_score: null,
   overall_score: null,
   last_audited: null,
+  page_type: null,
 };
 
 describe('siteHealthEntitlementSchema (quota authority)', () => {
@@ -122,11 +123,59 @@ describe('siteCrawlSchema (Free redaction / nullable totals)', () => {
   });
 });
 
+describe('siteScoreSummarySchema by_page_type (v2 P1)', () => {
+  const scoreSummary = {
+    overall_score: 71,
+    technical_score: 80,
+    aeo_score: 62,
+    selected_count: 10,
+    analyzed_count: 4,
+    issue_count: 3,
+    scoring_version: 's1',
+    by_page_type: {
+      homepage: { analyzed_count: 1, technical_score: 90.5, aeo_score: 70, overall_score: 80.2 },
+      article: { analyzed_count: 3, technical_score: null, aeo_score: null, overall_score: null },
+    },
+  };
+
+  it('accepts a score summary with a per-page-type breakdown', () => {
+    const parsed = strictValidate(
+      siteCrawlSchema,
+      { ...crawl, score_summary: scoreSummary },
+      'crawl',
+    );
+    expect(parsed.score_summary?.by_page_type.homepage?.analyzed_count).toBe(1);
+    expect(parsed.score_summary?.by_page_type.article?.overall_score).toBeNull();
+  });
+
+  it('accepts an empty by_page_type map (nothing classified yet)', () => {
+    const parsed = strictValidate(
+      siteCrawlSchema,
+      { ...crawl, score_summary: { ...scoreSummary, by_page_type: {} } },
+      'crawl',
+    );
+    expect(parsed.score_summary?.by_page_type).toEqual({});
+  });
+
+  it('rejects an extra key inside a by_page_type bucket (strict)', () => {
+    const bad = {
+      ...scoreSummary,
+      by_page_type: {
+        homepage: { ...scoreSummary.by_page_type.homepage, discovered_total: 9999 },
+      },
+    };
+    expect(() =>
+      strictValidate(siteCrawlSchema, { ...crawl, score_summary: bad }, 'crawl'),
+    ).toThrow();
+  });
+});
+
 describe('inventoryRowSchema (nullable analysis summaries)', () => {
   it('accepts null analysis summaries before analysis completes', () => {
     const parsed = strictValidate(inventoryRowSchema, inventoryRow, 'row');
     expect(parsed.overall_score).toBeNull();
     expect(parsed.issue_count).toBeNull();
+    expect(parsed.page_type).toBeNull();
   });
 
   it('accepts populated analysis summaries after analysis', () => {
@@ -137,8 +186,17 @@ describe('inventoryRowSchema (nullable analysis summaries)', () => {
       aeo_score: 72,
       overall_score: 80.2,
       last_audited: '2026-07-15T00:00:00Z',
+      page_type: 'article',
     };
-    expect(strictValidate(inventoryRowSchema, analysed, 'row').issue_count).toBe(3);
+    const parsed = strictValidate(inventoryRowSchema, analysed, 'row');
+    expect(parsed.issue_count).toBe(3);
+    expect(parsed.page_type).toBe('article');
+  });
+
+  it('rejects an unknown page_type vocabulary value', () => {
+    expect(() =>
+      strictValidate(inventoryRowSchema, { ...inventoryRow, page_type: 'landing_page' }, 'row'),
+    ).toThrow();
   });
 
   it('rejects an extra key on an inventory row', () => {
@@ -217,6 +275,7 @@ describe('pageDetailSchema (field_cwv_available literal false)', () => {
     overall_score: 85,
     issue_count: 2,
     last_audited: '2026-07-15T00:00:00Z',
+    page_type: 'homepage',
     facts: {
       title: 'Home',
       meta_description: null,

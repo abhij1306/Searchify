@@ -59,6 +59,8 @@ import type {
   pageDetailSchema,
   pageSummarySchema,
   pagesPageSchema,
+  pageTypeSchema,
+  pageTypeScoreSummarySchema,
   rerunPageResponseSchema,
   siteCrawlListPageSchema,
   siteCrawlSchema,
@@ -67,6 +69,7 @@ import type {
   siteIssueDetailSchema,
   siteIssueSchema,
   siteIssuesPageSchema,
+  siteScoreSummarySchema,
   // Content
   contentGenerationDetailSchema,
   contentGenerationListItemSchema,
@@ -126,6 +129,9 @@ export type CrawlOverallStatus = z.infer<typeof crawlOverallStatusSchema>;
 export type CrawlDiscoveryStatus = z.infer<typeof crawlDiscoveryStatusSchema>;
 export type CrawlAnalysisStatus = z.infer<typeof crawlAnalysisStatusSchema>;
 export type PageAnalysisStatus = z.infer<typeof pageAnalysisStatusSchema>;
+export type PageType = z.infer<typeof pageTypeSchema>;
+export type PageTypeScoreSummary = z.infer<typeof pageTypeScoreSummarySchema>;
+export type SiteScoreSummary = z.infer<typeof siteScoreSummarySchema>;
 export type SiteCrawl = z.infer<typeof siteCrawlSchema>;
 export type InventoryRow = z.infer<typeof inventoryRowSchema>;
 export type InventoryPage = z.infer<typeof inventoryPageSchema>;

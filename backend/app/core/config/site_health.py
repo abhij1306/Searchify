@@ -422,15 +422,318 @@ EVENT_CRAWL_COMPLETED: Final = "crawl.completed"
 EVENT_CRAWL_CANCELLED: Final = "crawl.cancelled"
 
 # =========================================================================
-# Versions (extractor / analyzer / rule catalog / scoring)
+# Versions (extractor / analyzer / rule catalog / scoring / classifier)
 # =========================================================================
 # Bumped whenever the deterministic extraction/rule/scoring logic changes so
 # every derived row (facts, evaluations, issues, scores) is traceable to the
-# exact rules that produced it (invariant 4).
+# exact rules that produced it (invariant 4). Each version is bumped by
+# exactly one v2 phase (docs/roadmap/site-health-v2-page-aware.md §6): P1
+# bumped ANALYZER/SCORING and introduced CLASSIFIER; RULE_CATALOG stays
+# sh-rules-1 (no rule-set change in P1) and EXTRACTOR stays sh-extractor-1
+# (the worker injects page_type into facts; the extractor is unchanged).
 EXTRACTOR_VERSION: Final = "sh-extractor-1"
-ANALYZER_VERSION: Final = "sh-analyzer-1"
+ANALYZER_VERSION: Final = "sh-analyzer-2"
 RULE_CATALOG_VERSION: Final = "sh-rules-1"
-SCORING_VERSION: Final = "sh-scoring-1"
+SCORING_VERSION: Final = "sh-scoring-2"
+CLASSIFIER_VERSION: Final = "sh-classifier-1"
+
+# =========================================================================
+# Page-type classification (v2 P1 — spec §5.1)
+# =========================================================================
+# The standard taxonomy every analyzed page is classified into by the pure
+# ``analysis/site_health/page_types.py`` classifier (no I/O, no ORM, no LLM —
+# invariant 9). Every pattern table, threshold, and weight below is
+# config-owned (invariant 1); the classifier only reads them.
+PAGE_TYPE_HOMEPAGE: Final = "homepage"
+PAGE_TYPE_ARTICLE: Final = "article"
+PAGE_TYPE_PRODUCT: Final = "product"
+PAGE_TYPE_CATEGORY: Final = "category"
+PAGE_TYPE_PRICING: Final = "pricing"
+PAGE_TYPE_DOCS: Final = "docs"
+PAGE_TYPE_FAQ: Final = "faq"
+PAGE_TYPE_ABOUT_CONTACT: Final = "about_contact"
+PAGE_TYPE_OTHER: Final = "other"
+PAGE_TYPES: Final[tuple[str, ...]] = (
+    PAGE_TYPE_HOMEPAGE,
+    PAGE_TYPE_ARTICLE,
+    PAGE_TYPE_PRODUCT,
+    PAGE_TYPE_CATEGORY,
+    PAGE_TYPE_PRICING,
+    PAGE_TYPE_DOCS,
+    PAGE_TYPE_FAQ,
+    PAGE_TYPE_ABOUT_CONTACT,
+    PAGE_TYPE_OTHER,
+)
+
+# Signal 1 (highest priority): the root path is a deterministic homepage
+# special case. Paths are matched NORMALIZED (lowercase, trailing slashes
+# stripped, so "/" and "" both normalize to the empty root). Locale roots
+# ("/en", "/en-us", ...) and index variants resolve through this equivalents
+# table; anything NOT listed deliberately falls through to the lower-priority
+# signals (an unlisted "/uk/" root is not assumed to be a homepage).
+HOMEPAGE_PATH_EQUIVALENTS: Final[frozenset[str]] = frozenset(
+    {
+        "",  # the root path itself ("/" or empty)
+        "/index",
+        "/index.html",
+        "/index.htm",
+        "/index.php",
+        "/index.asp",
+        "/index.aspx",
+        "/home",
+        "/home.html",
+        "/default.html",
+        "/default.aspx",
+        # Locale roots (bounded, curated).
+        "/en",
+        "/en-us",
+        "/en-gb",
+        "/en-au",
+        "/en-ca",
+        "/fr",
+        "/fr-fr",
+        "/fr-ca",
+        "/de",
+        "/de-de",
+        "/es",
+        "/es-es",
+        "/es-mx",
+        "/pt",
+        "/pt-br",
+        "/it",
+        "/it-it",
+        "/nl",
+        "/nl-nl",
+        "/ja",
+        "/ja-jp",
+        "/ko",
+        "/ko-kr",
+        "/zh",
+        "/zh-cn",
+        "/zh-tw",
+        "/ru",
+        "/pl",
+        "/sv",
+        "/da",
+        "/fi",
+        "/no",
+        "/tr",
+        "/ar",
+        "/hi",
+        "/id",
+        "/th",
+        "/vi",
+    }
+)
+
+# Signal 2: ordered URL path patterns — FIRST MATCH WINS. Each entry is
+# (page_type, regex) matched with re.match against the normalized path
+# (lowercase, trailing slashes stripped). Initial table per spec §5.1.
+PAGE_TYPE_PATH_PATTERNS: Final[tuple[tuple[str, str], ...]] = (
+    (PAGE_TYPE_ARTICLE, r"^/(blog|news|guides)(/|$)"),
+    (PAGE_TYPE_PRODUCT, r"^/(products?|p|shop)(/|$)"),
+    (PAGE_TYPE_CATEGORY, r"^/(category|collections)(/|$)"),
+    (PAGE_TYPE_PRICING, r"^/pricing(/|$)"),
+    (PAGE_TYPE_DOCS, r"^/(docs|reference)(/|$)"),
+    (PAGE_TYPE_FAQ, r"^/(faq|help)(/|$)"),
+    (PAGE_TYPE_ABOUT_CONTACT, r"^/(about|contact)(/|$)"),
+)
+
+# Signal 3: content/heading heuristics. Evaluated in a fixed sub-order
+# (faq -> product -> article, per the spec table); first matched heuristic
+# wins. All token tables, patterns, and thresholds live here.
+#
+# FAQ: question-form heading ratio over the bounded h2 texts the v1
+# extractor captures (h3 texts arrive with the P2 extractor). A heading is
+# question-form when it ends with "?" or starts with a question word.
+PAGE_TYPE_QUESTION_WORDS: Final[frozenset[str]] = frozenset(
+    {
+        "who",
+        "what",
+        "when",
+        "where",
+        "why",
+        "how",
+        "which",
+        "whose",
+        "whom",
+        "can",
+        "could",
+        "should",
+        "would",
+        "will",
+        "is",
+        "are",
+        "do",
+        "does",
+        "did",
+    }
+)
+# Minimum headings required before a ratio is meaningful (a single question
+# heading out of one is not a FAQ page) and the required question ratio.
+PAGE_TYPE_FAQ_MIN_HEADINGS: Final = 3
+PAGE_TYPE_FAQ_QUESTION_RATIO: Final = 0.6
+# Product: a price token AND a cart marker in the bounded body text.
+PAGE_TYPE_PRICE_PATTERN: Final = (
+    r"(?:[$€£¥]\s?\d+(?:[.,]\d{1,2})?"
+    r"|\b(?:USD|EUR|GBP|AUD|CAD|JPY|INR)\s?\d+(?:[.,]\d{1,2})?)"
+)
+PAGE_TYPE_CART_MARKERS: Final[frozenset[str]] = frozenset(
+    {
+        "add to cart",
+        "add-to-cart",
+        "add to bag",
+        "add-to-bag",
+        "add to basket",
+        "add-to-basket",
+        "buy now",
+    }
+)
+# Article: author byline + date within a bounded prefix of the body text
+# (the v1 extractor has no author/date facts; those land with P2's
+# sh-extractor-2, at which point this heuristic can read structured facts).
+PAGE_TYPE_ARTICLE_SCAN_CHARS: Final = 2000
+PAGE_TYPE_BYLINE_PATTERN: Final = (
+    r"\b[Bb]y\s+[A-Z][\w'’-]+(?:\s+[A-Z][\w'’-]+){1,2}\b"
+)
+PAGE_TYPE_DATE_PATTERN: Final = (
+    r"(?:\b\d{4}-\d{2}-\d{2}\b"
+    r"|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)"
+    r"[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b)"
+)
+
+# Signal 4 (lowest priority): structured-data types from
+# facts["structured_data"]["types"] mapped to a page type. DELIBERATE
+# SEMANTICS (spec §5.1): signals 1-3 OUTRANK this signal on conflict — the
+# URL/content type wins and the schema-suggested type is recorded in the
+# evidence instead, so the schema's claim about the page can never decide
+# the page's type (which would make type-expected-schema rules circular).
+PAGE_TYPE_SCHEMA_TYPE_MAP: Final[dict[str, str]] = {
+    "Article": PAGE_TYPE_ARTICLE,
+    "BlogPosting": PAGE_TYPE_ARTICLE,
+    "NewsArticle": PAGE_TYPE_ARTICLE,
+    "Product": PAGE_TYPE_PRODUCT,
+    "FAQPage": PAGE_TYPE_FAQ,
+    "TechArticle": PAGE_TYPE_DOCS,
+}
+
+# Signal names (recorded as bounded evidence: classified_by + signals).
+PAGE_TYPE_SIGNAL_ROOT_PATH: Final = "root_path"
+PAGE_TYPE_SIGNAL_PATH_PATTERN: Final = "path_pattern"
+PAGE_TYPE_SIGNAL_CONTENT_HEURISTIC: Final = "content_heuristic"
+PAGE_TYPE_SIGNAL_STRUCTURED_DATA: Final = "structured_data"
+PAGE_TYPE_SIGNAL_NONE: Final = "none"
+
+# Each matched signal contributes its weight once; confidence is the SUM.
+# Below the threshold the page classifies as "other". With these weights any
+# single matched signal classifies; the threshold guards future weight
+# retunes and keeps "no evidence" (0.0) firmly at "other".
+PAGE_TYPE_SIGNAL_WEIGHTS: Final[dict[str, float]] = {
+    PAGE_TYPE_SIGNAL_ROOT_PATH: 1.0,
+    PAGE_TYPE_SIGNAL_PATH_PATTERN: 0.8,
+    PAGE_TYPE_SIGNAL_CONTENT_HEURISTIC: 0.6,
+    PAGE_TYPE_SIGNAL_STRUCTURED_DATA: 0.5,
+}
+PAGE_TYPE_CONFIDENCE_THRESHOLD: Final = 0.5
+
+# Applicability token prefix for page-type-scoped rules (spec §5.2):
+# ``page_type:<type>`` resolves against ``facts["page_type"]``.
+PAGE_TYPE_APPLICABILITY_PREFIX: Final = "page_type:"
+
+
+class PageTypeProfile:
+    """Per-page-type rule-tuning profile (frozen, config-owned).
+
+    ``applicability_tokens`` are the ``applicability_key`` tokens this page
+    type answers to (unknown tokens stay fail-closed in the evaluator).
+    ``min_sufficient_words`` is the per-type thin-content minimum read by
+    ``aeo.sufficient_text`` (the v1 global ``MIN_SUFFICIENT_WORDS`` analysis
+    constant moved here in v2 — invariant 1). ``rule_weight_overrides`` maps
+    ``rule_id -> weight`` resolved at evaluation time; sparse by design.
+    """
+
+    __slots__ = (
+        "page_type",
+        "applicability_tokens",
+        "min_sufficient_words",
+        "rule_weight_overrides",
+    )
+
+    def __init__(
+        self,
+        *,
+        page_type: str,
+        applicability_tokens: tuple[str, ...],
+        min_sufficient_words: int,
+        rule_weight_overrides: dict[str, float] | None = None,
+    ) -> None:
+        self.page_type = page_type
+        self.applicability_tokens = applicability_tokens
+        self.min_sufficient_words = min_sufficient_words
+        self.rule_weight_overrides = dict(rule_weight_overrides or {})
+
+
+def _page_type_profile(
+    page_type: str,
+    *,
+    min_sufficient_words: int,
+    rule_weight_overrides: dict[str, float] | None = None,
+) -> PageTypeProfile:
+    return PageTypeProfile(
+        page_type=page_type,
+        applicability_tokens=(f"{PAGE_TYPE_APPLICABILITY_PREFIX}{page_type}",),
+        min_sufficient_words=min_sufficient_words,
+        rule_weight_overrides=rule_weight_overrides,
+    )
+
+
+# Per-type profiles (spec §5.2). The ``other`` minimum preserves the v1
+# global default (100 words) so unclassified pages score exactly as before;
+# classified pages get type-appropriate thin-content minimums. Weight
+# overrides start sparse (the mechanism is exercised at evaluation time).
+PAGE_TYPE_PROFILES: Final[dict[str, PageTypeProfile]] = {
+    PAGE_TYPE_HOMEPAGE: _page_type_profile(
+        PAGE_TYPE_HOMEPAGE,
+        # Homepages are naturally link-heavy/thin; a lower minimum and a
+        # reduced sufficient-text weight keep them from reading as thin.
+        min_sufficient_words=40,
+        rule_weight_overrides={"aeo.sufficient_text": 1.0},
+    ),
+    PAGE_TYPE_ARTICLE: _page_type_profile(
+        PAGE_TYPE_ARTICLE, min_sufficient_words=300
+    ),
+    PAGE_TYPE_PRODUCT: _page_type_profile(
+        PAGE_TYPE_PRODUCT, min_sufficient_words=80
+    ),
+    PAGE_TYPE_CATEGORY: _page_type_profile(
+        PAGE_TYPE_CATEGORY, min_sufficient_words=60
+    ),
+    PAGE_TYPE_PRICING: _page_type_profile(
+        PAGE_TYPE_PRICING, min_sufficient_words=80
+    ),
+    PAGE_TYPE_DOCS: _page_type_profile(PAGE_TYPE_DOCS, min_sufficient_words=150),
+    PAGE_TYPE_FAQ: _page_type_profile(PAGE_TYPE_FAQ, min_sufficient_words=120),
+    PAGE_TYPE_ABOUT_CONTACT: _page_type_profile(
+        PAGE_TYPE_ABOUT_CONTACT, min_sufficient_words=60
+    ),
+    PAGE_TYPE_OTHER: _page_type_profile(PAGE_TYPE_OTHER, min_sufficient_words=100),
+}
+
+def _check_page_type_config() -> None:
+    """Fail fast at import on a malformed page-type table (never later)."""
+    for page_type in PAGE_TYPES:
+        profile = PAGE_TYPE_PROFILES.get(page_type)
+        assert profile is not None, f"missing PAGE_TYPE_PROFILES entry: {page_type}"
+        assert profile.min_sufficient_words >= 0
+        for token in profile.applicability_tokens:
+            assert token.startswith(PAGE_TYPE_APPLICABILITY_PREFIX)
+    for page_type, _pattern in PAGE_TYPE_PATH_PATTERNS:
+        assert page_type in PAGE_TYPES, f"path pattern type unknown: {page_type}"
+    for _schema_type, page_type in PAGE_TYPE_SCHEMA_TYPE_MAP.items():
+        assert page_type in PAGE_TYPES, f"schema map type unknown: {page_type}"
+
+
+_check_page_type_config()
 
 # =========================================================================
 # Deterministic scoring weights (config-owned)

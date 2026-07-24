@@ -18,12 +18,15 @@ export type InventoryFilters = {
   query: string;
   status: string;
   monitored: MonitoredFilter;
+  /** v2 P1 page-type filter ('' = all types). */
+  page_type: string;
 };
 
 export const emptyInventoryFilters: InventoryFilters = {
   query: '',
   status: '',
   monitored: 'all',
+  page_type: '',
 };
 
 /** Issue filter model (drives the issues query + URL state). */
@@ -33,6 +36,8 @@ export type IssueFilters = {
   dimension: string;
   rule_id: string;
   site_url_id: string;
+  /** v2 P1 page-type filter ('' = all types). */
+  page_type: string;
 };
 
 export const emptyIssueFilters: IssueFilters = {
@@ -41,6 +46,7 @@ export const emptyIssueFilters: IssueFilters = {
   dimension: '',
   rule_id: '',
   site_url_id: '',
+  page_type: '',
 };
 
 function monitoredToParam(monitored: MonitoredFilter): boolean | undefined {
@@ -67,6 +73,7 @@ export function toInventoryParams(
     query: filters.query.trim() || undefined,
     status: filters.status || undefined,
     monitored: monitoredToParam(filters.monitored),
+    page_type: filters.page_type || undefined,
   };
 }
 
@@ -81,6 +88,7 @@ export function serializeInventoryFilters(
   if (filters.status) params.set('status', filters.status);
   if (filters.monitored !== 'all')
     params.set('monitored', String(monitoredToParam(filters.monitored)));
+  if (filters.page_type) params.set('page_type', filters.page_type);
   if (cursor) params.set('cursor', cursor);
   return params;
 }
@@ -91,6 +99,7 @@ export function parseInventoryFilters(params: URLSearchParams): InventoryFilters
     query: params.get('query') ?? '',
     status: params.get('status') ?? '',
     monitored: monitoredFromParam(params.get('monitored')),
+    page_type: params.get('page_type') ?? '',
   };
 }
 
@@ -114,7 +123,12 @@ export function changeInventoryFilters(
 
 /** True when two inventory filter models are equivalent (cursor validity). */
 export function inventoryFiltersEqual(a: InventoryFilters, b: InventoryFilters): boolean {
-  return a.query.trim() === b.query.trim() && a.status === b.status && a.monitored === b.monitored;
+  return (
+    a.query.trim() === b.query.trim() &&
+    a.status === b.status &&
+    a.monitored === b.monitored &&
+    a.page_type === b.page_type
+  );
 }
 
 /** Build issue request params. */
@@ -133,6 +147,7 @@ export function toIssueParams(
     // the `IssueFilters` model keeps `rule_id` as its internal URL-state key.
     rule: filters.rule_id || undefined,
     site_url_id: filters.site_url_id || undefined,
+    page_type: filters.page_type || undefined,
   };
 }
 
@@ -147,6 +162,7 @@ export function serializeIssueFilters(
   if (filters.dimension) params.set('dimension', filters.dimension);
   if (filters.rule_id) params.set('rule_id', filters.rule_id);
   if (filters.site_url_id) params.set('site_url_id', filters.site_url_id);
+  if (filters.page_type) params.set('page_type', filters.page_type);
   if (cursor) params.set('cursor', cursor);
   return params;
 }
@@ -159,6 +175,7 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
     dimension: params.get('dimension') ?? '',
     rule_id: params.get('rule_id') ?? '',
     site_url_id: params.get('site_url_id') ?? '',
+    page_type: params.get('page_type') ?? '',
   };
 }
 
@@ -177,6 +194,7 @@ export function issueFiltersEqual(a: IssueFilters, b: IssueFilters): boolean {
     a.category === b.category &&
     a.dimension === b.dimension &&
     a.rule_id === b.rule_id &&
-    a.site_url_id === b.site_url_id
+    a.site_url_id === b.site_url_id &&
+    a.page_type === b.page_type
   );
 }

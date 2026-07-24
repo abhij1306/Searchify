@@ -12,9 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { scoreBand, scoreBandText } from '@/components/ui/score-band';
+import { scoreTextClass } from '@/components/ui/score-band';
 import { cn } from '@/lib/utils';
 import type { PageSummary } from '@/lib/api/types';
+import { PageTypeBadge } from '@/components/site-health/page-type-badge';
 import {
   formatAudited,
   formatIssueCount,
@@ -26,18 +27,15 @@ import {
 /**
  * Analyzed-pages table (Slice 7, mockups 712 + 713).
  *
- * Renders one row per analyzed page: URL (+ path), a per-page analysis status
- * badge (queued/running/completed/error/blocked), issue count, Technical / AEO
- * scores, last audited, and a View action. Missing / not-yet-analysed scores
- * render the `—` placeholder — never a fabricated zero (an error/blocked row
- * shows `—`, not 0). The whole row is clickable and navigates to the Slice 8
- * per-URL detail route (`/site-health/crawls/[crawlId]/pages/[siteUrlId]`);
- * the View link remains as the keyboard/screen-reader affordance.
+ * Renders one row per analyzed page: URL (+ path), the page-type badge (v2
+ * P1), a per-page analysis status badge (queued/running/completed/error/
+ * blocked), issue count, Technical / AEO scores, last audited, and a View
+ * action. Missing / not-yet-analysed scores render the `—` placeholder —
+ * never a fabricated zero (an error/blocked row shows `—`, not 0). The whole
+ * row is clickable and navigates to the Slice 8 per-URL detail route
+ * (`/site-health/crawls/[crawlId]/pages/[siteUrlId]`); the View link remains
+ * as the keyboard/screen-reader affordance.
  */
-function scoreClass(score: number | null): string {
-  if (score === null) return 'text-muted';
-  return scoreBandText[scoreBand(score)];
-}
 
 export function PagesTable({
   pages,
@@ -56,6 +54,7 @@ export function PagesTable({
             #
           </TableHead>
           <TableHead>Page URL</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>Status</TableHead>
           <TableHead numeric>Issues</TableHead>
           <TableHead numeric>Technical</TableHead>
@@ -83,6 +82,9 @@ export function PagesTable({
               </span>
             </TableCell>
             <TableCell>
+              <PageTypeBadge pageType={page.page_type} />
+            </TableCell>
+            <TableCell>
               <Badge variant="status" value={pageStatusBadgeValue(page.analysis_status)}>
                 {statusLabel(page.analysis_status)}
               </Badge>
@@ -92,11 +94,11 @@ export function PagesTable({
             </TableCell>
             <TableCell
               numeric
-              className={cn('mono font-semibold', scoreClass(page.technical_score))}
+              className={cn('mono font-semibold', scoreTextClass(page.technical_score))}
             >
               {formatScore(page.technical_score)}
             </TableCell>
-            <TableCell numeric className={cn('mono font-semibold', scoreClass(page.aeo_score))}>
+            <TableCell numeric className={cn('mono font-semibold', scoreTextClass(page.aeo_score))}>
               {formatScore(page.aeo_score)}
             </TableCell>
             <TableCell className="text-secondary text-xs whitespace-nowrap">

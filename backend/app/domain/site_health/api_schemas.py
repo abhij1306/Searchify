@@ -107,6 +107,15 @@ class EntitlementResponse(_Model):
 # =========================================================================
 # Crawl
 # =========================================================================
+class ScoreSummaryByType(_Model):
+    """One page type's rollup inside ``score_summary.by_page_type`` (v2 P1)."""
+
+    analyzed_count: int
+    technical_score: float | None
+    aeo_score: float | None
+    overall_score: float | None
+
+
 class ScoreSummary(_Model):
     overall_score: float | None
     technical_score: float | None
@@ -115,6 +124,8 @@ class ScoreSummary(_Model):
     analyzed_count: int
     issue_count: int
     scoring_version: str
+    # Per-page-type breakdown (only types with >= 1 analyzed URL appear).
+    by_page_type: dict[str, ScoreSummaryByType] = {}
 
 
 class CrawlResponse(_Model):
@@ -168,6 +179,8 @@ class InventoryRow(_Model):
     first_seen_at: str | None
     last_seen_at: str | None
     issue_count: int | None
+    # Classified page type (v2 P1); None until the URL has an analysis.
+    page_type: str | None
     technical_score: float | None
     aeo_score: float | None
     overall_score: float | None
@@ -218,6 +231,8 @@ class PageSummary(_Model):
     analysis_status: PageAnalysisStatus
     error_code: str
     issue_count: int | None
+    # Classified page type (v2 P1); None until the URL has an analysis.
+    page_type: str | None
     technical_score: float | None
     aeo_score: float | None
     overall_score: float | None
@@ -309,6 +324,8 @@ class PageDetail(_Model):
     analysis_status: PageAnalysisStatus
     error_code: str
     field_cwv_available: Literal[False] = False
+    # Classified page type (v2 P1); None until the URL has an analysis.
+    page_type: str | None
     technical_score: float | None
     aeo_score: float | None
     overall_score: float | None
@@ -334,6 +351,9 @@ class AffectedUrl(_Model):
     normalized_url: str
     display_url: str
     title: str | None
+    # Classified page type of the affected analysis (v2 P1; None when the
+    # URL has no classified analysis).
+    page_type: str | None = None
 
 
 class IssuesSummary(_Model):

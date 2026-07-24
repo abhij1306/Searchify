@@ -228,6 +228,7 @@ describe('resolveSiteHealthPhase', () => {
       analyzed_count: 4,
       issue_count: 3,
       scoring_version: 's1',
+      by_page_type: {},
     };
     expect(
       resolveSiteHealthPhase(
@@ -265,6 +266,7 @@ describe('resolveSiteHealthPhase', () => {
       analyzed_count: 3,
       issue_count: 2,
       scoring_version: 's1',
+      by_page_type: {},
     };
     expect(
       resolveSiteHealthPhase(
@@ -285,6 +287,7 @@ describe('resolveSiteHealthPhase', () => {
       analyzed_count: 1,
       issue_count: 0,
       scoring_version: 's1',
+      by_page_type: {},
     };
     expect(
       resolveSiteHealthPhase(
@@ -402,6 +405,7 @@ describe('score-data helpers (cancelled-with-data product rule)', () => {
     analyzed_count: 4,
     issue_count: 3,
     scoring_version: 's1',
+    by_page_type: {},
   };
 
   it('hasScoreData reflects a present score_summary', () => {

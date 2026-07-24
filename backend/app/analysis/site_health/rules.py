@@ -7,9 +7,13 @@
 # the rule's dimension/category/severity/weight/version for provenance.
 #
 # PURE + deterministic (no I/O, no ORM). Applicability is driven by the rule's
-# ``applicability_key`` ("always" | "has_html"). If a rule's check raises, its
-# outcome is ERROR (preserved, given zero scoring credit) — a single broken
-# check never aborts the whole evaluation.
+# ``applicability_key`` ("always" | "has_html" | "page_type:<type>" — v2 P1,
+# resolved against ``facts["page_type"]`` via the config-owned
+# ``PAGE_TYPE_PROFILES``). If a rule's check raises, its outcome is ERROR
+# (preserved, given zero scoring credit) — a single broken check never aborts
+# the whole evaluation. Per-type thin-content minimums and rule-weight
+# overrides are config-owned (``PAGE_TYPE_PROFILES``, invariant 1); the v1
+# analysis-owned ``MIN_SUFFICIENT_WORDS`` constant moved there in v2.
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -17,19 +21,34 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config.site_health import (
+    PAGE_TYPE_APPLICABILITY_PREFIX,
+    PAGE_TYPE_OTHER,
+    PAGE_TYPE_PROFILES,
     RULE_OUTCOME_ERROR,
     RULE_OUTCOME_FAIL,
     RULE_OUTCOME_NOT_APPLICABLE,
     RULE_OUTCOME_PASS,
     SITE_HEALTH_RULES,
     SITE_HEALTH_RULES_BY_ID,
+    PageTypeProfile,
     SiteHealthRule,
 )
 
-# Minimum extractable words for the AEO "sufficient text" rule. A page below
-# this is answer-thin. Kept here (analysis-owned heuristic threshold) rather
-# than in the rule catalog, which owns only rule metadata.
-MIN_SUFFICIENT_WORDS = 100
+
+def _profile_for(facts: dict) -> PageTypeProfile | None:
+    """The config profile for ``facts["page_type"]`` (None when unknown)."""
+    page_type = str(facts.get("page_type") or "").strip().lower()
+    return PAGE_TYPE_PROFILES.get(page_type)
+
+
+def _sufficient_word_minimum(facts: dict) -> tuple[int, str]:
+    """Per-type thin-content minimum, falling back to the ``other`` profile.
+
+    Returns ``(minimum, page_type)`` so the check evidence records exactly
+    which profile drove the outcome.
+    """
+    profile = _profile_for(facts) or PAGE_TYPE_PROFILES[PAGE_TYPE_OTHER]
+    return profile.min_sufficient_words, profile.page_type
 
 
 @dataclass(frozen=True)
@@ -135,9 +154,11 @@ def _check_open_graph_present(facts: dict) -> tuple[str, dict]:
 def _check_sufficient_text(facts: dict) -> tuple[str, dict]:
     body = facts.get("body") or {}
     word_count = int(body.get("word_count", 0) or 0)
-    return _pass_fail(word_count >= MIN_SUFFICIENT_WORDS), {
+    minimum, page_type = _sufficient_word_minimum(facts)
+    return _pass_fail(word_count >= minimum), {
         "word_count": word_count,
-        "minimum": MIN_SUFFICIENT_WORDS,
+        "minimum": minimum,
+        "page_type": page_type,
     }
 
 
@@ -162,8 +183,28 @@ def _is_applicable(rule: SiteHealthRule, facts: dict) -> bool:
         return True
     if key == "has_html":
         return bool(facts.get("has_html"))
+    if key.startswith(PAGE_TYPE_APPLICABILITY_PREFIX):
+        # page_type:<type> tokens resolve against facts["page_type"] via the
+        # config profile's token set. An absent/unknown page type (or a token
+        # the profile does not carry) is inapplicable (fail-closed).
+        profile = _profile_for(facts)
+        return profile is not None and key in profile.applicability_tokens
     # Unknown applicability key: treat as inapplicable (fail-closed).
     return False
+
+
+def _weight_for(rule: SiteHealthRule, facts: dict) -> float:
+    """The rule's weight, with any per-(rule_id, page_type) config override.
+
+    Resolved at evaluation time from ``PAGE_TYPE_PROFILES`` so the emitted
+    ``RuleEvaluation`` carries exactly the weight scoring will credit.
+    """
+    profile = _profile_for(facts)
+    if profile is not None:
+        override = profile.rule_weight_overrides.get(rule.rule_id)
+        if override is not None:
+            return float(override)
+    return float(rule.weight)
 
 
 def evaluate_rule(rule: SiteHealthRule, facts: dict) -> RuleEvaluation:
@@ -179,7 +220,7 @@ def evaluate_rule(rule: SiteHealthRule, facts: dict) -> RuleEvaluation:
         dimension=rule.dimension,
         category=rule.category,
         severity=rule.severity,
-        weight=float(rule.weight),
+        weight=_weight_for(rule, facts),
         remediation=rule.remediation,
     )
     if not _is_applicable(rule, facts):

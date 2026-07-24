@@ -12,7 +12,9 @@ import pytest
 
 from app.analysis.site_health.scoring import (
     AnalysisScoreInput,
+    PageTypeScoreInput,
     _Scored,
+    aggregate_by_page_type,
     aggregate_scores,
     overall_score,
     score_analysis,
@@ -190,3 +192,60 @@ def test_aggregate_empty_is_none():
     assert agg.aeo_score is None
     assert agg.overall_score is None
     assert agg.analyzed_url_count == 0
+
+
+# --- v2 P1: per-page-type rollup (spec §5.2/§5.6) ----------------------------
+
+
+def test_by_page_type_groups_counts_and_means():
+    analyses = [
+        PageTypeScoreInput("article", 100.0, 80.0, 90.0),
+        PageTypeScoreInput("article", 60.0, 40.0, 50.0),
+        PageTypeScoreInput("product", 80.0, 80.0, 80.0),
+    ]
+    rollup = aggregate_by_page_type(analyses)
+    assert set(rollup) == {"article", "product"}
+    article = rollup["article"]
+    assert article["analyzed_count"] == 2
+    assert article["technical_score"] == pytest.approx(80.0)  # mean(100, 60)
+    assert article["aeo_score"] == pytest.approx(60.0)  # mean(80, 40)
+    assert article["overall_score"] == pytest.approx(70.0)  # mean(90, 50)
+    product = rollup["product"]
+    assert product["analyzed_count"] == 1
+    assert product["overall_score"] == pytest.approx(80.0)
+
+
+def test_by_page_type_skips_none_scores_never_zero():
+    # A completed analysis with no scores contributes to the count but is
+    # skipped in the means (missing/errored URLs never become zeros).
+    analyses = [
+        PageTypeScoreInput("article", 80.0, None, 80.0),
+        PageTypeScoreInput("article", None, None, None),
+    ]
+    rollup = aggregate_by_page_type(analyses)
+    article = rollup["article"]
+    assert article["analyzed_count"] == 2
+    assert article["technical_score"] == pytest.approx(80.0)
+    assert article["aeo_score"] is None  # no non-None aeo score at all
+    assert article["overall_score"] == pytest.approx(80.0)
+
+
+def test_by_page_type_omits_types_without_analyses():
+    rollup = aggregate_by_page_type([PageTypeScoreInput("faq", 50.0, 50.0, 50.0)])
+    assert set(rollup) == {"faq"}
+
+
+def test_by_page_type_empty_input_is_empty():
+    assert aggregate_by_page_type([]) == {}
+
+
+def test_by_page_type_key_order_follows_taxonomy():
+    analyses = [
+        PageTypeScoreInput("other", 10.0, 10.0, 10.0),
+        PageTypeScoreInput("article", 20.0, 20.0, 20.0),
+        PageTypeScoreInput("homepage", 30.0, 30.0, 30.0),
+        # Defensive: an unrecognized type sorts after the taxonomy members.
+        PageTypeScoreInput("legacy_type", 40.0, 40.0, 40.0),
+    ]
+    rollup = aggregate_by_page_type(analyses)
+    assert list(rollup) == ["homepage", "article", "other", "legacy_type"]

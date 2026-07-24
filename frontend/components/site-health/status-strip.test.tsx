@@ -33,6 +33,7 @@ function page(overrides: Partial<PageSummary> = {}): PageSummary {
     aeo_score: 64,
     overall_score: 55,
     last_audited: '2026-07-16T00:00:00Z',
+    page_type: 'article',
     ...overrides,
   };
 }
@@ -64,6 +65,7 @@ function crawl(overrides: Partial<SiteCrawl> = {}): SiteCrawl {
       analyzed_count: 1,
       issue_count: 0,
       scoring_version: 's1',
+      by_page_type: {},
     },
     extractor_version: 'e1',
     analyzer_version: 'a1',

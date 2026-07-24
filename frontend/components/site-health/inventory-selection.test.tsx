@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { fireEvent } from '@testing-library/react';
 import { mswServer } from '@/test/msw-server';
 import { renderWithProviders } from '@/test/render';
 import type { InventoryRow, SiteCrawl, SiteHealthEntitlement } from '@/lib/api/types';
@@ -47,6 +48,7 @@ function row(id: string, url: string): InventoryRow {
     aeo_score: null,
     overall_score: null,
     last_audited: null,
+    page_type: null,
   };
 }
 
@@ -148,5 +150,56 @@ describe('InventorySelection', () => {
       await screen.findByText(/merged your edits onto the latest version/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /analyze 1 of 50 pages/i })).toBeEnabled();
+  });
+
+  it('wires the page-type filter as a server param, set and cleared', async () => {
+    const user = userEvent.setup();
+    const seen: Array<string | null> = [];
+    mswServer.use(
+      http.get(`/api/v1/projects/${PROJECT}/monitored-urls`, () =>
+        HttpResponse.json({
+          project_id: PROJECT,
+          selection_version: 7,
+          monitored_urls: [],
+          quota: { used: 0, limit: 50 },
+        }),
+      ),
+      http.get(`/api/v1/site-crawls/${crawl.id}/inventory`, ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('page_type'));
+        return HttpResponse.json({
+          items: [row(URL_A, 'https://acme.com/a')],
+          next_cursor: null,
+        });
+      }),
+    );
+
+    renderWithProviders(
+      <InventorySelection crawl={crawl} entitlement={entitlement} projectId={PROJECT} />,
+    );
+
+    const select = await screen.findByLabelText('Filter by page type');
+    // No page-type param on the initial unfiltered request.
+    await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+    expect(seen.at(-1)).toBeNull();
+
+    await user.selectOptions(select, 'product');
+    await waitFor(() => expect(seen.at(-1)).toBe('product'));
+
+    // The product request ran under a new, uncached query key, so the screen
+    // went through its loading skeleton and the form REMOUNTED — the `select`
+    // reference above is now a detached node whose change events never reach
+    // React. Re-acquire the mounted control before clearing.
+    const remountedSelect = await screen.findByLabelText('Filter by page type');
+
+    // Clearing back to "All page types" drops the param entirely. The
+    // unfiltered combination is already cached (no new request), so force a
+    // fresh combination via the search filter and assert THAT request omits
+    // page_type. (Select by the option's visible label — user-event does not
+    // fire a change event for selectOptions(select, '').)
+    fireEvent.change(remountedSelect, { target: { value: '' } });
+    expect(remountedSelect).toHaveValue('');
+    await user.type(screen.getByLabelText('Search pages'), 'acme');
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+    await waitFor(() => expect(seen.at(-1)).toBeNull());
   });
 });

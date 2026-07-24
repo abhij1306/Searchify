@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { mswServer } from '@/test/msw-server';
@@ -85,6 +85,36 @@ describe('IssuesCatalog', () => {
     await waitFor(() => expect(seen).toContain('medium'));
   });
 
+  it('wires the page-type filter as a server param, set and cleared', async () => {
+    const seen: Array<string | null> = [];
+    mswServer.use(
+      http.get(`/api/v1/site-crawls/${CRAWL}/issues`, ({ request }) => {
+        seen.push(new URL(request.url).searchParams.get('page_type'));
+        return HttpResponse.json({ items: [issue()], next_cursor: null, summary });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<IssuesCatalog crawlId={CRAWL} />);
+    const select = await screen.findByLabelText('Filter by page type');
+    // The initial unfiltered request carries no page-type param.
+    await screen.findByText('WebSite schema is missing');
+    expect(seen.at(-1)).toBeNull();
+
+    await user.selectOptions(select, 'article');
+    await waitFor(() => expect(seen.at(-1)).toBe('article'));
+
+    // Clearing back to "All page types" drops the param entirely. The
+    // unfiltered combination is already cached (no new request), so force a
+    // fresh combination via a chip and assert THAT request omits page_type.
+    // (Select by the option's visible label — user-event does not fire a
+    // change event for selectOptions(select, '').)
+    await user.selectOptions(select, 'All page types');
+    expect(select).toHaveValue('');
+    await user.click(screen.getByRole('button', { name: 'Medium (23)' }));
+    await waitFor(() => expect(seen.at(-1)).toBeNull());
+  });
+
   it('expands affected URLs linking to the per-URL detail route', async () => {
     mswServer.use(
       http.get(`/api/v1/site-crawls/${CRAWL}/issues`, () =>
@@ -107,6 +137,7 @@ describe('IssuesCatalog', () => {
               normalized_url: 'https://acme.com/',
               display_url: 'https://acme.com/',
               title: 'Homepage',
+              page_type: 'article',
             },
           ],
           affected_url_count: 1,
@@ -126,6 +157,9 @@ describe('IssuesCatalog', () => {
 
     const link = await screen.findByRole('link', { name: /Homepage/ });
     expect(link).toHaveAttribute('href', `/site-health/crawls/${CRAWL}/pages/${URL_A}`);
+    // The affected page's v2 P1 type badge renders inside the row (scoped —
+    // the filter <select> also lists the type label as an option).
+    expect(within(link).getByText('Article')).toBeInTheDocument();
   });
 
   it('pages affected URLs with a cursor-aware Next/Previous control', async () => {
