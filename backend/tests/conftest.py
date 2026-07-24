@@ -13,6 +13,7 @@ import asyncio
 import re
 import sys
 import uuid
+import warnings
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -41,12 +42,27 @@ from app.main import app  # noqa: E402
 _TEST_RUN_ID = uuid.uuid4().hex[:12]
 _TEST_SCHEMA = f"test_{re.sub(r'[^a-zA-Z0-9_]', '_', _TEST_RUN_ID)}"
 
-# Every table, schema-qualified, for the between-test TRUNCATE. Raw SQL bypasses
-# the engine's ``schema_translate_map`` (which only rewrites SQLAlchemy
-# constructs), so the schema is spelled out here. Order is irrelevant because a
-# single CASCADE truncate handles all tables at once — so this deliberately uses
-# unordered ``.tables`` rather than ``.sorted_tables``, which emits a warning
-# about the FK cycles between the audit-task / artifact tables.
+# Between-test cleanup, as one round trip. Raw SQL bypasses the engine's
+# ``schema_translate_map`` (which only rewrites SQLAlchemy constructs), so the
+# schema is spelled out here.
+#
+# This deliberately uses DELETE rather than TRUNCATE. TRUNCATE is the faster
+# choice for large tables, but it takes an ACCESS EXCLUSIVE lock and rewrites
+# (and fsyncs) each table's storage even when the table is already empty —
+# across 67 mostly-empty test tables that measured ~1280ms per test, i.e. the
+# dominant cost of the whole suite. DELETE on an empty table is a no-op seq
+# scan; the same cleanup measured ~8ms, a ~167x improvement.
+#
+# The statements are wrapped in a DO block because asyncpg sends statements as
+# prepared statements and refuses multiple commands in one — the DO block is a
+# single command, so all 67 deletes still cost one round trip.
+#
+# Order matters for DELETE (unlike TRUNCATE ... CASCADE): a parent row cannot go
+# while a child still references it. ``sorted_tables`` is dependency order
+# (parents first), so it is reversed here to delete children first.
+# ``SET CONSTRAINTS ALL DEFERRED`` covers the FK cycles between the audit-task /
+# artifact tables that make a total order impossible; it is a no-op for
+# non-deferrable constraints rather than an error.
 #
 # NOTE: do NOT try to narrow this to "only non-empty tables" using
 # ``pg_class.reltuples`` / ``relpages`` / ``pg_stat_all_tables.n_live_tup``.
@@ -54,8 +70,16 @@ _TEST_SCHEMA = f"test_{re.sub(r'[^a-zA-Z0-9_]', '_', _TEST_RUN_ID)}"
 # table (so it matches every freshly created table, narrowing nothing), while
 # ``relpages`` and ``n_live_tup`` still read 0 immediately after an insert, so
 # genuinely written tables get skipped and their rows leak into the next test.
-_TRUNCATE_TARGETS = ", ".join(
-    f'"{_TEST_SCHEMA}"."{table.name}"' for table in Base.metadata.tables.values()
+with warnings.catch_warnings():
+    # Emits a cycle warning for the audit-task / artifact tables; the deferred
+    # constraints above are what actually makes those safe to delete.
+    warnings.simplefilter("ignore")
+    _DELETE_ORDER = list(reversed(Base.metadata.sorted_tables))
+
+_CLEANUP_SQL = "DO $$ BEGIN SET CONSTRAINTS ALL DEFERRED; {deletes} END $$;".format(
+    deletes="".join(
+        f'DELETE FROM "{_TEST_SCHEMA}"."{table.name}";' for table in _DELETE_ORDER
+    )
 )
 
 
@@ -154,12 +178,16 @@ async def session_factory(
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Yield a session factory bound to the shared per-session test schema.
 
-    Every table is truncated on teardown so tests never leak state into each
+    Every table is emptied on teardown so tests never leak state into each
     other — the same isolation the old per-test schema gave, without paying to
-    rebuild the schema each time. ``TRUNCATE ... CASCADE`` in one statement
-    also sidesteps the FK cycles between ``audit_tasks`` /
-    ``raw_response_artifacts`` / ``site_crawl_tasks`` / ``site_fetch_artifacts``
-    that make those tables unorderable for a delete-in-dependency-order pass.
+    rebuild the schema each time. See ``_CLEANUP_SQL`` for why that is a batched
+    DELETE rather than a TRUNCATE.
+
+    The factory stays bound to the shared engine (rather than to a single
+    connection inside an outer transaction that gets rolled back) because the
+    queue tests exercise ``SELECT ... FOR UPDATE SKIP LOCKED`` from concurrent
+    sessions: they need genuinely separate connections, which a rollback-based
+    fixture could not give them.
     """
     factory = async_sessionmaker(
         _schema_engine, expire_on_commit=False, class_=AsyncSession
@@ -168,7 +196,7 @@ async def session_factory(
         yield factory
     finally:
         async with _schema_engine.begin() as conn:
-            await conn.execute(text(f"TRUNCATE TABLE {_TRUNCATE_TARGETS} CASCADE"))
+            await conn.execute(text(_CLEANUP_SQL))
 
 
 @pytest_asyncio.fixture
