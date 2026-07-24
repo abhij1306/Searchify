@@ -14,7 +14,7 @@ const SYNC = '55555555-5555-4555-8555-555555555555';
 const SYNC2 = '66666666-6666-4666-8666-666666666666';
 
 // Fixture shapes come from the approved plan
-// (/.plans/v1-integrations-traffic-analytics.md §2 C3/C4, §5 F2) + the traffic
+// (docs/integrations-traffic-analytics.md contracts C3/C4) + the traffic
 // spec (docs/roadmap/traffic.md §6): totals + dated series with NULLABLE
 // points (chart gaps), keyset envelopes, per-run 202 enqueue objects.
 const dashboard = {

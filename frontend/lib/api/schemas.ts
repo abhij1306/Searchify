@@ -1269,7 +1269,7 @@ export const contentGenerationDetailSchema = z
 // ---------------------------------------------------------------------------
 // Integrations (GSC / GA4 / Bing), Traffic, and LLM Analytics
 //
-// Contract source: approved plan `/.plans/v1-integrations-traffic-analytics.md`
+// Contract source: `docs/integrations-traffic-analytics.md`
 // (§2 contracts C2–C4, §5 F1–F3) + specs `docs/roadmap/integrations.md`,
 // `docs/roadmap/traffic.md`, `docs/roadmap/llm-analytics.md`. Every object is
 // `.strict()` so an unexpected key fails loud (drift policy §6). No token field

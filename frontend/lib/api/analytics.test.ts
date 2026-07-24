@@ -10,7 +10,7 @@ const PROJECT = '11111111-1111-4111-8111-111111111111';
 const REFERRAL = '22222222-2222-4222-8222-222222222222';
 
 // Fixture shapes come from the approved plan
-// (/.plans/v1-integrations-traffic-analytics.md §2 C4, §5 F3) + the analytics
+// (docs/integrations-traffic-analytics.md contract C4) + the analytics
 // spec (docs/roadmap/llm-analytics.md §6): referral volume/share series,
 // per-source breakdown, per-engine visibility series, correlation summary,
 // keyset referrals envelope, theme rollup.

@@ -16,7 +16,7 @@ const CONN = '33333333-3333-4333-8333-333333333333';
 const SYNC = '44444444-4444-4444-8444-444444444444';
 
 // Fixture shapes come from the approved plan
-// (/.plans/v1-integrations-traffic-analytics.md §5 F1) + the integrations spec
+// (docs/integrations-traffic-analytics.md contracts) + the integrations spec
 // (docs/roadmap/integrations.md §5): a connection joined to grant status +
 // granted scopes, NEVER a token field.
 const connection = {

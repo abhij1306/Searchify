@@ -1,7 +1,7 @@
 # Test Plan — v1: Integrations (GSC/GA4/Bing) + Traffic + LLM Analytics
 
 Repo: `<repo-root>`, branch `vorflux/integrations-traffic-analytics`.
-Plan source: `/code/.plans/v1-integrations-traffic-analytics.md` (Wave 6 seeded
+Plan source: `docs/integrations-traffic-analytics.md` (Wave 6 seeded
 local-stack browser pass). Mocks: 14 HTML design mockups (not committed — described per-state in the group C/D/E cases below).
 Written: 2026-07-24 (planning stage; execution awaits orchestrator go-ahead —
 A10/A11 landing in working tree, F6–F10 pending).

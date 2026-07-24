@@ -1,4 +1,4 @@
-> NOTE (v1 integrations branch): this is the MVP-era base-stack doc kept for context. For the integrations/Traffic/LLM-Analytics stack, follow `README.md` in this directory and `docs/plans/v1-integrations-handoff.md` §2 — they supersede the details below.
+> NOTE (v1 integrations branch): this is the MVP-era base-stack doc kept for context. For the integrations/Traffic/LLM-Analytics stack, follow `README.md` in this directory and `docs/integrations-traffic-analytics.md` — they supersede the details below.
 
 # Searchify -- Setup & Seed Instructions
 
