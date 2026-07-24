@@ -234,11 +234,9 @@ async def _latest_referral_rows(
 ) -> list[IntegrationMetricRow]:
     """The artifact's referral-dataset rows at the latest ``resync_seq``.
 
-    Consumers read the LATEST revision per identity tuple
-    ``(project_id, property_ref, provider, dataset, date, dimension_key)``
-    (the ``uq_integration_metric_row_identity`` columns): a row superseded
-    by a later re-sync at a higher ``resync_seq`` is stale evidence and is
-    never ingested, even if this artifact's queued task runs late.
+    Consumers read the LATEST revision per row identity
+    (``metric_row_not_superseded``): a superseded row is stale evidence
+    and is never ingested, even if this artifact's queued task runs late.
     """
     stmt = (
         select(IntegrationMetricRow)

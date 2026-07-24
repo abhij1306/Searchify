@@ -127,6 +127,41 @@ async def enqueue_classify_referrals(
     )
 
 
+async def _enqueue_window_snapshot_refresh(
+    session: AsyncSession,
+    *,
+    task_kind: str,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    window_start: date,
+    window_end: date,
+    resync_seq: int,
+    priority: int = 0,
+) -> uuid.UUID | None:
+    """The shared body of the two window snapshot-refresh enqueues (A7/A8).
+
+    The payload is window-level; the executor expands the configured
+    snapshot granularities. The idempotency key carries the triggering
+    data revision (``resync_seq``) so a re-sync of an already-projected
+    window re-fires the refresh while a same-revision duplicate still
+    dedupes.
+    """
+    return await _enqueue_task(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        task_kind=task_kind,
+        payload={
+            "window_start": window_start.isoformat(),
+            "window_end": window_end.isoformat(),
+        },
+        idempotency_key=_idempotency_key(
+            task_kind, project_id, window_start, window_end, resync_seq
+        ),
+        priority=priority,
+    )
+
+
 async def enqueue_traffic_snapshot_refresh(
     session: AsyncSession,
     *,
@@ -139,28 +174,18 @@ async def enqueue_traffic_snapshot_refresh(
 ) -> uuid.UUID | None:
     """Enqueue a rebuild of the Traffic snapshot rows for one window (A7).
 
-    The payload is window-level; the executor expands the configured
-    snapshot granularities (``TRAFFIC_SNAPSHOT_GRANULARITIES``). The
-    idempotency key carries the triggering data revision (``resync_seq``)
-    so a re-sync of an already-projected window re-fires the refresh
-    while a same-revision duplicate still dedupes.
+    The executor expands ``TRAFFIC_SNAPSHOT_GRANULARITIES``; the
+    revision-keyed dedupe rule is documented on
+    ``_enqueue_window_snapshot_refresh``.
     """
-    return await _enqueue_task(
+    return await _enqueue_window_snapshot_refresh(
         session,
+        task_kind=ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH,
         workspace_id=workspace_id,
         project_id=project_id,
-        task_kind=ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH,
-        payload={
-            "window_start": window_start.isoformat(),
-            "window_end": window_end.isoformat(),
-        },
-        idempotency_key=_idempotency_key(
-            ANALYTICS_TASK_KIND_TRAFFIC_SNAPSHOT_REFRESH,
-            project_id,
-            window_start,
-            window_end,
-            resync_seq,
-        ),
+        window_start=window_start,
+        window_end=window_end,
+        resync_seq=resync_seq,
         priority=priority,
     )
 
@@ -177,28 +202,18 @@ async def enqueue_analytics_snapshot_refresh(
 ) -> uuid.UUID | None:
     """Enqueue a rebuild of the LLM-Analytics snapshot for one window (A8).
 
-    The payload is window-level; the executor expands the configured
-    snapshot granularities (``ANALYTICS_SNAPSHOT_GRANULARITIES``). The
-    idempotency key carries the triggering data revision (``resync_seq``)
-    so a re-sync of an already-projected window re-fires the refresh
-    while a same-revision duplicate still dedupes.
+    The executor expands ``ANALYTICS_SNAPSHOT_GRANULARITIES``; the
+    revision-keyed dedupe rule is documented on
+    ``_enqueue_window_snapshot_refresh``.
     """
-    return await _enqueue_task(
+    return await _enqueue_window_snapshot_refresh(
         session,
+        task_kind=ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
         workspace_id=workspace_id,
         project_id=project_id,
-        task_kind=ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
-        payload={
-            "window_start": window_start.isoformat(),
-            "window_end": window_end.isoformat(),
-        },
-        idempotency_key=_idempotency_key(
-            ANALYTICS_TASK_KIND_ANALYTICS_SNAPSHOT_REFRESH,
-            project_id,
-            window_start,
-            window_end,
-            resync_seq,
-        ),
+        window_start=window_start,
+        window_end=window_end,
+        resync_seq=resync_seq,
         priority=priority,
     )
 

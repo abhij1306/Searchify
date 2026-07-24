@@ -130,6 +130,8 @@ GA4_PROPERTY_REF_PATTERN: Final = re.compile(r"^(?:properties/)?\d+$")
 def is_ga4_property_ref(property_ref: str) -> bool:
     """True when ``property_ref`` is a well-formed GA4 numeric property id."""
     return bool(GA4_PROPERTY_REF_PATTERN.match(property_ref.strip()))
+
+
 # Bing Webmaster API v1 literals, pinned from Microsoft docs at I12 (plan
 # R3): host ``ssl.bing.com``, JSON endpoint root
 # ``/webmaster/api.svc/json/`` (learn.microsoft.com

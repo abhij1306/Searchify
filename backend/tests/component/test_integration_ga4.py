@@ -251,6 +251,18 @@ def _canonical_hash(payload: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _channel_requests(fake: _ProviderFake) -> list[dict]:
+    """The channel-dataset runReport request bodies, in request order."""
+    return [
+        body
+        for body in fake.ga4_requests
+        if any(
+            entry.get("name") == "sessionDefaultChannelGroup"
+            for entry in body["dimensions"]
+        )
+    ]
+
+
 @pytest.mark.asyncio
 async def test_fixture_import_refresh_artifacts_derivation(
     session_factory, db_session, monkeypatch: pytest.MonkeyPatch
@@ -289,14 +301,7 @@ async def test_fixture_import_refresh_artifacts_derivation(
 
     # The runReport requests carried the template dimensions/metrics and
     # the limit/offset paging (channel dataset paged 0 -> 2).
-    channel_requests = [
-        body
-        for body in fake.ga4_requests
-        if any(
-            entry.get("name") == "sessionDefaultChannelGroup"
-            for entry in body["dimensions"]
-        )
-    ]
+    channel_requests = _channel_requests(fake)
     assert [body["offset"] for body in channel_requests] == [0, 2]
     assert [body["limit"] for body in channel_requests] == [2, 2]
     assert channel_requests[0]["dateRanges"] == [
@@ -436,14 +441,7 @@ async def test_full_raw_page_with_dropped_row_still_pages_on(
     await db_session.refresh(run)
     assert run.status == TASK_STATUS_SUCCEEDED
 
-    channel_requests = [
-        body
-        for body in fake.ga4_requests
-        if any(
-            entry.get("name") == "sessionDefaultChannelGroup"
-            for entry in body["dimensions"]
-        )
-    ]
+    channel_requests = _channel_requests(fake)
     # Offset 2 WAS requested — the short normalized page (1 row) did not
     # terminate paging early.
     assert [body["offset"] for body in channel_requests] == [0, 2]
@@ -522,14 +520,7 @@ async def test_retry_resumes_past_durable_page_with_dropped_row(
 
     await db_session.refresh(run)
     assert run.status == TASK_STATUS_SUCCEEDED
-    channel_requests = [
-        body
-        for body in fake.ga4_requests
-        if any(
-            entry.get("name") == "sessionDefaultChannelGroup"
-            for entry in body["dimensions"]
-        )
-    ]
+    channel_requests = _channel_requests(fake)
     # Page 0 was NOT refetched and the dataset was NOT declared complete:
     # exactly one channel request, at the resumed offset.
     assert [body["offset"] for body in channel_requests] == [2]
