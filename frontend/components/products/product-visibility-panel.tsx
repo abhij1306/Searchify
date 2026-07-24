@@ -80,6 +80,27 @@ export function ProductVisibilityPanel({
     // 404 = no completed run with product metrics yet (no-audit) OR the run
     // predates / lacks a catalog (no-catalog CTA).
     if (error instanceof ApiError && error.status === 404) {
+      // When the 404 is for a run the user explicitly picked (e.g. a
+      // brand-only audit), keep the run selector on screen — otherwise the
+      // selection sticks (it lives in screen-level state) and the only way
+      // back to "Latest" is a full page reload.
+      if (activeRunId) {
+        return (
+          <div className="grid gap-4">
+            <div
+              className="flex flex-wrap items-center gap-2.5"
+              data-testid="product-visibility-toolbar"
+            >
+              <RunSelectorDropdown
+                runOptions={runOptions}
+                activeRunId={activeRunId}
+                selectRun={selectRun}
+              />
+            </div>
+            <NoAuditEmpty onGoToCatalog={onGoToCatalog} selectedRun />
+          </div>
+        );
+      }
       return <NoAuditEmpty onGoToCatalog={onGoToCatalog} />;
     }
     return (
@@ -105,35 +126,15 @@ export function ProductVisibilityPanel({
   if (!visibility) return <VisibilitySkeleton />;
 
   const summary = summarizeProductVisibility(visibility);
-  const activeRun = runOptions.find((run) => run.id === activeRunId) ?? null;
 
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-2.5" data-testid="product-visibility-toolbar">
-        <Dropdown>
-          <DropdownTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Select run">
-              <span className="text-muted">Run:</span>
-              <span className="font-medium">{activeRun?.label ?? 'Latest'}</span>
-              <ChevronDown className="text-muted size-3" aria-hidden />
-            </Button>
-          </DropdownTrigger>
-          <DropdownContent>
-            <DropdownLabel>Runs</DropdownLabel>
-            <DropdownItem data-active={activeRunId === null} onSelect={() => selectRun(null)}>
-              Latest
-            </DropdownItem>
-            {runOptions.map((run) => (
-              <DropdownItem
-                key={run.id}
-                data-active={run.id === activeRunId}
-                onSelect={() => selectRun(run.id)}
-              >
-                {run.label}
-              </DropdownItem>
-            ))}
-          </DropdownContent>
-        </Dropdown>
+        <RunSelectorDropdown
+          runOptions={runOptions}
+          activeRunId={activeRunId}
+          selectRun={selectRun}
+        />
 
         <EngineFilterDropdown engine={engine} onChange={setEngine} />
 
@@ -358,8 +359,50 @@ function VisibilitySkeleton() {
   );
 }
 
+/** Run picker shared by the toolbar and the selected-run 404 empty state. */
+function RunSelectorDropdown({
+  runOptions,
+  activeRunId,
+  selectRun,
+}: Readonly<{
+  runOptions: VisibilityQueries['runOptions'];
+  activeRunId: string | null;
+  selectRun: (id: string | null) => void;
+}>) {
+  const activeRun = runOptions.find((run) => run.id === activeRunId) ?? null;
+  return (
+    <Dropdown>
+      <DropdownTrigger asChild>
+        <Button variant="secondary" size="sm" aria-label="Select run">
+          <span className="text-muted">Run:</span>
+          <span className="font-medium">{activeRun?.label ?? 'Latest'}</span>
+          <ChevronDown className="text-muted size-3" aria-hidden />
+        </Button>
+      </DropdownTrigger>
+      <DropdownContent>
+        <DropdownLabel>Runs</DropdownLabel>
+        <DropdownItem data-active={activeRunId === null} onSelect={() => selectRun(null)}>
+          Latest
+        </DropdownItem>
+        {runOptions.map((run) => (
+          <DropdownItem
+            key={run.id}
+            data-active={run.id === activeRunId}
+            onSelect={() => selectRun(run.id)}
+          >
+            {run.label}
+          </DropdownItem>
+        ))}
+      </DropdownContent>
+    </Dropdown>
+  );
+}
+
 /** No completed run has product metrics yet — guide to runs and the catalog. */
-function NoAuditEmpty({ onGoToCatalog }: Readonly<{ onGoToCatalog: () => void }>) {
+function NoAuditEmpty({
+  onGoToCatalog,
+  selectedRun = false,
+}: Readonly<{ onGoToCatalog: () => void; selectedRun?: boolean }>) {
   return (
     <Card>
       <CardContent className="grid justify-items-center gap-4 py-12 text-center">
@@ -370,9 +413,11 @@ function NoAuditEmpty({ onGoToCatalog }: Readonly<{ onGoToCatalog: () => void }>
         <div className="grid gap-1">
           <h2 className={displayHeadingLgClasses}>No product visibility yet</h2>
           <p className="text-secondary max-w-md text-sm">
-            Once a run completes with products in your catalog, each product&apos;s share of
+            {selectedRun
+              ? 'This run completed without product metrics — product visibility is only measured for runs that score your catalog. Pick another run above, or launch a new one.'
+              : `Once a run completes with products in your catalog, each product\u2019s share of
             voice, rank distribution, and price accuracy appear here. An empty catalog measures
-            nothing — add products first, then launch a run.
+            nothing — add products first, then launch a run.`}
           </p>
         </div>
         <div className="flex items-center gap-2">

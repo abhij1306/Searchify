@@ -100,6 +100,48 @@ describe('ProductVisibilityPanel states', () => {
     expect(onGoToCatalog).toHaveBeenCalled();
   });
 
+  it('keeps the run selector reachable on a 404 for an explicitly selected run', () => {
+    // Regression: picking a run without product metrics used to swap the whole
+    // panel for the empty state — the selection stuck (screen-level state) and
+    // the only way back to "Latest" was a full page reload.
+    render(
+      <ProductVisibilityPanel
+        projectId={PROJECT}
+        queries={makeQueries({
+          activeRunId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          runOptions: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', label: 'Jul 24, 2026' }],
+          visibilityQuery: {
+            isLoading: false,
+            isError: true,
+            error: new ApiError('not found', 404, '', 'req-1'),
+          },
+        })}
+        onGoToCatalog={() => {}}
+      />,
+    );
+    expect(screen.getByText('No product visibility yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select run' })).toBeInTheDocument();
+    expect(screen.getByText(/without product metrics/)).toBeInTheDocument();
+  });
+
+  it('hides the run selector on a 404 with no explicit run selection', () => {
+    render(
+      <ProductVisibilityPanel
+        projectId={PROJECT}
+        queries={makeQueries({
+          visibilityQuery: {
+            isLoading: false,
+            isError: true,
+            error: new ApiError('not found', 404, '', 'req-1'),
+          },
+        })}
+        onGoToCatalog={() => {}}
+      />,
+    );
+    expect(screen.getByText('No product visibility yet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select run' })).not.toBeInTheDocument();
+  });
+
   it('renders the summary strip and both rankings tables with data', () => {
     render(
       <ProductVisibilityPanel
