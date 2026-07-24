@@ -23,6 +23,7 @@ from app.api.provider_connections import (
 )
 from app.api.provider_connections import router as provider_connections_router
 from app.api.site_health import router as site_health_router
+from app.api.traffic import router as traffic_router
 from app.api.workspaces import router as workspaces_router
 from app.core.config import get_frontend_origins, settings
 from app.core.database import dispose_engine
@@ -71,6 +72,7 @@ _ROUTERS = (
     content_router,
     integrations_router,
     analytics_router,
+    traffic_router,
 )
 
 

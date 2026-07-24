@@ -24,6 +24,8 @@ from app.core.config.integrations import (
     DATASET_GA4_SOURCE_MEDIUM_DAILY,
     DATASET_GSC_PAGE_DAILY,
     DATASET_GSC_QUERY_DAILY,
+    INTEGRATION_PROVIDER_GA4,
+    INTEGRATION_PROVIDER_GSC,
 )
 
 # --- Projection window + granularity ----------------------------------------
@@ -41,6 +43,11 @@ TRAFFIC_GRANULARITY_MONTH: Final = "month"
 TRAFFIC_SNAPSHOT_GRANULARITIES: Final[frozenset[str]] = frozenset(
     {TRAFFIC_GRANULARITY_DAY, TRAFFIC_GRANULARITY_WEEK, TRAFFIC_GRANULARITY_MONTH}
 )
+# The granularity served when a request omits ``granularity`` — and the
+# snapshot the paged stat endpoints read: the per-page/per-query fold is
+# granularity-independent (bucketing only shapes the series), so the
+# default-granularity snapshot's stat rows serve every table request.
+TRAFFIC_DEFAULT_GRANULARITY: Final = TRAFFIC_GRANULARITY_DAY
 
 # --- Provenance versions (invariant 4) ---------------------------------------
 # Stamped on ``TrafficSnapshot.formula_version`` / ``.normalization_version``.
@@ -88,4 +95,22 @@ TRAFFIC_PAGE_SORT_WHITELIST: Final[frozenset[str]] = frozenset(
 )
 TRAFFIC_QUERY_SORT_WHITELIST: Final[frozenset[str]] = frozenset(
     {"impressions", "clicks", "ctr", "position"}
+)
+# Sort direction idiom: a leading ``-`` requests descending (what the table
+# sends for its default "top rows" view); a bare key is ascending. This is
+# the effective sort when ``?sort=`` is omitted.
+TRAFFIC_DEFAULT_SORT: Final = "-impressions"
+# Page size for the keyset-paged stat tables (contract C4): every page reads
+# at most this many persisted stat rows (+1 lookahead row for the
+# ``next_cursor``), so a response is always bounded.
+TRAFFIC_TABLE_PAGE_SIZE: Final = 50
+
+# --- Sync pass-through (``POST /projects/{id}/traffic/sync``) -----------------
+# The provider vocabulary of the traffic-sync fan-out: the project's ACTIVE
+# mapped connections of these providers each get one on-demand
+# ``IntegrationSyncRun`` (Bing carries no Traffic-consumed dataset). The
+# enqueue itself is OWNED by ``domain/integrations/sync.py`` (invariant 2) —
+# only the fan-out vocabulary lives here.
+TRAFFIC_SYNC_PROVIDERS: Final[frozenset[str]] = frozenset(
+    {INTEGRATION_PROVIDER_GSC, INTEGRATION_PROVIDER_GA4}
 )
