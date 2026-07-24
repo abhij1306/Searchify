@@ -33,6 +33,7 @@ from app.models.brand import (
     UnintendedDomain,
 )
 from app.models.content import ContentGeneration, ContentGenerationAttempt
+from app.models.opportunity import Opportunity, OpportunitySnapshot
 from app.models.project import Project
 from app.models.prompt import Prompt, PromptSet, Topic
 from app.models.provider import (
@@ -80,6 +81,8 @@ __all__ = [
     "ContentGenerationAttempt",
     "DiscoveryModelConfig",
     "MetricSnapshot",
+    "Opportunity",
+    "OpportunitySnapshot",
     "OwnedDomain",
     "Project",
     "Prompt",
