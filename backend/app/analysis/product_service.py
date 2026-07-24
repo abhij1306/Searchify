@@ -83,11 +83,9 @@ async def analyze_task_products(
         transport_model=task.transport_model,
         prompt_index=task.prompt_index,
         repetition=task.repetition,
-        own_product_mention_count=int(score.get("own_product_mention_count") or 0),
-        competitor_product_mention_count=int(
-            score.get("competitor_product_mention_count") or 0
-        ),
-        products_with_price_match=int(score.get("products_with_price_match") or 0),
+        own_product_mention_count=score["own_product_mention_count"],
+        competitor_product_mention_count=score["competitor_product_mention_count"],
+        products_with_price_match=score["products_with_price_match"],
         score=score,
     )
     session.add(analysis)
@@ -95,7 +93,7 @@ async def analyze_task_products(
 
     entry_names = {entry.id: entry.name for entry in config.products}
     entry_skus = {entry.id: entry.sku for entry in config.products}
-    for signals in score.get("products") or []:
+    for signals in score["products"]:
         if not signals.get("mentioned"):
             continue
         session.add(
@@ -110,7 +108,7 @@ async def analyze_task_products(
             )
         )
     competitor_names = {entry.id: entry.name for entry in config.competitor_products}
-    for signals in score.get("competitor_products") or []:
+    for signals in score["competitor_products"]:
         if not signals.get("mentioned"):
             continue
         session.add(

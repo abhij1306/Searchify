@@ -310,9 +310,9 @@ def _line_spans(text: str) -> list[tuple[int, str]]:
 
 def _is_table_separator(line: str) -> bool:
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-    return bool(cells) and all(
+    return any(cells) and all(
         _TABLE_SEPARATOR_CELL_RE.match(cell) for cell in cells if cell
-    ) and any(cells)
+    )
 
 
 def _rank_in_block(
@@ -374,7 +374,7 @@ def detect_product_rank(answer_text: str, match_offset: int) -> int | None:
             family = "numbered"
             if current_family == "numbered" and int(numbered.group(1)) <= last_number:
                 family = "numbered_restart"
-            last_number = int(numbered.group(1)) if numbered else last_number
+            last_number = int(numbered.group(1))
         elif _BULLET_RE.match(line):
             family = "bullet"
         elif line.strip() and current and current_family in {"numbered", "bullet"}:
@@ -543,7 +543,6 @@ def aggregate_product_run(
         mention_count = len(rows)
         ranks = [r["rank_position"] for r in rows if r.get("rank_position") is not None]
         distribution = {label: 0 for label, _, _ in PRODUCT_RANK_BUCKETS}
-        distribution[PRODUCT_RANK_BUCKET_UNRANKED] = 0
         for rank in ranks:
             distribution[_rank_bucket(rank)] += 1
         distribution[PRODUCT_RANK_BUCKET_UNRANKED] = mention_count - len(ranks)

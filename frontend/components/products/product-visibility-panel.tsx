@@ -37,9 +37,9 @@ import {
   summarizeProductVisibility,
 } from '@/lib/products/catalog';
 import type { useProductVisibilityQueries } from '@/lib/products/use-products-screen';
-import { engineLabel } from '@/lib/providers/catalog';
-import { ENGINE_ORDER } from '@/lib/providers/catalog';
 import { cn } from '@/lib/utils';
+
+import { EngineFilterDropdown } from './engine-filter-dropdown';
 
 type VisibilityQueries = ReturnType<typeof useProductVisibilityQueries>;
 
@@ -135,32 +135,7 @@ export function ProductVisibilityPanel({
           </DropdownContent>
         </Dropdown>
 
-        <Dropdown>
-          <DropdownTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Filter by engine">
-              <span className="text-muted">Engine:</span>
-              <span className="font-medium">
-                {engine === 'all' ? 'All engines' : engineLabel(engine)}
-              </span>
-              <ChevronDown className="text-muted size-3" aria-hidden />
-            </Button>
-          </DropdownTrigger>
-          <DropdownContent>
-            <DropdownLabel>Engine</DropdownLabel>
-            <DropdownItem data-active={engine === 'all'} onSelect={() => setEngine('all')}>
-              All engines
-            </DropdownItem>
-            {ENGINE_ORDER.map((option) => (
-              <DropdownItem
-                key={option}
-                data-active={engine === option}
-                onSelect={() => setEngine(option)}
-              >
-                {engineLabel(option)}
-              </DropdownItem>
-            ))}
-          </DropdownContent>
-        </Dropdown>
+        <EngineFilterDropdown engine={engine} onChange={setEngine} />
 
         <div className="ml-auto">
           <Button asChild variant="ghost" size="sm">

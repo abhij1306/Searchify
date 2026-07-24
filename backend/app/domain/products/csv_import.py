@@ -109,8 +109,6 @@ def parse_product_csv(content: str) -> list[ProductInput]:
     for row in rows[1:]:
         sku = _cell(row, sku_i)
         name = _cell(row, name_i)
-        if not sku and not name:
-            continue
         if not sku:
             # sku is the (project_id, sku) import identity — a row without one
             # cannot be de-duplicated, so it is skipped rather than guessed.

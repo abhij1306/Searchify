@@ -5,7 +5,7 @@
  *
  * `useProductsTab` mirrors the active tab into `?tab=` (Catalog is default)
  * so refresh / back / forward preserve it. `useCatalogQueries` loads the
- * catalog + competitor products. `useProductVisibilityQueries` loads the
+ * catalog. `useProductVisibilityQueries` loads the
  * project's dashboard-ready runs (for the Run selector) and the product
  * visibility projection — defaulting to the latest product audit, sliced by
  * the engine filter via the backend's persisted per-engine aggregates.
@@ -17,12 +17,12 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/api/query-keys';
 import { productsApi } from '@/lib/api/products';
 import { runsApi } from '@/lib/api/runs';
-import type { LogicalEngine } from '@/lib/api/types';
-import { normalizeProductsTab, type ProductsTab } from '@/lib/products/catalog';
+import {
+  normalizeProductsTab,
+  type ProductEngineFilter,
+  type ProductsTab,
+} from '@/lib/products/catalog';
 import { toRunOptions } from '@/lib/visibility/dashboard';
-
-/** Engine filter value for the visibility tab (`all` = cross-engine). */
-export type ProductEngineFilter = LogicalEngine | 'all';
 
 export function useProductsTab() {
   const router = useRouter();
@@ -53,12 +53,7 @@ export function useCatalogQueries(projectId: string | null) {
     queryFn: ({ signal }) => productsApi.list(projectId!, { signal }),
     enabled: Boolean(projectId),
   });
-  const competitorProductsQuery = useQuery({
-    queryKey: queryKeys.products.competitorProducts(projectId ?? ''),
-    queryFn: ({ signal }) => productsApi.listCompetitorProducts(projectId!, { signal }),
-    enabled: Boolean(projectId),
-  });
-  return { productsQuery, competitorProductsQuery };
+  return { productsQuery };
 }
 
 export function useProductVisibilityQueries(projectId: string | null) {

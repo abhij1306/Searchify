@@ -8,12 +8,16 @@
  */
 import type {
   CompetitorProductVisibilityEntry,
+  LogicalEngine,
   ProductVisibility,
   ProductVisibilityEntry,
 } from '@/lib/api/types';
 
 /** The two `/products` workspace tabs, in display order; Catalog is default. */
 export type ProductsTab = 'catalog' | 'visibility';
+
+/** Engine filter value for the products surfaces (`all` = cross-engine). */
+export type ProductEngineFilter = LogicalEngine | 'all';
 
 export const PRODUCTS_TABS: readonly { id: ProductsTab; label: string }[] = [
   { id: 'catalog', label: 'Catalog' },

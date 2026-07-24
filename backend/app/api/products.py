@@ -354,10 +354,7 @@ async def product_visibility_endpoint(
     except AnalysisNotFoundError as exc:
         raise_not_found("Product visibility", cause=exc)
     except TrendQueryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get(
@@ -389,10 +386,7 @@ async def product_evidence_endpoint(
     except AnalysisNotFoundError as exc:
         raise_not_found("Audit", cause=exc)
     except TrendQueryError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("/projects/{project_id}/products/visibility/export.csv")

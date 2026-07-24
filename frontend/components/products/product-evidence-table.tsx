@@ -2,20 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronLeft, Info } from 'lucide-react';
+import { ChevronLeft, Info } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardEyebrow, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dropdown,
-  DropdownContent,
-  DropdownItem,
-  DropdownLabel,
-  DropdownTrigger,
-} from '@/components/ui/dropdown';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -28,13 +21,13 @@ import {
 import { productsApi } from '@/lib/api/products';
 import { queryKeys } from '@/lib/api/query-keys';
 import type { Product, ProductEvidenceItem } from '@/lib/api/types';
-import { formatPrice } from '@/lib/products/catalog';
-import { ENGINE_ORDER, engineLabel } from '@/lib/providers/catalog';
+import { formatPrice, type ProductEngineFilter } from '@/lib/products/catalog';
+import { engineLabel } from '@/lib/providers/catalog';
+
+import { EngineFilterDropdown } from './engine-filter-dropdown';
 
 /** Newest-window size for the evidence request (backend max 500). */
 const EVIDENCE_LIMIT = 100;
-
-type EngineFilter = 'all' | (typeof ENGINE_ORDER)[number];
 
 /**
  * Product evidence drill-down (`/products/[productId]`): the persisted
@@ -48,7 +41,7 @@ export function ProductEvidenceTable({
   product,
   backHref = '/products',
 }: Readonly<{ product: Product; backHref?: string }>) {
-  const [engine, setEngine] = useState<EngineFilter>('all');
+  const [engine, setEngine] = useState<ProductEngineFilter>('all');
   const engineParam = engine === 'all' ? undefined : engine;
 
   const evidenceQuery = useQuery({
@@ -88,32 +81,7 @@ export function ProductEvidenceTable({
               {product.completeness.present}/{product.completeness.total} attributes
             </p>
           </div>
-          <Dropdown>
-            <DropdownTrigger asChild>
-              <Button variant="secondary" size="sm" aria-label="Filter by engine">
-                <span className="text-muted">Engine:</span>
-                <span className="font-medium">
-                  {engine === 'all' ? 'All engines' : engineLabel(engine)}
-                </span>
-                <ChevronDown className="text-muted size-3" aria-hidden />
-              </Button>
-            </DropdownTrigger>
-            <DropdownContent>
-              <DropdownLabel>Engine</DropdownLabel>
-              <DropdownItem data-active={engine === 'all'} onSelect={() => setEngine('all')}>
-                All engines
-              </DropdownItem>
-              {ENGINE_ORDER.map((option) => (
-                <DropdownItem
-                  key={option}
-                  data-active={engine === option}
-                  onSelect={() => setEngine(option)}
-                >
-                  {engineLabel(option)}
-                </DropdownItem>
-              ))}
-            </DropdownContent>
-          </Dropdown>
+          <EngineFilterDropdown engine={engine} onChange={setEngine} />
         </CardHeader>
 
         <CardContent className="p-0">

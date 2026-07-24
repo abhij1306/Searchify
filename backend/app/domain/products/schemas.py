@@ -22,6 +22,20 @@ def _clean_str_list(values: Any) -> list[str]:
     return [str(value).strip() for value in values if str(value).strip()]
 
 
+def _clean_aliases(value: Any) -> list[str]:
+    return _clean_str_list(value)
+
+
+def _clean_optional_aliases(value: Any) -> list[str] | None:
+    if value is None:
+        return None
+    return _clean_str_list(value)
+
+
+def _clean_currency(value: str | None) -> str | None:
+    return value.strip().upper() if value is not None else None
+
+
 class ProductVariant(BaseModel):
     """One variant value object inside ``Product.variants``."""
 
@@ -52,15 +66,8 @@ class ProductInput(BaseModel):
     url: str = Field(default="", max_length=2048)
     attributes: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("aliases", mode="before")
-    @classmethod
-    def _aliases_clean(cls, value: Any) -> list[str]:
-        return _clean_str_list(value)
-
-    @field_validator("currency")
-    @classmethod
-    def _currency_upper(cls, value: str) -> str:
-        return value.strip().upper()
+    _aliases_clean = field_validator("aliases", mode="before")(_clean_aliases)
+    _currency_upper = field_validator("currency")(_clean_currency)
 
 
 class ProductUpdate(BaseModel):
@@ -73,17 +80,10 @@ class ProductUpdate(BaseModel):
     url: str | None = Field(default=None, max_length=2048)
     attributes: dict[str, Any] | None = None
 
-    @field_validator("aliases", mode="before")
-    @classmethod
-    def _aliases_clean(cls, value: Any) -> list[str] | None:
-        if value is None:
-            return None
-        return _clean_str_list(value)
-
-    @field_validator("currency")
-    @classmethod
-    def _currency_upper(cls, value: str | None) -> str | None:
-        return value.strip().upper() if value is not None else None
+    _aliases_clean = field_validator("aliases", mode="before")(
+        _clean_optional_aliases
+    )
+    _currency_upper = field_validator("currency")(_clean_currency)
 
 
 class ProductImport(BaseModel):
@@ -125,15 +125,8 @@ class CompetitorProductInput(BaseModel):
     currency: str = Field(default="", max_length=3)
     url: str = Field(default="", max_length=2048)
 
-    @field_validator("aliases", mode="before")
-    @classmethod
-    def _aliases_clean(cls, value: Any) -> list[str]:
-        return _clean_str_list(value)
-
-    @field_validator("currency")
-    @classmethod
-    def _currency_upper(cls, value: str) -> str:
-        return value.strip().upper()
+    _aliases_clean = field_validator("aliases", mode="before")(_clean_aliases)
+    _currency_upper = field_validator("currency")(_clean_currency)
 
 
 class CompetitorProductUpdate(BaseModel):
@@ -143,17 +136,10 @@ class CompetitorProductUpdate(BaseModel):
     currency: str | None = Field(default=None, max_length=3)
     url: str | None = Field(default=None, max_length=2048)
 
-    @field_validator("aliases", mode="before")
-    @classmethod
-    def _aliases_clean(cls, value: Any) -> list[str] | None:
-        if value is None:
-            return None
-        return _clean_str_list(value)
-
-    @field_validator("currency")
-    @classmethod
-    def _currency_upper(cls, value: str | None) -> str | None:
-        return value.strip().upper() if value is not None else None
+    _aliases_clean = field_validator("aliases", mode="before")(
+        _clean_optional_aliases
+    )
+    _currency_upper = field_validator("currency")(_clean_currency)
 
 
 class CompetitorProductResponse(BaseModel):

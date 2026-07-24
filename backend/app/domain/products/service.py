@@ -78,7 +78,7 @@ async def list_products(
     return list(result.scalars().all())
 
 
-async def _get_product(
+async def get_product(
     session: AsyncSession, *, workspace_id: uuid.UUID, product_id: uuid.UUID
 ) -> Product:
     result = await session.execute(
@@ -93,14 +93,6 @@ async def _get_product(
     if product is None:
         raise ProductNotFoundError("Product not found")
     return product
-
-
-async def get_product(
-    session: AsyncSession, *, workspace_id: uuid.UUID, product_id: uuid.UUID
-) -> Product:
-    return await _get_product(
-        session, workspace_id=workspace_id, product_id=product_id
-    )
 
 
 def _apply_product_fields(product: Product, data: dict[str, Any]) -> None:
@@ -147,7 +139,7 @@ async def update_product(
     product_id: uuid.UUID,
     payload: Any,
 ) -> Product:
-    product = await _get_product(
+    product = await get_product(
         session, workspace_id=workspace_id, product_id=product_id
     )
     _apply_product_fields(product, payload.model_dump(exclude_unset=True))
@@ -165,7 +157,7 @@ async def update_product(
 async def delete_product(
     session: AsyncSession, *, workspace_id: uuid.UUID, product_id: uuid.UUID
 ) -> None:
-    product = await _get_product(
+    product = await get_product(
         session, workspace_id=workspace_id, product_id=product_id
     )
     await session.delete(product)

@@ -86,37 +86,12 @@ async def get_product_visibility(
     """
     if engine is not None and engine not in LOGICAL_ENGINES:
         raise TrendQueryError(f"Unknown logical engine: {engine!r}")
-    if audit_id is None:
-        audit_id = await _latest_product_audit_id(
-            session, workspace_id=workspace_id, project_id=project_id
-        )
-        if audit_id is None:
-            raise AnalysisNotFoundError(
-                "No completed audit with product metrics for project"
-            )
-
-    audit = await session.scalar(
-        select(Audit).where(
-            Audit.id == audit_id,
-            Audit.workspace_id == workspace_id,
-            Audit.project_id == project_id,
-        )
+    audit, snapshots = await _load_audit_and_snapshots(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        audit_id=audit_id,
     )
-    if audit is None:
-        raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
-
-    snapshots = list(
-        (
-            await session.scalars(
-                select(ProductMetricSnapshot).where(
-                    ProductMetricSnapshot.audit_id == audit.id,
-                    ProductMetricSnapshot.workspace_id == workspace_id,
-                )
-            )
-        ).all()
-    )
-    if not snapshots:
-        raise AnalysisNotFoundError("Product metrics not available for audit")
 
     config = build_product_scoring_config(audit.configuration)
     by_entry = {_snapshot_entry_id(snapshot): snapshot for snapshot in snapshots}
@@ -312,36 +287,12 @@ async def load_product_visibility_export_bundle(
     projection). 404-class ``AnalysisNotFoundError`` when there is nothing
     persisted to render.
     """
-    if audit_id is None:
-        audit_id = await _latest_product_audit_id(
-            session, workspace_id=workspace_id, project_id=project_id
-        )
-        if audit_id is None:
-            raise AnalysisNotFoundError(
-                "No completed audit with product metrics for project"
-            )
-    audit = await session.scalar(
-        select(Audit).where(
-            Audit.id == audit_id,
-            Audit.workspace_id == workspace_id,
-            Audit.project_id == project_id,
-        )
+    return await _load_audit_and_snapshots(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        audit_id=audit_id,
     )
-    if audit is None:
-        raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
-    snapshots = list(
-        (
-            await session.scalars(
-                select(ProductMetricSnapshot).where(
-                    ProductMetricSnapshot.audit_id == audit.id,
-                    ProductMetricSnapshot.workspace_id == workspace_id,
-                )
-            )
-        ).all()
-    )
-    if not snapshots:
-        raise AnalysisNotFoundError("Product metrics not available for audit")
-    return audit, snapshots
 
 
 def product_visibility_csv(
@@ -419,14 +370,14 @@ def _entry_metrics(
             "price_mention_count": snapshot.price_mention_count,
             "price_accuracy_rate": snapshot.price_accuracy_rate,
         }
-    aggregate = ((snapshot.metrics or {}).get("per_engine") or {}).get(engine)
+    aggregate = ((snapshot.metrics or {}).get("per_engine") or {}).get(engine) or {}
     return {
-        "mention_count": int((aggregate or {}).get("mention_count") or 0),
-        "sov_share": float((aggregate or {}).get("sov_share") or 0.0),
-        "avg_rank": (aggregate or {}).get("avg_rank"),
-        "rank_distribution": dict((aggregate or {}).get("rank_distribution") or {}),
-        "price_mention_count": int((aggregate or {}).get("price_mention_count") or 0),
-        "price_accuracy_rate": (aggregate or {}).get("price_accuracy_rate"),
+        "mention_count": int(aggregate.get("mention_count") or 0),
+        "sov_share": float(aggregate.get("sov_share") or 0.0),
+        "avg_rank": aggregate.get("avg_rank"),
+        "rank_distribution": dict(aggregate.get("rank_distribution") or {}),
+        "price_mention_count": int(aggregate.get("price_mention_count") or 0),
+        "price_accuracy_rate": aggregate.get("price_accuracy_rate"),
     }
 
 
@@ -440,6 +391,51 @@ def _snapshot_entry_id(snapshot: ProductMetricSnapshot) -> str:
     if live is not None:
         return str(live)
     return str((snapshot.metrics or {}).get("entry_id") or "")
+
+
+async def _load_audit_and_snapshots(
+    session: AsyncSession,
+    *,
+    workspace_id: uuid.UUID,
+    project_id: uuid.UUID,
+    audit_id: uuid.UUID | None,
+) -> tuple[Audit, list[ProductMetricSnapshot]]:
+    """Resolve the audit + load its product snapshots (shared resolution).
+
+    Defaults to the latest dashboard-eligible audit with product snapshots
+    when ``audit_id`` is omitted. 404-class ``AnalysisNotFoundError`` when
+    the audit is missing/cross-workspace or has no product snapshots.
+    """
+    if audit_id is None:
+        audit_id = await _latest_product_audit_id(
+            session, workspace_id=workspace_id, project_id=project_id
+        )
+        if audit_id is None:
+            raise AnalysisNotFoundError(
+                "No completed audit with product metrics for project"
+            )
+    audit = await session.scalar(
+        select(Audit).where(
+            Audit.id == audit_id,
+            Audit.workspace_id == workspace_id,
+            Audit.project_id == project_id,
+        )
+    )
+    if audit is None:
+        raise AnalysisNotFoundError(_AUDIT_NOT_FOUND)
+    snapshots = list(
+        (
+            await session.scalars(
+                select(ProductMetricSnapshot).where(
+                    ProductMetricSnapshot.audit_id == audit.id,
+                    ProductMetricSnapshot.workspace_id == workspace_id,
+                )
+            )
+        ).all()
+    )
+    if not snapshots:
+        raise AnalysisNotFoundError("Product metrics not available for audit")
+    return audit, snapshots
 
 
 async def _latest_product_audit_id(
