@@ -128,7 +128,6 @@ async def _cleanup_leftovers_async() -> None:
 
 
 def main() -> int:
-    _cleanup_leftovers()
     demo = httpx.Client(base_url=BASE, timeout=30, follow_redirects=False)
     anon = httpx.Client(base_url=BASE, timeout=30, follow_redirects=False)
 
@@ -139,6 +138,7 @@ def main() -> int:
     r = demo.get("/auth/me")
     check("A1", "auth/me 200", r.status_code == 200 and r.json()["user"]["email"] == "demo@searchify.dev")
     resolve_ids(demo)
+    _cleanup_leftovers()  # needs resolved connection ids; safe to run post-login
 
     # ---------------- A2: GET /integrations shape + token hygiene ----------------
     r = demo.get("/integrations")
