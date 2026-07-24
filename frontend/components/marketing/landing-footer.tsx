@@ -78,7 +78,7 @@ const FOOTER_COLUMNS: readonly FooterColumn[] = [
 ];
 
 /** One footer-column link: internal routes via next/link, everything else <a>. */
-function FooterColumnLink({ link }: { link: FooterLink }) {
+function FooterColumnLink({ link }: Readonly<{ link: FooterLink }>) {
   if (link.external) {
     return (
       <a href={link.href} target="_blank" rel="noreferrer">
@@ -94,7 +94,7 @@ function FooterColumnLink({ link }: { link: FooterLink }) {
 }
 
 /** Social chip: '#' placeholders stay plain anchors; real profiles open externally. */
-function SocialButton({ social }: { social: SocialLink }) {
+function SocialButton({ social }: Readonly<{ social: SocialLink }>) {
   const Icon = social.icon;
   const external = social.href !== '#';
   return (
@@ -127,11 +127,15 @@ export function LandingFooter() {
               <span>Searchify</span>
             </Link>
             <p className="footer-desc">Open-source AI visibility and site intelligence platform.</p>
-            <div className="social-row">
-              {SOCIAL_LINKS.map((social) => (
-                <SocialButton key={social.key} social={social} />
-              ))}
-            </div>
+            {/* No social profiles configured yet (see social.ts) — skip the
+                wrapper entirely rather than emit an empty row. */}
+            {SOCIAL_LINKS.length > 0 ? (
+              <div className="social-row">
+                {SOCIAL_LINKS.map((social) => (
+                  <SocialButton key={social.key} social={social} />
+                ))}
+              </div>
+            ) : null}
           </div>
           {FOOTER_COLUMNS.map((column) => (
             <div className="footer-col" key={column.key}>
@@ -142,7 +146,6 @@ export function LandingFooter() {
                 ))}
               </div>
             </div>
-          ))}            </div>
           ))}
         </nav>
         <div className="footer-bottom">

@@ -70,8 +70,13 @@ describe('Pricing page (public marketing `/pricing`)', () => {
     // Spot-check grounded pro cells: full inventory rides every paid tier.
     const inventoryRow = screen.getByRole('row', { name: /Site Health crawl mode/ });
     expect(within(inventoryRow).getAllByText('Full progressive inventory')).toHaveLength(3);
+    // Pro/Enterprise monitored-URL sizes are commercial terms the repo can't
+    // ground, so they render with a visible [TODO(user)] placeholder.
     const monitoredRow = screen.getByRole('row', { name: /Monitored URL set/ });
-    expect(within(monitoredRow).getByText('Expanded selection')).toBeInTheDocument();
+    expect(
+      within(monitoredRow).getByText(/Expanded selection — \[TODO\(user\)\]/),
+    ).toBeInTheDocument();
+    expect(within(monitoredRow).getByText('Quota-controlled selection')).toBeInTheDocument();
   });
 
   it('renders the BYOK trust strip', () => {

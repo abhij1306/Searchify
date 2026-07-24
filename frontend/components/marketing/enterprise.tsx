@@ -136,7 +136,7 @@ const LIMIT_CELLS: readonly LimitCell[] = [
   { label: 'Support & SLA', desc: 'response targets, channels, and escalation path' },
 ];
 
-function CheckItem({ children }: { children: string }) {
+function CheckItem({ children }: Readonly<{ children: string }>) {
   return (
     <span className="audit-item">
       <span className="audit-check">

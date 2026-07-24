@@ -36,7 +36,7 @@ export function PricingTiers() {
   );
 }
 
-function TierCard({ tier }: { tier: PricingTier }) {
+function TierCard({ tier }: Readonly<{ tier: PricingTier }>) {
   // Mockup: the "Custom" price drops the per-label; its cadence moves down
   // to the note line under the price.
   const isCustom = tier.price === 'Custom';
@@ -46,7 +46,8 @@ function TierCard({ tier }: { tier: PricingTier }) {
       {tier.highlighted && <span className="tier-tag">Recommended</span>}
       <div className="tier-head">
         <h3 className="tier-name">{tier.name}</h3>
-        <p className="tier-pos">{tier.blurb}</p>        <div className="tier-price">
+        <p className="tier-pos">{tier.blurb}</p>{' '}
+        <div className="tier-price">
           <span className="amount">{tier.price}</span>
           {!isCustom && <span className="per">{tier.cadence}</span>}
         </div>
@@ -136,7 +137,7 @@ export function PricingTable() {
  * cell still has an accessible value), everything else renders as text —
  * '[TODO(user)]'-style placeholders get the mockup's mono `.tbd` treatment.
  */
-function TableCell({ value, highlighted }: { value: string; highlighted: boolean }) {
+function TableCell({ value, highlighted }: Readonly<{ value: string; highlighted: boolean }>) {
   if (value === '✓') {
     return (
       <td className={cn('yes', highlighted && 'hl')}>

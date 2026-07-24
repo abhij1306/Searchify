@@ -11,10 +11,10 @@ test.describe('marketing navigation (real-engine CSS contract)', () => {
     await page.goto('/');
 
     for (const { key, count } of DROPS) {
-      const trigger = page.locator(`button[aria-controls="desktop-nav-panel"]`, {
-        hasText: new RegExp(key, 'i'),
-      });
-      const panel = page.locator('#desktop-nav-panel');
+      // Each trigger controls its own panel, nested inside its .nav-item so the
+      // menu items stay reachable when focus moves into them.
+      const trigger = page.locator(`button[aria-controls="desktop-nav-panel-${key}"]`);
+      const panel = page.locator(`#desktop-nav-panel-${key}`);
 
       await trigger.hover();
       await expect(panel).toBeVisible();

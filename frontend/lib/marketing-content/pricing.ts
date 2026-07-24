@@ -72,7 +72,8 @@ export const PRICING_TIERS: readonly PricingTier[] = [
     primaryCta: true,
     features: [
       'Everything in Starter, plus:',
-      'Higher monitored-URL quotas',
+      // Quota sizes are a commercial term the repo cannot ground.
+      'Higher monitored-URL quotas — [TODO(user)]',
       'Multiple projects per workspace',
       'Cross-run trends — engine, time-range, and granularity controls',
       'Competitor benchmarking + share of voice',
@@ -87,10 +88,14 @@ export const PRICING_TIERS: readonly PricingTier[] = [
     cta: { label: 'Explore Enterprise', href: '/enterprise' },
     features: [
       'Everything in Pro, plus:',
+      // Both grounded in README.md (Docker Compose quick start; the
+      // workspace-isolation guarantee).
       'Self-host option — Docker Compose deployment inside your network',
       'Strict workspace isolation with UUID identifiers throughout',
-      'Custom volumes, seats, and retention',
-      'Support options tailored to your team',
+      // Volumes, seats, retention windows, and support levels are commercial
+      // terms with no basis in the repo — they stay placeholders.
+      'Custom volumes, seats, and retention — [TODO(user)]',
+      'Support options tailored to your team — [TODO(user)]',
     ],
   },
 ];
@@ -132,11 +137,13 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
     enterprise: 'Full progressive inventory',
   },
   {
+    // Free/Starter cells are grounded in docs/site-health.md's entitlement
+    // table; the Pro/Enterprise sizes are commercial terms the repo can't ground.
     dimension: 'Monitored URL set',
     free: '—',
     starter: 'Quota-controlled selection',
-    pro: 'Expanded selection',
-    enterprise: 'Custom',
+    pro: 'Expanded selection — [TODO(user)]',
+    enterprise: 'Custom — [TODO(user)]',
   },
   {
     dimension: 'Authenticated CSV + Markdown exports',
@@ -146,10 +153,12 @@ export const PRICING_TABLE_ROWS: readonly PricingTableRow[] = [
     enterprise: '✓',
   },
   {
+    // No support channel, tier, or SLA is documented anywhere in the repo —
+    // every cell stays a placeholder rather than a published commitment.
     dimension: 'Support',
-    free: 'Community forum',
-    starter: 'Product support',
-    pro: 'Priority support',
-    enterprise: 'Tailored support',
+    free: '[TODO(user)]',
+    starter: '[TODO(user)]',
+    pro: '[TODO(user)]',
+    enterprise: '[TODO(user)]',
   },
 ];

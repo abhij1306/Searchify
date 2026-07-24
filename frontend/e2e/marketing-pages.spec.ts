@@ -27,8 +27,8 @@ test.describe('marketing routes', () => {
     await page.goto('/pricing');
     const resources = page.getByRole('button', { name: 'Resources' });
     await resources.hover();
-    await expect(page.locator('#desktop-nav-panel')).toBeVisible();
-    await expect(page.locator('#desktop-nav-panel').getByRole('menuitem')).toHaveCount(3);
+    await expect(page.locator('#desktop-nav-panel-resources')).toBeVisible();
+    await expect(page.locator('#desktop-nav-panel-resources').getByRole('menuitem')).toHaveCount(3);
 
     const footer = page.getByRole('navigation', { name: 'Footer' });
     await expect(footer.locator('.f-col-label')).toHaveCount(5);

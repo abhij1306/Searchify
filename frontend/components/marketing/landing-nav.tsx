@@ -196,7 +196,7 @@ const NAV_DROPS: readonly NavDrop[] = [
 ];
 
 /** Icon tile for a dropdown/menu row: lucide glyph or mono step number. */
-function DropGlyph({ item }: { item: NavDropItem }) {
+function DropGlyph({ item }: Readonly<{ item: NavDropItem }>) {
   if ('num' in item) {
     return <span className="d-icon mono-num">{item.num}</span>;
   }
@@ -214,7 +214,7 @@ function isExternal(item: NavDropItem): boolean {
 }
 
 /** Desktop dropdown panel row — internal rows use Link, external a plain <a>. */
-function DropItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () => void }) {
+function DropItemLink({ item, onSelect }: Readonly<{ item: NavDropItem; onSelect: () => void }>) {
   const body = (
     <>
       <DropGlyph item={item} />
@@ -247,7 +247,7 @@ function DropItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () => v
 }
 
 /** Mobile accordion row — same internal/external split as the desktop rows. */
-function MobileItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () => void }) {
+function MobileItemLink({ item, onSelect }: Readonly<{ item: NavDropItem; onSelect: () => void }>) {
   const body = (
     <>
       <DropGlyph item={item} />

@@ -14,7 +14,11 @@ export const SOV_ROWS = [
 ] as const;
 
 /** SovRow — one share-of-voice bar row; also used by the evidence band drill. */
-export function SovRow({ name, value, you }: { name: string; value: number; you?: boolean }) {
+export function SovRow({
+  name,
+  value,
+  you,
+}: Readonly<{ name: string; value: number; you?: boolean }>) {
   return (
     <div className={cn('sov-row', you && 'you')}>
       <span className="sov-name">{name}</span>
@@ -163,10 +167,9 @@ export function ProductVisual() {
           <div className="evidence">
             <div className="evidence-head">
               <span className="panel-label">Evidence — latest runs</span>
-              <span className="view-link">
-                View all runs →
-              </span>
-            </div>            {EVIDENCE_ROWS.map(({ prompt, engine, dot, mentioned, citations, ago }) => (
+              <span className="view-link">View all runs →</span>
+            </div>{' '}
+            {EVIDENCE_ROWS.map(({ prompt, engine, dot, mentioned, citations, ago }) => (
               <div className="evidence-row" key={prompt}>
                 <span className="ev-prompt">{prompt}</span>
                 {/* `display: contents` on desktop (children stay grid items);

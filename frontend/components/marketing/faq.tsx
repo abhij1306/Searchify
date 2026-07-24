@@ -37,7 +37,7 @@ const INLINE_TOKEN_RE = /\[TODO\(user\)\]|https?:\/\/\S+/g;
 // Sentence punctuation straight after a URL belongs to the prose, not the href.
 const TRAILING_PUNCT_RE = /[.,;:!?)]+$/;
 
-function AnswerText({ text }: { text: string }) {
+function AnswerText({ text }: Readonly<{ text: string }>) {
   const nodes: ReactNode[] = [];
   let cursor = 0;
   let key = 0;
@@ -53,7 +53,8 @@ function AnswerText({ text }: { text: string }) {
           {href}
         </a>,
       );
-      key += 1;      if (trailing) nodes.push(trailing);
+      key += 1;
+      if (trailing) nodes.push(trailing);
     } else {
       nodes.push(
         <span key={key} className="todo-tag">
