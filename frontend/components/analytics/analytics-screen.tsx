@@ -45,7 +45,7 @@ import {
   bucketAdjectiveTitle,
   bucketCountLabel,
   rangeLabel,
-  rangeToFrom,
+  rangeToWindow,
   type AnalyticsGranularity,
   type AnalyticsRange,
 } from '@/lib/analytics/options';
@@ -63,6 +63,7 @@ import {
   toPercentChartPoints,
   totalSourceSessions,
 } from '@/lib/analytics/series';
+import { formatWindowDate } from '@/lib/format';
 import { engineLabel } from '@/lib/providers/catalog';
 import { useProjectContext } from '@/lib/project/project-context';
 import { cn } from '@/lib/utils';
@@ -99,21 +100,24 @@ export function AnalyticsScreen() {
   const { activeProject, isLoading: isProjectLoading } = useProjectContext();
   const projectId = activeProject?.id ?? null;
 
-  const [range, setRange] = useState<AnalyticsRange>('90d');
+  const [range, setRange] = useState<AnalyticsRange>('latest');
   const [granularity, setGranularity] = useState<AnalyticsGranularity>('week');
 
-  // Resolve the range preset to a `from` bound once per range change —
-  // computing it inline would call `new Date()` on every render and churn the
-  // query key (visibility precedent).
-  const fromParam = useMemo(() => rangeToFrom(range), [range]);
+  // Resolve the range preset to `from`/`to` date bounds once per range
+  // change — computing them inline would call `new Date()` on every render
+  // and churn the query key (visibility precedent). The default `latest`
+  // preset sends no bounds so the backend serves the freshest persisted
+  // snapshot (traffic precedent).
+  const windowBounds = useMemo(() => rangeToWindow(range), [range]);
 
   const dashboardQuery = useQuery({
     queryKey: queryKeys.analytics.dashboard(projectId ?? '', {
-      from: fromParam ?? null,
+      from: windowBounds.from ?? null,
+      to: windowBounds.to ?? null,
       granularity,
     }),
     queryFn: ({ signal }) =>
-      analyticsApi.getAnalytics(projectId!, { from: fromParam, granularity }, { signal }),
+      analyticsApi.getAnalytics(projectId!, { ...windowBounds, granularity }, { signal }),
     enabled: Boolean(projectId),
   });
 
@@ -121,8 +125,11 @@ export function AnalyticsScreen() {
   const empty = data ? isAnalyticsEmpty(data) : false;
 
   const themesQuery = useQuery({
-    queryKey: queryKeys.analytics.themes(projectId ?? '', { from: fromParam ?? null }),
-    queryFn: ({ signal }) => analyticsApi.getThemes(projectId!, { from: fromParam }, { signal }),
+    queryKey: queryKeys.analytics.themes(projectId ?? '', {
+      from: windowBounds.from ?? null,
+      to: windowBounds.to ?? null,
+    }),
+    queryFn: ({ signal }) => analyticsApi.getThemes(projectId!, { ...windowBounds }, { signal }),
     enabled: Boolean(projectId) && !empty,
   });
 
@@ -147,18 +154,39 @@ export function AnalyticsScreen() {
     );
   }
 
-  if (!data || empty) {
+  const toolbar = (
+    <AnalyticsToolbar
+      range={range}
+      onChangeRange={setRange}
+      granularity={granularity}
+      onChangeGranularity={setGranularity}
+    />
+  );
+
+  // No persisted snapshot at all (default latest mode): the project has no
+  // AI-referral evidence yet — the empty state (mockup).
+  if (!data || (empty && range === 'latest')) {
     return <AnalyticsEmptyState />;
+  }
+
+  // A bounded preset with no matching persisted window: surfaced honestly
+  // (read endpoints serve persisted snapshot windows only — never recompute).
+  if (empty) {
+    return (
+      <div className="grid gap-5">
+        {toolbar}
+        <Alert tone="info">
+          No synced snapshot covers {formatWindowDate(windowBounds.from ?? '')} –{' '}
+          {formatWindowDate(windowBounds.to ?? '')} yet. LLM Analytics serves persisted sync windows
+          only — switch to the latest synced window or run a sync from Traffic.
+        </Alert>
+      </div>
+    );
   }
 
   return (
     <div className="grid gap-6">
-      <AnalyticsToolbar
-        range={range}
-        onChangeRange={setRange}
-        granularity={granularity}
-        onChangeGranularity={setGranularity}
-      />
+      {toolbar}
       <div className="grid gap-6 lg:grid-cols-2">
         <ReferralVolumeCard data={data} />
         <ReferralShareCard data={data} />
@@ -171,7 +199,12 @@ export function AnalyticsScreen() {
       <ThemesCard query={themesQuery} />
       {/* Remount on window change so the keyset walk restarts (a cursor
           replayed against a different window is a backend 400). */}
-      <ReferralsTable key={fromParam ?? 'all'} projectId={projectId} from={fromParam} />
+      <ReferralsTable
+        key={`${windowBounds.from ?? ''}|${windowBounds.to ?? ''}`}
+        projectId={projectId}
+        from={windowBounds.from}
+        to={windowBounds.to}
+      />
     </div>
   );
 }
@@ -223,7 +256,7 @@ function AnalyticsToolbar({
             variant="secondary"
             size="sm"
             aria-label="Select date range"
-            className={cn(range !== '90d' && CHIP_ACTIVE_CLASS)}
+            className={cn(range !== 'latest' && CHIP_ACTIVE_CLASS)}
           >
             <span className="text-muted">Range:</span>
             <span className="font-medium">{rangeLabel(range)}</span>
@@ -299,10 +332,7 @@ function TrendCard({
               className="h-[180px] w-full"
             />
             {points.length > 1 ? (
-              <div
-                className="text-2xs text-muted mt-1 flex justify-between font-mono"
-                aria-hidden
-              >
+              <div className="text-2xs text-muted mt-1 flex justify-between font-mono" aria-hidden>
                 <span>{firstLabel}</span>
                 <span>{lastLabel}</span>
               </div>
@@ -416,9 +446,7 @@ function EngineVisibilityCard({
       </CardHeader>
       <CardContent>
         {engines.length === 0 ? (
-          <p className="text-secondary text-sm">
-            No audited-engine visibility in this window yet.
-          </p>
+          <p className="text-secondary text-sm">No audited-engine visibility in this window yet.</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {engines.map((engine) => (
@@ -431,9 +459,7 @@ function EngineVisibilityCard({
   );
 }
 
-function EngineTile({
-  engine,
-}: Readonly<{ engine: LlmAnalytics['engine_visibility'][number] }>) {
+function EngineTile({ engine }: Readonly<{ engine: LlmAnalytics['engine_visibility'][number] }>) {
   const latest = latestValue(engine.series);
   const points = toCountChartPoints(engine.series);
   const firstLabel = points[0]?.label ?? '';
@@ -487,9 +513,7 @@ function ThemesCard({
     <Card>
       <CardHeader>
         <CardTitle>Themes</CardTitle>
-        <CardDescription>
-          Visibility metrics rolled up by prompt theme and intent
-        </CardDescription>
+        <CardDescription>Visibility metrics rolled up by prompt theme and intent</CardDescription>
       </CardHeader>
       {query.isLoading ? (
         <CardContent className="grid gap-2" aria-hidden>

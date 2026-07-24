@@ -328,7 +328,14 @@ async def seed_completed(session: AsyncSession, project, prompts, connections):
         total_completed=completed, total_failed=0, visibility_score=83.0,
         metrics={
             "brand_mention_rate": 0.83, "owned_citation_rate": 0.61,
-            "competitor_mention_rate": 0.44, "per_engine": {
+            # Real scoring shape: dict keyed by competitor name (scoring.py
+            # `_competitor_aggregates`), not a bare float — the trends endpoint
+            # iterates it (`set(metrics.get("competitor_mention_rate") or {})`).
+            # NOTE: no `share_of_voice` block here, so the Visibility Trends
+            # SOV chart / SOV ranking columns render empty in the harness.
+            # Real audits populate it via scoring; enrich the seed if those
+            # visuals need harness coverage.
+            "competitor_mention_rate": {"Velocity Sports": 0.44}, "per_engine": {
                 logical: {"mention_rate": 0.83} for logical, _, _ in ENGINES
             },
         },

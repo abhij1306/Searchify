@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  bucketAdjective,
-  bucketAdjectiveTitle,
-  bucketCountLabel,
-  rangeToFrom,
-} from './options';
+import { bucketAdjective, bucketAdjectiveTitle, bucketCountLabel, rangeToWindow } from './options';
 import {
   CORRELATION_MIN_SAMPLE,
   aiSourceLabel,
@@ -28,12 +23,12 @@ import {
 import type { LlmAnalytics } from '@/lib/api/analytics';
 
 describe('analytics options vocabulary', () => {
-  it('resolves range presets to an inclusive UTC from bound', () => {
+  it('resolves range presets to UTC date window bounds (latest sends none)', () => {
     const now = new Date('2026-07-24T12:00:00Z');
-    expect(rangeToFrom('all', now)).toBeUndefined();
-    expect(rangeToFrom('30d', now)).toBe('2026-06-24T12:00:00.000Z');
-    expect(rangeToFrom('90d', now)).toBe('2026-04-25T12:00:00.000Z');
-    expect(rangeToFrom('1y', now)).toBe('2025-07-24T12:00:00.000Z');
+    expect(rangeToWindow('latest', now)).toEqual({});
+    expect(rangeToWindow('30d', now)).toEqual({ from: '2026-06-24', to: '2026-07-24' });
+    expect(rangeToWindow('90d', now)).toEqual({ from: '2026-04-25', to: '2026-07-24' });
+    expect(rangeToWindow('1y', now)).toEqual({ from: '2025-07-24', to: '2026-07-24' });
   });
 
   it('labels buckets per granularity', () => {
@@ -95,7 +90,12 @@ describe('countDomainMax + countYLabels', () => {
 
 describe('latestValue', () => {
   it('returns the last available value, skipping trailing gaps', () => {
-    expect(latestValue([{ date: 'a', value: 1 }, { date: 'b', value: null }])).toBe(1);
+    expect(
+      latestValue([
+        { date: 'a', value: 1 },
+        { date: 'b', value: null },
+      ]),
+    ).toBe(1);
     expect(latestValue([{ date: 'a', value: null }])).toBeNull();
     expect(latestValue([])).toBeNull();
   });
@@ -169,10 +169,7 @@ describe('sortEngineVisibility', () => {
 
 describe('correlationDisplay', () => {
   it('frames an ok coefficient as descriptive, not a forecast', () => {
-    const display = correlationDisplay(
-      { state: 'ok', coefficient: 0.68, sample_size: 12 },
-      'week',
-    );
+    const display = correlationDisplay({ state: 'ok', coefficient: 0.68, sample_size: 12 }, 'week');
     expect(display.value).toBe('r = 0.68');
     expect(display.insufficient).toBe(false);
     expect(display.badge).toBe('n = 12 weekly buckets');

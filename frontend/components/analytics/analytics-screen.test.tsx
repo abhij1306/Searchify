@@ -129,10 +129,10 @@ describe('AnalyticsScreen — populated dashboard', () => {
     mockEndpoints();
     renderWithProviders(<AnalyticsScreen />);
 
-    // Toolbar (default range + week granularity selected).
+    // Toolbar (default latest-snapshot range + week granularity selected).
     const toolbar = await screen.findByTestId('analytics-toolbar');
     expect(within(toolbar).getByRole('button', { name: 'Select date range' })).toHaveTextContent(
-      'Last 90 days',
+      'Latest synced window',
     );
     const group = within(toolbar).getByRole('radiogroup', { name: 'Granularity' });
     expect(within(group).getByRole('radio', { name: 'Week' })).toHaveAttribute(
@@ -188,18 +188,25 @@ describe('AnalyticsScreen — populated dashboard', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Day' }));
     await waitFor(() =>
-      expect(
-        seen.some((url) => new URL(url).searchParams.get('granularity') === 'day'),
-      ).toBe(true),
+      expect(seen.some((url) => new URL(url).searchParams.get('granularity') === 'day')).toBe(true),
     );
     expect(await screen.findByText('3 days')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Select date range' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Last 30 days' }));
-    const fromValues = () => seen.map((url) => new URL(url).searchParams.get('from'));
-    await waitFor(() =>
-      expect(new Set(fromValues().filter(Boolean)).size).toBeGreaterThan(1),
-    );
+    const params = (url: string) => new URL(url).searchParams;
+    const fromValues = () => seen.map((url) => params(url).get('from'));
+    // Bounded presets send the both-or-neither `from`+`to` UTC-date window
+    // the analytics API binds — never a from-only ISO datetime.
+    await waitFor(() => expect(fromValues().some((value) => value !== null)).toBe(true));
+    for (const url of seen.filter((candidate) => params(candidate).get('from') !== null)) {
+      expect(params(url).get('from')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(params(url).get('to')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Select date range' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Last 90 days' }));
+    await waitFor(() => expect(new Set(fromValues().filter(Boolean)).size).toBeGreaterThan(1));
   });
 });
 

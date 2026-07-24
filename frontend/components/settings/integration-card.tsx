@@ -121,8 +121,8 @@ function GrantAlert({ family, status }: Readonly<{ family: GrantFamily; status: 
   if (status === 'error') {
     return (
       <Alert tone="danger">
-        The last connection test failed — {title} rejected this grant&rsquo;s refresh. Reconnect to
-        resume syncing.
+        The last connection test failed — {title}&nbsp;rejected this grant&rsquo;s refresh.
+        Reconnect to resume syncing.
       </Alert>
     );
   }
@@ -353,8 +353,9 @@ function ConnectionRow({
                 deleted. Previously imported {label} data is kept.
               </p>
               <p className="text-secondary text-sm">
-                If {familyTitle} can&rsquo;t be reached to complete the revocation, the grant moves
-                to <strong className="text-foreground font-semibold">pending revocation</strong> and
+                If {familyTitle}&nbsp;can&rsquo;t be reached to complete the revocation, the grant
+                moves to{' '}
+                <strong className="text-foreground font-semibold">pending revocation</strong> and
                 Searchify retries in the background.
               </p>
             </>

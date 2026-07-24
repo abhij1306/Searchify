@@ -47,7 +47,7 @@ describe('ReferralsTable — rendering', () => {
     mswServer.use(
       http.get(REFERRALS_URL, () => HttpResponse.json({ items: [rowA, rowB], next_cursor: null })),
     );
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     expect(await screen.findByText('chatgpt.com')).toBeInTheDocument();
     // Both fixture rows land on the same host (muted host span per row).
@@ -81,7 +81,7 @@ describe('ReferralsTable — rendering', () => {
         }),
       ),
     );
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     expect(await screen.findByText('Other')).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);
@@ -101,7 +101,7 @@ describe('ReferralsTable — keyset paging', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     expect(await screen.findByText('chatgpt.com')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
@@ -137,7 +137,7 @@ describe('ReferralsTable — source filter', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     // Advance to page two first so the stale-cursor case is exercised.
     expect(await screen.findByText('chatgpt.com')).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe('ReferralsTable — empty states', () => {
     mswServer.use(
       http.get(REFERRALS_URL, () => HttpResponse.json({ items: [], next_cursor: null })),
     );
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     expect(
       await screen.findByText('No AI-referral events recorded in this window yet.'),
@@ -182,7 +182,7 @@ describe('ReferralsTable — empty states', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} />);
+    renderWithProviders(<ReferralsTable projectId={PROJECT} from={undefined} to={undefined} />);
 
     expect(await screen.findByText('chatgpt.com')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Filter by source' }));

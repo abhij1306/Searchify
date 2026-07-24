@@ -7,13 +7,7 @@ import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { badgeBase, neutralBadge } from '@/components/ui/badge-variants';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CursorPager } from '@/components/ui/cursor-pager';
 import {
   Dropdown,
@@ -56,14 +50,15 @@ const CHIP_ACTIVE_CLASS =
  * Referrer host, per-source badge, Confidence, Match signal (`—` for nulls —
  * never a fabricated value). Paging walks the C4 keyset envelope via the
  * shared `useCursorStack`; the `?source=` filter restarts the walk. The
- * parent remounts this table on window change (`key={from}`) so a stale
+ * parent remounts this table on window change (`key={from|to}`) so a stale
  * cursor is never replayed against a different window (backend rejects that
  * with a 400).
  */
 export function ReferralsTable({
   projectId,
   from,
-}: Readonly<{ projectId: string; from: string | undefined }>) {
+  to,
+}: Readonly<{ projectId: string; from: string | undefined; to: string | undefined }>) {
   const [source, setSource] = useState<AiSource | null>(null);
   const { cursor, canPrev, push, pop, reset } = useCursorStack();
 
@@ -71,12 +66,13 @@ export function ReferralsTable({
     queryKey: queryKeys.analytics.referrals(projectId, {
       source: source ?? null,
       from: from ?? null,
+      to: to ?? null,
       cursor: cursor ?? null,
     }),
     queryFn: ({ signal }) =>
       analyticsApi.getReferrals(
         projectId,
-        { source: source ?? undefined, from, cursor },
+        { source: source ?? undefined, from, to, cursor },
         { signal },
       ),
   });
