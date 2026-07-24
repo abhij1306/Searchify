@@ -49,12 +49,11 @@ function AnswerText({ text }: { text: string }) {
       const trailing = token.match(TRAILING_PUNCT_RE)?.[0] ?? '';
       const href = trailing ? token.slice(0, -trailing.length) : token;
       nodes.push(
-        <a key={key} href={href}>
+        <a key={key} href={href} target="_blank" rel="noreferrer">
           {href}
         </a>,
       );
-      key += 1;
-      if (trailing) nodes.push(trailing);
+      key += 1;      if (trailing) nodes.push(trailing);
     } else {
       nodes.push(
         <span key={key} className="todo-tag">

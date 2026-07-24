@@ -14,7 +14,10 @@ import { BLOG_EMPTY_STATE, POSTS, type BlogPost } from '@/lib/marketing-content/
  * Heading-rule note: post titles are rendered as styled paragraphs
  * (.featured-title / .post-card-title), NOT h2/h3 like the mockup — the
  * placeholder title contains "Searchify" and no h2–h6 may contain the
- * product name (keeps heading queries unambiguous in tests).
+ * product name (keeps heading queries unambiguous in tests). The paragraphs
+ * carry role="heading" + aria-level so assistive tech still gets the document
+ * outline the mockup implies; the brand-name test asserts against literal
+ * h2–h6 tags rather than heading-role queries so the two rules coexist.
  */
 
 function TagRow({ tags }: Readonly<{ tags: readonly string[] }>) {
@@ -52,7 +55,7 @@ function FeaturedPost({ post }: Readonly<{ post: BlogPost }>) {
         <div className="card rim featured">
           <div className="featured-copy">
             <TagRow tags={post.tags} />
-            <p className="featured-title">
+            <p className="featured-title" role="heading" aria-level={2}>
               <Link href={href}>{post.title}</Link>
             </p>
             <p className="excerpt">{post.excerpt}</p>
@@ -88,7 +91,7 @@ function PostGrid({ posts }: Readonly<{ posts: readonly BlogPost[] }>) {
           {posts.map((post) => (
             <article className="card post-card" key={post.slug}>
               <TagRow tags={post.tags} />
-              <p className="post-card-title">
+              <p className="post-card-title" role="heading" aria-level={3}>
                 <Link href={`/blog/${post.slug}`}>{post.title}</Link>
               </p>
               <p className="excerpt">{post.excerpt}</p>

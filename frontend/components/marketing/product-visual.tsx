@@ -163,11 +163,10 @@ export function ProductVisual() {
           <div className="evidence">
             <div className="evidence-head">
               <span className="panel-label">Evidence — latest runs</span>
-              <a className="view-link" href="#evidence">
+              <span className="view-link">
                 View all runs →
-              </a>
-            </div>
-            {EVIDENCE_ROWS.map(({ prompt, engine, dot, mentioned, citations, ago }) => (
+              </span>
+            </div>            {EVIDENCE_ROWS.map(({ prompt, engine, dot, mentioned, citations, ago }) => (
               <div className="evidence-row" key={prompt}>
                 <span className="ev-prompt">{prompt}</span>
                 {/* `display: contents` on desktop (children stay grid items);

@@ -45,9 +45,8 @@ function TierCard({ tier }: { tier: PricingTier }) {
     <div className={cn('card tier-card', tier.highlighted && 'popular rim')}>
       {tier.highlighted && <span className="tier-tag">Recommended</span>}
       <div className="tier-head">
-        <div className="tier-name">{tier.name}</div>
-        <p className="tier-pos">{tier.blurb}</p>
-        <div className="tier-price">
+        <h3 className="tier-name">{tier.name}</h3>
+        <p className="tier-pos">{tier.blurb}</p>        <div className="tier-price">
           <span className="amount">{tier.price}</span>
           {!isCustom && <span className="per">{tier.cadence}</span>}
         </div>

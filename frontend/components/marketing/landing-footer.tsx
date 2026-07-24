@@ -126,24 +126,23 @@ export function LandingFooter() {
               <LogoCube size={24} />
               <span>Searchify</span>
             </Link>
-            <p className="footer-desc">AI visibility and site intelligence platform.</p>
-            {SOCIAL_LINKS.length > 0 ? (
-              <div className="social-row">
-                {SOCIAL_LINKS.map((social) => (
-                  <SocialButton key={social.key} social={social} />
-                ))}
-              </div>
-            ) : null}
+            <p className="footer-desc">Open-source AI visibility and site intelligence platform.</p>
+            <div className="social-row">
+              {SOCIAL_LINKS.map((social) => (
+                <SocialButton key={social.key} social={social} />
+              ))}
+            </div>
           </div>
           {FOOTER_COLUMNS.map((column) => (
             <div className="footer-col" key={column.key}>
               <div className="f-col-label">{column.label}</div>
-              <nav className="f-col-links" aria-label={column.label}>
+              <div className="f-col-links">
                 {column.links.map((link) => (
                   <FooterColumnLink key={link.label} link={link} />
                 ))}
-              </nav>
+              </div>
             </div>
+          ))}            </div>
           ))}
         </nav>
         <div className="footer-bottom">

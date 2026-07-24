@@ -32,13 +32,14 @@ describe('Blog index (public marketing `/blog`)', () => {
   it('renders the intentional empty state until an editorial post is approved', () => {
     const { container } = render(<BlogPage />);
 
-    // Exactly one h1; no h2–h6 may contain the product name (post titles are
-    // styled paragraphs, not headings, so the placeholder title is exempt).
+    // Exactly one h1; no h2–h6 may contain the product name. Post titles are
+    // styled paragraphs carrying role="heading" for assistive tech, so this
+    // asserts against literal h2–h6 tags rather than the heading role — the
+    // placeholder title is a heading to screen readers but not an h2–h6.
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).toHaveTextContent(/notes on/i);
-    for (const heading of screen.getAllByRole('heading')) {
-      if (heading === h1s[0]) continue;
+    for (const heading of container.querySelectorAll('h2, h3, h4, h5, h6')) {
       expect(heading).not.toHaveTextContent(/searchify/i);
     }
 

@@ -43,17 +43,20 @@ describe('LandingNav', () => {
 
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument();
 
-    for (const [name] of [
+    for (const [name, key] of [
       [/^product$/i, 'product'],
       [/^resources$/i, 'resources'],
       [/^solutions$/i, 'solutions'],
     ] as const) {
-      const trigger = control(name, 'desktop-nav-panel');
+      // Each trigger controls its own panel, nested in the trigger's .nav-item
+      // so the menu items are reachable by Tab.
+      const trigger = control(name, `desktop-nav-panel-${key}`);
       expect(trigger).toHaveAttribute('aria-haspopup', 'true');
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
-      const drop = panel('desktop-nav-panel');
+      const drop = panel(`desktop-nav-panel-${key}`);
       expect(drop).toHaveAttribute('role', 'menu');
       expect(drop).toHaveClass('drop', 'shared-drop');
+      expect(trigger.closest('.nav-item')).toContainElement(drop);
     }
 
     // Enterprise / Pricing are plain links — no dropdown chrome whatsoever.
@@ -82,9 +85,9 @@ describe('LandingNav', () => {
     // Product: the 6 feature rows (absolute anchors so they resolve from
     // subpages) + the "How it works" group's 3 numbered steps.
     fireEvent.mouseEnter(
-      control(/^product$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+      control(/^product$/i, 'desktop-nav-panel-product').closest('.nav-item') as Element,
     );
-    const product = panel('desktop-nav-panel');
+    const product = panel('desktop-nav-panel-product');
     expect(within(product).getAllByRole('menuitem')).toHaveLength(9);
     for (const title of [
       'Three-engine coverage',
@@ -106,9 +109,9 @@ describe('LandingNav', () => {
     expect(product.querySelector('.d-group-label')).toHaveTextContent('How it works');
 
     fireEvent.mouseEnter(
-      control(/^resources$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+      control(/^resources$/i, 'desktop-nav-panel-resources').closest('.nav-item') as Element,
     );
-    const resources = panel('desktop-nav-panel');
+    const resources = panel('desktop-nav-panel-resources');
     expect(within(resources).getAllByRole('menuitem')).toHaveLength(3);
     expect(within(resources).getByRole('menuitem', { name: /^blog/i })).toHaveAttribute(
       'href',
@@ -125,9 +128,9 @@ describe('LandingNav', () => {
     expect(within(resources).queryByRole('menuitem', { name: /^documentation/i })).toBeNull();
 
     fireEvent.mouseEnter(
-      control(/^solutions$/i, 'desktop-nav-panel').closest('.nav-item') as Element,
+      control(/^solutions$/i, 'desktop-nav-panel-solutions').closest('.nav-item') as Element,
     );
-    const solutions = panel('desktop-nav-panel');
+    const solutions = panel('desktop-nav-panel-solutions');
     expect(within(solutions).getAllByRole('menuitem')).toHaveLength(4);
     expect(within(solutions).getByRole('menuitem', { name: /^agencies/i })).toHaveAttribute(
       'href',
@@ -145,6 +148,42 @@ describe('LandingNav', () => {
       'href',
       '/solutions#pr',
     );
+  });
+
+  it('keeps the panel open when focus moves from the trigger into its menu items', () => {
+    renderWithProviders(<LandingNav />);
+
+    for (const [name, key, count] of [
+      [/^product$/i, 'product', 9],
+      [/^resources$/i, 'resources', 3],
+      [/^solutions$/i, 'solutions', 4],
+    ] as const) {
+      const trigger = control(name, `desktop-nav-panel-${key}`);
+      const navItem = trigger.closest('.nav-item') as HTMLElement;
+
+      // Keyboard focus alone opens the panel (no pointer involved).
+      fireEvent.focus(trigger);
+      fireEvent.focusIn(navItem);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+      // Tabbing from the trigger to the first menu item must NOT close the
+      // panel — the blur handler only fires when focus leaves the .nav-item.
+      const items = within(panel(`desktop-nav-panel-${key}`)).getAllByRole('menuitem');
+      expect(items).toHaveLength(count);
+      fireEvent.blur(trigger, { relatedTarget: items[0] });
+      fireEvent.focusOut(navItem, { relatedTarget: items[0] });
+
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(navItem).toHaveClass('open');
+      // Every item is still rendered and reachable, none of them inert.
+      const stillThere = within(panel(`desktop-nav-panel-${key}`)).getAllByRole('menuitem');
+      expect(stillThere).toHaveLength(count);
+      for (const item of stillThere) expect(item).toHaveAttribute('href');
+
+      // Focus leaving the whole .nav-item does close it.
+      fireEvent.focusOut(navItem, { relatedTarget: document.body });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    }
   });
 
   it('keeps every nav link inside the site', () => {
@@ -183,7 +222,7 @@ describe('LandingNav', () => {
   it('drives the open-state classes the CSS keys on', () => {
     renderWithProviders(<LandingNav />);
 
-    const product = control(/^product$/i, 'desktop-nav-panel');
+    const product = control(/^product$/i, 'desktop-nav-panel-product');
     const navItem = product.closest('.nav-item');
     expect(navItem).not.toBeNull();
     fireEvent.mouseEnter(navItem as Element);

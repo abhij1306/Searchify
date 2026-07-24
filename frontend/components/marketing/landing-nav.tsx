@@ -277,7 +277,10 @@ function MobileItemLink({ item, onSelect }: { item: NavDropItem; onSelect: () =>
  * never closes a hover-open panel — and item click + Esc close; chevron
  * rotates, an invisible bridge covers the trigger→panel gap so the pointer
  * never loses hover). "Enterprise" / "Pricing" are plain links with no
- * dropdown chrome. ≤860px: a hamburger opens a slide-down menu with
+ * dropdown chrome. One panel exists at a time and renders inside the open
+ * trigger's `.nav-item`, so Tab moves from the trigger into the submenu links
+ * rather than blurring out of the subtree and closing the panel first.
+ * ≤860px: a hamburger opens a slide-down menu with
  * tap-to-expand accordions (Esc closes it too). The bar's backdrop
  * intensifies once the page scrolls. Open state is driven from React
  * (`.open`) so `aria-expanded` stays truthful; class lists go through `cn()`
@@ -290,9 +293,6 @@ export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [openDrop, setOpenDrop] = useState<DropKey | null>(null);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
-  const [dropLeft, setDropLeft] = useState(0);
-  const navLinksRef = useRef<HTMLDivElement | null>(null);
-  const triggerRefs = useRef<Partial<Record<DropKey, HTMLButtonElement>>>({});
   const closeTimer = useRef<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openAcc, setOpenAcc] = useState<DropKey | null>(null);
@@ -331,18 +331,14 @@ export function LandingNav() {
     closeTimer.current = null;
   };
 
+  // The panel renders inside the open trigger's .nav-item (which is
+  // position:relative), so the base `.drop { left: 50% }` already centers it on
+  // that trigger — no measured offset needed.
   const openDesktopDrop = (key: DropKey) => {
     clearDropClose();
     const order: DropKey[] = ['product', 'resources', 'solutions'];
     if (openDrop && openDrop !== key) {
       setSlideDirection(order.indexOf(key) > order.indexOf(openDrop) ? 'right' : 'left');
-    }
-    const trigger = triggerRefs.current[key];
-    const navLinks = navLinksRef.current;
-    if (trigger && navLinks) {
-      const triggerRect = trigger.getBoundingClientRect();
-      const navRect = navLinks.getBoundingClientRect();
-      setDropLeft(triggerRect.left - navRect.left + triggerRect.width / 2);
     }
     setOpenDrop(key);
   };
@@ -385,7 +381,6 @@ export function LandingNav() {
   });
 
   const toggleAcc = (key: DropKey) => setOpenAcc((current) => (current === key ? null : key));
-  const activeDrop = NAV_DROPS.find((drop) => drop.key === openDrop);
 
   return (
     <div className="nav-wrap">
@@ -395,81 +390,79 @@ export function LandingNav() {
           <span>Searchify</span>
           <span className="by-tag">by CUBE27</span>
         </Link>
-        <div
-          className="nav-links"
-          ref={navLinksRef}
-          onMouseEnter={clearDropClose}
-          onMouseLeave={scheduleDropClose}
-        >
-          {NAV_DROPS.map(({ key, label }) => (
-            <div
-              className={cn('nav-item', openDrop === key && 'open')}
-              key={key}
-              {...dropProps(key)}
-            >
-              <button
-                ref={(node) => {
-                  if (node) triggerRefs.current[key] = node;
-                }}
-                className="nav-link"
-                type="button"
-                aria-expanded={openDrop === key}
-                aria-haspopup="true"
-                aria-controls="desktop-nav-panel"
-                onClick={() => openDesktopDrop(key)}
-              >
-                {label} <ChevronDown className="chev" aria-hidden />
-              </button>
-            </div>
-          ))}
+        <div className="nav-links" onMouseEnter={clearDropClose} onMouseLeave={scheduleDropClose}>
+          {NAV_DROPS.map(({ key, label, groups }) => {
+            const isOpen = openDrop === key;
+            return (
+              <div className={cn('nav-item', isOpen && 'open')} key={key} {...dropProps(key)}>
+                <button
+                  className="nav-link"
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-haspopup="true"
+                  aria-controls={`desktop-nav-panel-${key}`}
+                  onClick={() => openDesktopDrop(key)}
+                >
+                  {label} <ChevronDown className="chev" aria-hidden />
+                </button>
+                {/* Each trigger owns its panel, rendered INSIDE its .nav-item.
+                    That nesting is what makes the submenu keyboard-reachable:
+                    onBlurCapture only closes when focus leaves the .nav-item
+                    subtree, so Tab moves from the trigger into the menu items
+                    instead of closing the panel first. The panel element is
+                    always present (so aria-controls resolves) and hidden via
+                    .open/aria-hidden; only its content is mounted on open, which
+                    keeps the existing remount-driven slide animation. */}
+                <div
+                  className={cn(
+                    'drop shared-drop',
+                    isOpen && 'open',
+                    `drop-${key}`,
+                    `slide-${slideDirection}`,
+                  )}
+                  id={`desktop-nav-panel-${key}`}
+                  role="menu"
+                  aria-hidden={!isOpen}
+                  onMouseEnter={clearDropClose}
+                >
+                  {isOpen ? (
+                    <div className="drop-content" key={key}>
+                      {groups.map((group) =>
+                        group.label ? (
+                          <div className="d-group" key={group.label}>
+                            <span className="d-group-label">{group.label}</span>
+                            <div className="d-steps">
+                              {group.items.map((item) => (
+                                <DropItemLink
+                                  key={item.title}
+                                  item={item}
+                                  onSelect={() => setOpenDrop(null)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          group.items.map((item) => (
+                            <DropItemLink
+                              key={item.title}
+                              item={item}
+                              onSelect={() => setOpenDrop(null)}
+                            />
+                          ))
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
           <Link className="nav-link" href="/enterprise">
             Enterprise
           </Link>
           <Link className="nav-link" href="/pricing">
             Pricing
           </Link>
-          <div
-            className={cn(
-              'drop shared-drop',
-              openDrop && 'open',
-              openDrop && `drop-${openDrop}`,
-              `slide-${slideDirection}`,
-            )}
-            id="desktop-nav-panel"
-            role="menu"
-            aria-hidden={!openDrop}
-            style={{ left: dropLeft }}
-            onMouseEnter={clearDropClose}
-          >
-            {activeDrop ? (
-              <div className="drop-content" key={activeDrop.key}>
-                {activeDrop.groups.map((group) =>
-                  group.label ? (
-                    <div className="d-group" key={group.label}>
-                      <span className="d-group-label">{group.label}</span>
-                      <div className="d-steps">
-                        {group.items.map((item) => (
-                          <DropItemLink
-                            key={item.title}
-                            item={item}
-                            onSelect={() => setOpenDrop(null)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    group.items.map((item) => (
-                      <DropItemLink
-                        key={item.title}
-                        item={item}
-                        onSelect={() => setOpenDrop(null)}
-                      />
-                    ))
-                  ),
-                )}
-              </div>
-            ) : null}
-          </div>
         </div>
         <div className="nav-actions">
           <button
