@@ -18,8 +18,9 @@ rather than guessing. Every write validates:
   ingest may target it (non-matching ⇒ ``MappingPropertyNotOwnedError``,
   API 422). GA4 property refs are numeric property ids, never domains, so
   the owned-domain rule can never match them: they are validated on id
-  SHAPE only (``is_ga4_property_ref``), with reachability probed by the
-  connection test;
+  SHAPE only (``is_ga4_property_ref``) and persisted in the CANONICAL
+  bare-numeric form (``normalize_ga4_property_ref``), with reachability
+  probed by the connection test;
 - **one active owner** — the partial unique index on
   ``(workspace_id, provider, property_ref) WHERE status = active``
   guarantees a single active owner across ALL connections; an
@@ -45,6 +46,7 @@ from app.core.config.integrations import (
     MAPPING_STATUS_ACTIVE,
     MAPPING_STATUS_DISABLED,
     is_ga4_property_ref,
+    normalize_ga4_property_ref,
 )
 from app.domain.integrations.schemas import IntegrationPropertyMappingResponse
 from app.domain.integrations.service import get_connection
@@ -158,11 +160,14 @@ async def create_mapping(
     if provider == INTEGRATION_PROVIDER_GA4:
         # GA4 property refs are numeric ids, never domains: the owned-domain
         # rule cannot apply — validate the id shape only and rely on the
-        # connection test for reachability.
+        # connection test for reachability. Persist the CANONICAL bare
+        # numeric id so the ``properties/``-prefixed and bare spellings
+        # cannot split the one-active-owner slot for the same property.
         if not is_ga4_property_ref(property_ref):
             raise MappingPropertyNotOwnedError(
                 f"GA4 property {property_ref!r} is not a numeric property id"
             )
+        canonical_ref = normalize_ga4_property_ref(property_ref)
     else:
         host = property_ref_host(property_ref)
         owned_hosts = {
@@ -174,11 +179,12 @@ async def create_mapping(
                 f"property {property_ref!r} does not resolve to an owned domain "
                 f"of project {project_id}"
             )
+        canonical_ref = property_ref.strip()
     mapping = IntegrationPropertyMapping(
         workspace_id=workspace_id,
         connection_id=connection.id,
         provider=provider,
-        property_ref=property_ref.strip(),
+        property_ref=canonical_ref,
         project_id=project.id,
         status=MAPPING_STATUS_ACTIVE,
     )

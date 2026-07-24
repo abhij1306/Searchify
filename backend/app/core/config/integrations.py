@@ -123,13 +123,27 @@ GA4_RUN_REPORT_PATH: Final = "/v1beta/properties/{property_ref}:runReport"
 # provider's ``properties/`` resource prefix (``123456789`` or
 # ``properties/123456789``) — never domain-shaped, so the owned-domain
 # mapping rule cannot apply to them (shape is validated on mapping writes;
-# the connection test probes reachability).
+# the connection test probes reachability). The CANONICAL stored form is
+# the bare numeric id — mappings, metric rows, and the runReport URL all
+# use it (``normalize_ga4_property_ref``) so the two spellings can never
+# split owner identity or produce ``/v1beta/properties/properties%2F…``.
 GA4_PROPERTY_REF_PATTERN: Final = re.compile(r"^(?:properties/)?\d+$")
+GA4_PROPERTY_RESOURCE_PREFIX: Final = "properties/"
 
 
 def is_ga4_property_ref(property_ref: str) -> bool:
     """True when ``property_ref`` is a well-formed GA4 numeric property id."""
     return bool(GA4_PROPERTY_REF_PATTERN.match(property_ref.strip()))
+
+
+def normalize_ga4_property_ref(property_ref: str) -> str:
+    """The canonical GA4 property ref: the bare numeric id.
+
+    Idempotent — a bare numeric id passes through unchanged. Callers must
+    validate with ``is_ga4_property_ref`` first when the value is
+    user-supplied; this helper only normalizes spelling.
+    """
+    return property_ref.strip().removeprefix(GA4_PROPERTY_RESOURCE_PREFIX)
 
 
 # Bing Webmaster API v1 literals, pinned from Microsoft docs at I12 (plan

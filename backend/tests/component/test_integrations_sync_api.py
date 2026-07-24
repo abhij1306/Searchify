@@ -247,7 +247,10 @@ async def test_duplicate_active_window_is_409(
     assert first.status_code == 202
     duplicate = await client.post(f"{_BASE}/{gsc.id}/sync", json=window)
     assert duplicate.status_code == 409
-    assert duplicate.json()["detail"] == "sync_active_window_conflict"
+    # Same dict detail shape as the project-level sync fan-out 409.
+    detail = duplicate.json()["detail"]
+    assert detail["error"] == "sync_active_window_conflict"
+    assert detail["enqueued_connection_ids"] == []
 
     runs = list((await db_session.execute(select(IntegrationSyncRun))).scalars())
     assert [str(run.id) for run in runs] == [first.json()["sync_run_id"]]

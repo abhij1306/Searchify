@@ -306,6 +306,8 @@ async def test_same_property_allowed_for_another_provider(
         },
     )
     assert ga4_mapping.status_code == 201
+    # The prefixed provider resource-name spelling persists canonical.
+    assert ga4_mapping.json()["property_ref"] == "123456789"
 
 
 @pytest.mark.asyncio
@@ -313,23 +315,28 @@ async def test_create_ga4_mapping_numeric_property_ids(
     client: httpx.AsyncClient, db_session
 ) -> None:
     """GA4 refs are numeric property ids: the owned-domain rule does not
-    apply (a numeric id can never resolve to an ``OwnedDomain`` host)."""
+    apply (a numeric id can never resolve to an ``OwnedDomain`` host).
+    Both spellings are accepted and persist as the CANONICAL bare numeric
+    id, so the two spellings share one active-owner slot."""
     _ws, _gsc, ga4, project = await _setup(client, db_session, "map-ga4@example.com")
 
-    for property_ref in ("123456789", "properties/987654321"):
+    for submitted, canonical in (
+        ("123456789", "123456789"),
+        ("properties/987654321", "987654321"),
+    ):
         resp = await client.post(
             f"{_BASE}/{ga4.id}/mappings",
             json={
                 "provider": "ga4",
-                "property_ref": property_ref,
+                "property_ref": submitted,
                 "project_id": str(project.id),
             },
         )
-        assert resp.status_code == 201, property_ref
+        assert resp.status_code == 201, submitted
         body = resp.json()
         _assert_mapping_contract_shape(body)
         assert body["provider"] == "ga4"
-        assert body["property_ref"] == property_ref
+        assert body["property_ref"] == canonical
 
 
 @pytest.mark.asyncio

@@ -249,9 +249,15 @@ async def enqueue_sync_endpoint(
             detail=ERROR_SYNC_WINDOW_INVALID,
         ) from exc
     except ActiveWindowConflictError as exc:
+        # Same detail shape as the project-level sync fan-out 409
+        # (api/traffic.py) — one dict contract per error token; here the
+        # conflict means nothing was enqueued by this call.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+            detail={
+                "error": ERROR_SYNC_ACTIVE_WINDOW_CONFLICT,
+                "enqueued_connection_ids": [],
+            },
         ) from exc
     return IntegrationSyncEnqueueResponse(
         sync_run_id=run.id, connection_id=run.connection_id, status=run.status

@@ -214,6 +214,13 @@ def metric_row_not_superseded() -> ColumnElement[bool]:
     a later re-sync at a higher ``resync_seq`` is stale evidence and is
     filtered out. On an OUTER join a NULL metric row passes (no row means
     no newer revision).
+
+    Scope limitation: ``resync_seq`` is allocated per (connection,
+    sync_kind, window), so "latest revision" is only meaningful within one
+    connection+kind chain. Disconnecting and re-connecting a provider
+    starts a NEW connection whose re-sync begins again at seq 0 and does
+    not supersede the old connection's rows — cross-connection duplicates
+    are a known, spec-sanctioned edge (docs/roadmap/integrations.md).
     """
     newer_rows = aliased(IntegrationMetricRow)
     return ~(

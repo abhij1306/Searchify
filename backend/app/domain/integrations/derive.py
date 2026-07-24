@@ -49,8 +49,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config.integrations import (
     INTEGRATION_DATASET_TEMPLATES,
     INTEGRATION_IMPORTER_VERSION,
+    INTEGRATION_PROVIDER_GA4,
     MAPPING_STATUS_ACTIVE,
     IntegrationDatasetTemplate,
+    normalize_ga4_property_ref,
     pack_dimension_key,
 )
 from app.models.integrations import (
@@ -92,8 +94,13 @@ async def resolve_active_mapping(
     The partial unique index guarantees at most one ACTIVE owner, so this
     never picks between candidates; zero owners raises
     ``UnmappedPropertyError`` (the run fails, the property is never
-    guessed).
+    guessed). GA4 refs are normalized to the canonical bare-numeric form
+    first — mappings are stored canonical (``create_mapping``) while a
+    connection's ``account_ref`` may carry the provider's
+    ``properties/`` resource-name spelling.
     """
+    if provider == INTEGRATION_PROVIDER_GA4:
+        property_ref = normalize_ga4_property_ref(property_ref)
     result = await session.execute(
         select(IntegrationPropertyMapping).where(
             IntegrationPropertyMapping.workspace_id == workspace_id,

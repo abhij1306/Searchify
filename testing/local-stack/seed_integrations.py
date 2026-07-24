@@ -6,8 +6,10 @@ Creates, for the seeded demo workspace (demo@searchify.dev) and its
 
   - Google OAuth grant (stub-encrypted dummy tokens) + GSC & GA4 connections
   - Microsoft OAuth grant + Bing connection
-  - 3 ACTIVE property mappings (property_ref == connection.account_ref, all
-    resolving to the project's owned domains)
+  - 3 ACTIVE property mappings (GSC/Bing property_ref == connection.account_ref;
+    GA4 keeps the provider's ``properties/`` account_ref spelling on the
+    connection but maps + writes metric rows under the canonical bare id,
+    mirroring the normalizing create/derive paths)
   - Terminal (succeeded) sync runs + immutable import artifacts per dataset
   - IntegrationMetricRow history 2026-07-08..2026-07-21 (14 days):
     55 GSC pages + 55 GSC queries per day (keyset-paging volume), GA4
@@ -58,6 +60,7 @@ from app.core.config.integrations import (
     INTEGRATION_TRANSPORT_MICROSOFT,
     MAPPING_STATUS_ACTIVE,
     SYNC_KIND_SCHEDULED,
+    normalize_ga4_property_ref,
     pack_dimension_key,
 )
 from app.core.config.provider_catalog import (
@@ -100,8 +103,12 @@ VISIBILITY_DAYS = [date(2026, 7, 8) + timedelta(days=i) for i in range(10)]
 
 GSC_PROPERTY = "sc-domain:acme-running.example.com"
 # GA4 property refs are numeric property ids (the API validates the shape;
-# never domain-shaped).
+# never domain-shaped). The connection's account_ref keeps the provider's
+# resource-name spelling (what Google's account listing returns) while
+# mappings + metric rows use the CANONICAL bare id — exactly what the
+# normalizing write/derive paths produce.
 GA4_PROPERTY = "properties/123456789"
+GA4_PROPERTY_CANONICAL = normalize_ga4_property_ref(GA4_PROPERTY)
 BING_PROPERTY = "https://acme-running.example.com"
 
 GSC_PAGES = [
@@ -316,7 +323,14 @@ async def seed() -> dict:
                     workspace_id=workspace.id,
                     connection_id=connection.id,
                     provider=provider,
-                    property_ref=connection.account_ref,
+                    # GA4 mappings persist the CANONICAL bare numeric id
+                    # (create_mapping normalizes); the connection keeps the
+                    # provider's resource-name account_ref spelling.
+                    property_ref=(
+                        GA4_PROPERTY_CANONICAL
+                        if provider == "ga4"
+                        else connection.account_ref
+                    ),
                     project_id=project.id,
                     status=MAPPING_STATUS_ACTIVE,
                 )
@@ -379,7 +393,7 @@ async def seed() -> dict:
                             "Paid Search": 10}[channel]
                 rows.append(
                     _row(
-                        workspace.id, project.id, GA4_PROPERTY, "ga4",
+                        workspace.id, project.id, GA4_PROPERTY_CANONICAL, "ga4",
                         DATASET_GA4_CHANNEL_DAILY, day,
                         [channel, _ga4_date(day)], _ga4_metrics(sessions),
                         artifacts[DATASET_GA4_CHANNEL_DAILY].id,
@@ -394,7 +408,7 @@ async def seed() -> dict:
                 }[(source, medium)]
                 rows.append(
                     _row(
-                        workspace.id, project.id, GA4_PROPERTY, "ga4",
+                        workspace.id, project.id, GA4_PROPERTY_CANONICAL, "ga4",
                         DATASET_GA4_SOURCE_MEDIUM_DAILY, day,
                         [source, medium, _ga4_date(day)], _ga4_metrics(sessions),
                         artifacts[DATASET_GA4_SOURCE_MEDIUM_DAILY].id,
@@ -405,7 +419,7 @@ async def seed() -> dict:
                             3 + (di % 3), 1, 4][ri]
                 rows.append(
                     _row(
-                        workspace.id, project.id, GA4_PROPERTY, "ga4",
+                        workspace.id, project.id, GA4_PROPERTY_CANONICAL, "ga4",
                         DATASET_GA4_REFERRER_DAILY, day,
                         [referrer, _ga4_date(day)], _ga4_metrics(sessions),
                         artifacts[DATASET_GA4_REFERRER_DAILY].id,
@@ -415,7 +429,7 @@ async def seed() -> dict:
                 sessions = [30 + di, 12, 5 + di, 2 + (di % 3)][li]
                 rows.append(
                     _row(
-                        workspace.id, project.id, GA4_PROPERTY, "ga4",
+                        workspace.id, project.id, GA4_PROPERTY_CANONICAL, "ga4",
                         DATASET_GA4_LANDING_DAILY, day,
                         [page, source, medium, _ga4_date(day)], _ga4_metrics(sessions),
                         artifacts[DATASET_GA4_LANDING_DAILY].id,

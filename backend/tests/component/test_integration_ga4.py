@@ -170,6 +170,8 @@ async def _seed_graph(
     *,
     grant_status: str = GRANT_STATUS_CONNECTED,
     token_expires_at: datetime | None = None,
+    account_ref: str = _PROPERTY_REF,
+    mapping_ref: str | None = None,
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID]:
     workspace = Workspace(name="Acme")
     db_session.add(workspace)
@@ -194,7 +196,7 @@ async def _seed_graph(
         grant_id=grant.id,
         provider=INTEGRATION_PROVIDER_GA4,
         label="ga4 connection",
-        account_ref=_PROPERTY_REF,
+        account_ref=account_ref,
     )
     db_session.add(connection)
     await db_session.flush()
@@ -203,7 +205,7 @@ async def _seed_graph(
             workspace_id=workspace.id,
             connection_id=connection.id,
             provider=INTEGRATION_PROVIDER_GA4,
-            property_ref=_PROPERTY_REF,
+            property_ref=mapping_ref if mapping_ref is not None else account_ref,
             project_id=project.id,
             status="active",
         )
@@ -413,6 +415,50 @@ async def test_fixture_import_refresh_artifacts_derivation(
         "window_start": _WINDOW[0].isoformat(),
         "window_end": _WINDOW[1].isoformat(),
     }
+
+
+@pytest.mark.asyncio
+async def test_prefixed_account_ref_normalizes_to_canonical_ref_and_url(
+    session_factory, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``properties/``-prefixed account_ref still works end to end.
+
+    Mappings persist the CANONICAL bare-numeric id (``create_mapping``
+    normalizes) while a GA4 connection's ``account_ref`` may carry the
+    provider's resource-name spelling: derivation resolves the canonical
+    mapping through normalization, the runReport URL takes the bare id
+    (never ``properties/properties%2F…``), and derived metric rows carry
+    the canonical ref.
+    """
+    monkeypatch.setattr(integration_settings, "sync_page_size", 2)
+    workspace_id, _project_id, _grant_id, connection_id = await _seed_graph(
+        db_session,
+        account_ref=f"properties/{_PROPERTY_REF}",
+        mapping_ref=_PROPERTY_REF,
+    )
+    run = await enqueue_sync_run(
+        db_session,
+        workspace_id=workspace_id,
+        connection_id=connection_id,
+        window_start=_WINDOW[0],
+        window_end=_WINDOW[1],
+    )
+    fake = _ProviderFake()
+
+    ran = await _worker(session_factory, fake.mock_transport()).run_until_idle()
+    assert ran == 1
+
+    await db_session.refresh(run)
+    assert run.status == TASK_STATUS_SUCCEEDED
+    # Every runReport call hit the canonical bare-id path.
+    assert fake.ga4_urls
+    assert fake.ga4_urls == [
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{_PROPERTY_REF}:runReport"
+    ] * len(fake.ga4_urls)
+    # Derivation resolved the canonical mapping and wrote canonical refs.
+    rows = await _metric_rows(db_session, run.id)
+    assert rows
+    assert {row.property_ref for row in rows} == {_PROPERTY_REF}
 
 
 @pytest.mark.asyncio

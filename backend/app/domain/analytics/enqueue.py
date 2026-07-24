@@ -294,9 +294,10 @@ async def enqueue_post_sync_projections(
         )
     ).all()
     resolved_ids = {row.id for row in rows}
-    # One refresh per DISTINCT affected (window, data revision), in
-    # first-seen order (a hook call normally carries one run's artifacts —
-    # one window at one resync_seq).
+    # One refresh per DISTINCT affected (window, data revision), deduped
+    # in first-seen order of the returned rows (the SELECT has no ORDER
+    # BY; a hook call normally carries one run's artifacts — one window
+    # at one resync_seq — so ordering is moot in practice).
     revisions = list(
         dict.fromkeys(
             (row.window_start, row.window_end, row.resync_seq) for row in rows

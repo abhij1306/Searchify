@@ -67,6 +67,7 @@ from app.core.config.integrations import (
     INTEGRATION_PROVIDER_GA4,
     IntegrationDatasetTemplate,
     integration_settings,
+    normalize_ga4_property_ref,
 )
 
 
@@ -203,8 +204,11 @@ class Ga4Client:
         on any failure (classified, never carrying the token).
         """
         template = _ga4_template_for_dimensions(dimensions)
+        # The path takes the BARE numeric id — a connection account_ref may
+        # carry the provider's ``properties/`` resource-name spelling,
+        # which would otherwise double the prefix in the URL.
         url = GA4_API_BASE_URL + GA4_RUN_REPORT_PATH.format(
-            property_ref=quote(property_ref, safe="")
+            property_ref=quote(normalize_ga4_property_ref(property_ref), safe="")
         )
         assert_approved_url(url, label="GA4", error_type=Ga4ApiError)
         body = {
