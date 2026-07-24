@@ -18,6 +18,8 @@ const LEARN_URL = 'https://docs.searchify.example';
  */
 const PAGE_TITLES: ReadonlyArray<readonly [prefix: string, title: string]> = [
   ['/visibility', 'Visibility'],
+  ['/analytics', 'LLM Analytics'],
+  ['/traffic', 'Traffic'],
   ['/prompts', 'Prompts'],
   ['/runs', 'Audits'],
   ['/content', 'Content'],

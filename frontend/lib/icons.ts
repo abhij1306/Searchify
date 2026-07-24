@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   BookOpen,
+  Bot,
   Check,
   FileText,
   Gauge,
@@ -11,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   TriangleAlert,
   Wrench,
 } from 'lucide-react';
@@ -38,6 +40,8 @@ import {
 export const ICONS = {
   // Nav concepts.
   visibility: Gauge,
+  analytics: Bot,
+  traffic: TrendingUp,
   prompts: MessageSquareText,
   runs: ListChecks,
   content: FileText,
