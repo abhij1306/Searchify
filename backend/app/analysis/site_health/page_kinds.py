@@ -116,7 +116,10 @@ def _is_absolute_http_url(final_url: str) -> bool:
     """
     try:
         parts = urlsplit(str(final_url or ""))
-    except ValueError:
+    # Same guard as ``_normalized_path``: the two call ``urlsplit`` on the same
+    # input, so a narrower scope here would let a malformed URL raise out of one
+    # while the other quietly returned a value for it.
+    except Exception:  # noqa: BLE001
         return False
     # ``hostname``, not ``netloc``: ``http://user@/products`` carries a non-empty
     # netloc with no host at all, and deriving path signals from it would attach

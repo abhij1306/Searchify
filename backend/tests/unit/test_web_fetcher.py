@@ -105,6 +105,22 @@ class _SequenceAcquisitionTransport(AcquisitionTransport):
         return next(self.results)
 
 
+def _rendered_result(*, title: str = "rendered page") -> FetchResult:
+    """A browser result big enough to clear ``browser_low_content_bytes``.
+
+    The floor exists so a challenge interstitial or JS shell cannot overwrite
+    the server evidence an earlier rung already had, which means a stub standing
+    in for a REAL rendered page has to look like one. A 40-byte fixture is a
+    shell by the crawler's own definition.
+    """
+    body = (
+        f"<html><head><title>{title}</title></head><body>".encode()
+        + b"<p>Rendered prose that a real page would carry.</p>" * 16
+        + b"</body></html>"
+    )
+    return _acquisition_result(body=body)
+
+
 def _acquisition_result(
     *,
     status: int = 200,
@@ -144,8 +160,13 @@ def _fetcher(
     )
 
 
-class _StubBrowserTransport:
-    """Records calls and returns a canned rendered result (no real browser)."""
+class _StubBrowserTransport(AcquisitionTransport):
+    """Records calls and returns a canned rendered result (no real browser).
+
+    Declares the transport interface like ``_FakeAcquisitionTransport`` does, so
+    a change to that contract fails here rather than leaving a structurally
+    typed stub standing in for a transport it no longer matches.
+    """
 
     def __init__(self, result: FetchResult | Exception) -> None:
         self._result = result
@@ -679,7 +700,7 @@ async def test_hard_excluded_url_never_calls_any_acquisition_rung():
         calls["httpx"] += 1
         return _html_response()
 
-    browser = _StubBrowserTransport(_acquisition_result())
+    browser = _StubBrowserTransport(_rendered_result())
     settings = SiteHealthSettings(curl_cffi_enabled=True, browser_enabled=True)
     async with _fetcher(
         direct_handler,
@@ -702,11 +723,7 @@ async def test_challenge_uses_browser_after_explicit_curl_unavailable():
     def direct_handler(request: httpx.Request) -> httpx.Response:
         return _html_response(403, body=b"<title>Just a moment...</title>")
 
-    rendered = replace(
-        _acquisition_result(),
-        body=b"<html><title>actual page</title><body>content</body></html>",
-    )
-    browser = _StubBrowserTransport(rendered)
+    browser = _StubBrowserTransport(_rendered_result(title="actual page"))
     settings = SiteHealthSettings(curl_cffi_enabled=True, browser_enabled=True)
     async with _fetcher(
         direct_handler,
@@ -819,7 +836,7 @@ async def test_browser_keeps_evidence_trigger_when_curl_is_unavailable(
     def direct_handler(request: httpx.Request) -> httpx.Response:
         return _html_response(direct_status, body=direct_body)
 
-    browser = _StubBrowserTransport(_acquisition_result())
+    browser = _StubBrowserTransport(_rendered_result())
     settings = SiteHealthSettings(
         curl_cffi_enabled=True,
         curl_cffi_low_content_bytes=low_content_bytes,
@@ -839,6 +856,39 @@ async def test_browser_keeps_evidence_trigger_when_curl_is_unavailable(
     assert result.acquisition is not None
     assert result.acquisition.transport == "patchright"
     assert result.acquisition.trigger == expected_trigger
+
+
+async def test_browser_shell_below_the_content_floor_keeps_prior_evidence():
+    """A render under ``browser_low_content_bytes`` is the shell, not the page.
+
+    The floor was configured and never consulted, so a challenge interstitial
+    the browser rendered came back as the crawl's answer and overwrote the
+    thin-but-real server evidence rung 1 already had.
+    """
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        return _html_response(403, body=b"<title>Just a moment...</title>")
+
+    shell = _acquisition_result(body=b"<html><body>checking...</body></html>")
+    browser = _StubBrowserTransport(shell)
+    settings = SiteHealthSettings(
+        curl_cffi_enabled=True, browser_enabled=True, browser_low_content_bytes=512
+    )
+    async with _fetcher(
+        direct_handler,
+        _FakeResolver({}),
+        settings=settings,
+        browser_transport=browser,
+        curl_pinned_resolution_supported=False,
+    ) as fetcher:
+        result = await fetcher.fetch(
+            FetchRequest(url="https://example.com/", purpose="discover")
+        )
+
+    assert browser.calls == ["https://example.com/"]
+    # The prior 403 evidence survives; the shell did not become the answer.
+    assert result.status_code == 403
+    assert b"checking" not in result.body
 
 
 async def test_browser_rung_failure_keeps_prior_server_evidence():
@@ -895,7 +945,7 @@ async def test_injected_browser_transport_is_not_closed_by_the_fetcher():
     def direct_handler(request: httpx.Request) -> httpx.Response:
         return _html_response(403, body=b"<title>Just a moment...</title>")
 
-    browser = _StubBrowserTransport(_acquisition_result())
+    browser = _StubBrowserTransport(_rendered_result())
     settings = SiteHealthSettings(browser_enabled=True)
     async with _fetcher(
         direct_handler,
@@ -918,7 +968,7 @@ async def test_browser_rung_is_skipped_when_disabled():
     def direct_handler(request: httpx.Request) -> httpx.Response:
         return _html_response(403, body=b"cf-chl")
 
-    browser = _StubBrowserTransport(_acquisition_result())
+    browser = _StubBrowserTransport(_rendered_result())
     settings = SiteHealthSettings(curl_cffi_enabled=True, browser_enabled=False)
     async with _fetcher(
         direct_handler,

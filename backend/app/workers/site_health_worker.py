@@ -235,10 +235,21 @@ class SiteHealthWorker(
         return self._browser_transport
 
     async def aclose(self) -> None:
-        """Release the worker's shared OS-level resources."""
+        """Release the worker's shared OS-level resources.
+
+        Teardown NEVER raises. This runs on the shutdown path, where the caller
+        is usually already unwinding ``run_forever``'s own exception or a
+        ``CancelledError`` — letting a dying browser process raise here would
+        replace the reason the worker is shutting down with a footnote about
+        cleanup, and the transport is dropped either way.
+        """
         transport, self._browser_transport = self._browser_transport, None
-        if transport is not None:
+        if transport is None:
+            return
+        try:
             await transport.aclose()
+        except Exception:  # noqa: BLE001
+            logger.warning("browser transport teardown failed", exc_info=True)
 
     async def run_once(self) -> int:
         """Sweep expired leases, claim a batch of all task kinds, execute it.

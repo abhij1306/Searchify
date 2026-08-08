@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from hashlib import sha256
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -149,6 +150,23 @@ def _versions() -> dict[str, str]:
         "journey_coverage": JOURNEY_COVERAGE_VERSION,
         "dimension_formula": DIMENSION_FORMULA_VERSION,
     }
+
+
+def projection_version() -> str:
+    """One identity for EVERY input that shapes a stored projection.
+
+    Stamped on the snapshot so a version-filtered query can tell a stale
+    projection from a current one. It used to be the dimension formula version
+    alone, which meant a new knowledge extractor or coverage rule produced a
+    materially different projection under an unchanged version stamp — and
+    every such query then treated the stale rows as current.
+
+    A digest rather than a join: the four component versions do not fit the
+    column, and the snapshot payload already carries them verbatim under
+    ``versions`` for anyone who needs to read which is which.
+    """
+    material = "|".join(f"{key}={value}" for key, value in sorted(_versions().items()))
+    return f"si-{sha256(material.encode()).hexdigest()[:16]}"
 
 
 def _overlay_not_applicable(crawl: SiteCrawl) -> frozenset[str]:
@@ -438,6 +456,13 @@ class _PageTally:
         if not named:
             # No name to compare. Absence of a claim is not a mismatch.
             return True
+        if not visible.strip():
+            # The schema names something and the page shows nothing to match it
+            # against — the mismatch this measures, at its most extreme. It used
+            # to score as parity: ``visible in name`` is ``"" in name``, which
+            # is true for every name, so a page with no title and no H1 passed
+            # against any structured data at all.
+            return False
         return any(name in visible or visible in name for name in named)
 
     def to_signals(

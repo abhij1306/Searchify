@@ -77,11 +77,16 @@ MONEY_CURRENCY_SYMBOLS = site_health_config.MONEY_CURRENCY_SYMBOLS
 # prefix of an ungrouped run: with ``*`` it matched "250" out of "250000" and
 # reported a 250-rupee annual fee. Both Western (250,000) and Indian
 # (2,50,000) grouping are accepted, hence the 2-or-3 digit group.
+# ``Rs``/``Rs.`` is deliberately not a token here: the abbreviation is shared by
+# four different rupees, and MONEY_CURRENCY_SYMBOLS refuses to guess between
+# them, so matching it would only produce a match this loop then discards.
 _MONEY_PATTERN = re.compile(
-    r"(?P<currency>₹|\$|£|€|¥|₦|₨|INR|USD|GBP|EUR|AED|Rs\.?)\s*"
+    r"(?P<currency>₹|\$|£|€|¥|₦|₨|INR|USD|GBP|EUR|AED)\s*"
     r"(?P<amount>\d{1,3}(?:[,\s]\d{2,3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)",
     re.IGNORECASE,
 )
+# Every separator the amount group above accepts, for stripping before ``float``.
+_AMOUNT_SEPARATORS = re.compile(r"[,\s]")
 # The security response headers whose mere presence the delivery facts record.
 _SECURITY_HEADERS = (
     "strict-transport-security",
@@ -405,7 +410,11 @@ def _money_mentions(text: str) -> list[dict[str, Any]]:
         )
         if not currency:
             continue
-        digits = (match.group("amount") or "").replace(",", "").replace(" ", "")
+        # Strip EVERY separator the pattern accepts. ``[,\s]`` matches Unicode
+        # whitespace, so a price grouped with a non-breaking or thin space —
+        # ordinary on Indian and European sites — survived this cleanup, failed
+        # ``float``, and was dropped as if the page had named no amount.
+        digits = _AMOUNT_SEPARATORS.sub("", match.group("amount") or "")
         try:
             amount = float(digits)
         except ValueError:

@@ -829,6 +829,35 @@ class SecureFetcher:
             started=started,
             acquisition=acquisition,
         )
+        return self._browser_result_or_prior(
+            result,
+            prior=prior,
+            request=request,
+            attempts=attempts,
+            acquisition=acquisition,
+        )
+
+    def _browser_result_or_prior(
+        self,
+        result: FetchResult,
+        *,
+        prior: FetchResult,
+        request: FetchRequest,
+        attempts: list[FetchCallTrace],
+        acquisition: AcquisitionProvenance,
+    ) -> FetchResult:
+        """The render, unless it came back under the configured content floor.
+
+        ``browser_low_content_bytes`` was configured and then never consulted. A
+        render below it is the challenge page or the JS shell this rung was sent
+        to get PAST, and returning it let that shell overwrite the thin-but-real
+        server evidence the earlier rung already had. Treated exactly like a
+        render failure: keep what we had.
+        """
+        # ``decoded_bytes`` is the measure the curl rung's own low-content check
+        # uses, so the two floors mean the same thing.
+        if result.decoded_bytes < self._settings.browser_low_content_bytes:
+            return replace(prior, attempts=tuple(attempts))
         return cast(  # type: ignore[redundant-cast]
             FetchResult,
             replace(

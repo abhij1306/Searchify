@@ -19,7 +19,7 @@ import { titleCaseStatus } from '@/lib/utils';
 export const PAGE_KINDS: readonly PageKind[] = pageKindSchema.options;
 
 /** Humanized label per page type — the one shared mapping. */
-export const PAGE_TYPE_LABELS: Record<PageKind, string> = {
+export const PAGE_KIND_LABELS: Record<PageKind, string> = {
   homepage: 'Homepage',
   article: 'Article',
   product: 'Product',
@@ -43,7 +43,7 @@ export const PAGE_TYPE_LABELS: Record<PageKind, string> = {
  * blank — the same defensive fallback `issueTitle` applies to blank titles.
  */
 export function pageKindLabel(pageKind: string): string {
-  return PAGE_TYPE_LABELS[pageKind as PageKind] ?? titleCaseStatus(pageKind);
+  return PAGE_KIND_LABELS[pageKind as PageKind] ?? titleCaseStatus(pageKind);
 }
 
 /** One display row of the dashboard per-page-kind score breakdown. */

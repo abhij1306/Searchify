@@ -324,6 +324,14 @@ def test_fee_binds_to_the_pack_declared_subject_and_predicate(education):
         ("INR 2,50,000", 250000.0),
         ("INR 250,000", 250000.0),
         ("INR 250000", 250000.0),
+        # Paise must survive: truncating to 250000 understates a fee, and
+        # discarding the mention entirely reports the page as naming no price.
+        ("INR 2,50,000.75", 250000.75),
+        # A non-breaking space is ordinary grouping on Indian and European
+        # sites. The amount pattern accepts it, so the cleanup must strip it —
+        # it used to reach ``float`` intact and drop the fee on ValueError.
+        ("INR 2,50,000 ", 250000.0),
+        ("INR 250 000", 250000.0),
     ],
 )
 def test_indian_and_western_grouping_both_parse_in_full(markup, expected):
@@ -331,6 +339,9 @@ def test_indian_and_western_grouping_both_parse_in_full(markup, expected):
     facts = extract_page_facts(
         f"<html><body><p>Fee {markup} yearly</p></body></html>".encode(),
         final_url="https://a.test/",
+        # Declared, because the non-ASCII separators below are UTF-8 bytes and a
+        # mis-decode would make this test pass or fail for the wrong reason.
+        charset="utf-8",
     )
     assert [m["amount"] for m in facts["money_mentions"]] == [expected]
 

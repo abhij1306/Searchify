@@ -120,23 +120,35 @@ def frozen_manifest(configuration: Mapping | None) -> dict[str, str] | None:
     return {str(key): str(value) for key, value in manifest.items()}
 
 
-@lru_cache(maxsize=16)
-def _compiled(pack_id: str, version: str, content_hash: str) -> CompiledPack:
-    """Compile one exact pack, verifying it is byte-identical to the freeze.
+def _load_verified(pack_id: str, version: str, content_hash: str):
+    """One exact pack plus its observed manifest, verified against the freeze.
 
-    The cache key includes the content hash so a catalog edit can never be
-    served from a stale compile. ``load_pack`` verifies the hash itself; the
-    comparison below catches the case where the registry was re-released with
-    the same id/version but different bytes, which would silently change a
-    historical crawl's meaning.
+    ``load_pack`` verifies the hash itself; the comparison here catches the case
+    where the registry was re-released under the same id/version with different
+    bytes, which would silently change a historical crawl's meaning.
+
+    Shared by the compile and vocabulary caches so the two can never disagree
+    about whether a pack is still the one a crawl froze — they were the same
+    block of code twice, and a fix to one would have missed the other.
     """
-
     pack = load_pack(pack_id, version)
     observed = dict(pack_manifest(pack_id, version))
     if content_hash and observed.get("pack_content_hash") != content_hash:
         raise IndustryPackError(
             f"frozen pack hash no longer matches the catalog: {pack_id}@{version}"
         )
+    return pack, observed
+
+
+@lru_cache(maxsize=16)
+def _compiled(pack_id: str, version: str, content_hash: str) -> CompiledPack:
+    """Compile one exact pack, verifying it is byte-identical to the freeze.
+
+    The cache key includes the content hash so a catalog edit can never be
+    served from a stale compile.
+    """
+
+    pack, observed = _load_verified(pack_id, version, content_hash)
     return compile_pack(pack, manifest=observed)
 
 
@@ -283,12 +295,7 @@ def _vocabulary(pack_id: str, version: str, content_hash: str) -> KnowledgeVocab
     always built against the pack it froze.
     """
 
-    pack = load_pack(pack_id, version)
-    observed = dict(pack_manifest(pack_id, version))
-    if content_hash and observed.get("pack_content_hash") != content_hash:
-        raise IndustryPackError(
-            f"frozen pack hash no longer matches the catalog: {pack_id}@{version}"
-        )
+    pack, _observed = _load_verified(pack_id, version, content_hash)
     return compile_vocabulary(pack)
 
 

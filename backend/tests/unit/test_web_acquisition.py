@@ -182,6 +182,24 @@ def test_a_longer_tag_name_does_not_close_a_script() -> None:
     assert acquisition.readable_text_length(body, scan_bytes=262_144) == 2
 
 
+def test_commented_out_script_does_not_erase_the_page_text() -> None:
+    """A disabled ``<script>`` is inert markup, not the start of a bundle.
+
+    The unterminated-script sweep saw the opening tag inside the comment and
+    dropped the whole rest of the document, so a content-rich page reported
+    zero readable text and escalated to a browser render as a "JS shell".
+    """
+    prose = "Real prose that should count. "
+    body = (
+        b"<html><body><!-- <script src=x.js> --><p>"
+        + (prose * 20).encode()
+        + b"</p></body></html>"
+    )
+    assert acquisition.readable_text_length(body, scan_bytes=262_144) == len(
+        "".join((prose * 20).split())
+    )
+
+
 def test_commented_out_script_is_not_evidence_of_client_rendering() -> None:
     """Inert markup must not escalate a static page to a browser render."""
     body = (

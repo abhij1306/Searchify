@@ -381,11 +381,17 @@ def _merge(
         if value.candidate.source in kept_entities
         and value.candidate.target in kept_entities
     }
-    disputes = _group_contradictions(assertions, vocabulary=vocabulary)
+    # Cap BEFORE grouping, for the same reason entities are truncated before
+    # their edges: grouping the full set counted disputes between claims the cap
+    # then discarded, and set ``disputed`` on rows that were never persisted. A
+    # reader would see a contradiction total with no contradicting rows behind
+    # it. Conflicts among the kept claims are the only ones this crawl can show.
+    kept_assertions = dict(list(assertions.items())[:MAX_ASSERTIONS_PER_CRAWL])
+    disputes = _group_contradictions(kept_assertions, vocabulary=vocabulary)
 
     return _Merged(
         entities=kept_entities,
-        assertions=dict(list(assertions.items())[:MAX_ASSERTIONS_PER_CRAWL]),
+        assertions=kept_assertions,
         relations=dict(list(kept_relations.items())[:MAX_RELATIONS_PER_CRAWL]),
         contradiction_count=disputes,
         warnings=tuple(dict.fromkeys(warnings)),

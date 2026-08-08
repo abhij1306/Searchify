@@ -41,8 +41,10 @@ from app.core.config.site_health import (
     PAGE_ANALYSIS_STATUS_COMPLETED,
     SCORING_VERSION,
 )
-from app.core.config.site_intelligence import DIMENSION_FORMULA_VERSION
-from app.domain.site_health.intelligence import build_intelligence_projection
+from app.domain.site_health.intelligence import (
+    build_intelligence_projection,
+    projection_version,
+)
 from app.domain.site_health.knowledge import build_crawl_knowledge
 from app.models.site_health import (
     MonitoredSiteUrl,
@@ -219,7 +221,9 @@ async def persist_crawl_snapshot(
         pg_insert(SiteHealthSnapshot)
         .values(
             intelligence=projection.payload,
-            intelligence_version=DIMENSION_FORMULA_VERSION,
+            # Every projection input, not the dimension formula alone — a new
+            # knowledge extractor changed the payload under an unchanged stamp.
+            intelligence_version=projection_version(),
             workspace_id=crawl.workspace_id,
             project_id=crawl.project_id,
             crawl_id=crawl.id,

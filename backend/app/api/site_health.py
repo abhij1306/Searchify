@@ -1251,6 +1251,7 @@ async def get_knowledge_relations_endpoint(
     session: _SessionDep,
     crawl_id: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> KnowledgeRelationPage:
     try:
         result = await service.get_knowledge_relations(
@@ -1259,6 +1260,7 @@ async def get_knowledge_relations_endpoint(
             project_id=project_id,
             crawl_id=crawl_id,
             limit=limit,
+            offset=offset,
         )
     except SiteHealthNotFoundError as exc:
         raise _not_found(str(exc)) from exc

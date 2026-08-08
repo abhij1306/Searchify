@@ -223,6 +223,27 @@ def test_unavailable_evidence_stays_in_the_denominator(education):
     assert report.denominator == len(education.questions)
 
 
+def test_every_question_excused_reports_no_ratio_rather_than_zero(education):
+    """An empty denominator has no ratio — and zero would be an accusation.
+
+    ``0.0`` is the score of a site that answered nothing. A project whose
+    reviewer excused every question answered nothing because there was nothing
+    to answer, and reporting those two identically turns a scoping decision into
+    a failing grade.
+    """
+    report = resolve_question_coverage(
+        vocabulary=education,
+        knowledge=index(),
+        observed_role_ids=frozenset(),
+        acquisition_failed=False,
+        not_applicable_question_ids=frozenset(
+            question.question_id for question in education.questions
+        ),
+    )
+    assert report.denominator == 0
+    assert report.answered_ratio is None
+
+
 def test_a_site_answering_nothing_scores_zero_not_none(education):
     report = resolve_question_coverage(
         vocabulary=education,

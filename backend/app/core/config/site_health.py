@@ -91,8 +91,10 @@ MONEY_CURRENCY_SYMBOLS: Final[dict[str, str]] = {
     "USD": "USD",
     "GBP": "GBP",
     "EUR": "EUR",
-    "RS": "INR",
-    "RS.": "INR",
+    # "Rs"/"Rs." are deliberately ABSENT. The abbreviation is used for the
+    # Indian, Pakistani, Sri Lankan, and Nepalese rupee alike, so resolving it
+    # to INR publishes a guess as an observed fact — exactly what the note above
+    # forbids. "₨" stays because it is unambiguous.
 }
 SITE_HEALTH_MAX_PATH_CHARS: Final = 512
 SITE_HEALTH_MAX_SIGNAL_DETAIL_CHARS: Final = 256
@@ -307,6 +309,21 @@ URL_HARD_EXCLUSION_EXTENSIONS: Final[frozenset[str]] = frozenset(
         ".woff2",
         ".ttf",
         ".eot",
+        # Remaining archives and installers. Without these an ``.exe`` or
+        # ``.tar.gz`` link was admitted as an ordinary page, and the crawler
+        # spent an analysis slot fetching a binary the HTML analyzer can never
+        # read — a scheduled, guaranteed failure.
+        ".tar",
+        ".bz2",
+        ".7z",
+        ".rar",
+        ".exe",
+        ".msi",
+        ".dmg",
+        ".pkg",
+        ".apk",
+        ".deb",
+        ".rpm",
     }
 )
 # Higher values are more valuable.  Used only for deterministic frontier
@@ -2173,9 +2190,9 @@ class SiteHealthSettings(BaseSettings):
     # A rendered document below this size is still treated as a challenge/JS
     # shell rather than usable evidence.
     browser_low_content_bytes: int = 512
-    # Bounded same-site JSON/XHR capture (0 disables capture entirely).
-    browser_max_captured_responses: int = 16
-    browser_max_captured_bytes: int = 2_000_000
+    # NOTE: the same-site JSON/XHR capture knobs that used to live here are
+    # gone with the capture itself. Keeping tunables for a feature the transport
+    # no longer has advertises a capability that does nothing.
     # Each pooled entry is a live browser process pinned to one resolved
     # address, so the pool is bounded and evicts least-recently-used. Contexts
     # are deliberately NOT pooled — one fresh context per fetch is what keeps

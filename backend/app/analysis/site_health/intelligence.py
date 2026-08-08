@@ -143,7 +143,10 @@ class CorpusSignals:
     role_page_counts: Mapping[str, int] = field(default_factory=dict)
     # role_id -> how many of those pages link onward to another role page
     role_continuity_counts: Mapping[str, int] = field(default_factory=dict)
-    # Roles the pack declares that no page in the corpus carries.
+    # How many roles the pack declares IN TOTAL — the denominator of
+    # ``role_coverage``, whose numerator is the number of those roles some page
+    # actually carries. Not the missing count: reading it that way inverts the
+    # ratio and lets full coverage report as zero.
     declared_role_count: int = 0
     # Entity names observed in schema that disagree with the canonical entity.
     entity_name_conflicts: int = 0
@@ -292,6 +295,32 @@ def _resolve_one(
     )
 
 
+def _answered_state(
+    required: Sequence[str],
+    satisfied: Sequence[str],
+    answering: Sequence[str],
+) -> tuple[str, str] | None:
+    """The ANSWERED_* state when every required fact is evidenced, else ``None``.
+
+    A pack may declare a question with NO required predicates — one whose answer
+    is that the page playing the role exists at all. That case needs its own
+    arm: with nothing to satisfy, ``satisfied`` is empty and a truthiness test
+    reads it as "nothing answered", so such a question used to fall through to
+    ``unsupported`` and report a fully answered question as one this analyzer
+    cannot extract. With no answering page it stays unanswered, as before.
+    """
+    if required:
+        if len(satisfied) != len(required):
+            return None
+    elif not answering:
+        return None
+    if answering:
+        return COVERAGE_ANSWERED_STRONG, "answered on the expected page"
+    # The facts exist but not where the pack expects them. A reader looking for
+    # this answer where it belongs will not find it.
+    return COVERAGE_ANSWERED_WEAK, "facts present but not on a page for this role"
+
+
 def _coverage_state(
     *,
     required: Sequence[str],
@@ -314,12 +343,9 @@ def _coverage_state(
             COVERAGE_UNAVAILABLE_EVIDENCE,
             "no page that could answer this was successfully acquired",
         )
-    if satisfied and len(satisfied) == len(required):
-        if answering:
-            return COVERAGE_ANSWERED_STRONG, "answered on the expected page"
-        # The facts exist but not where the pack expects them. A reader looking
-        # for this answer where it belongs will not find it.
-        return COVERAGE_ANSWERED_WEAK, "facts present but not on a page for this role"
+    answered = _answered_state(required, satisfied, answering)
+    if answered is not None:
+        return answered
     if present and all(knowledge.only_historical(p) for p in present):
         return COVERAGE_HISTORICAL_ONLY, "only historical evidence exists"
     if satisfied:

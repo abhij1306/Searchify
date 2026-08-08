@@ -535,8 +535,14 @@ async def get_knowledge_relations(
     project_id: uuid.UUID,
     crawl_id: uuid.UUID | None = None,
     limit: int = 100,
+    offset: int = 0,
 ) -> dict:
-    """Edges between this crawl's entities, with both endpoints resolved."""
+    """Edges between this crawl's entities, with both endpoints resolved.
+
+    Paged like the entity and assertion readers: ``total`` is the full count, so
+    a caller shown "120 relations" over a 100-row page needs an offset to reach
+    the rest. The ordering is deterministic, which is what makes paging stable.
+    """
 
     crawl = await _load_crawl(
         session, workspace_id=workspace_id, project_id=project_id, crawl_id=crawl_id
@@ -573,6 +579,7 @@ async def get_knowledge_relations(
                 KnowledgeRelation.workspace_id == workspace_id,
             )
             .order_by(KnowledgeRelation.relation_type_id, KnowledgeRelation.id)
+            .offset(max(0, offset))
             .limit(_bounded(limit))
         )
     ).all()

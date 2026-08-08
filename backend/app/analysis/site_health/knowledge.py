@@ -977,6 +977,40 @@ def _extract_contact_points(
         )
 
 
+def _usable_amount(value: object) -> float | None:
+    """A real numeric amount, or ``None``.
+
+    ``bool`` is a subclass of ``int``, so a JSON ``true`` arriving in a
+    persisted money fact passed a bare ``isinstance(value, (int, float))`` and
+    published itself as a fee of 1.00.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _own_money_subject(
+    role: RoleSpec,
+    entities: Sequence[EntityCandidate],
+    money_predicates: Sequence[PredicateSpec],
+) -> tuple[PredicateSpec, EntityRef] | None:
+    """A money predicate whose subject is an entity type this ROLE itself owns.
+
+    Restricted to the role's own types on purpose. Scanning every extracted
+    entity let a merely-mentioned one — a schema-declared place or person that
+    happens to be a valid money subject — win and short-circuit the guarded
+    resolution that keeps a page's price attached to the page's own subject.
+    """
+    own_types = set(role.entity_type_ids)
+    for candidate in entities:
+        if candidate.ref.entity_type_id not in own_types:
+            continue
+        for spec in money_predicates:
+            if candidate.ref.entity_type_id in spec.subject_entity_type_ids:
+                return spec, candidate.ref
+    return None
+
+
 def _money_binding(
     role: RoleSpec | None,
     vocabulary: KnowledgeVocabulary,
@@ -1014,10 +1048,9 @@ def _money_binding(
     ]
     if not money_predicates:
         return None
-    for candidate in entities:
-        for spec in money_predicates:
-            if candidate.ref.entity_type_id in spec.subject_entity_type_ids:
-                return spec, candidate.ref
+    own = _own_money_subject(role, entities, money_predicates)
+    if own is not None:
+        return own
     primary = next(
         (
             candidate
@@ -1086,8 +1119,8 @@ def _extract_money(
     spec, subject = binding
     for mention in mentions:
         currency = normalize_text(mention.get("currency"), limit=8).upper()
-        amount = mention.get("amount")
-        if not currency or not isinstance(amount, (int, float)):
+        amount = _usable_amount(mention.get("amount"))
+        if not currency or amount is None:
             continue
         assertions.append(
             AssertionCandidate(

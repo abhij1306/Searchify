@@ -396,7 +396,7 @@ async def test_analyze_task_persists_analysis_evaluations_issues_scores(
 
 
 @pytest.mark.asyncio
-async def test_analyze_persists_page_type_classifier_and_v2_versions(
+async def test_analyze_persists_page_kind_classifier_and_v2_versions(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """v2 P1: the analyze task classifies the page, injects page_kind into

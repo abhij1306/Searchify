@@ -561,13 +561,24 @@ class AnalyzePhaseMixin(PhaseSupport):
             finalized_at=_utcnow(),
             **role,
         )
-        # Append-only: supersede any earlier current understanding for this
-        # artifact before inserting the new one, so the partial unique index
-        # never sees two live rows.
+        # Append-only: supersede any earlier current understanding of this PAGE
+        # before inserting the new one.
+        #
+        # Matched on the page, not the artifact. A rerun fetches again and gets
+        # a NEW artifact, so the artifact-keyed supersede never found the
+        # previous analysis and left two live rows for one URL — which
+        # ``build_crawl_knowledge`` then folded into one model, manufacturing
+        # exactly the contradictions-out-of-a-rerun its docstring warns about.
+        #
+        # The partial unique index stays keyed on ``artifact_id``: the snapshot
+        # deliberately tolerates several current analyses per page and resolves
+        # the latest itself, so tightening the constraint is a separate
+        # decision from making this supersede actually fire.
         await session.execute(
             update(SitePageAnalysis)
             .where(
-                SitePageAnalysis.artifact_id == artifact_id,
+                SitePageAnalysis.crawl_id == analysis.crawl_id,
+                SitePageAnalysis.site_url_id == analysis.site_url_id,
                 SitePageAnalysis.is_current.is_(True),
             )
             .values(is_current=False)

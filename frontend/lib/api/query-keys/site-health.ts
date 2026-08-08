@@ -41,13 +41,18 @@ export const siteHealthKeys = {
  * crawl selector re-fetches every panel instead of showing another crawl's
  * frozen snapshot under the new selection.
  */
+const SITE_INTELLIGENCE = ['site-intelligence'] as const;
+
 export const siteIntelligenceKeys = {
-  all: ['site-intelligence'] as const,
+  // Every builder starts from `all`, so invalidating the namespace really does
+  // reach all of them. Repeating the literal meant a rename would leave the
+  // builders on the old prefix and silently stop `all` from matching any of it.
+  all: SITE_INTELLIGENCE,
   overview: (projectId: string, crawlId?: string) =>
-    ['site-intelligence', 'overview', projectId, crawlId ?? 'latest'] as const,
+    [...SITE_INTELLIGENCE, 'overview', projectId, crawlId ?? 'latest'] as const,
   entities: (projectId: string, crawlId?: string, entityTypeId?: string) =>
     [
-      'site-intelligence',
+      ...SITE_INTELLIGENCE,
       'entities',
       projectId,
       crawlId ?? 'latest',
@@ -55,16 +60,16 @@ export const siteIntelligenceKeys = {
     ] as const,
   assertions: (projectId: string, crawlId?: string, predicateId?: string) =>
     [
-      'site-intelligence',
+      ...SITE_INTELLIGENCE,
       'assertions',
       projectId,
       crawlId ?? 'latest',
       predicateId ?? 'all',
     ] as const,
   contradictions: (projectId: string, crawlId?: string) =>
-    ['site-intelligence', 'contradictions', projectId, crawlId ?? 'latest'] as const,
+    [...SITE_INTELLIGENCE, 'contradictions', projectId, crawlId ?? 'latest'] as const,
   relations: (projectId: string, crawlId?: string) =>
-    ['site-intelligence', 'relations', projectId, crawlId ?? 'latest'] as const,
+    [...SITE_INTELLIGENCE, 'relations', projectId, crawlId ?? 'latest'] as const,
   schemaGraph: (projectId: string, crawlId?: string) =>
-    ['site-intelligence', 'schema', projectId, crawlId ?? 'latest'] as const,
+    [...SITE_INTELLIGENCE, 'schema', projectId, crawlId ?? 'latest'] as const,
 };

@@ -31,6 +31,7 @@ by aborting any main-frame navigation that leaves the validated authority.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections import OrderedDict
 from types import ModuleType
@@ -53,6 +54,8 @@ from app.core.config.site_health import (
     SITE_HEALTH_USER_AGENT,
     site_health_settings,
 )
+
+logger = logging.getLogger("app.connectors.web_evidence.browser_transport")
 
 # Resource kinds that never contribute to analyzable evidence. Blocking them is
 # a latency and politeness measure, not a stealth one: a crawl that renders a
@@ -177,6 +180,21 @@ def _host_resolver_rule(target: ResolvedTarget) -> str:
     # carrying a trailing dot would otherwise produce a MAP rule the browser
     # never matches, and every request would fall through to ``~NOTFOUND``.
     return f"MAP {_normalize_host(target.host)} {address},MAP * ~NOTFOUND"
+
+
+def _warn_if_unbalanced(rule: str, balance: int) -> None:
+    """Report a lease released more times than it was acquired.
+
+    Harmless where it is caught — the entry is cleared either way — but it means
+    some path releases twice or acquires without a lease, and the next such bug
+    could evict a browser out from under a live fetch. Silence would hide it.
+    """
+    if balance >= 0:
+        return
+    logger.warning(
+        "browser pool lease released more times than acquired",
+        extra={"resolver_rule": rule, "lease_balance": balance},
+    )
 
 
 async def _close_quietly(browser) -> None:
@@ -310,8 +328,9 @@ class _BrowserPool:
             remaining = self._leases.get(rule, 0) - 1
             if remaining > 0:
                 self._leases[rule] = remaining
-            else:
-                self._leases.pop(rule, None)
+                return
+            _warn_if_unbalanced(rule, remaining)
+            self._leases.pop(rule, None)
 
     async def aclose(self) -> None:
         async with self._lock:

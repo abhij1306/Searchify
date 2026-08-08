@@ -222,6 +222,31 @@ def test_supported_documents_are_inventoried_not_hard_excluded(url):
     assert decision.item_kind == "document"
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/downloads/bundle.zip",
+        "https://example.com/downloads/installer.exe",
+        "https://example.com/downloads/archive.tar",
+    ],
+)
+def test_unsupported_binaries_are_refused_not_inventoried(url):
+    """The other half of the document rule: a binary is not corpus coverage.
+
+    A prospectus is evidence a pack can read later; an installer never will be.
+    Admitting one as an ordinary page spent an analysis slot fetching something
+    the HTML analyzer cannot read — a scheduled, guaranteed failure.
+    """
+    decision = classify_url_admission(
+        url,
+        root_registrable_domain="example.com",
+        include_globs=["*"],
+        exclude_globs=[],
+    )
+    assert not decision.accepted
+    assert decision.reason_code == "hard_excluded_asset"
+
+
 def test_value_aware_admission_returns_safe_scope_and_priority_details():
     product = classify_url_admission(
         "https://example.com/products/widget",
